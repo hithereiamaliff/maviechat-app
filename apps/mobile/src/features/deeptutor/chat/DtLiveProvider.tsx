@@ -128,10 +128,15 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
       .catch(() => undefined);
   }, [state, client, signOut]);
 
-  // iOS closes sockets while the app is in the background; a running reply resumes on return.
+  // Ready before you send: an open socket and this phone's push token. A reply then reaches the
+  // relay within a second of sending, before iOS freezes the app if you leave straight away
+  // (from a cold start it took about three seconds, and the reply went unnoticed).
+  // iOS closes sockets in the background, so coming back opens it again (and resumes any reply).
   useEffect(() => {
+    void pushTokenIfOn();
+    connection.connect();
     const subscription = AppState.addEventListener('change', (next) => {
-      if (next === 'active') connection.wake();
+      if (next === 'active') connection.connect();
     });
     return () => subscription.remove();
   }, [connection]);
