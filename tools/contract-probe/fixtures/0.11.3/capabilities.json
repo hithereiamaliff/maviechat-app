@@ -1,0 +1,21 @@
+{
+  "support": "supported",
+  "isAdmin": false,
+  "websocketOnly": true,
+  "heartbeatIntervalSec": 30,
+  "features": {
+    "webSearch": false,
+    "imageGeneration": false,
+    "codeInterpreter": true,
+    "codeExecution": true,
+    "folders": false,
+    "notes": false,
+    "channels": false,
+    "memories": true,
+    "apiKeys": true,
+    "automations": false,
+    "calendar": false,
+    "userWebhooks": false,
+    "messageRating": true
+  }
+}

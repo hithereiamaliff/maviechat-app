@@ -4,9 +4,9 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { acceptable, FORBIDDEN } from './lib/spdx.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-const FORBIDDEN = /\b(A?GPL|LGPL|SSPL|EUPL|OSL|CC-BY-NC)|open\s*webui/i;
 
 let raw;
 try {
@@ -52,13 +52,16 @@ function describe(value) {
 
 const forbidden = [];
 const unknown = [];
+const dual = [];
 for (const [key, info] of packages) {
   if (key.startsWith('@maviechat/')) continue;
   const licence = licenceOf(info);
   if (!licence) unknown.push(key);
-  else if (FORBIDDEN.test(licence)) forbidden.push(`${key} (${licence})`);
+  else if (!acceptable(licence)) forbidden.push(`${key} (${licence})`);
+  else if (FORBIDDEN.test(licence)) dual.push(`${key} (${licence})`);
 }
 
+for (const entry of dual) console.log(`· dual-licensed, used under its permissive option: ${entry}`);
 for (const key of unknown) console.warn(`! no licence declared: ${key}`);
 if (forbidden.length > 0) {
   for (const entry of forbidden) console.error(`✗ forbidden licence: ${entry}`);

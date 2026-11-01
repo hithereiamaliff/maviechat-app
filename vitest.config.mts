@@ -13,6 +13,7 @@ export default defineConfig({
       'packages/*/src/**/*.test.ts',
       'tools/*/src/**/*.test.ts',
       'apps/mobile/src/**/*.test.ts',
+      'scripts/**/*.test.mjs',
     ],
   },
 });

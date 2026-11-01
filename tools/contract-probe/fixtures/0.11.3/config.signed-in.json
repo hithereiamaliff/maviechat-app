@@ -1,0 +1,220 @@
+{
+  "shape": {
+    "audio": {
+      "stt": {
+        "engine": "string"
+      },
+      "tts": {
+        "engine": "string",
+        "split_on": "string",
+        "voice": "string"
+      }
+    },
+    "code": {
+      "engine": "string",
+      "interpreter_engine": "string"
+    },
+    "default_locale": "string",
+    "default_models": "string",
+    "default_pinned_models": "string",
+    "default_prompt_suggestions": [
+      {
+        "content": "string",
+        "title": [
+          "string"
+        ]
+      }
+    ],
+    "features": {
+      "auth": "boolean",
+      "auth_trusted_header": "boolean",
+      "enable_admin_analytics": "boolean",
+      "enable_admin_chat_access": "boolean",
+      "enable_admin_export": "boolean",
+      "enable_api_keys": "boolean",
+      "enable_autocomplete_generation": "boolean",
+      "enable_automations": "boolean",
+      "enable_calendar": "boolean",
+      "enable_channels": "boolean",
+      "enable_code_execution": "boolean",
+      "enable_code_interpreter": "boolean",
+      "enable_community_sharing": "boolean",
+      "enable_context_compaction": "boolean",
+      "enable_direct_connections": "boolean",
+      "enable_easter_eggs": "boolean",
+      "enable_folders": "boolean",
+      "enable_google_drive_integration": "boolean",
+      "enable_image_generation": "boolean",
+      "enable_ldap": "boolean",
+      "enable_login_form": "boolean",
+      "enable_memories": "boolean",
+      "enable_message_rating": "boolean",
+      "enable_notes": "boolean",
+      "enable_onedrive_integration": "boolean",
+      "enable_password_change_form": "boolean",
+      "enable_plugins": "boolean",
+      "enable_public_active_users_count": "boolean",
+      "enable_pyodide_file_persistence": "boolean",
+      "enable_signup": "boolean",
+      "enable_signup_password_confirmation": "boolean",
+      "enable_tool_permissions": "boolean",
+      "enable_user_status": "boolean",
+      "enable_user_webhooks": "boolean",
+      "enable_version_update_check": "boolean",
+      "enable_web_search": "boolean",
+      "enable_web_search_confirmation": "boolean",
+      "enable_websocket": "boolean",
+      "folder_max_file_count": "string",
+      "web_search_confirmation_content": "string"
+    },
+    "file": {
+      "image_compression": {
+        "height": "null",
+        "width": "null"
+      },
+      "max_count": "null",
+      "max_size": "null"
+    },
+    "google_drive": {
+      "api_key": "string",
+      "client_id": "string"
+    },
+    "license_metadata": "null",
+    "name": "string",
+    "oauth": {
+      "auto_redirect": "boolean",
+      "providers": {}
+    },
+    "onedrive": {
+      "client_id_business": "string",
+      "client_id_personal": "string",
+      "sharepoint_tenant_id": "string",
+      "sharepoint_url": "string"
+    },
+    "permissions": {
+      "access_grants": {
+        "allow_users": "boolean"
+      },
+      "chat": {
+        "call": "boolean",
+        "continue_response": "boolean",
+        "controls": "boolean",
+        "delete": "boolean",
+        "delete_message": "boolean",
+        "edit": "boolean",
+        "export": "boolean",
+        "file_upload": "boolean",
+        "import": "boolean",
+        "multiple_models": "boolean",
+        "params": "boolean",
+        "rate_response": "boolean",
+        "regenerate_response": "boolean",
+        "share": "boolean",
+        "stt": "boolean",
+        "system_prompt": "boolean",
+        "temporary": "boolean",
+        "temporary_enforced": "boolean",
+        "tts": "boolean",
+        "valves": "boolean",
+        "web_upload": "boolean"
+      },
+      "features": {
+        "api_keys": "boolean",
+        "automations": "boolean",
+        "calendar": "boolean",
+        "channels": "boolean",
+        "code_interpreter": "boolean",
+        "direct_tool_servers": "boolean",
+        "folders": "boolean",
+        "image_generation": "boolean",
+        "memories": "boolean",
+        "notes": "boolean",
+        "web_search": "boolean",
+        "webhooks": "boolean"
+      },
+      "settings": {
+        "interface": "boolean"
+      },
+      "sharing": {
+        "knowledge": "boolean",
+        "models": "boolean",
+        "notes": "boolean",
+        "prompts": "boolean",
+        "public_calendars": "boolean",
+        "public_chats": "boolean",
+        "public_knowledge": "boolean",
+        "public_models": "boolean",
+        "public_notes": "boolean",
+        "public_prompts": "boolean",
+        "public_skills": "boolean",
+        "public_tools": "boolean",
+        "skills": "boolean",
+        "tools": "boolean"
+      },
+      "workspace": {
+        "knowledge": "boolean",
+        "models": "boolean",
+        "models_export": "boolean",
+        "models_import": "boolean",
+        "prompts": "boolean",
+        "prompts_export": "boolean",
+        "prompts_import": "boolean",
+        "skills": "boolean",
+        "skills_export": "boolean",
+        "skills_import": "boolean",
+        "tools": "boolean",
+        "tools_export": "boolean",
+        "tools_import": "boolean"
+      }
+    },
+    "status": "boolean",
+    "ui": {
+      "default_interface_settings": {},
+      "iframe_csp": "string",
+      "pending_user_overlay_content": "string",
+      "pending_user_overlay_title": "string",
+      "response_watermark": "string"
+    },
+    "version": "string"
+  },
+  "features": {
+    "auth": true,
+    "auth_trusted_header": false,
+    "enable_admin_analytics": true,
+    "enable_admin_chat_access": true,
+    "enable_admin_export": true,
+    "enable_api_keys": true,
+    "enable_autocomplete_generation": false,
+    "enable_automations": true,
+    "enable_calendar": true,
+    "enable_channels": false,
+    "enable_code_execution": true,
+    "enable_code_interpreter": true,
+    "enable_community_sharing": true,
+    "enable_context_compaction": false,
+    "enable_direct_connections": false,
+    "enable_easter_eggs": true,
+    "enable_folders": true,
+    "enable_google_drive_integration": false,
+    "enable_image_generation": false,
+    "enable_ldap": false,
+    "enable_login_form": true,
+    "enable_memories": true,
+    "enable_message_rating": true,
+    "enable_notes": true,
+    "enable_onedrive_integration": false,
+    "enable_password_change_form": true,
+    "enable_plugins": true,
+    "enable_public_active_users_count": true,
+    "enable_pyodide_file_persistence": false,
+    "enable_signup": false,
+    "enable_signup_password_confirmation": false,
+    "enable_tool_permissions": false,
+    "enable_user_status": true,
+    "enable_user_webhooks": true,
+    "enable_version_update_check": true,
+    "enable_web_search": true,
+    "enable_web_search_confirmation": false,
+    "enable_websocket": true
+  }
+}

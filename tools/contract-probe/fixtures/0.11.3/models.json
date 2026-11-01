@@ -1,0 +1,244 @@
+{
+  "count": 2,
+  "shape": {
+    "data": [
+      {
+        "actions": [],
+        "api": {
+          "chat-completions": {
+            "base_url": "string",
+            "capabilities": {
+              "tools": {
+                "choice": [
+                  "string"
+                ],
+                "strict": "boolean",
+                "updates": "boolean"
+              }
+            },
+            "compatibility": {
+              "reasoning_field": "string"
+            },
+            "sdk": {
+              "aisdk": "string",
+              "opencodeai": "string"
+            }
+          }
+        },
+        "canonical_id": "string",
+        "capabilities": {
+          "effort_updates": "boolean",
+          "reasoning": {
+            "effort": [
+              "string"
+            ],
+            "supported": "boolean"
+          },
+          "structured_output": "boolean",
+          "system_updates": "boolean",
+          "temperature": "boolean",
+          "tools": {
+            "supported": "boolean"
+          },
+          "top_k": "boolean",
+          "top_p": "boolean"
+        },
+        "connection_type": "string",
+        "cost": {
+          "multipliers": [
+            {
+              "factor": "number",
+              "when": {
+                "any": [
+                  "object"
+                ],
+                "utc_days": {
+                  "in": [
+                    "string"
+                  ]
+                }
+              }
+            }
+          ],
+          "text": {
+            "input": {
+              "cache": {
+                "read": "number"
+              },
+              "price": "number"
+            },
+            "output": {
+              "price": "number"
+            }
+          }
+        },
+        "created": "number",
+        "description": "string",
+        "family": "string",
+        "filters": [],
+        "id": "string",
+        "info": {
+          "access_grants": [
+            {
+              "created_at": "number",
+              "id": "string",
+              "permission": "string",
+              "principal_id": "string",
+              "principal_type": "string",
+              "resource_id": "string",
+              "resource_type": "string"
+            }
+          ],
+          "base_model_id": "null",
+          "created_at": "number",
+          "id": "string",
+          "is_active": "boolean",
+          "meta": {
+            "capabilities": {
+              "builtin_tools": "boolean",
+              "citations": "boolean",
+              "code_interpreter": "boolean",
+              "file_context": "boolean",
+              "file_upload": "boolean",
+              "image_generation": "boolean",
+              "memory": "boolean",
+              "status_updates": "boolean",
+              "terminal": "boolean",
+              "vision": "boolean",
+              "web_search": "boolean"
+            },
+            "defaultFeatureIds": [
+              "string"
+            ],
+            "description": "null",
+            "filterIds": [
+              "string"
+            ],
+            "knowledge": "null",
+            "suggestion_prompts": "null",
+            "tags": [],
+            "toolIds": [
+              "string"
+            ]
+          },
+          "name": "string",
+          "updated_at": "number",
+          "user_id": "string"
+        },
+        "knowledge": "string",
+        "last_updated": "string",
+        "limit": {
+          "context": "number",
+          "output": "number"
+        },
+        "modalities": {
+          "input": [
+            "string"
+          ],
+          "output": [
+            "string"
+          ]
+        },
+        "name": "string",
+        "object": "string",
+        "open_weights": "boolean",
+        "openai": {
+          "api": {
+            "chat-completions": {
+              "base_url": "string",
+              "capabilities": {
+                "tools": {
+                  "choice": [
+                    "string"
+                  ],
+                  "strict": "boolean",
+                  "updates": "boolean"
+                }
+              },
+              "compatibility": {
+                "reasoning_field": "string"
+              },
+              "sdk": {
+                "aisdk": "string",
+                "opencodeai": "string"
+              }
+            }
+          },
+          "canonical_id": "string",
+          "capabilities": {
+            "effort_updates": "boolean",
+            "reasoning": {
+              "effort": [
+                "string"
+              ],
+              "supported": "boolean"
+            },
+            "structured_output": "boolean",
+            "system_updates": "boolean",
+            "temperature": "boolean",
+            "tools": {
+              "supported": "boolean"
+            },
+            "top_k": "boolean",
+            "top_p": "boolean"
+          },
+          "connection_type": "string",
+          "cost": {
+            "multipliers": [
+              {
+                "factor": "number",
+                "when": {
+                  "any": [
+                    "object"
+                  ],
+                  "utc_days": "object"
+                }
+              }
+            ],
+            "text": {
+              "input": {
+                "cache": {
+                  "read": "number"
+                },
+                "price": "number"
+              },
+              "output": {
+                "price": "number"
+              }
+            }
+          },
+          "created": "number",
+          "description": "string",
+          "family": "string",
+          "id": "string",
+          "knowledge": "string",
+          "last_updated": "string",
+          "limit": {
+            "context": "number",
+            "output": "number"
+          },
+          "modalities": {
+            "input": [
+              "string"
+            ],
+            "output": [
+              "string"
+            ]
+          },
+          "name": "string",
+          "object": "string",
+          "open_weights": "boolean",
+          "owned_by": "string",
+          "release_date": "string",
+          "type": "string"
+        },
+        "owned_by": "string",
+        "provider": "string",
+        "release_date": "string",
+        "tags": [],
+        "type": "string",
+        "urlIdx": "number"
+      }
+    ]
+  }
+}

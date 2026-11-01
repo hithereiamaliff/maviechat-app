@@ -1,0 +1,14 @@
+{
+  "count": 1,
+  "shape": [
+    {
+      "active": "boolean",
+      "created_at": "number",
+      "id": "string",
+      "last_read_at": "number",
+      "snippet": "null",
+      "title": "string",
+      "updated_at": "number"
+    }
+  ]
+}

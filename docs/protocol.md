@@ -138,6 +138,13 @@ This is a spec written from reading Open WebUI's source (v0.12.5, read 2026-11-0
   - `meta{task_id, response_started_at, response_ended_at}`.
 - Written by the client: `annotation{rating, reason, comment, tags, details}`, `feedbackId`, `favorite`, `merged`.
 
+**Confirmed by the 0.11.3 probe** (fixtures in `tools/contract-probe/fixtures/0.11.3/`):
+- Assistant messages carry `meta.variables`: the template variables resolved for that turn, such as `{{USER_NAME}}`, `{{CURRENT_DATE}}`, `{{USER_LOCATION}}`.
+- `output[]` items seen so far: `message`, `reasoning`, `function_call` and `function_call_output`, from a turn where the model used a tool.
+- Saved-chat keys:
+  - top level: `archived, chat, context_usage, created_at, current_message_id, folder_id, id, meta, pinned, share_id, summary, tasks, title, updated_at, user_id, variables`;
+  - `chat.*`: `files, history, id, messages, models, tags, timestamp, title`.
+
 **Tree rules**
 - Siblings share a `parentId` and appear in the parent's `childrenIds`.
 - Branch arrows walk the siblings.

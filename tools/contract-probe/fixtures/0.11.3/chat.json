@@ -1,0 +1,206 @@
+{
+  "tree": {
+    "messageCount": 2,
+    "roles": {
+      "user": 1,
+      "assistant": 1
+    },
+    "branchPoints": 0,
+    "multiModelTurns": 0,
+    "withOutput": 1,
+    "withModelIdx": 1,
+    "outputItemTypes": [
+      "function_call",
+      "function_call_output",
+      "message",
+      "reasoning"
+    ],
+    "messageKeys": [
+      "childrenIds",
+      "content",
+      "done",
+      "id",
+      "meta",
+      "model",
+      "modelIdx",
+      "models",
+      "output",
+      "parentId",
+      "role",
+      "timestamp",
+      "usage"
+    ],
+    "hasCurrentId": true,
+    "chatKeys": [
+      "archived",
+      "chat",
+      "context_usage",
+      "created_at",
+      "current_message_id",
+      "folder_id",
+      "id",
+      "meta",
+      "pinned",
+      "share_id",
+      "summary",
+      "tasks",
+      "title",
+      "updated_at",
+      "user_id",
+      "variables"
+    ],
+    "innerKeys": [
+      "files",
+      "history",
+      "id",
+      "messages",
+      "models",
+      "tags",
+      "timestamp",
+      "title"
+    ]
+  },
+  "shape": {
+    "archived": "boolean",
+    "chat": {
+      "files": [],
+      "history": {
+        "currentId": "string",
+        "messages": {
+          "<id>": {
+            "childrenIds": [
+              "string"
+            ],
+            "content": "string",
+            "done": "boolean",
+            "id": "string",
+            "meta": {
+              "features": {
+                "code_interpreter": "boolean",
+                "image_generation": "boolean",
+                "memory": "boolean",
+                "voice": "boolean",
+                "web_search": "boolean"
+              },
+              "files": [],
+              "filter_ids": [],
+              "params": {
+                "compact_token_threshold": "null",
+                "function_calling": "string",
+                "reasoning_tags": "null",
+                "stream_delta_chunk_size": "null",
+                "tool_approval_mode": "string"
+              },
+              "session_id": "string",
+              "skill_ids": [],
+              "terminal_id": "null",
+              "tool_ids": [
+                "string"
+              ],
+              "tool_servers": [],
+              "variables": {
+                "{{CURRENT_DATETIME}}": "string",
+                "{{CURRENT_DATE}}": "string",
+                "{{CURRENT_TIMEZONE}}": "string",
+                "{{CURRENT_TIME}}": "string",
+                "{{CURRENT_WEEKDAY}}": "string",
+                "{{USER_EMAIL}}": "string",
+                "{{USER_LANGUAGE}}": "string",
+                "{{USER_LOCATION}}": "string",
+                "{{USER_NAME}}": "string"
+              }
+            },
+            "model": "string",
+            "modelIdx": "number",
+            "models": [
+              "string"
+            ],
+            "output": [
+              {
+                "arguments": "string",
+                "attributes": {
+                  "type": "string"
+                },
+                "call_id": "string",
+                "content": [
+                  "object"
+                ],
+                "duration": "number",
+                "end_tag": "string",
+                "ended_at": "number",
+                "id": "string",
+                "name": "string",
+                "output": [
+                  "object"
+                ],
+                "role": "string",
+                "start_tag": "string",
+                "started_at": "number",
+                "status": "string",
+                "summary": "null",
+                "type": "string"
+              }
+            ],
+            "parentId": "null|string",
+            "role": "string",
+            "timestamp": "number",
+            "usage": {
+              "completion_tokens": "number",
+              "completion_tokens_details": {
+                "reasoning_tokens": "number"
+              },
+              "cost": "number",
+              "input_tokens": "number",
+              "opencode": {
+                "allowance": "number",
+                "billing_source": "string",
+                "list_cost": "number",
+                "tokens": {
+                  "cache_read": "number",
+                  "cache_write_1h": "number",
+                  "cache_write_5m": "number",
+                  "input": "number",
+                  "output": "number",
+                  "reasoning": "number"
+                }
+              },
+              "output_tokens": "number",
+              "prompt_tokens": "number",
+              "prompt_tokens_details": {
+                "cached_tokens": "number"
+              },
+              "total_tokens": "number"
+            }
+          }
+        }
+      },
+      "id": "string",
+      "messages": [
+        {
+          "content": "string",
+          "role": "string"
+        }
+      ],
+      "models": [
+        "string"
+      ],
+      "tags": [],
+      "timestamp": "number",
+      "title": "string"
+    },
+    "context_usage": "null",
+    "created_at": "number",
+    "current_message_id": "string",
+    "folder_id": "null",
+    "id": "string",
+    "meta": {},
+    "pinned": "boolean",
+    "share_id": "null",
+    "summary": "null",
+    "tasks": "null",
+    "title": "string",
+    "updated_at": "number",
+    "user_id": "string",
+    "variables": {}
+  }
+}
