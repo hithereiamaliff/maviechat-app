@@ -1,9 +1,12 @@
-import type { SourceRef } from '@maviechat/owui-protocol';
-import { lexMarkdown, type Token, type Tokens } from '@maviechat/owui-markdown';
+import type { ModelItem, SourceRef } from '@maviechat/owui-protocol';
+import { lexMarkdown, type MentionToken, type Token, type Tokens } from '@maviechat/owui-markdown';
+import { useQueryClient } from '@tanstack/react-query';
+import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { memo, useMemo, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View, type TextStyle } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { useToast } from '@/components/Toast';
 import { openLink } from '@/lib/links';
 import { fonts, radius, usePalette, type Palette } from '@/theme';
 import { CodeBlock } from './CodeBlock';
@@ -24,13 +27,27 @@ interface Context {
   sources: SourceRef[];
   baseUrl?: string;
   token?: string;
+  /** For `@M:` mentions; undefined until the model list has loaded. */
+  models?: ModelItem[];
+  copy: (text: string) => void;
 }
 
 /** Renders markdown as native views (no web view). */
 export const Markdown = memo(function Markdown({ text, muted = false, sources, baseUrl, token }: MarkdownProps) {
   const palette = usePalette();
+  const toast = useToast();
+  const models = useQueryClient().getQueryData<ModelItem[]>(['models']);
   const tokens = useMemo(() => lexMarkdown(text), [text]);
-  const context: Context = { palette, color: muted ? palette.textMuted : palette.text, sources: sources ?? [], baseUrl, token };
+  const context: Context = {
+    palette,
+    color: muted ? palette.textMuted : palette.text,
+    sources: sources ?? [],
+    baseUrl,
+    token,
+    models,
+    // As on the web, tapping inline code copies it.
+    copy: (code) => void Clipboard.setStringAsync(code).then(() => toast('Copied to clipboard')),
+  };
   return <View>{tokens.map((block, index) => renderBlock(block, `${index}`, context))}</View>;
 });
 
@@ -187,12 +204,18 @@ function renderInline(tokens: Token[] | undefined, key: string, context: Context
             {renderInline((token as Tokens.Del).tokens, k, context)}
           </Text>
         );
-      case 'codespan':
+      case 'codespan': {
+        const code = decodeCode((token as Tokens.Codespan).text);
         return (
-          <Text key={k} style={[styles.codespan, { backgroundColor: palette.surfaceStrong }]}>
-            {decodeCode((token as Tokens.Codespan).text)}
+          <Text
+            key={k}
+            accessibilityHint="Copies the code"
+            onPress={() => context.copy(code)}
+            style={[styles.codespan, { backgroundColor: palette.surfaceStrong }]}>
+            {code}
           </Text>
         );
+      }
       case 'br':
         return '\n';
       case 'link': {
@@ -220,6 +243,24 @@ function renderInline(tokens: Token[] | undefined, key: string, context: Context
             style={[styles.citation, { backgroundColor: palette.surfaceStrong, color: palette.textMuted }]}
             onPress={first?.url ? () => void openLink(first.url as string) : undefined}>
             {` ${ids.join(', ')} `}
+          </Text>
+        );
+      }
+      case 'footnote': {
+        const id = (token as unknown as { id: string }).id;
+        const raised = superscript(id);
+        return (
+          <Text key={k} accessibilityLabel={`footnote ${id}`} style={[!raised && styles.footnote, { color: palette.textMuted }]}>
+            {raised ?? id}
+          </Text>
+        );
+      }
+      case 'mention': {
+        const mention = token as unknown as MentionToken;
+        return (
+          <Text key={k} style={[styles.mention, { color: palette.link }]}>
+            {mention.trigger}
+            {mentionLabel(mention, context.models)}
           </Text>
         );
       }
@@ -257,6 +298,20 @@ function headingSize(depth: number): TextStyle {
   return { fontSize: 16, lineHeight: 24 };
 }
 
+const SUPERSCRIPT_DIGITS = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+
+/** Footnote numbers drawn raised; other ids are shown small. */
+function superscript(id: string): string | null {
+  return /^\d+$/.test(id) ? [...id].map((digit) => SUPERSCRIPT_DIGITS[Number(digit)]).join('') : null;
+}
+
+/** A mention's text, as the web shows it: `@M:` mentions name the model (or "Unknown"); others use their label. */
+function mentionLabel(mention: MentionToken, models: ModelItem[] | undefined): string {
+  if (mention.trigger !== '@' || !mention.id.startsWith('M:')) return mention.label;
+  const model = models?.find((item) => item.id === mention.id.slice(2));
+  return model?.name ?? (models ? 'Unknown' : mention.label);
+}
+
 /** marked escapes HTML inside code spans; show the characters as written. */
 function decodeCode(text: string): string {
   return text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
@@ -270,6 +325,8 @@ const styles = StyleSheet.create({
   del: { textDecorationLine: 'line-through' },
   codespan: { fontFamily: fonts.mono, fontSize: 14 },
   citation: { fontFamily: fonts.medium, fontSize: 12 },
+  footnote: { fontSize: 11 },
+  mention: { fontFamily: fonts.medium },
   quote: { borderLeftWidth: 3, paddingLeft: 12, marginVertical: 6 },
   list: { marginVertical: 4, gap: 2 },
   listItem: { flexDirection: 'row', gap: 8 },

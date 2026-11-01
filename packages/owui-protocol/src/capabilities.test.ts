@@ -33,6 +33,13 @@ describe('buildCapabilities', () => {
     expect(caps.feature('notes')).toBe(false); // flag missing
   });
 
+  it('can treat an unlisted feature permission as allowed', () => {
+    const caps = buildCapabilities({ config: { ...config, features: { ...config.features, enable_notes: true } }, user: { role: 'user', permissions: userPermissions } });
+    expect(caps.feature('notes')).toBe(false);
+    expect(caps.feature('notes', true)).toBe(true);
+    expect(caps.feature('codeInterpreter', true)).toBe(false); // listed as off
+  });
+
   it('flag-only features ignore permissions', () => {
     const caps = buildCapabilities({ config, user: { role: 'user', permissions: {} } });
     expect(caps.feature('codeExecution')).toBe(true);

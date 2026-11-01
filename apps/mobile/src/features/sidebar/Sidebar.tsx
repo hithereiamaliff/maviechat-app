@@ -1,4 +1,5 @@
 import {
+  canUseWorkspace,
   CHAT_PAGE_SIZE,
   folderTree,
   listChats,
@@ -7,8 +8,10 @@ import {
   listPinnedChats,
   searchChats,
   setFolderExpanded,
+  sidebarShortcuts,
   type ChatListItem,
   type FolderNode,
+  type ShortcutId,
 } from '@maviechat/owui-protocol';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -22,12 +25,21 @@ import { IconButton } from '@/components/IconButton';
 import { MenuButton, MenuTrigger, type MenuItem } from '@/components/Menu';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
 import { useChatActions } from '@/features/chats/useChatActions';
-import { useAuthed, useCapabilities, useServerConfig } from '@/lib/server';
+import { useAuthed, useCapabilities, useServerConfig, useUserSettings } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
 import { useSession } from '@/session/SessionProvider';
 import { fonts, radius, usePalette } from '@/theme';
 import { buildSidebarRows, isUnread, type SidebarRow } from './rows';
 import { useSidebar } from './SidebarContext';
+
+/** The pages the web can pin under Search. They open on the web until the app has them (Workspace in M3). */
+const SHORTCUTS: Record<ShortcutId, { label: string; icon: IconName; path: string }> = {
+  notes: { label: 'Notes', icon: 'document-text', path: '/notes' },
+  workspace: { label: 'Workspace', icon: 'squares-2x2', path: '/workspace' },
+  automations: { label: 'Automations', icon: 'clock', path: '/automations' },
+  calendar: { label: 'Calendar', icon: 'calendar', path: '/calendar' },
+  playground: { label: 'Playground', icon: 'code-bracket', path: '/playground' },
+};
 
 export function Sidebar() {
   const palette = usePalette();
@@ -38,6 +50,7 @@ export function Sidebar() {
   const queryClient = useQueryClient();
   const capabilities = useCapabilities();
   const config = useServerConfig();
+  const settings = useUserSettings();
   const actions = useChatActions();
   const picker = useFolderPicker();
   const pathname = usePathname();
@@ -123,8 +136,13 @@ export function Sidebar() {
     sidebar.close();
     void WebBrowser.openBrowserAsync(`${session.baseUrl}${path}`);
   };
+  // The user's own order, once their settings have loaded (so a customised list never flashes the defaults).
+  const shortcuts =
+    capabilities && !settings.isPending
+      ? sidebarShortcuts(capabilities, (settings.data?.ui as { pinnedMenuItems?: unknown } | null | undefined)?.pinnedMenuItems)
+      : [];
   const userMenu: MenuItem[] = [
-    ...(['workspace.models', 'workspace.knowledge', 'workspace.prompts', 'workspace.tools'].some((permission) => capabilities?.can(permission))
+    ...(capabilities && canUseWorkspace(capabilities)
       ? [{ key: 'workspace', label: 'Workspace', icon: 'squares-2x2' as const, onPress: () => openOnWeb('/workspace') }]
       : []),
     ...(capabilities?.isAdmin ? [{ key: 'admin', label: 'Admin Panel', icon: 'wrench-screwdriver' as const, onPress: () => openOnWeb('/admin') }] : []),
@@ -251,6 +269,17 @@ export function Sidebar() {
           <IconButton icon="x-mark" label="Close search" size={16} color={palette.textMuted} onPress={() => setSearch(null)} />
         </View>
       )}
+      {search === null
+        ? shortcuts.map((id) => (
+            <SidebarAction
+              key={id}
+              icon={SHORTCUTS[id].icon}
+              label={SHORTCUTS[id].label}
+              hint="Opens on the web"
+              onPress={() => openOnWeb(SHORTCUTS[id].path)}
+            />
+          ))
+        : null}
 
       <View style={styles.list}>
         <FlashList
@@ -326,11 +355,12 @@ function ChatRow({
   );
 }
 
-function SidebarAction({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
+function SidebarAction({ icon, label, hint, onPress }: { icon: IconName; label: string; hint?: string; onPress: () => void }) {
   const palette = usePalette();
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityHint={hint}
       onPress={onPress}
       style={({ pressed }) => [styles.action, pressed && { backgroundColor: palette.sidebarActive }]}>
       <Icon name={icon} size={19} color={palette.text} />

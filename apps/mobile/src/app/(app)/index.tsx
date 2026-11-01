@@ -1,31 +1,41 @@
-import { filesPending, promptSuggestions } from '@maviechat/owui-protocol';
+import { filesPending, modelAuthor, promptSuggestions } from '@maviechat/owui-protocol';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { useToast } from '@/components/Toast';
 import { ChatHeader } from '@/features/chat/ChatHeader';
-import { Composer, type OutgoingMessage } from '@/features/chat/Composer';
-import { carryOver, getDraft, NEW_CHAT, updateDraft } from '@/features/chat/drafts';
+import { Composer, type ComposerHandle, type OutgoingMessage } from '@/features/chat/Composer';
+import { carryOver, getDraft, NEW_CHAT, updateDraft, useDraftText } from '@/features/chat/drafts';
+import { ModelAvatar } from '@/features/chat/ModelAvatar';
 import { ModelPicker } from '@/features/chat/ModelPicker';
+import { Suggestions } from '@/features/chat/Suggestions';
 import { useModelChoice } from '@/features/chat/useModelChoice';
 import { useSendMessage } from '@/features/chat/useSendMessage';
-import { useCapabilities, useServerConfig, useSessionUser } from '@/lib/server';
-import { fonts, radius, usePalette } from '@/theme';
+import { openLink } from '@/lib/links';
+import { useCapabilities, useServerConfig, useSessionUser, useUserSettings } from '@/lib/server';
+import { fonts, usePalette } from '@/theme';
 
-/** New chat: the web app's default landing layout (model name, description, centred input, suggestions). */
+/**
+ * New chat: the web app's default landing layout. The model's picture and name (or "Hello"),
+ * its description and author, the centred input, then suggestions.
+ */
 export default function NewChat() {
   const palette = usePalette();
   const toast = useToast();
   const config = useServerConfig();
   const user = useSessionUser();
   const capabilities = useCapabilities();
+  const settings = useUserSettings();
   const choice = useModelChoice(undefined);
   const { send } = useSendMessage();
+  const typed = useDraftText(NEW_CHAT);
+  const composer = useRef<ComposerHandle>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [temporaryOn, setTemporaryOn] = useState(false);
+  const [fullDescription, setFullDescription] = useState(false);
 
   // As on the web: admins and permitted users may start temporary chats; some accounts only get temporary chats.
   const enforced = capabilities ? !capabilities.isAdmin && capabilities.can('chat.temporary_enforced') : false;
@@ -33,9 +43,10 @@ export default function NewChat() {
   const temporary = enforced || (allowed && temporaryOn);
 
   const model = choice.model;
-  const description = model?.info?.meta?.description;
-  const suggestions = promptSuggestions(model, config.data).slice(0, 4);
-  const firstName = user.data?.name?.split(/\s+/)[0];
+  const description = model?.info?.meta?.description?.trim();
+  const author = modelAuthor(model);
+  const suggestions = useMemo(() => promptSuggestions(model, config.data), [model, config.data]);
+  const insertSuggestion = (settings.data?.ui as { insertSuggestionPrompt?: boolean } | null | undefined)?.insertSuggestionPrompt ?? false;
 
   const start = async ({ text, files, toggles, toolIds }: OutgoingMessage) => {
     if (!model) {
@@ -49,7 +60,13 @@ export default function NewChat() {
     return true;
   };
 
+  // As on the web, a suggestion is sent at once, unless the user's settings say to put it in the input.
   const suggest = (text: string) => {
+    if (insertSuggestion) {
+      updateDraft(NEW_CHAT, (draft) => ({ ...draft, text }));
+      composer.current?.focus();
+      return;
+    }
     const { files, toggles, toolIds } = getDraft(NEW_CHAT);
     if (filesPending(files)) {
       toast('Wait for the attachments to finish uploading.', 'error');
@@ -93,19 +110,42 @@ export default function NewChat() {
                 </Text>
               </View>
             ) : null}
-            <Text style={[styles.title, { color: palette.text }]} numberOfLines={2}>
-              {model?.name ?? (firstName ? `Hello, ${firstName}` : 'Hello')}
-            </Text>
+            <View style={styles.titleRow}>
+              {model ? <ModelAvatar modelId={model.id} size={40} rounded={14} /> : null}
+              <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
+                {model?.name ?? (user.data?.name ? `Hello, ${user.data.name}` : 'Hello')}
+              </Text>
+            </View>
             {description ? (
-              <Text style={[styles.description, { color: palette.textMuted }]} numberOfLines={3}>
-                {description}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: fullDescription }}
+                accessibilityHint={fullDescription ? 'Shows less' : 'Shows the whole description'}
+                onPress={() => setFullDescription((value) => !value)}>
+                <Text style={[styles.description, { color: palette.textMuted }]} numberOfLines={fullDescription ? undefined : 2}>
+                  {description}
+                </Text>
+              </Pressable>
+            ) : null}
+            {description && author ? (
+              <Text style={[styles.author, { color: palette.textFaint }]}>
+                {'By '}
+                {author.url ? (
+                  <Text accessibilityRole="link" style={{ color: palette.link }} onPress={() => void openLink(author.url as string)}>
+                    {author.label}
+                  </Text>
+                ) : (
+                  author.label
+                )}
               </Text>
             ) : null}
           </View>
 
           <Composer
+            ref={composer}
             floating
             draftKey={NEW_CHAT}
+            placeholder="How can I help you today?"
             model={model}
             modelLabel={model?.name ?? 'Select a model'}
             onPickModel={() => setPickerOpen(true)}
@@ -115,27 +155,7 @@ export default function NewChat() {
             temporary={temporary}
           />
 
-          {suggestions.length > 0 ? (
-            <View style={styles.suggestions}>
-              <Text style={[styles.suggestedLabel, { color: palette.textFaint }]}>Suggested</Text>
-              {suggestions.map((suggestion, index) => (
-                <Pressable
-                  key={index}
-                  accessibilityRole="button"
-                  onPress={() => suggest(suggestion.content)}
-                  style={({ pressed }) => [styles.suggestion, { borderColor: palette.border }, pressed && { backgroundColor: palette.surface }]}>
-                  <Text style={[styles.suggestionTitle, { color: palette.text }]} numberOfLines={1}>
-                    {suggestion.title?.[0] ?? suggestion.content}
-                  </Text>
-                  {suggestion.title?.[1] ? (
-                    <Text style={[styles.suggestionSub, { color: palette.textMuted }]} numberOfLines={1}>
-                      {suggestion.title[1]}
-                    </Text>
-                  ) : null}
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
+          <Suggestions suggestions={suggestions} input={typed} inserts={insertSuggestion} onSelect={suggest} />
         </ScrollView>
       </KeyboardAvoidingView>
       <ModelPicker
@@ -158,11 +178,8 @@ const styles = StyleSheet.create({
   badge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   badgeText: { fontFamily: fonts.medium, fontSize: 13 },
   temporaryNote: { fontFamily: fonts.regular, fontSize: 13, textAlign: 'center' },
-  title: { fontFamily: fonts.semibold, fontSize: 26, textAlign: 'center' },
-  description: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, textAlign: 'center' },
-  suggestions: { paddingHorizontal: 16, gap: 6 },
-  suggestedLabel: { fontFamily: fonts.medium, fontSize: 13, paddingHorizontal: 4, marginBottom: 2 },
-  suggestion: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 10 },
-  suggestionTitle: { fontFamily: fonts.medium, fontSize: 15 },
-  suggestionSub: { fontFamily: fonts.regular, fontSize: 13, marginTop: 2 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, maxWidth: '100%' },
+  title: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 24 },
+  description: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  author: { fontFamily: fonts.regular, fontSize: 14, textAlign: 'center' },
 });

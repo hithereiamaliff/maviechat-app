@@ -6,6 +6,23 @@ export interface CitationToken extends Tokens.Generic {
   ids: number[];
 }
 
+/** `[^1]` or `[^note]`: a footnote reference. Like the web, it is shown raised; definitions stay plain text. */
+export interface FootnoteToken extends Tokens.Generic {
+  type: 'footnote';
+  id: string;
+}
+
+/**
+ * `<@U:id|Name>`, `<@M:model>`, `<#C:id|name>` or `<$skill|Name>`: a mention of a user,
+ * model, channel or skill. `label` falls back to the id.
+ */
+export interface MentionToken extends Tokens.Generic {
+  type: 'mention';
+  trigger: '@' | '#' | '$';
+  id: string;
+  label: string;
+}
+
 /** `$…$`, `\(…\)` (inline) or `$$…$$` written inside a sentence (display). */
 export interface InlineMathToken extends Tokens.Generic {
   type: 'inlineMath';
@@ -30,6 +47,37 @@ export const citation: TokenizerExtension = {
       type: 'citation',
       raw: match[0],
       ids: (match[1] ?? '').split(',').map((part) => Number(part.trim())),
+    };
+    return token;
+  },
+};
+
+export const footnote: TokenizerExtension = {
+  name: 'footnote',
+  level: 'inline',
+  start: (src) => src.match(/\[\^\s*[\w-]+\s*\]/)?.index,
+  tokenizer(src) {
+    const match = /^\[\^\s*([\w-]+)\s*\]/.exec(src);
+    if (!match) return undefined;
+    const token: FootnoteToken = { type: 'footnote', raw: match[0], id: match[1] ?? '' };
+    return token;
+  },
+};
+
+export const mention: TokenizerExtension = {
+  name: 'mention',
+  level: 'inline',
+  start: (src) => src.match(/<[@#$]/)?.index,
+  tokenizer(src) {
+    const match = /^<([@#$])([\w.:/-]+)(?:\|([^>]*))?>/.exec(src);
+    if (!match) return undefined;
+    const id = match[2] ?? '';
+    const token: MentionToken = {
+      type: 'mention',
+      raw: match[0],
+      trigger: match[1] as MentionToken['trigger'],
+      id,
+      label: match[3] || id,
     };
     return token;
   },

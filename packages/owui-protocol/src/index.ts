@@ -11,6 +11,7 @@ export * from './ids';
 export * from './models';
 export * from './output';
 export * from './server';
+export * from './shortcuts';
 export * from './socket';
 export * from './sources';
 export * from './stream';

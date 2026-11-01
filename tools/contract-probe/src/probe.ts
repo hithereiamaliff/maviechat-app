@@ -21,6 +21,7 @@ import {
   getConfig,
   getSessionUser,
   getVersion,
+  modelImagePath,
   openSocketSession,
   OwuiClient,
   signIn,
@@ -141,13 +142,36 @@ async function main() {
         return { value, note: `support ${capabilities.support}` };
       });
 
-      await step('GET /api/models', async () => {
+      const models = await step('GET /api/models', async () => {
         const value = await client.get<{ data?: unknown[] }>('/api/models');
         const list = value.data ?? [];
         fixtures.models = { count: list.length, shape: shapeOf(value) };
         if (list.length === 0) throw new Error('the test account sees no models: give it access to at least one');
         return { value: list, note: `${list.length} visible` };
       });
+
+      // The picture the app shows beside a model: the image itself, or a redirect (the server's logo or a linked image).
+      const firstModelId = (models?.[0] as { id?: unknown } | undefined)?.id;
+      if (typeof firstModelId === 'string') {
+        await step('GET /api/v1/models/model/profile/image', async () => {
+          const response = await fetch(`${client.baseUrl}${modelImagePath(firstModelId)}`, {
+            headers: { Authorization: `Bearer ${client.token ?? ''}` },
+            redirect: 'manual',
+          });
+          await response.body?.cancel();
+          const location = response.headers.get('location');
+          const target = location ? new URL(location, client.baseUrl) : null;
+          const note =
+            response.status === 200
+              ? `image (${response.headers.get('content-type') ?? 'no type'})`
+              : target
+                ? `redirect to ${target.origin === new URL(client.baseUrl).origin ? target.pathname : 'an external image'}`
+                : null;
+          if (!note || ![200, 302, 307].includes(response.status)) throw new Error(`answered ${response.status}`);
+          fixtures['models.profile-image'] = { status: response.status, kind: response.status === 200 ? 'image' : 'redirect' };
+          return { value: response.status, note };
+        });
+      }
 
       const chats = await step('GET /api/v1/chats/?page=1', async () => {
         const value = await client.get<unknown[]>('/api/v1/chats/', { query: { page: 1 } });

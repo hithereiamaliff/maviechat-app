@@ -30,8 +30,11 @@ export interface Capabilities {
   readonly support: SupportStatus;
   readonly isAdmin: boolean;
   readonly isPending: boolean;
-  /** Admin flag on, and the user is an admin or permitted. */
-  feature(id: FeatureId): boolean;
+  /**
+   * Admin flag on, and the user is an admin or permitted. `fallback` applies when the
+   * server doesn't list the permission (the web treats Notes as allowed).
+   */
+  feature(id: FeatureId, fallback?: boolean): boolean;
   /**
    * The user is an admin, or the permission at a dotted path (e.g. `chat.multiple_models`) is true.
    * `fallback` applies when the server doesn't list the permission (the web treats some as allowed).
@@ -65,9 +68,9 @@ export function buildCapabilities({ config, user, version }: CapabilityInput): C
     support: supportStatus(resolvedVersion),
     isAdmin,
     isPending: user.role === 'pending',
-    feature: (id) => {
+    feature: (id, fallback = false) => {
       const { flag, permission } = FEATURES[id];
-      return featureFlag(config, flag) && (permission === null || can(permission));
+      return featureFlag(config, flag) && (permission === null || can(permission, fallback));
     },
     can,
     hidden: () => false,

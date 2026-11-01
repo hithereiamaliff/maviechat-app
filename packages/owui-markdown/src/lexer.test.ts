@@ -22,6 +22,24 @@ describe('lexMarkdown', () => {
     expect(inlineTypes(lexMarkdown('[4](https://x.test)'))).toEqual(['link']);
   });
 
+  it('recognises footnote references', () => {
+    const [paragraph] = lexMarkdown('Water boils at 100 °C[^1] at sea level[^ note ].');
+    const notes = paragraph && 'tokens' in paragraph ? (paragraph.tokens ?? []).filter((t) => t.type === 'footnote') : [];
+    expect(notes.map((t) => (t as unknown as { id: string }).id)).toEqual(['1', 'note']);
+    expect(inlineTypes(lexMarkdown('[1]'))).toEqual(['citation']);
+  });
+
+  it('recognises mentions with and without labels', () => {
+    const [paragraph] = lexMarkdown('Ask <@M:gpt-4o> or <@U:42|Ada>, see <#C:abc|general>, use <$web.search|Search>. Not <b>bold</b> or <x@y.z>.');
+    const mentions = (paragraph && 'tokens' in paragraph ? (paragraph.tokens ?? []) : [])
+      .filter((t) => t.type === 'mention')
+      .map((t) => {
+        const { trigger, id, label } = t as unknown as { trigger: string; id: string; label: string };
+        return `${trigger}${id}=${label}`;
+      });
+    expect(mentions).toEqual(['@M:gpt-4o=M:gpt-4o', '@U:42=Ada', '#C:abc=general', '$web.search=Search']);
+  });
+
   it('recognises math and leaves prices alone', () => {
     const tokens = lexMarkdown('Area is $\\pi r^2$ or \\(a^2\\), not $5 and $10.\n\n$$\nE = mc^2\n$$\n');
     const inline = inlineTypes(tokens).filter((type) => type === 'inlineMath');

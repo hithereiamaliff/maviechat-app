@@ -10,7 +10,7 @@ import {
   type ModelItem,
   type ToggleKey,
 } from '@maviechat/owui-protocol';
-import { useEffect, useState } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState, type ComponentRef, type Ref } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
@@ -19,6 +19,7 @@ import { useAuthed, useCapabilities, useTools, useUserSettings } from '@/lib/ser
 import { fonts, usePalette } from '@/theme';
 import { AttachmentStrip } from './AttachmentStrip';
 import { getDraft, updateDraft, useDraft } from './drafts';
+import { FullScreenInput } from './FullScreenInput';
 import { IntegrationsSheet, TOGGLE_INFO } from './IntegrationsSheet';
 import { QueuedMessages } from './QueuedMessages';
 import { useAttachments } from './useAttachments';
@@ -30,7 +31,13 @@ export interface OutgoingMessage {
   toolIds: string[];
 }
 
+/** Lets a screen put the cursor in the input (e.g. after inserting a suggestion). */
+export interface ComposerHandle {
+  focus: () => void;
+}
+
 interface ComposerProps {
+  ref?: Ref<ComposerHandle>;
   /** Which chat's draft this is (`NEW_CHAT` on the new-chat screen). */
   draftKey: string;
   model: ModelItem | undefined;
@@ -47,6 +54,8 @@ interface ComposerProps {
   /** Floating in the middle of the new-chat screen rather than docked at the bottom. */
   floating?: boolean;
   autoFocus?: boolean;
+  /** The web asks "How can I help you today?" on the new-chat screen and "Send a Message" in a chat. */
+  placeholder?: string;
 }
 
 const NO_TOGGLES: Record<ToggleKey, boolean> = { webSearch: false, imageGeneration: false, codeInterpreter: false };
@@ -54,9 +63,11 @@ const NO_TOGGLES: Record<ToggleKey, boolean> = { webSearch: false, imageGenerati
 /**
  * The web app's phone input bar: attachments and queued messages above the text; below it
  * +, integrations and the switched-on toggles, then the model and send/stop.
- * Enter inserts a new line, as on the web's touch layout.
+ * Enter inserts a new line, as on the web's touch layout. Past two lines an expand button
+ * opens the same text in a full-screen editor.
  */
 export function Composer({
+  ref,
   draftKey,
   model,
   modelLabel,
@@ -68,6 +79,7 @@ export function Composer({
   temporary = false,
   floating = false,
   autoFocus = false,
+  placeholder = 'Send a Message',
 }: ComposerProps) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
@@ -79,6 +91,9 @@ export function Composer({
   const attach = useAttachments({ draftKey, model, temporary });
   const [sending, setSending] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const input = useRef<ComponentRef<typeof TextInput>>(null);
+  useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }), []);
 
   const available = capabilities ? availableToggles(capabilities, model) : NO_TOGGLES;
   const toggles = effectiveToggles(draft.toggles, available);
@@ -88,6 +103,8 @@ export function Composer({
   const uploading = filesPending(draft.files);
   const canSend = hasContent && !sending && !uploading;
   const showIntegrations = available.webSearch || available.imageGeneration || available.codeInterpreter || usable.length > 0;
+  const canExpand = draft.text.split('\n').length > 2;
+  const setText = (text: string) => updateDraft(draftKey, (current) => ({ ...current, text }));
 
   // Like the web, a model brings its own default toggles and tools when you start with it.
   const settingsReady = !settings.isPending;
@@ -148,16 +165,29 @@ export function Composer({
       <QueuedMessages queue={draft.queue} onSendNow={onSendQueued} onEdit={editQueued} onDelete={deleteQueued} />
       <View style={[styles.box, { borderColor: palette.border, backgroundColor: palette.background }]}>
         <AttachmentStrip files={draft.files} previews={draft.previews} baseUrl={session.baseUrl} token={session.token} onRemove={removeAttachment} />
-        <TextInput
-          value={draft.text}
-          onChangeText={(text) => updateDraft(draftKey, (current) => ({ ...current, text }))}
-          placeholder="Send a Message"
-          placeholderTextColor={palette.textFaint}
-          multiline
-          autoFocus={autoFocus}
-          style={[styles.input, { color: palette.text }]}
-          accessibilityLabel="Message"
-        />
+        <View>
+          <TextInput
+            ref={input}
+            value={draft.text}
+            onChangeText={setText}
+            placeholder={placeholder}
+            placeholderTextColor={palette.textFaint}
+            multiline
+            autoFocus={autoFocus}
+            style={[styles.input, canExpand && styles.inputBesideExpand, { color: palette.text }]}
+            accessibilityLabel="Message"
+          />
+          {canExpand ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Expand input"
+              onPress={() => setExpanded(true)}
+              hitSlop={8}
+              style={({ pressed }) => [styles.expand, pressed && { backgroundColor: palette.surfaceStrong }]}>
+              <Icon name="arrows-pointing-out" size={16} color={palette.textMuted} />
+            </Pressable>
+          ) : null}
+        </View>
         <View style={styles.row}>
           <Pressable
             ref={plusRef}
@@ -238,6 +268,14 @@ export function Composer({
         </View>
       </View>
       {plusMenu}
+      <FullScreenInput
+        visible={expanded}
+        value={draft.text}
+        placeholder={placeholder}
+        onChange={setText}
+        onClose={() => setExpanded(false)}
+        onDismiss={() => input.current?.focus()}
+      />
       <IntegrationsSheet
         visible={sheetOpen}
         onClose={() => setSheetOpen(false)}
@@ -256,6 +294,8 @@ const styles = StyleSheet.create({
   wrap: { paddingHorizontal: 12, paddingTop: 6 },
   box: { borderWidth: 1, borderRadius: 26, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 8, gap: 6 },
   input: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 22, maxHeight: 160, paddingTop: 2, paddingBottom: 2 },
+  inputBesideExpand: { paddingRight: 30 },
+  expand: { position: 'absolute', top: -2, right: -6, width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   round: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   chips: { flexGrow: 1, flexShrink: 1 },

@@ -84,6 +84,7 @@ export default function FolderScreen() {
           <Composer
             floating
             draftKey={draftKey}
+            placeholder="How can I help you today?"
             model={model}
             modelLabel={model?.name ?? 'Select a model'}
             onPickModel={() => setPickerOpen(true)}

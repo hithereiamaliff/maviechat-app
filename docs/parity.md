@@ -38,7 +38,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | | Item | Mn |
 |---|---|---|
 | [x] | Logo + server name (tap = new chat), New Chat, Search | M1 |
-| [ ] | Pinned shortcuts (Workspace; Notes, Calendar and Automations open on web) | M1 |
+| [x] | Pinned shortcuts under Search, in the user's order (`ui.pinnedMenuItems`, default Notes and Workspace), each only when the account may use it; Playground for admins. Slice 5: they open on the web (Workspace until M3) | M1 |
 | [ ] | Section: pinned models (`PinnedModelList.svelte`) opening `/?model=id` | M2 |
 | [x] | Section: Folders tree, own and shared. Tap opens the folder landing; the chevron expands; unread badge (folder landing from slice 4) | M1 |
 | [ ] | Folder menu: New Chat, Create subfolder, Mark all read, Edit, Export JSON, Delete (optionally with contents) | M2 |
@@ -65,8 +65,8 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Item | Mn |
 |---|---|---|
-| [~] | Search by name/ID/tag; filters All / Local / External / Direct / tag. Slice 2: search by name, id and tag | M1 |
-| [~] | Rows: avatar, name, tags, badges, description, checkmark. Slice 2: name, description, default badge, checkmark | M1 |
+| [x] | Search by name/ID/tag; filters All / Local / External / Direct / tag. Slice 5: fuzzy search as on the web, filter chips All / Local / External / tags, hidden models left out. Direct connections live in the browser, so the server's list never has them | M1 |
+| [x] | Rows: avatar, name, tags, badges, description, checkmark. Slice 5: picture, size label (Ollama, LM Studio, llama.cpp), loaded dot, tag and External icons, description line, default badge, checkmark | M1 |
 | [ ] | Row "…": Keep in Sidebar / Hide from Sidebar, Copy link (Edit/Delete for admins → M3) | M2 |
 | [ ] | **Compare** toggle for multi-model (permission `multiple_models`) | M2 |
 | [x] | "Set as default" (new chat only) | M1 |
@@ -85,8 +85,8 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Item | Mn |
 |---|---|---|
-| [~] | Centred input; stacked model avatars; model name or "Hello, {name}"; description; "By author". Slice 1: model name, description, centred input (inactive) | M1 |
-| [~] | "Suggested" prompts (model's own, else admin defaults), shuffled and filtered as you type; tap sends, or inserts if that setting is on. Slice 2: shown and tap sends | M1 |
+| [x] | Centred input; stacked model avatars; model name or "Hello, {name}"; description; "By author". Slice 5: the model's picture and name (or "Hello, {name}"), two lines of description (tap for the rest), "By author" (community authors link to their page), input asking "How can I help you today?". One picture until Compare (M2) | M1 |
+| [x] | "Suggested" prompts (model's own, else admin defaults), shuffled and filtered as you type; tap sends, or inserts if that setting is on. Slice 5: all of it (a model whose own list is empty shows none; nothing past 500 typed characters). When there are none the web shows its own name and version; the app leaves that line out | M1 |
 | [ ] | Landing mode "chat" (input pinned to the bottom) | M2 |
 | [ ] | Folder landing page: folder header, input, Chats / Knowledge tabs | M2 |
 
@@ -97,7 +97,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [x] | Above the input: scroll-to-bottom arrow, queued messages (Send now / Edit / Delete) | M1 |
 | [ ] | Ask-user cards (multiple choice, "Recommended", Other, Previous/Next, Submit, timeout) (`chat/AskUserCard.svelte`) | M2 |
 | [~] | Attachments: thumbnails (warning if the model lacks vision), file chips with spinner and ×; file preview with "Focused Retrieval / Entire Document". Slice 3: all but the preview; server image-compression limits not applied (needs a native resizer) | M1; preview M2 |
-| [ ] | Expand to a full-screen editor after 2 lines | M1 |
+| [x] | Expand to a full-screen editor after 2 lines. Slice 5: the button appears from the third line and opens the "Input" editor | M1 |
 | [~] | "+" menu: Upload files, Camera, Attach webpage, Attach previous files, Attach knowledge, Reference chats. Slice 3: Upload Files, Photo Library, Capture | M1 (upload, camera, photos); M2 (rest) |
 | — | "+" menu: Google Drive / OneDrive, Compare text, Screen capture | — |
 | [~] | Integrations menu: tools (switch each; OAuth Connect), skills, filters, Web Search, Image, Code Interpreter. Slice 3: a sheet with Web Search / Image / Code Interpreter (server, permission and model must allow) and tools; model defaults applied | M1 (web search/image/code + tools); M2 (skills/filters/OAuth) |
@@ -127,7 +127,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 |---|---|---|
 | [x] | Header: model name (avatar hidden on narrow screens), "context compacted" label | M1 |
 | [x] | Status history (latest, expandable; "Searched N sites", "Retrieved N sources") (`ResponseMessage/StatusHistory*`) | M1 |
-| [~] | Markdown: GFM, tables (+ Copy / Export CSV), task lists, callouts NOTE/TIP/IMPORTANT/WARNING/CAUTION, footnotes, `[1]` citation chips, mentions, `:::` fences, inline code copy. Slice 1: GFM, tables, task lists, citation chips, math as text | M1 core, M2 tables export/callouts/fences |
+| [~] | Markdown: GFM, tables (+ Copy / Export CSV), task lists, callouts NOTE/TIP/IMPORTANT/WARNING/CAUTION, footnotes, `[1]` citation chips, mentions, `:::` fences, inline code copy. Slice 1: GFM, tables, task lists, citation chips, math as text; slice 5: footnote references (raised), mentions (`@M:` names the model), tap inline code to copy | M1 core, M2 tables export/callouts/fences |
 | [ ] | Math (KaTeX-equivalent, inline and block) | M2 |
 | [~] | Code blocks: language label, collapse/expand, Copy, Run (server Jupyter), Preview (HTML/SVG → artifacts), diff blocks; Mermaid and Vega diagrams. Slice 1: label, highlighting, collapse, Copy | M1 copy/collapse; M2 run/preview/diagrams |
 | [x] | Collapsibles: Reasoning ("Thinking…", "Thought for N seconds"), code interpreter ("Analyzing…/Analyzed"), tool calls ("Executing X…", "View Result from X", input/output, Allow/Deny), grouped "Explored…" | M1 |
@@ -196,7 +196,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Item | Mn |
 |---|---|---|
-| [ ] | Server URL, then email + password; errors; pending approval | M0/M1 |
+| [x] | Server URL, then email + password; errors; pending approval (M0, `app/login.tsx`) | M0/M1 |
 | [ ] | LDAP switch (when enabled) | M6 |
 | [ ] | MFA challenge: code, recovery code, first-time setup (0.12.x) | M5 |
 | [ ] | SSO buttons (when the server has providers) | M6 |

@@ -1,10 +1,10 @@
 import { Marked, type Token } from 'marked';
-import { blockMath, citation, inlineMath } from './extensions';
+import { blockMath, citation, footnote, inlineMath, mention } from './extensions';
 
 const markdown = new Marked({ gfm: true, breaks: true });
-markdown.use({ extensions: [blockMath, inlineMath, citation] });
+markdown.use({ extensions: [blockMath, inlineMath, citation, footnote, mention] });
 
-/** GitHub-flavoured markdown with line breaks, plus citations and math. */
+/** GitHub-flavoured markdown with line breaks, plus citations, math, footnote references and mentions. */
 export function lexMarkdown(source: string): Token[] {
   return [...markdown.lexer(source)];
 }

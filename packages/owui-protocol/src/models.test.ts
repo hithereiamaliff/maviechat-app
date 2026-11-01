@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { defaultModelId, modelName, promptSuggestions, type ModelItem } from './models';
+import {
+  defaultModelId,
+  matchesModelFilter,
+  modelAuthor,
+  modelFilterOptions,
+  modelImagePath,
+  modelName,
+  modelSizeLabel,
+  modelTags,
+  pickerModels,
+  promptSuggestions,
+  type ModelItem,
+} from './models';
 import { errorText, latestStatus, normalizeSources } from './sources';
 
 const models: ModelItem[] = [
@@ -21,10 +33,65 @@ describe('models', () => {
     expect(promptSuggestions(models[1], config).map((s) => s.content)).toEqual(['Hello']);
   });
 
+  it('shows no suggestions for a model whose own list is empty', () => {
+    const config = { default_prompt_suggestions: [{ content: 'Hello' }] };
+    const quiet: ModelItem = { id: 'quiet', name: 'Quiet', info: { meta: { suggestion_prompts: [] } } };
+    const unset: ModelItem = { id: 'unset', name: 'Unset', info: { meta: { suggestion_prompts: null } } };
+    expect(promptSuggestions(quiet, config)).toEqual([]);
+    expect(promptSuggestions(unset, config).map((s) => s.content)).toEqual(['Hello']);
+  });
+
   it('names models by id', () => {
     expect(modelName(models, 'claude')).toBe('Claude');
     expect(modelName(models, 'unknown')).toBe('unknown');
     expect(modelName(models, undefined)).toBe('Assistant');
+  });
+});
+
+describe('model picker', () => {
+  const list: ModelItem[] = [
+    { id: 'llama3:8b', name: 'Llama 3', owned_by: 'ollama', connection_type: 'local', ollama: { details: { parameter_size: '8.0B' } }, tags: [{ name: 'Fast' }] },
+    { id: 'gpt-4o', name: 'GPT-4o', owned_by: 'openai', connection_type: 'external', tags: [{ name: 'vision' }, 'Fast'] },
+    { id: 'secret', name: 'Secret', connection_type: 'external', info: { meta: { hidden: true } }, tags: [{ name: 'internal' }] },
+    { id: 'qwen', name: 'Qwen', provider: 'lmstudio', quantization: { name: 'Q4_K_M' }, size_bytes: 4.5 * 1024 ** 3 },
+  ];
+
+  it('leaves hidden models out', () => {
+    expect(pickerModels(list).map((model) => model.id)).toEqual(['llama3:8b', 'gpt-4o', 'qwen']);
+  });
+
+  it('reads tags given as objects or strings', () => {
+    expect(modelTags(list[1] as ModelItem)).toEqual(['vision', 'Fast']);
+    expect(modelTags({ id: 'x', name: 'X', tags: [null, { name: ' ' }, 3] })).toEqual([]);
+  });
+
+  it('offers Local, External and each tag once, in lower case', () => {
+    const options = modelFilterOptions(pickerModels(list));
+    expect(options.map((option) => option.value)).toEqual(['connection:local', 'connection:external', 'tag:fast', 'tag:vision']);
+    expect(options[0]?.label).toBe('Local');
+  });
+
+  it('filters by connection type or tag', () => {
+    const ids = (filter: string) => list.filter((model) => matchesModelFilter(model, filter)).map((model) => model.id);
+    expect(ids('')).toHaveLength(4);
+    expect(ids('connection:local')).toEqual(['llama3:8b']);
+    expect(ids('tag:fast')).toEqual(['llama3:8b', 'gpt-4o']);
+  });
+
+  it('labels local model sizes', () => {
+    expect(modelSizeLabel(list[0] as ModelItem)).toBe('8.0B');
+    expect(modelSizeLabel(list[1] as ModelItem)).toBeNull();
+    expect(modelSizeLabel(list[3] as ModelItem)).toBe('Q4_K_M');
+    expect(modelSizeLabel({ id: 'z', name: 'Z', provider: 'llama.cpp', size: 2 * 1024 ** 3 })).toBe('(2.0GB)');
+  });
+
+  it('builds the picture path and the author line', () => {
+    expect(modelImagePath('a/b c')).toBe('/api/v1/models/model/profile/image?id=a%2Fb%20c');
+    const meta = (user: unknown): ModelItem => ({ id: 'm', name: 'M', info: { meta: { user } } });
+    expect(modelAuthor(meta({ name: 'Ada' }))).toEqual({ label: 'Ada' });
+    expect(modelAuthor(meta({ username: 'ada', community: true }))).toEqual({ label: '@ada', url: 'https://openwebui.com/m/ada' });
+    expect(modelAuthor(meta({ username: 'ada' }))).toBeNull();
+    expect(modelAuthor(undefined)).toBeNull();
   });
 });
 

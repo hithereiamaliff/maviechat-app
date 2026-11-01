@@ -435,6 +435,11 @@
     "license": "MIT"
   },
   {
+    "name": "fuse.js",
+    "version": "7.5.0",
+    "license": "Apache-2.0"
+  },
+  {
     "name": "getenv",
     "version": "2.0.0",
     "license": "MIT"

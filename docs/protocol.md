@@ -63,6 +63,7 @@ This is a spec written from reading Open WebUI's source (v0.12.5, read 2026-11-0
 **Core**
 - `POST /api/chat/completions`
 - `GET /api/models` returns `{data: [...]}`; each entry is a "model item" and is sent back as `model_item`.
+- `GET /api/v1/models/model/profile/image?id=` (bearer token) answers with the model's picture, or redirects to a linked image or to the server's `/static/favicon.png`. `/api/models` leaves `profile_image_url` out.
 - `GET /api/tasks/chat/{chat_id}` returns `{task_ids}`.
 - `POST /api/tasks/chat/{chat_id}/stop`
 - `POST /api/chat/actions/{action_id}`
@@ -291,6 +292,13 @@ The server merges these writes: it keeps its own copy of in-progress assistant m
 - **Generate a title:** `POST /api/v1/tasks/title/completions {model, messages: [{role, content}], chat_id}` ✓. The answer is OpenAI-shaped; the content should be `{"title": …}` but may be wrapped in prose or use other quotes. When the admin turned titles off, the server answers 200 with `{detail: "Title generation is disabled"}`.
 - **Folder page:** a new chat started there carries `folder_id` in `/api/chat/completions`. Not probed (folders are off for the test account).
 - **Message queue** (setting `ui.enableMessageQueue`, default on): messages typed during a reply queue; when the reply ends they go out as one message, texts joined by a blank line and attachments combined. Send now stops the reply and sends one item.
+- **New-chat screen and model picker** (slice 5; read-only probe ✓ for the picture):
+  - **Model picture:** `GET /api/v1/models/model/profile/image?id=` with the bearer token. The test account's first model redirected to `/static/favicon.png` (no picture set) ✓.
+  - **Picker** (0.11.3 web): leaves out models with `info.meta.hidden`; fuzzy search (Fuse.js, threshold 0.4) over id, tag names and name; one filter at a time: Local / External (`connection_type`), Direct (browser-side connections, never in the server's list) or a tag (lower case).
+  - **Suggestions:** the model's `info.meta.suggestion_prompts` when it is a list, even an empty one, else `config.default_prompt_suggestions`. They are shuffled each time the list appears and fuzzy-filtered (threshold 0.5, over text and title lines) as you type; none past 500 characters. Tapping sends, unless `ui.insertSuggestionPrompt` is on (then it fills the input).
+  - **Author line:** `info.meta.user` → "By {name}"; community models (`community: true`) show `name` or `@username` and link to `https://openwebui.com/m/{username}`.
+  - **Pinned sidebar shortcuts:** `ui.pinnedMenuItems` (default `['notes', 'workspace']`, user's order). Notes needs `enable_notes` and `features.notes` (allowed unless denied); Workspace needs admin or any `workspace.*` permission (models, knowledge, prompts, tools, skills); Automations and Calendar need their flag and permission; Playground is admin only.
+  - **Markdown extras:** `[^id]` footnote references (shown raised; the web lists no definitions), mentions `<@id|label>`, `<#id|label>`, `<$id|label>` (`@M:` shows the model's name or "Unknown"), and tapping inline code copies it.
 
 ## 9. Stability notes
 

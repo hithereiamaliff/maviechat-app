@@ -61,6 +61,11 @@ export function useDraft(key: string): Draft {
   return useSyncExternalStore(subscribe, () => getDraft(key));
 }
 
+/** Only the text, for screens that react to typing (the new-chat suggestions). */
+export function useDraftText(key: string): string {
+  return useSyncExternalStore(subscribe, () => getDraft(key).text);
+}
+
 /** Only the queue, so a chat screen doesn't re-render on every keystroke. */
 export function useQueue(key: string): QueuedMessage[] {
   return useSyncExternalStore(subscribe, () => getDraft(key).queue);
