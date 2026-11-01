@@ -10,6 +10,7 @@ export * from './http';
 export * from './input';
 export * from './ids';
 export * from './models';
+export * from './notifications';
 export * from './output';
 export * from './server';
 export * from './shortcuts';

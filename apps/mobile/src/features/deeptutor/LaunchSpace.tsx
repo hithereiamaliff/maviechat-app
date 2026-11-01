@@ -1,3 +1,4 @@
+import * as Notifications from 'expo-notifications';
 import { router, useRootNavigationState } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
@@ -12,7 +13,8 @@ export function LaunchSpace() {
   useEffect(() => {
     if (decided.current || !ready || state.status === 'loading') return;
     decided.current = true;
-    if (state.status !== 'signed-in') return;
+    // Opened from a notification: NotificationRoot takes you to its chat instead.
+    if (state.status !== 'signed-in' || Notifications.getLastNotificationResponse()) return;
     void loadSpace().then((space) => {
       if (space === 'deeptutor') router.replace('/learn');
     });

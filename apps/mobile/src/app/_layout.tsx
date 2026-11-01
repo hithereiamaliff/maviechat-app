@@ -15,6 +15,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider } from '@/components/Toast';
 import { LaunchSpace } from '@/features/deeptutor/LaunchSpace';
+import { NotificationRoot } from '@/features/notifications/NotificationRoot';
 import { DeepTutorProvider } from '@/session/DeepTutorProvider';
 import { SessionProvider } from '@/session/SessionProvider';
 import { usePalette } from '@/theme';
@@ -59,6 +60,7 @@ export default function RootLayout() {
                   <StatusBar style="auto" />
                   <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.background } }} />
                   <LaunchSpace />
+                  <NotificationRoot />
                 </DeepTutorProvider>
               </SessionProvider>
             </ToastProvider>

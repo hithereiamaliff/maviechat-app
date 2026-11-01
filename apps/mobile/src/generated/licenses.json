@@ -60,6 +60,11 @@
     "license": "MIT"
   },
   {
+    "name": "@expo/image-utils",
+    "version": "0.12.6",
+    "license": "MIT"
+  },
+  {
     "name": "@expo/log-box",
     "version": "58.0.14",
     "license": "MIT"
@@ -220,6 +225,11 @@
     "license": "MIT"
   },
   {
+    "name": "abort-controller",
+    "version": "3.0.0",
+    "license": "MIT"
+  },
+  {
     "name": "anser",
     "version": "1.4.10",
     "license": "MIT"
@@ -227,6 +237,11 @@
   {
     "name": "arg",
     "version": "4.1.3",
+    "license": "MIT"
+  },
+  {
+    "name": "badgin",
+    "version": "1.2.3",
     "license": "MIT"
   },
   {
@@ -257,11 +272,6 @@
   {
     "name": "client-only",
     "version": "0.0.1",
-    "license": "MIT"
-  },
-  {
-    "name": "cross-spawn",
-    "version": "7.0.6",
     "license": "MIT"
   },
   {
@@ -330,8 +340,18 @@
     "license": "MIT"
   },
   {
+    "name": "event-target-shim",
+    "version": "5.0.1",
+    "license": "MIT"
+  },
+  {
     "name": "expo",
     "version": "58.0.22",
+    "license": "MIT"
+  },
+  {
+    "name": "expo-application",
+    "version": "58.1.2",
     "license": "MIT"
   },
   {
@@ -397,6 +417,11 @@
   {
     "name": "expo-manifests",
     "version": "58.0.1",
+    "license": "MIT"
+  },
+  {
+    "name": "expo-notifications",
+    "version": "58.1.7",
     "license": "MIT"
   },
   {
@@ -470,9 +495,9 @@
     "license": "MIT"
   },
   {
-    "name": "isexe",
-    "version": "2.0.0",
-    "license": "ISC"
+    "name": "jimp-compact",
+    "version": "0.16.1",
+    "license": "MIT"
   },
   {
     "name": "js-tokens",
@@ -535,8 +560,8 @@
     "license": "MIT"
   },
   {
-    "name": "path-key",
-    "version": "3.1.1",
+    "name": "parse-png",
+    "version": "2.1.0",
     "license": "MIT"
   },
   {
@@ -548,6 +573,11 @@
     "name": "picocolors",
     "version": "1.1.1",
     "license": "ISC"
+  },
+  {
+    "name": "pngjs",
+    "version": "3.4.0",
+    "license": "MIT"
   },
   {
     "name": "pretty-format",
@@ -635,6 +665,11 @@
     "license": "MIT"
   },
   {
+    "name": "semver",
+    "version": "7.8.5",
+    "license": "ISC"
+  },
+  {
     "name": "server-only",
     "version": "0.0.1",
     "license": "MIT"
@@ -642,16 +677,6 @@
   {
     "name": "sf-symbols-typescript",
     "version": "2.2.0",
-    "license": "MIT"
-  },
-  {
-    "name": "shebang-command",
-    "version": "2.0.0",
-    "license": "MIT"
-  },
-  {
-    "name": "shebang-regex",
-    "version": "3.0.0",
     "license": "MIT"
   },
   {
@@ -678,11 +703,6 @@
     "name": "whatwg-fetch",
     "version": "3.6.20",
     "license": "MIT"
-  },
-  {
-    "name": "which",
-    "version": "2.0.2",
-    "license": "ISC"
   },
   {
     "name": "xmlbuilder",

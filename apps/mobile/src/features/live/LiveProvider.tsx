@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Alert, AppState, Platform } from 'react-native';
 import { useToast } from '@/components/Toast';
 import { patchChatRow } from '@/features/chats/cache';
+import { setPresence } from '@/features/notifications/presence';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { ChatStreams } from './chatStreams';
 
@@ -65,6 +66,12 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
   useEffect(() => {
     viewing.current = currentChatId;
   }, [currentChatId]);
+
+  // Push banners stay away from the chat on screen, and from replies this connection announces itself.
+  useEffect(() => {
+    setPresence({ viewingChatId: currentChatId, liveConnected: status === 'joined' });
+  }, [currentChatId, status]);
+  useEffect(() => () => setPresence({ viewingChatId: null, liveConnected: false }), []);
 
   const [streams] = useState(
     () =>

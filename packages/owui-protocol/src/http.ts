@@ -108,7 +108,7 @@ export class OwuiClient {
     return this.request<T>('POST', path, { ...options, form });
   }
 
-  async request<T>(method: 'GET' | 'POST' | 'DELETE' | 'PATCH', path: string, options: RequestOptions = {}): Promise<T> {
+  async request<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH', path: string, options: RequestOptions = {}): Promise<T> {
     const headers: Record<string, string> = { Accept: 'application/json', ...this.options.headers };
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
     let body: string | FormData | undefined;

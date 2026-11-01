@@ -2,8 +2,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { fonts, radius, usePalette } from '@/theme';
 import { setThemePreference, THEME_CHOICES, useThemePreference } from '@/theme/preference';
+import { NotificationSettings } from './NotificationSettings';
 
-/** General: the theme, as in the web's General settings. Other settings come in M2. */
+/** General: the theme, as in the web's General settings, and this iPhone's notifications. Other settings come in M2. */
 export function GeneralSettings() {
   const palette = usePalette();
   const preference = useThemePreference();
@@ -34,6 +35,7 @@ export function GeneralSettings() {
       <Text style={[styles.note, { color: palette.textFaint }]}>
         Saved on this iPhone, as the web app saves it per browser. Language, system prompt and the other settings come in a later update.
       </Text>
+      <NotificationSettings />
     </ScrollView>
   );
 }

@@ -26,6 +26,7 @@ import { MenuButton, MenuTrigger, type MenuItem } from '@/components/Menu';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
 import { useChatActions } from '@/features/chats/useChatActions';
 import { switchToDeepTutor } from '@/features/deeptutor/switch';
+import { disablePush } from '@/features/notifications/push';
 import { useAuthed, useCapabilities, useServerConfig, useUserSettings } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
@@ -176,7 +177,13 @@ export function Sidebar() {
         router.push('/connection');
       },
     },
-    { key: 'signout', label: 'Sign Out', icon: 'arrow-right-start-on-rectangle', onPress: () => void signOut() },
+    {
+      key: 'signout',
+      label: 'Sign Out',
+      icon: 'arrow-right-start-on-rectangle',
+      // Notifications for this account stop on this phone: its target leaves your Open WebUI settings.
+      onPress: () => void disablePush(client).catch(() => undefined).finally(() => void signOut()),
+    },
   ];
 
   const renderRow = ({ item }: { item: SidebarRow }) => {

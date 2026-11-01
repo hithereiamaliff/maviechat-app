@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { Drawer } from 'react-native-drawer-layout';
 import { LiveProvider } from '@/features/live/LiveProvider';
+import { PushSetup } from '@/features/notifications/PushSetup';
 import { Sidebar } from '@/features/sidebar/Sidebar';
 import { SidebarContext } from '@/features/sidebar/SidebarContext';
 import { useSession } from '@/session/SessionProvider';
@@ -23,6 +24,7 @@ export default function AppLayout() {
 
   return (
     <LiveProvider currentChatId={currentChatId}>
+      <PushSetup />
       <SidebarContext.Provider value={controls}>
         <Drawer
           open={open}
