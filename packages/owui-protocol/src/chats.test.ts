@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createChat,
   deleteChat,
+  deleteMessage,
   getChat,
   listChats,
   listFolderChats,
   listPinnedChats,
   moveChatToFolder,
   renameChat,
+  saveMessage,
   searchChats,
   selectBranch,
   toggleArchived,
@@ -67,5 +70,21 @@ describe('chat and folder endpoints (0.11.3)', () => {
     ]);
     expect(calls[3]?.body).toEqual({ folder_id: null });
     expect(calls[5]?.body).toEqual({ is_expanded: true });
+  });
+});
+
+describe('message-level chat calls', () => {
+  it('deletes one message, saves one edited message and creates chats', async () => {
+    const { client, calls } = recordingClient();
+    const message = { id: 'm1', parentId: null, childrenIds: [], role: 'user', content: 'Edited' };
+    await deleteMessage(client, 'c1', 'm1');
+    await saveMessage(client, 'c1', message, 'a9');
+    await createChat(client, { title: 'Kept', history: { messages: {}, currentId: null } });
+    expect(calls.map((c) => `${c.method} ${c.url.replace('https://x.test', '')}`)).toEqual([
+      'DELETE /api/v1/chats/c1/messages/m1',
+      'POST /api/v1/chats/c1',
+      'POST /api/v1/chats/new',
+    ]);
+    expect(calls[1]?.body).toEqual({ chat: { history: { messages: { m1: message }, currentId: 'a9' } } });
   });
 });

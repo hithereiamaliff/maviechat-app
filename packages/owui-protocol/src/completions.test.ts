@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildCompletionRequest, buildTurn, chatFeatures } from './completions';
+import {
+  buildCompletionRequest,
+  buildRegenerateTurn,
+  buildTurn,
+  chatFeatures,
+  isTemporaryChatId,
+  temporaryChatId,
+  temporaryChatMessages,
+} from './completions';
 import type { ChatHistory } from './history';
 import { uuidv4 } from './ids';
 import { templateVariables } from './variables';
@@ -141,5 +149,62 @@ describe('uuidv4', () => {
     const ids = new Set(Array.from({ length: 200 }, () => uuidv4()));
     expect(ids.size).toBe(200);
     for (const id of ids) expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  });
+});
+
+describe('regenerate and temporary chats', () => {
+  it('adds a sibling reply under the same user message', () => {
+    const turn = buildRegenerateTurn({ history, userMessageId: 'u0', model: { id: 'gpt', name: 'GPT' }, newId: () => 'r2' });
+    expect(turn.userMessage.childrenIds).toEqual(['a0', 'r2']);
+    expect(turn.replies[0]).toMatchObject({ id: 'r2', parentId: 'u0', done: false, model: 'gpt', modelIdx: 0 });
+    expect(turn.history.currentId).toBe('r2');
+    expect(history.messages.u0?.childrenIds).toEqual(['a0']);
+    expect(() => buildRegenerateTurn({ history, userMessageId: 'gone', model: { id: 'm', name: 'M' } })).toThrow();
+  });
+
+  it('sends the regeneration prompt', () => {
+    const turn = buildRegenerateTurn({ history, userMessageId: 'u0', model: { id: 'gpt', name: 'GPT' }, newId: () => 'r2' });
+    const body = buildCompletionRequest({
+      turn,
+      chatId: 'c1',
+      sessionId: 's',
+      model: { id: 'gpt', name: 'GPT' },
+      features: {},
+      variables: {},
+      tasks: {},
+      regenerationPrompt: 'More Concise',
+    });
+    expect(body).toMatchObject({ regeneration_prompt: 'More Concise', parent_id: null, id: 'r2', user_message: { id: 'u0' } });
+  });
+
+  it('builds the full conversation for temporary chats and skips title and tags', () => {
+    const branch = [
+      { id: 'u', parentId: null, childrenIds: ['a'], role: 'user', content: 'Look', files: [{ type: 'image', url: 'data:image/png;base64,AA' }] },
+      { id: 'a', parentId: 'u', childrenIds: [], role: 'assistant', content: 'Nice', model: 'm', output: [{ type: 'message', content: [{ type: 'output_text', text: 'Nice' }] }] },
+      { id: 'a2', parentId: 'u', childrenIds: [], role: 'assistant', content: '   ' },
+    ];
+    const messages = temporaryChatMessages(branch, 'Be kind');
+    expect(messages).toEqual([
+      { role: 'system', content: 'Be kind' },
+      { role: 'user', content: [{ type: 'text', text: 'Look' }, { type: 'image_url', image_url: { url: 'data:image/png;base64,AA' } }] },
+      { role: 'assistant', model: 'm', output: branch[1]?.output },
+    ]);
+    const turn = buildTurn({ history: { messages: {}, currentId: null }, content: 'Hi', models: [{ id: 'm', name: 'M' }], newId: counter() });
+    const body = buildCompletionRequest({
+      turn,
+      chatId: temporaryChatId('sock'),
+      sessionId: 'sock',
+      model: { id: 'm', name: 'M' },
+      features: {},
+      variables: {},
+      tasks: {},
+      temporaryMessages: messages,
+    });
+    expect(body.chat_id).toBe('temporary:sock');
+    expect(body.messages).toBe(messages);
+    expect(body.background_tasks).toEqual({ follow_up_generation: true });
+    expect(isTemporaryChatId('temporary:x')).toBe(true);
+    expect(isTemporaryChatId('local:x')).toBe(true);
+    expect(isTemporaryChatId('c1')).toBe(false);
   });
 });

@@ -55,6 +55,9 @@ export interface Palette {
   overlay: string;
   menu: string;
   unread: string;
+  /** A switched-on input toggle (web search, image, code interpreter). */
+  active: string;
+  onActive: string;
 }
 
 export const light: Palette = {
@@ -79,6 +82,8 @@ export const light: Palette = {
   overlay: 'rgba(0, 0, 0, 0.4)',
   menu: '#FFFFFF',
   unread: '#0EA5E9',
+  active: '#E0F2FE',
+  onActive: '#0284C7',
 };
 
 export const dark: Palette = {
@@ -103,6 +108,8 @@ export const dark: Palette = {
   overlay: 'rgba(0, 0, 0, 0.6)',
   menu: gray[850],
   unread: '#38BDF8',
+  active: 'rgba(56, 189, 248, 0.16)',
+  onActive: '#7DD3FC',
 };
 
 /** Code colours by highlight.js scope (GitHub's Primer palette, MIT). */

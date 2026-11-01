@@ -274,6 +274,16 @@ The server merges these writes: it keeps its own copy of in-progress assistant m
   - `request:user_input` → `{status: 'cancelled', answers: {}}`;
   - `request:elicitation` → `{action: 'cancel'}`;
   - `confirmation` and `input` are asked with native alerts.
+- **Attachments, regenerate, edit, delete, temporary chats** (slice 3 probe ✓, `tools/contract-probe/src/slice3-probe.ts`):
+  - **Upload:** `POST /api/v1/files/?process=true|false`, multipart field `file`, no JSON content type. Documents use `process=true` and are read in the background: poll `GET /api/v1/files/{id}/process/status` until `completed` or `failed` before sending (the web waits the same way, over a stream). Photos use `process=false`.
+  - **Attachment item** in `user_message.files`: `{type: 'file', file, id, url: id, name, collection_name, status: 'uploaded', size, error: '', itemId, content_type}`. Photos are told apart by `content_type` and load from `/api/v1/files/{id}/content`.
+  - **Request `files`** carry only documents (from the whole shown branch plus the new message, once each); photos travel in `user_message.files`. The model answered from an attached document ✓.
+  - **Regenerate:** a new reply placeholder under the same user message (`parent_id` = the user message's parent, `user_message` = that message with the new reply in `childrenIds`); `regeneration_prompt` = "Add Details", "More Concise" or your own words. Two versions afterwards, the new one identical to the server copy ✓.
+  - **Edit in place:** `POST /api/v1/chats/{id} {chat: {history: {messages: {[id]: message}, currentId}}}`. Content saved, message count and branches intact ✓. **Edit + Send** is a new user message beside the original (same parent), sent as a normal turn.
+  - **Delete message:** `DELETE /api/v1/chats/{id}/messages/{mid}` removes the message and its direct replies, re-attaches grandchildren to its parent, picks the branch to show, and answers with the updated chat ✓. The server checks only ownership: `chat.delete_message` just hides the web's button (own messages: hidden unless granted; reply versions: shown unless denied, and only when another version remains).
+  - **Temporary chat:** `chat_id: "temporary:<socket id>"` (the web's own prefix; `local:` is the legacy one), every message in `messages` (finished replies as `{role, model, output}`, photos as `image_url` parts), no title or tags tasks. The reply streams normally and nothing is stored ✓. Attachments stay on the device: photos as `{type: 'image', url: <data URL>}`, text files as `{type: 'text', content}`.
+- **Input bar rules** (0.11.3 web): a toggle (web search, image, code interpreter) shows when the server flag, the user permission and the model's `info.meta.capabilities` all allow it (a capability the model doesn't list counts as allowed). A model's `defaultFeatureIds` switch toggles on only for capabilities it lists. Default tools: the model's `toolIds`, else `ui.tools`. Limits: `config.file.max_count`, `config.file.max_size` (MB). Uploads need `chat.file_upload` (allowed unless denied).
+- **Message queue** (setting `ui.enableMessageQueue`, default on): messages typed during a reply queue; when the reply ends they go out as one message, texts joined by a blank line and attachments combined. Send now stops the reply and sends one item.
 
 ## 9. Stability notes
 

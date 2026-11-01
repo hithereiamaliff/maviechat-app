@@ -1,4 +1,4 @@
-import type { ChatHistory } from './history';
+import type { ChatHistory, HistoryMessage } from './history';
 import type { OwuiClient } from './http';
 
 /** A row of the sidebar lists (`ChatTitleIdResponse`). Times are Unix seconds. */
@@ -95,6 +95,27 @@ export function toggleArchived(client: OwuiClient, id: string): Promise<ChatReco
 
 export function deleteChat(client: OwuiClient, id: string): Promise<boolean> {
   return client.delete<boolean>(chatPath(id));
+}
+
+/**
+ * Removes a message and its replies; the server re-attaches deeper messages to the parent.
+ * Needs the `chat.delete_message` permission (admins always may).
+ */
+export function deleteMessage(client: OwuiClient, chatId: string, messageId: string): Promise<ChatRecord> {
+  return client.delete<ChatRecord>(`${chatPath(chatId)}/messages/${encodeURIComponent(messageId)}`);
+}
+
+/**
+ * Saves one edited message in place. The server merges histories by message id, so only
+ * this (complete) message is sent; `currentId` keeps the shown branch.
+ */
+export function saveMessage(client: OwuiClient, chatId: string, message: HistoryMessage, currentId: string | null): Promise<ChatRecord> {
+  return client.post<ChatRecord>(chatPath(chatId), { chat: { history: { messages: { [message.id]: message }, currentId } } });
+}
+
+/** Creates a saved chat from a whole history (used to keep a temporary chat). The server picks the id. */
+export function createChat(client: OwuiClient, chat: ChatDocument): Promise<ChatRecord> {
+  return client.post<ChatRecord>('/api/v1/chats/new', { chat });
 }
 
 /** `null` moves the chat out of its folder. */

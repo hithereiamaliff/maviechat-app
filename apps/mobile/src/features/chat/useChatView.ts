@@ -2,6 +2,7 @@ import {
   branchPath,
   getChat,
   initialLeaf,
+  isTemporaryChatId,
   selectBranch,
   siblingPosition,
   switchSibling,
@@ -14,11 +15,15 @@ import { useAuthed } from '@/lib/server';
 
 const EMPTY_HISTORY: ChatHistory = { messages: {}, currentId: null };
 
-/** Loads a chat and tracks which branch is shown; switching branches is saved like the web app does. */
+/**
+ * Loads a chat and tracks which branch is shown; switching branches is saved like the web app does.
+ * A temporary chat exists only in the app's cache, so it is never fetched or saved.
+ */
 export function useChatView(chatId: string) {
   const { client } = useAuthed();
   const toast = useToast();
-  const query = useQuery({ queryKey: ['chat', chatId], queryFn: () => getChat(client, chatId), enabled: Boolean(chatId) });
+  const temporary = isTemporaryChatId(chatId);
+  const query = useQuery({ queryKey: ['chat', chatId], queryFn: () => getChat(client, chatId), enabled: Boolean(chatId) && !temporary });
   // Keyed by chat, so opening another chat starts from that chat's own saved branch.
   const [selection, setSelection] = useState<{ chatId: string; leaf: string } | null>(null);
 
@@ -34,9 +39,9 @@ export function useChatView(chatId: string) {
       const next = switchSibling(history, messageId, direction);
       if (!next) return;
       setSelection({ chatId, leaf: next });
-      selectBranch(client, chatId, next).catch(() => toast("Couldn't save which version is shown", 'error'));
+      if (!temporary) selectBranch(client, chatId, next).catch(() => toast("Couldn't save which version is shown", 'error'));
     },
-    [history, client, chatId, toast],
+    [history, client, chatId, toast, temporary],
   );
 
   /** Show this leaf (e.g. a reply just sent) without saving the choice; the server already did. */

@@ -79,6 +79,89 @@ export function buildTurn({
   };
 }
 
+/**
+ * Regenerates a reply: a new, empty reply joins the old one under the same user message
+ * (the ‹ n/m › arrows then switch between them). No user message is added.
+ */
+export function buildRegenerateTurn({
+  history,
+  userMessageId,
+  model,
+  modelIdx = 0,
+  now = new Date(),
+  newId = uuidv4,
+}: {
+  history: ChatHistory;
+  userMessageId: string;
+  model: Pick<ModelItem, 'id' | 'name'>;
+  modelIdx?: number;
+  now?: Date;
+  newId?: () => string;
+}): Turn {
+  const user = history.messages[userMessageId];
+  if (!user) throw new Error('The message to regenerate from is missing');
+  const reply: HistoryMessage = {
+    id: newId(),
+    parentId: user.id,
+    childrenIds: [],
+    role: 'assistant',
+    content: '',
+    done: false,
+    model: model.id,
+    modelName: model.name ?? model.id,
+    modelIdx,
+    timestamp: Math.floor(now.getTime() / 1000),
+  };
+  const userMessage: HistoryMessage = { ...user, childrenIds: [...user.childrenIds, reply.id] };
+  return {
+    history: { messages: { ...history.messages, [user.id]: userMessage, [reply.id]: reply }, currentId: reply.id },
+    userMessage,
+    replies: [reply],
+    messageIds: [{ model_id: model.id, message_id: reply.id, modelIdx }],
+  };
+}
+
+/** Temporary chats are identified by the socket that started them; the server stores nothing. */
+export function temporaryChatId(sessionId: string): string {
+  return `temporary:${sessionId}`;
+}
+
+export function isTemporaryChatId(chatId: string | null | undefined): boolean {
+  return Boolean(chatId && (chatId.startsWith('temporary:') || chatId.startsWith('local:')));
+}
+
+/**
+ * The whole conversation for a temporary chat (the server has no copy): finished replies
+ * with `output[]` go as `{role, model, output}`, user photos as image parts, the rest as text.
+ */
+export function temporaryChatMessages(branch: HistoryMessage[], system?: string | null): Record<string, unknown>[] {
+  const list: Record<string, unknown>[] = [];
+  const prompt = system?.trim();
+  if (prompt) list.push({ role: 'system', content: prompt });
+  for (const message of branch) {
+    if (message.role === 'assistant' && Array.isArray(message.output) && message.output.length > 0) {
+      list.push({ role: 'assistant', model: message.model, output: message.output });
+      continue;
+    }
+    const images = (message.files ?? []).filter(
+      (file): file is { url: string } =>
+        typeof file === 'object' &&
+        file !== null &&
+        typeof (file as { url?: unknown }).url === 'string' &&
+        ((file as { type?: unknown }).type === 'image' || String((file as { content_type?: unknown }).content_type ?? '').startsWith('image/')),
+    );
+    if (message.role === 'user' && images.length > 0) {
+      list.push({
+        role: 'user',
+        content: [{ type: 'text', text: message.content }, ...images.map((image) => ({ type: 'image_url', image_url: { url: image.url } }))],
+      });
+      continue;
+    }
+    if (message.role === 'user' || message.content.trim()) list.push({ role: message.role, content: message.content });
+  }
+  return list;
+}
+
 export interface FeatureToggles {
   webSearch?: boolean;
   imageGeneration?: boolean;
@@ -116,6 +199,10 @@ export interface CompletionRequestInput {
   toolIds?: string[];
   files?: unknown[];
   folderId?: string | null;
+  /** "Add Details", "More Concise" or your own words: asks for a different take on the reply. */
+  regenerationPrompt?: string;
+  /** Temporary chat: the full conversation (see `temporaryChatMessages`); nothing is saved. */
+  temporaryMessages?: Record<string, unknown>[];
 }
 
 /** The `POST /api/chat/completions` body for a saved chat, matching Open WebUI 0.11.3. */
@@ -123,12 +210,14 @@ export function buildCompletionRequest(input: CompletionRequestInput): Record<st
   const { turn } = input;
   const firstReply = turn.replies[0];
   const system = input.system?.trim();
+  const temporary = input.temporaryMessages !== undefined || isTemporaryChatId(input.chatId);
   const isNewChat = input.chatId === null;
+  const messages = input.temporaryMessages ?? (system ? [{ role: 'system', content: system }] : []);
   return {
     stream: true,
     model: input.model.id,
-    // Saved chats send only the system prompt; the server loads the conversation itself.
-    ...(system ? { messages: [{ role: 'system', content: system }] } : {}),
+    // Saved chats send only the system prompt (the server loads the conversation); temporary chats send everything.
+    ...(messages.length > 0 ? { messages } : {}),
     params: { ...(input.params ?? {}) },
     ...(input.files && input.files.length > 0 ? { files: input.files } : {}),
     ...(input.toolIds && input.toolIds.length > 0 ? { tool_ids: input.toolIds } : {}),
@@ -143,8 +232,9 @@ export function buildCompletionRequest(input: CompletionRequestInput): Record<st
     message_ids: turn.messageIds,
     parent_id: turn.userMessage.parentId ?? null,
     user_message: turn.userMessage,
+    ...(input.regenerationPrompt ? { regeneration_prompt: input.regenerationPrompt } : {}),
     background_tasks: {
-      ...(isNewChat ? { title_generation: input.tasks.title ?? true, tags_generation: input.tasks.tags ?? true } : {}),
+      ...(isNewChat && !temporary ? { title_generation: input.tasks.title ?? true, tags_generation: input.tasks.tags ?? true } : {}),
       follow_up_generation: input.tasks.followUps ?? true,
     },
   };

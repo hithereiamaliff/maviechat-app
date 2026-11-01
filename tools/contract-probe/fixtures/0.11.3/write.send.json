@@ -7,11 +7,12 @@
   },
   "eventCounts": {
     "chat:active": 1,
-    "chat:completion": 2,
+    "chat:completion": 3,
     "chat:list": 1,
+    "chat:message:follow_ups": 1,
     "chat:outlet": 1,
     "chat:title": 1,
-    "response:completion": 4
+    "response:completion": 2
   },
   "chatLevelEvents": [
     "chat:active",
@@ -22,6 +23,7 @@
     "childrenIds",
     "content",
     "done",
+    "followUps",
     "id",
     "model",
     "modelIdx",

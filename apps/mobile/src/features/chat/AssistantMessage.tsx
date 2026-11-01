@@ -1,17 +1,22 @@
 import {
+  attachmentUrl,
   errorText,
   groupSteps,
+  isImageItem,
   latestStatus,
   messageBlocks,
   normalizeSources,
   plainText,
+  type FileItem,
   type HistoryMessage,
 } from '@maviechat/owui-protocol';
 import * as Clipboard from 'expo-clipboard';
+import { Image } from 'expo-image';
 import { memo, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
+import { MenuButton, type MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
 import { Markdown } from '@/markdown/Markdown';
 import { fonts, radius, usePalette } from '@/theme';
@@ -43,6 +48,8 @@ export const AssistantMessage = memo(function AssistantMessage({
   baseUrl,
   token,
   onFollowUp,
+  onRegenerate,
+  onDelete,
 }: {
   message: HistoryMessage;
   modelLabel: string;
@@ -53,6 +60,9 @@ export const AssistantMessage = memo(function AssistantMessage({
   token: string;
   /** Sends a suggested follow-up (shown under the last reply once it's done). */
   onFollowUp?: (text: string) => void;
+  /** Asks for another version of this reply, optionally steered ("More Concise", your own words). */
+  onRegenerate?: (prompt?: string) => void;
+  onDelete?: () => void;
 }) {
   const palette = usePalette();
   const toast = useToast();
@@ -65,6 +75,37 @@ export const AssistantMessage = memo(function AssistantMessage({
   const streaming = message.done === false;
   const usage = usageSummary(message.usage);
   const showActions = isLast || revealed;
+  const images = useMemo(
+    () => (Array.isArray(message.files) ? (message.files as FileItem[]).filter((file) => file && typeof file === 'object' && isImageItem(file)) : []),
+    [message.files],
+  );
+  const regenerateItems: MenuItem[] = onRegenerate
+    ? [
+        { key: 'again', label: 'Try Again', icon: 'arrow-path', onPress: () => onRegenerate() },
+        { key: 'details', label: 'Add Details', icon: 'bars-arrow-down', onPress: () => onRegenerate('Add Details') },
+        { key: 'concise', label: 'More Concise', icon: 'bars-arrow-up', onPress: () => onRegenerate('More Concise') },
+        ...(Platform.OS === 'ios'
+          ? [
+              {
+                key: 'suggest',
+                label: 'Suggest a change',
+                icon: 'chat-bubble-bottom-center-text' as const,
+                onPress: () =>
+                  Alert.prompt('Suggest a change', undefined, [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Regenerate',
+                      onPress: (value?: string) => {
+                        const prompt = value?.trim();
+                        if (prompt) onRegenerate(prompt);
+                      },
+                    },
+                  ]),
+              },
+            ]
+          : []),
+      ]
+    : [];
 
   return (
     <Pressable onPress={() => setRevealed((value) => !value)} style={styles.wrap} accessibilityHint="Shows message actions">
@@ -82,6 +123,23 @@ export const AssistantMessage = memo(function AssistantMessage({
           <Text style={[styles.statusText, { color: palette.textMuted }]} numberOfLines={2}>
             {status.description}
           </Text>
+        </View>
+      ) : null}
+
+      {images.length > 0 ? (
+        <View style={styles.images}>
+          {images.map((file, index) => {
+            const url = attachmentUrl(file, baseUrl);
+            return url ? (
+              <Image
+                key={index}
+                accessibilityLabel={typeof file.name === 'string' ? file.name : 'Generated image'}
+                source={{ uri: url, headers: url.startsWith(baseUrl) ? { Authorization: `Bearer ${token}` } : undefined }}
+                style={[styles.image, { backgroundColor: palette.surface }]}
+                contentFit="cover"
+              />
+            ) : null;
+          })}
         </View>
       ) : null}
 
@@ -143,6 +201,8 @@ export const AssistantMessage = memo(function AssistantMessage({
               onPress={() => Alert.alert('Usage', usage)}
             />
           ) : null}
+          {regenerateItems.length > 0 ? <MenuButton items={regenerateItems} label="Regenerate" icon="arrow-path" size={18} color={palette.textMuted} /> : null}
+          {onDelete ? <IconButton icon="trash" label="Delete" size={18} color={palette.textMuted} onPress={onDelete} /> : null}
         </View>
       ) : null}
     </Pressable>
@@ -155,6 +215,8 @@ const styles = StyleSheet.create({
   status: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 4 },
   statusText: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 14 },
   pending: { alignSelf: 'flex-start', marginVertical: 8 },
+  images: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 6 },
+  image: { width: 220, height: 220, borderRadius: radius.lg },
   error: {
     flexDirection: 'row',
     gap: 8,

@@ -33,6 +33,7 @@ import { DEFAULT_ENV_FILE, loadEnvFile } from './env';
 import { shapeOf } from './shape';
 import { summarizeTree } from './tree-summary';
 import { probeSend } from './send-probe';
+import { probeSlice3 } from './slice3-probe';
 import { probeChatActions } from './write-probe';
 
 const { values: args } = parseArgs({
@@ -206,6 +207,19 @@ async function main() {
           });
           for (const result of sendReport.steps) results.push({ ...result, name: `send: ${result.name}` });
           fixtures['write.send'] = { steps: Object.fromEntries(sendReport.steps.map((s) => [s.name.replace(/ to .*/, ''), s.ok])), ...sendReport.fixture };
+
+          const slice3 = await probeSlice3({
+            client,
+            baseUrl,
+            token: session.token,
+            userId: session.id,
+            userName: session.name,
+            capabilities,
+            canDelete,
+            modelId: env.OWUI_PROBE_MODEL,
+          });
+          for (const result of slice3.steps) results.push({ ...result, name: `slice 3: ${result.name}` });
+          fixtures['write.slice3'] = slice3.fixture;
         }
       }
 

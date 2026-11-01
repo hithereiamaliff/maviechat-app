@@ -212,11 +212,17 @@ export class ChatStreams {
     }
   }
 
-  /** Refetch shortly after a reply finishes, so title, follow-ups and saved output match the server. */
+  /**
+   * Refetch shortly after a reply finishes, so title, follow-ups and saved output match the server.
+   * Not while another reply in the chat is still streaming (e.g. a queued message went out at once):
+   * its events build on the local copy, and that reply's own finish refetches.
+   */
   private converge(chatId: string): void {
     this.later(() => {
-      void this.queryClient.invalidateQueries({ queryKey: ['chat', chatId] });
       void this.queryClient.invalidateQueries({ queryKey: ['chats'] });
+      const messages = this.queryClient.getQueryData<ChatRecord>(['chat', chatId])?.chat?.history?.messages ?? {};
+      if (Object.values(messages).some((message) => message.role === 'assistant' && message.done === false)) return;
+      void this.queryClient.invalidateQueries({ queryKey: ['chat', chatId] });
     }, 1500);
   }
 

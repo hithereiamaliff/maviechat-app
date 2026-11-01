@@ -52,6 +52,9 @@ describe('buildCapabilities', () => {
     expect(caps.can('chat.multiple_models')).toBe(false);
     expect(caps.can('chat.missing')).toBe(false);
     expect(caps.can('features.web_search.deeper')).toBe(false);
+    // Unlisted permissions can default to allowed, as some web controls do; listed ones win.
+    expect(caps.can('chat.missing', true)).toBe(true);
+    expect(caps.can('chat.multiple_models', true)).toBe(false);
   });
 
   it('reports version support, pending users and socket settings', () => {

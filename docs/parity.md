@@ -57,7 +57,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 |---|---|---|
 | [x] | Sidebar button, chat title | M1 |
 | [~] | "…" menu: Scroll to top, Artifacts, Share, Download JSON/TXT/PDF, Rename, Copy chat, Move to folder, Archive, Delete, Tags editor. Slice 1: Rename, Pin, Archive, Delete | M1 core, M2 rest |
-| [ ] | Temporary Chat toggle (new chat only) / Save Chat (temporary chat with messages) | M1 |
+| [~] | Temporary Chat toggle (new chat only) / Save Chat (temporary chat with messages). Slice 3: the toggle, with the `chat.temporary` / `temporary_enforced` rules | M1 toggle, M2 Save Chat |
 | [x] | New Chat button (phone only), Controls (knobs) button | M1 |
 | [ ] | Admin banners on the new-chat screen | M2 |
 
@@ -94,20 +94,20 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Item | Mn |
 |---|---|---|
-| [ ] | Above the input: scroll-to-bottom arrow, queued messages (Send now / Edit / Delete) | M1 |
+| [x] | Above the input: scroll-to-bottom arrow, queued messages (Send now / Edit / Delete) | M1 |
 | [ ] | Ask-user cards (multiple choice, "Recommended", Other, Previous/Next, Submit, timeout) (`chat/AskUserCard.svelte`) | M2 |
-| [ ] | Attachments: thumbnails (warning if the model lacks vision), file chips with spinner and ×; file preview with "Focused Retrieval / Entire Document" | M1 |
+| [~] | Attachments: thumbnails (warning if the model lacks vision), file chips with spinner and ×; file preview with "Focused Retrieval / Entire Document". Slice 3: all but the preview; server image-compression limits not applied (needs a native resizer) | M1; preview M2 |
 | [ ] | Expand to a full-screen editor after 2 lines | M1 |
-| [ ] | "+" menu: Upload files, Camera, Attach webpage, Attach previous files, Attach knowledge, Reference chats | M1 (upload, camera, photos); M2 (rest) |
+| [~] | "+" menu: Upload files, Camera, Attach webpage, Attach previous files, Attach knowledge, Reference chats. Slice 3: Upload Files, Photo Library, Capture | M1 (upload, camera, photos); M2 (rest) |
 | — | "+" menu: Google Drive / OneDrive, Compare text, Screen capture | — |
-| [ ] | Integrations menu: tools (switch each; OAuth Connect), skills, filters, Web Search, Image, Code Interpreter | M1 (web search/image/code + tools); M2 (skills/filters/OAuth) |
-| [ ] | Active chips (tap to turn off); Chat Variables `{}`; model knobs | M1 chips, M2 rest |
-| [~] | Last button: Stop (generating, empty input) / Dictate + Voice (empty) / Send. Slice 2: Send and Stop | M1 (stop/send); M2 (dictate) |
+| [~] | Integrations menu: tools (switch each; OAuth Connect), skills, filters, Web Search, Image, Code Interpreter. Slice 3: a sheet with Web Search / Image / Code Interpreter (server, permission and model must allow) and tools; model defaults applied | M1 (web search/image/code + tools); M2 (skills/filters/OAuth) |
+| [~] | Active chips (tap to turn off); Chat Variables `{}`; model knobs. Slice 3: chips (icon only, as on narrow web layouts) | M1 chips, M2 rest |
+| [~] | Last button: Stop (generating, empty input) / Dictate + Voice (empty) / Send. Slice 2: Send and Stop; slice 3: Stop + Queue while typing during a reply | M1 (stop/send); M2 (dictate) |
 | [ ] | `/` commands + saved prompts with variables form (`InputVariablesModal.svelte`); `@` models/knowledge/files/URL; `#` folders/collections/files/URLs; `$` skills | M2 |
 | [ ] | Built-in variables `{{USER_NAME}}`, `{{CURRENT_DATE}}`, `{{CLIPBOARD}}`, `{{USER_LOCATION}}`, … | M2 |
-| [ ] | Message queue while replying (setting "Enable Message Queue", default on); queue while uploads finish | M1 |
+| [~] | Message queue while replying (setting "Enable Message Queue", default on); queue while uploads finish. Slice 3: the queue (combined with blank lines when the reply ends; off = stop then send); Send waits for uploads instead of queueing | M1 |
 | [ ] | Paste image/file uploads it; long paste becomes a `.txt` attachment (setting) | M2 |
-| [ ] | Drafts kept per chat | M1 |
+| [x] | Drafts kept per chat (text, attachments, toggles, tools, queue; while the app runs) | M1 |
 | web | Voice call mode (`CallOverlay.svelte`), realtime voice | — |
 
 ## 8. Messages
@@ -119,7 +119,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | | Item | Mn |
 |---|---|---|
 | [x] | Right-side bubble (or flat row setting); attachments; full-screen image viewer | M1 |
-| [~] | Edit (Cancel / Save / Send = new branch), Copy, Delete (permission), branch arrows `< n/m >`. Slice 1: Copy, branch arrows (saved like the web) | M1 |
+| [~] | Edit (Cancel / Save / Send = new branch), Copy, Delete (permission), branch arrows `< n/m >`. Slice 1: Copy, branch arrows; slice 3: Edit (text only; removing files while editing → M2), Delete | M1 |
 
 **Assistant message** (`Messages/ResponseMessage.svelte`)
 
@@ -132,9 +132,9 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [~] | Code blocks: language label, collapse/expand, Copy, Run (server Jupyter), Preview (HTML/SVG → artifacts), diff blocks; Mermaid and Vega diagrams. Slice 1: label, highlighting, collapse, Copy | M1 copy/collapse; M2 run/preview/diagrams |
 | [x] | Collapsibles: Reasoning ("Thinking…", "Thought for N seconds"), code interpreter ("Analyzing…/Analyzed"), tool calls ("Executing X…", "View Result from X", input/output, Allow/Deny), grouped "Explored…" | M1 |
 | [x] | Sources: "N Sources" pill with favicons, expandable list, detail sheet (excerpts, relevance, page, open) | M1 |
-| [ ] | Generated images and files; tool HTML embeds (sandboxed) | M1 images, M2 embeds |
+| [~] | Generated images and files; tool HTML embeds (sandboxed). Slice 3: generated images | M1 images, M2 embeds |
 | [x] | Error box; blinking cursor while streaming | M1 |
-| [~] | Action bar (always on the last message; tap to reveal on others): branch arrows, Edit (Save / Save As Copy), Copy, Read Aloud, Info (usage), Fork, 👍/👎, Continue (last only), Regenerate menu (Suggest a change / Try again / Add details / More concise), custom actions, Delete (when siblings exist), timestamp. Slice 1: arrows, Copy, Info | M1 (arrows, copy, regenerate, info, delete); M2 (edit, read aloud, fork, rate, continue, actions) |
+| [~] | Action bar (always on the last message; tap to reveal on others): branch arrows, Edit (Save / Save As Copy), Copy, Read Aloud, Info (usage), Fork, 👍/👎, Continue (last only), Regenerate menu (Suggest a change / Try again / Add details / More concise), custom actions, Delete (when siblings exist), timestamp. Slice 1: arrows, Copy, Info; slice 3: Regenerate menu, Delete | M1 (arrows, copy, regenerate, info, delete); M2 (edit, read aloud, fork, rate, continue, actions) |
 | [x] | Follow-ups list under the last reply (tap sends, or inserts per setting) | M1 |
 | [ ] | Rating panel: 1–10, reason chips (up/down sets), comment, Save (`Messages/RateComment.svelte`) | M2 |
 | [ ] | Multi-model: full-width swipeable cards; solid border = the branch continued from; per-model arrows; tabs setting; "Merge Responses" | M2 |
@@ -151,7 +151,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [ ] | Tags: editor; `tag:` search | M2 |
 | [ ] | Clone (sidebar), Fork from a message, `/fork` | M2 |
 | [ ] | Archive / Unarchive, Pin, Move to folder, Delete, Mark unread | M1 |
-| [ ] | Temporary chat (not saved; Save Chat later) | M1 |
+| [~] | Temporary chat (not saved; Save Chat later). Slice 3: temporary chats (photos inline, text files read on the phone; other documents need a saved chat) | M1; Save Chat M2 |
 | [~] | Background completions: toast "reply finished" for a chat you're not viewing (tap to open). Slice 2: toast while the app is open | M1 (while foregrounded); M6 push |
 | — | Shared-chat presence and typing (Allow replies) | M5 |
 

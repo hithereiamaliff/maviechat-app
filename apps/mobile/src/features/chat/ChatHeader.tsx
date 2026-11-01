@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconButton } from '@/components/IconButton';
@@ -6,8 +7,8 @@ import { MenuButton, type MenuItem } from '@/components/Menu';
 import { useSidebar } from '@/features/sidebar/SidebarContext';
 import { fonts, usePalette } from '@/theme';
 
-/** Phone layout of the web app's navbar: sidebar button, title, new chat, chat menu. */
-export function ChatHeader({ title, menu }: { title?: string; menu?: MenuItem[] }) {
+/** Phone layout of the web app's navbar: sidebar button, title, extra buttons, new chat, chat menu. */
+export function ChatHeader({ title, menu, accessory }: { title?: string; menu?: MenuItem[]; accessory?: ReactNode }) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
   const sidebar = useSidebar();
@@ -18,6 +19,7 @@ export function ChatHeader({ title, menu }: { title?: string; menu?: MenuItem[] 
       <Text style={[styles.title, { color: palette.text }]} numberOfLines={1} accessibilityRole="header">
         {title ?? ''}
       </Text>
+      {accessory}
       <IconButton icon="pencil-square" label="New chat" onPress={() => router.replace('/')} />
       {menu && menu.length > 0 ? <MenuButton items={menu} label="Chat options" /> : null}
     </View>

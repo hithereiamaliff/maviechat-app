@@ -1,0 +1,11 @@
+{
+  "steps": {
+    "upload a document and wait for processing": true,
+    "upload a photo without processing and read it back": true,
+    "the model reads the attached document": true,
+    "regenerate \"More Concise\" adds a second reply": true,
+    "edit a message in place without losing anything": true,
+    "delete one reply version": true,
+    "temporary chat streams and leaves nothing behind": true
+  }
+}

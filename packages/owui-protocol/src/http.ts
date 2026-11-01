@@ -16,7 +16,11 @@ export interface OwuiClientOptions {
 export interface RequestOptions {
   query?: Record<string, QueryValue>;
   body?: unknown;
+  /** Multipart body (uploads). */
+  form?: FormData;
   signal?: AbortSignal;
+  /** Overrides the client's timeout for this request (uploads can be slow). */
+  timeoutMs?: number;
 }
 
 /** A non-2xx answer from the server. `detail` is Open WebUI's error text when it sent one. */
@@ -99,11 +103,18 @@ export class OwuiClient {
     return this.request<T>('DELETE', path, options);
   }
 
+  /** Multipart upload; fetch sets the boundary, so no Content-Type header is sent. */
+  postForm<T>(path: string, form: FormData, options?: Omit<RequestOptions, 'body'>): Promise<T> {
+    return this.request<T>('POST', path, { ...options, form });
+  }
+
   async request<T>(method: 'GET' | 'POST' | 'DELETE' | 'PATCH', path: string, options: RequestOptions = {}): Promise<T> {
     const headers: Record<string, string> = { Accept: 'application/json', ...this.options.headers };
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
-    let body: string | undefined;
-    if (options.body !== undefined) {
+    let body: string | FormData | undefined;
+    if (options.form) {
+      body = options.form;
+    } else if (options.body !== undefined) {
       headers['Content-Type'] = 'application/json';
       body = JSON.stringify(options.body);
     }
@@ -113,7 +124,7 @@ export class OwuiClient {
     const timer = setTimeout(() => {
       timedOut = true;
       controller.abort();
-    }, this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    }, options.timeoutMs ?? this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
     const onAbort = () => controller.abort();
     options.signal?.addEventListener('abort', onAbort);
 

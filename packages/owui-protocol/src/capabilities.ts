@@ -32,8 +32,11 @@ export interface Capabilities {
   readonly isPending: boolean;
   /** Admin flag on, and the user is an admin or permitted. */
   feature(id: FeatureId): boolean;
-  /** The user is an admin, or the permission at a dotted path (e.g. `chat.multiple_models`) is true. */
-  can(permissionPath: string): boolean;
+  /**
+   * The user is an admin, or the permission at a dotted path (e.g. `chat.multiple_models`) is true.
+   * `fallback` applies when the server doesn't list the permission (the web treats some as allowed).
+   */
+  can(permissionPath: string, fallback?: boolean): boolean;
   /**
    * Controls the admin hid for non-admins. Open WebUI 0.12 adds `config.ui.visibility`;
    * 0.11.x has no such list, so nothing is hidden. Implement when validating 0.12 (M5).
@@ -55,7 +58,7 @@ export function buildCapabilities({ config, user, version }: CapabilityInput): C
   const resolvedVersion = version ?? config.version;
   const isAdmin = user.role === 'admin';
   const permissions = user.permissions ?? {};
-  const can = (permissionPath: string) => isAdmin || readPath(permissions, permissionPath) === true;
+  const can = (permissionPath: string, fallback = false) => isAdmin || (readPath(permissions, permissionPath) ?? fallback) === true;
 
   return {
     version: resolvedVersion ?? undefined,

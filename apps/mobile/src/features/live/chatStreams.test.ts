@@ -78,6 +78,23 @@ describe('ChatStreams', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['chat', 'c1'] });
   });
 
+  it('waits to refetch while another reply in the chat is still streaming', () => {
+    const { streams, seed, event, frames, timers, queryClient } = setup();
+    seed('c1');
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    streams.handle(event('c1', 'a1', 'chat:completion', { done: true, content: 'Done' }));
+    frames[0]?.();
+    // A queued message went out right away: a new reply is streaming in the same chat.
+    queryClient.setQueryData<ChatRecord>(['chat', 'c1'], (record) => {
+      const history = record!.chat.history!;
+      const next = { id: 'a2', parentId: 'u1', childrenIds: [], role: 'assistant', content: '', done: false };
+      return { ...record!, chat: { ...record!.chat, history: { ...history, messages: { ...history.messages, a2: next } } } };
+    });
+    timers[0]?.();
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ['chat', 'c1'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['chats'] });
+  });
+
   it('updates titles live and refreshes the sidebar on list changes', () => {
     const { streams, seed, event, queryClient } = setup();
     seed('c1');

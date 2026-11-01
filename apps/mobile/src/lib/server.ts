@@ -5,6 +5,7 @@ import {
   getUserSettings,
   getVersion,
   listModels,
+  listTools,
   type Capabilities,
   type OwuiClient,
 } from '@maviechat/owui-protocol';
@@ -43,6 +44,12 @@ export function useModels() {
 export function useUserSettings() {
   const { client } = useAuthed();
   return useQuery({ queryKey: ['user-settings'], queryFn: () => getUserSettings(client), staleTime: 5 * 60_000 });
+}
+
+/** Tools this account can switch on for a message (empty when it may use none). */
+export function useTools() {
+  const { client } = useAuthed();
+  return useQuery({ queryKey: ['tools'], queryFn: () => listTools(client), staleTime: 5 * 60_000 });
 }
 
 /** Server features for this user (flag + permission), once config and session are loaded. */

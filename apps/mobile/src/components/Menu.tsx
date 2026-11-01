@@ -23,7 +23,8 @@ interface Anchor {
 const MENU_WIDTH = 224;
 const ROW_HEIGHT = 44;
 
-function useAnchoredMenu(items: MenuItem[]) {
+/** Opens a popover menu anchored to whatever `ref` is attached to (for custom triggers). */
+export function useAnchoredMenu(items: MenuItem[]) {
   const ref = useRef<HostInstance>(null);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const [visible, setVisible] = useState(false);
