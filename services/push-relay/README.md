@@ -1,13 +1,21 @@
 # MavieChat push relay
 
-Turns Open WebUI's "chat finished" and "chat failed" webhooks into push notifications on the phone, through Expo's push service. It stores nothing.
+Turns Open WebUI's "chat finished" and "chat failed" events into push notifications on users' phones, through Expo's push service. It works for every Open WebUI account: it uses the server-wide event webhook, not per-user webhooks, which Open WebUI only allows for admins and accounts with the "User Webhooks" permission.
 
-- `POST /v1/devices`: the app, signed in to Open WebUI (`Authorization: Bearer <Open WebUI token>`), sends `{pushToken}`. The relay checks the token with `OWUI_URL/api/v1/auths/` and answers `{webhookUrl}`. That link carries the push token and user id sealed with AES-256-GCM, so only this relay can read it and nobody can forge one.
-- `POST /v1/hooks/<sealed>`: Open WebUI calls the link (a notification target with events `chat.finished` and `chat.failed`). The relay sends "Reply ready: <chat title>" with the start of the reply. It also handles Open WebUI's test button. It answers 410 when the phone no longer accepts notifications.
-- `GET /health`.
+- **`POST /v1/devices`**, **`DELETE /v1/devices`**: the app adds or removes `{pushToken}`.
+  - It sends `Authorization: Bearer <Open WebUI token>`. The relay checks it with `OWUI_URL/api/v1/auths/` and files the phone under that user's id.
+  - A phone belongs to one account at a time, with up to 10 phones per account.
+- **`POST /v1/devices/test`**: a test notification to the caller's phone.
+- **`POST /v1/events/<EVENTS_SECRET>`**: Open WebUI's server-wide webhook.
+  - Set it up once in Admin Panel → Settings → Events → Add webhook, for events `chat.finished` and `chat.failed`, sent for all users.
+  - For each event the relay notifies that user's phones with "Reply ready: <chat title>" and the start of the reply.
+  - Phones Apple reports as gone are dropped.
+- **`GET /health`**.
 
-Environment:
-- `RELAY_KEY`: 32 random bytes, base64. Changing it breaks every link, and phones then register again.
-- `PUBLIC_URL`: this relay's address.
+**Stored:** `DATA_DIR/devices.json` (mode 600) holds Open WebUI user ids, push tokens and when the last event arrived. No passwords, Open WebUI tokens or chat text.
+
+**Environment:**
+- `EVENTS_SECRET`: at least 32 URL-safe characters; it is part of the webhook address.
 - `OWUI_URL`: the one Open WebUI server whose users may register.
+- `DATA_DIR`: default `/data`.
 

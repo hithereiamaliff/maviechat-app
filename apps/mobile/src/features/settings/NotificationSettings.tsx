@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { useToast } from '@/components/Toast';
 import { disablePush, enablePush, sendTestPush, usePushState } from '@/features/notifications/push';
-import { describePushError, WEBHOOKS_NOT_ALLOWED, WEBHOOKS_OFF } from '@/features/notifications/relay';
-import { useAuthed, useCapabilities, useServerConfig } from '@/lib/server';
+import { describePushError } from '@/features/notifications/relay';
+import { useAuthed } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
 
 /** Notifications for replies that finish while MavieChat isn't on screen (this iPhone only). */
@@ -11,8 +11,6 @@ export function NotificationSettings() {
   const palette = usePalette();
   const toast = useToast();
   const { client, session } = useAuthed();
-  const capabilities = useCapabilities();
-  const config = useServerConfig();
   const push = usePushState();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -22,12 +20,8 @@ export function NotificationSettings() {
     setBusy(true);
     setProblem(null);
     try {
-      if (on) {
-        const status = await enablePush(client, session, { ask: true });
-        setBlocked(status === 'blocked');
-      } else {
-        await disablePush(client);
-      }
+      if (on) setBlocked((await enablePush(client, session, { ask: true })) === 'blocked');
+      else await disablePush(session);
     } catch (error) {
       setProblem(describePushError(error));
     } finally {
@@ -37,17 +31,16 @@ export function NotificationSettings() {
 
   const test = async () => {
     try {
-      await sendTestPush(client);
+      await sendTestPush(session);
       toast('Test sent. It arrives as a notification in a few seconds.', 'success');
     } catch (error) {
       toast(describePushError(error), 'error');
     }
   };
 
-  // Open WebUI only lets admins and accounts with "User Webhooks" save a notification target.
-  const serverOff = config.data ? config.data.features?.enable_user_webhooks === false : false;
-  const unavailable = serverOff ? WEBHOOKS_OFF : capabilities && !capabilities.feature('userWebhooks') ? WEBHOOKS_NOT_ALLOWED : null;
-  const enabled = (push?.enabled ?? false) && !unavailable;
+  const enabled = push?.enabled ?? false;
+  // The relay hears about replies only once an admin adds its webhook in Open WebUI.
+  const waitingForServer = enabled && push?.lastEventAt === null;
   return (
     <View style={styles.wrap}>
       <Text style={[styles.section, { color: palette.textMuted }]}>Notifications</Text>
@@ -57,12 +50,7 @@ export function NotificationSettings() {
           {busy ? (
             <ActivityIndicator color={palette.textMuted} />
           ) : (
-            <Switch
-              accessibilityLabel="Notify me when a reply finishes"
-              value={enabled}
-              disabled={Boolean(unavailable)}
-              onValueChange={(on) => void turn(on)}
-            />
+            <Switch accessibilityLabel="Notify me when a reply finishes" value={enabled} onValueChange={(on) => void turn(on)} />
           )}
         </View>
         {enabled ? (
@@ -74,18 +62,19 @@ export function NotificationSettings() {
           </Pressable>
         ) : null}
       </View>
-      {unavailable ? (
-        <Text style={[styles.note, { color: palette.textMuted }]}>{unavailable}</Text>
-      ) : problem ? (
-        <Text style={[styles.note, { color: palette.danger }]}>{problem}</Text>
-      ) : null}
+      {problem ? <Text style={[styles.note, { color: palette.danger }]}>{problem}</Text> : null}
       {blocked ? (
         <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()} hitSlop={6}>
           <Text style={[styles.note, { color: palette.link }]}>Notifications are off for MavieChat in iOS Settings. Open Settings</Text>
         </Pressable>
       ) : null}
+      {waitingForServer ? (
+        <Text style={[styles.note, { color: palette.textMuted }]}>
+          {"This iPhone is ready, but Open WebUI hasn't reported any replies to MavieChat's notification service yet. An admin adds its webhook once, in Open WebUI: Admin Panel → Settings → Events."}
+        </Text>
+      ) : null}
       <Text style={[styles.note, { color: palette.textFaint }]}>
-        {"Open WebUI tells this iPhone when a reply finishes or fails, with the chat title and the start of the reply, through MavieChat's notification service. While a chat is on screen, the app shows its own notice instead."}
+        {"When a reply finishes or fails, Open WebUI tells MavieChat's notification service, which notifies this iPhone with the chat title and the start of the reply. While a chat is on screen, the app shows its own notice instead."}
       </Text>
     </View>
   );

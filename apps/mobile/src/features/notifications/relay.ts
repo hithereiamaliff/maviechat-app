@@ -1,50 +1,54 @@
 import { OwuiHttpError } from '@maviechat/owui-protocol';
 
-/** MavieChat's push relay (services/push-relay): turns Open WebUI's webhooks into notifications. */
+/** MavieChat's push relay (services/push-relay): turns Open WebUI's events into notifications. */
 export const PUSH_RELAY_URL = 'https://push.techmavie.digital';
 
-/** One notification target per phone, so two phones never overwrite each other. */
-export function targetIdFor(deviceId: string): string {
+/** The name of the per-phone Open WebUI target earlier app versions saved (removed now). */
+export function legacyTargetId(deviceId: string): string {
   return `maviechat-${deviceId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12).toLowerCase()}`;
 }
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
-/**
- * Trades this phone's Expo push token for a webhook link. The relay checks the Open WebUI
- * sign-in once and keeps nothing; the link itself carries the sealed push token.
- */
-export async function registerWithRelay(fetchImpl: Fetch, owuiToken: string, pushToken: string, relayUrl = PUSH_RELAY_URL): Promise<string> {
+export interface RelayAnswer {
+  /** When Open WebUI last sent the relay an event; null means its admin hasn't added the webhook yet. */
+  lastEventAt: number | null;
+}
+
+async function call(fetchImpl: Fetch, method: 'POST' | 'DELETE', path: string, owuiToken: string, pushToken: string, relayUrl: string): Promise<Record<string, unknown>> {
   let response: Response;
   try {
-    response = await fetchImpl(`${relayUrl}/v1/devices`, {
-      method: 'POST',
+    response = await fetchImpl(`${relayUrl}${path}`, {
+      method,
       headers: { Authorization: `Bearer ${owuiToken}`, 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ pushToken }),
     });
   } catch {
     throw new Error("couldn't reach the notification service");
   }
-  const body = (await response.json().catch(() => undefined)) as { webhookUrl?: unknown; error?: unknown } | undefined;
-  if (!response.ok || typeof body?.webhookUrl !== 'string') {
-    throw new Error(typeof body?.error === 'string' ? body.error : `the notification service answered ${response.status}`);
-  }
-  return body.webhookUrl;
+  const body = (await response.json().catch(() => undefined)) as Record<string, unknown> | undefined;
+  if (!response.ok) throw new Error(typeof body?.error === 'string' ? body.error : `the notification service answered ${response.status}`);
+  return body ?? {};
 }
 
-/** The server's admin switched user webhooks off (Admin Panel → Settings). */
-export const WEBHOOKS_OFF = 'Notifications need user webhooks, and this Open WebUI server has them turned off.';
+const lastEvent = (body: Record<string, unknown>): RelayAnswer => ({ lastEventAt: typeof body.lastEventAt === 'number' ? body.lastEventAt : null });
 
-/** The account lacks the "User Webhooks" permission (admins always have it). */
-export const WEBHOOKS_NOT_ALLOWED =
-  'Notifications need the User Webhooks permission, which this Open WebUI account doesn\'t have. Sign in with an admin account, or turn on User Webhooks for it in Open WebUI: Admin Panel → Users → Groups (Default permissions, or its group).';
+/** Adds this phone under your Open WebUI account; the relay checks the sign-in once and keeps only ids and tokens. */
+export async function registerWithRelay(fetchImpl: Fetch, owuiToken: string, pushToken: string, relayUrl = PUSH_RELAY_URL): Promise<RelayAnswer> {
+  return lastEvent(await call(fetchImpl, 'POST', '/v1/devices', owuiToken, pushToken, relayUrl));
+}
 
-/** Why notifications can't be switched on, in words. */
+export async function unregisterFromRelay(fetchImpl: Fetch, owuiToken: string, pushToken: string, relayUrl = PUSH_RELAY_URL): Promise<void> {
+  await call(fetchImpl, 'DELETE', '/v1/devices', owuiToken, pushToken, relayUrl);
+}
+
+/** A test notification to this phone, straight from the relay. */
+export async function testThroughRelay(fetchImpl: Fetch, owuiToken: string, pushToken: string, relayUrl = PUSH_RELAY_URL): Promise<RelayAnswer> {
+  return lastEvent(await call(fetchImpl, 'POST', '/v1/devices/test', owuiToken, pushToken, relayUrl));
+}
+
+/** Why notifications couldn't be switched on, in words. */
 export function describePushError(error: unknown): string {
-  if (error instanceof OwuiHttpError) {
-    if (error.status === 404) return WEBHOOKS_OFF;
-    if (error.status === 403) return WEBHOOKS_NOT_ALLOWED;
-    return error.detail ?? `Open WebUI answered ${error.status}.`;
-  }
+  if (error instanceof OwuiHttpError) return error.detail ?? `Open WebUI answered ${error.status}.`;
   return error instanceof Error ? `Notifications couldn't be set up: ${error.message}.` : "Notifications couldn't be set up.";
 }

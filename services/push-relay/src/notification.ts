@@ -10,15 +10,23 @@ export interface PushMessage {
 }
 
 /**
- * What Open WebUI posts to a plain webhook URL: the event's data as-is. For a finished
- * chat that is `{action: "chat", title, message, url}` (`chat_failed` when it failed,
- * `test` from its "send test" button); `message` is the reply text.
+ * What Open WebUI's server-wide event webhooks post (Admin Panel → Settings → Events): the
+ * event as recorded, e.g. `{event: "chat.finished", actor: {id, …}, data: {user_id, chat_id,
+ * title, message, url, …}}`. `message` is the reply (or the error), cut to 1000 characters.
  */
-export interface WebhookBody {
-  action?: unknown;
-  title?: unknown;
-  message?: unknown;
-  url?: unknown;
+export interface OwuiEvent {
+  event?: unknown;
+  actor?: { id?: unknown } | null;
+  data?: { user_id?: unknown; chat_id?: unknown; title?: unknown; message?: unknown; url?: unknown } | null;
+}
+
+/** A finished or failed reply, and whose phones should hear about it. */
+export interface ChatOutcome {
+  userId: string;
+  kind: 'chat.finished' | 'chat.failed';
+  chatId: string | null;
+  title: string | null;
+  text: string;
 }
 
 const PREVIEW_LENGTH = 140;
@@ -46,27 +54,39 @@ export function preview(markdown: string, limit = PREVIEW_LENGTH): string {
   return text.length > limit ? `${text.slice(0, limit - 1).trimEnd()}…` : text;
 }
 
-function chatTitle(value: unknown): string | null {
-  const title = typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
-  // A first reply finishes before its title is written.
-  return title && title !== 'New Chat' ? title.slice(0, 80) : null;
+const text = (value: unknown): string => (typeof value === 'string' ? value : '');
+
+/** The chat outcome an event describes, or null for events MavieChat doesn't announce. */
+export function chatOutcome(event: OwuiEvent): ChatOutcome | null {
+  if (event.event !== 'chat.finished' && event.event !== 'chat.failed') return null;
+  const data = event.data ?? {};
+  const userId = text(data.user_id) || text(event.actor?.id);
+  if (!userId) return null;
+  const title = text(data.title).replace(/\s+/g, ' ').trim();
+  return {
+    userId,
+    kind: event.event,
+    chatId: text(data.chat_id) || chatIdFromUrl(text(data.url)),
+    // A first reply finishes before its title is written.
+    title: title && title !== 'New Chat' ? title.slice(0, 80) : null,
+    text: preview(text(data.message)),
+  };
 }
 
-/** The notification for a webhook call, or null for events MavieChat doesn't announce. */
-export function pushFor(body: WebhookBody, pushToken: string): PushMessage | null {
-  const action = typeof body.action === 'string' ? body.action : '';
-  const title = chatTitle(body.title);
-  const chatId = typeof body.url === 'string' ? chatIdFromUrl(body.url) : null;
-  const text = typeof body.message === 'string' ? preview(body.message) : '';
-  const base = { to: pushToken, sound: 'default' as const, priority: 'high' as const, ...(chatId ? { threadId: chatId } : {}) };
-  switch (action) {
-    case 'chat':
-      return { ...base, title: title ? `Reply ready: ${title}` : 'Reply ready', body: text || 'Open the chat to read it.', data: { kind: 'chat.finished', ...(chatId ? { chatId } : {}) } };
-    case 'chat_failed':
-      return { ...base, title: title ? `Reply failed: ${title}` : 'Reply failed', body: text || 'Open the chat to try again.', data: { kind: 'chat.failed', ...(chatId ? { chatId } : {}) } };
-    case 'test':
-      return { to: pushToken, sound: 'default', priority: 'high', title: 'MavieChat notifications work', body: 'Open WebUI can reach your phone.', data: { kind: 'test' } };
-    default:
-      return null;
-  }
+export function notificationFor(outcome: ChatOutcome, pushToken: string): PushMessage {
+  const finished = outcome.kind === 'chat.finished';
+  const heading = finished ? 'Reply ready' : 'Reply failed';
+  return {
+    to: pushToken,
+    title: outcome.title ? `${heading}: ${outcome.title}` : heading,
+    body: outcome.text || (finished ? 'Open the chat to read it.' : 'Open the chat to try again.'),
+    data: { kind: outcome.kind, ...(outcome.chatId ? { chatId: outcome.chatId } : {}) },
+    sound: 'default',
+    priority: 'high',
+    ...(outcome.chatId ? { threadId: outcome.chatId } : {}),
+  };
+}
+
+export function testNotification(pushToken: string): PushMessage {
+  return { to: pushToken, title: 'MavieChat notifications work', body: 'Replies that finish while MavieChat is closed will show up like this.', data: { kind: 'test' }, sound: 'default', priority: 'high' };
 }

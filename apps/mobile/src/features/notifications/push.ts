@@ -1,34 +1,33 @@
-import {
-  deleteNotificationTarget,
-  OwuiHttpError,
-  saveWebhookTarget,
-  testNotificationTarget,
-  uuidv4,
-  type OwuiClient,
-} from '@maviechat/owui-protocol';
+import { deleteNotificationTarget, uuidv4, type OwuiClient } from '@maviechat/owui-protocol';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { useSyncExternalStore } from 'react';
 import type { StoredSession } from '@/session/stored-session';
-import { registerWithRelay, targetIdFor } from './relay';
+import { legacyTargetId, registerWithRelay, testThroughRelay, unregisterFromRelay, type RelayAnswer } from './relay';
 
 /** What this phone did about notifications, kept on the device. */
 export interface PushState {
   version: 1;
-  /** Random, per install: names this phone's notification target in Open WebUI. */
+  /** Random, per install. */
   deviceId: string;
   enabled: boolean;
   /** iOS's permission prompt was shown once already (it can't be shown again). */
   asked: boolean;
-  /** The Open WebUI account the target was saved in. */
+  /** The Open WebUI account the phone is registered under, and the token it registered. */
   userId: string | null;
+  pushToken?: string | null;
+  /** From the relay: when Open WebUI last sent it an event (null: the server-wide webhook isn't set up). */
+  lastEventAt?: number | null;
+  /** Earlier versions saved a per-user Open WebUI target; it's removed once. */
+  legacyCleaned?: boolean;
 }
 
 export type PushStatus = 'on' | 'off' | 'blocked';
 
 const KEY = 'maviechat.push';
 const options: SecureStore.SecureStoreOptions = { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY };
+const relayFetch = (input: string, init?: RequestInit) => fetch(input, init);
 
 let state: PushState | null = null;
 const listeners = new Set<() => void>();
@@ -63,10 +62,15 @@ export function usePushState(): PushState | null {
   );
 }
 
+async function expoPushToken(): Promise<string> {
+  const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId;
+  return (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : {})).data;
+}
+
 /**
- * Switches notifications on for this phone: iOS permission (asked once), the Expo push
- * token, a webhook link from MavieChat's relay, and a target in your Open WebUI settings
- * for finished and failed replies. Safe to repeat; a repeat refreshes the link.
+ * Switches notifications on for this phone: iOS permission (asked once), the Expo push token,
+ * and a place in MavieChat's relay under your Open WebUI account. Open WebUI's server-wide
+ * webhook then reports every finished or failed reply, so any account works. Safe to repeat.
  */
 export async function enablePush(client: OwuiClient, session: StoredSession, { ask }: { ask: boolean }): Promise<PushStatus> {
   const current = await loadState();
@@ -76,42 +80,34 @@ export async function enablePush(client: OwuiClient, session: StoredSession, { a
     await saveState({ ...current, enabled: false, asked: current.asked || ask });
     return 'blocked';
   }
-  const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId;
-  const { data: pushToken } = await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : {});
-  const webhookUrl = await registerWithRelay((input, init) => fetch(input, init), session.token, pushToken);
-  await saveWebhookTarget(client, { id: targetIdFor(current.deviceId), url: webhookUrl });
-  await saveState({ ...current, enabled: true, asked: true, userId: session.user.id });
+  const pushToken = await expoPushToken();
+  const answer: RelayAnswer = await registerWithRelay(relayFetch, session.token, pushToken);
+  if (!current.legacyCleaned) {
+    // The per-user webhook of earlier versions would now notify twice.
+    await deleteNotificationTarget(client, legacyTargetId(current.deviceId)).catch(() => undefined);
+  }
+  await saveState({ ...current, enabled: true, asked: true, userId: session.user.id, pushToken, lastEventAt: answer.lastEventAt, legacyCleaned: true });
   return 'on';
 }
 
-/** Removes this phone's target from Open WebUI. Also called before signing out. */
-export async function disablePush(client: OwuiClient): Promise<void> {
+/** Takes this phone off the relay for this account. Also called before signing out. */
+export async function disablePush(session: StoredSession): Promise<void> {
   const current = await loadState();
-  if (current.enabled) {
-    try {
-      await deleteNotificationTarget(client, targetIdFor(current.deviceId));
-    } catch (error) {
-      // Already gone is fine; anything else is reported.
-      if (!(error instanceof OwuiHttpError && error.status === 404)) throw error;
-    }
-  }
+  if (current.enabled && current.pushToken) await unregisterFromRelay(relayFetch, session.token, current.pushToken);
   await saveState({ ...current, enabled: false, userId: null });
 }
 
-/** Has Open WebUI send this phone a test notification through the whole chain. */
-export async function sendTestPush(client: OwuiClient): Promise<void> {
-  await testNotificationTarget(client, targetIdFor((await loadState()).deviceId));
+/** A test notification straight from the relay. */
+export async function sendTestPush(session: StoredSession): Promise<RelayAnswer> {
+  const current = await loadState();
+  const answer = await testThroughRelay(relayFetch, session.token, current.pushToken ?? (await expoPushToken()));
+  await saveState({ ...current, lastEventAt: answer.lastEventAt });
+  return answer;
 }
 
-/** First launch with an account: ask once and switch on. Later launches refresh the link quietly. */
+/** First launch with an account: ask once and switch on. Later launches refresh the registration quietly. */
 export async function setUpPushOnLaunch(client: OwuiClient, session: StoredSession): Promise<void> {
   const current = await loadState();
-  if (current.enabled && current.userId && current.userId !== session.user.id) {
-    // Another account signed in on this phone: it gets its own target.
-    await saveState({ ...current, enabled: false, userId: null });
-    await enablePush(client, session, { ask: false });
-    return;
-  }
   if (!current.asked) await enablePush(client, session, { ask: true });
   else if (current.enabled) await enablePush(client, session, { ask: false });
 }

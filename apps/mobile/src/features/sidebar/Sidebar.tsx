@@ -181,8 +181,8 @@ export function Sidebar() {
       key: 'signout',
       label: 'Sign Out',
       icon: 'arrow-right-start-on-rectangle',
-      // Notifications for this account stop on this phone: its target leaves your Open WebUI settings.
-      onPress: () => void disablePush(client).catch(() => undefined).finally(() => void signOut()),
+      // Notifications for this account stop on this phone: it leaves the relay first.
+      onPress: () => void disablePush(session).catch(() => undefined).finally(() => void signOut()),
     },
   ];
 

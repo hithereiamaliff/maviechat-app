@@ -1,36 +1,20 @@
-import { randomBytes } from 'node:crypto';
+import { mkdtempSync, readFileSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { chatIdFromUrl, preview, pushFor } from './notification.ts';
+import { chatIdFromUrl, chatOutcome, notificationFor, preview } from './notification.ts';
 import { createRelay, RateLimiter } from './relay.ts';
-import { loadKey, seal, unseal } from './seal.ts';
+import { DeviceStore } from './store.ts';
 
-const key = randomBytes(32);
-const token = 'ExponentPushToken[abc123_DEF-456]';
-
-describe('seal', () => {
-  it('round-trips and rejects tampering or another key', () => {
-    const sealed = seal(key, { pushToken: token, userId: 'u1' });
-    expect(unseal(key, sealed)).toEqual({ pushToken: token, userId: 'u1' });
-    const flipped = `${sealed.slice(0, 20)}${sealed[20] === 'A' ? 'B' : 'A'}${sealed.slice(21)}`;
-    expect(unseal(key, flipped)).toBeNull();
-    expect(unseal(randomBytes(32), sealed)).toBeNull();
-    expect(unseal(key, 'short')).toBeNull();
-    expect(seal(key, { pushToken: token, userId: 'u1' })).not.toBe(sealed);
-  });
-
-  it('wants a 32-byte key', () => {
-    expect(() => loadKey(undefined)).toThrow();
-    expect(() => loadKey(randomBytes(16).toString('base64'))).toThrow();
-    expect(loadKey(key.toString('base64')).equals(key)).toBe(true);
-  });
-});
+const phone = 'ExponentPushToken[abc123_DEF-456]';
+const otherPhone = 'ExponentPushToken[zzz999]';
+const secret = 'a'.repeat(43);
 
 describe('notifications', () => {
   it('reads the chat id from the links Open WebUI sends', () => {
-    expect(chatIdFromUrl('https://chat.example.com/3f9c2a1b-77aa-4e0b-9a3e-5d2f1c0b8e11')).toBe('3f9c2a1b-77aa-4e0b-9a3e-5d2f1c0b8e11');
-    expect(chatIdFromUrl('/3f9c2a1b-77aa-4e0b-9a3e-5d2f1c0b8e11')).toBe('3f9c2a1b-77aa-4e0b-9a3e-5d2f1c0b8e11');
+    expect(chatIdFromUrl('https://chat.example.com/3f9c2a1b-77aa-4e0b')).toBe('3f9c2a1b-77aa-4e0b');
+    expect(chatIdFromUrl('/3f9c2a1b-77aa-4e0b')).toBe('3f9c2a1b-77aa-4e0b');
     expect(chatIdFromUrl('https://chat.example.com/')).toBeNull();
-    expect(chatIdFromUrl('')).toBeNull();
   });
 
   it('previews a reply as plain text', () => {
@@ -39,70 +23,125 @@ describe('notifications', () => {
     expect(preview('a'.repeat(300)).length).toBe(140);
   });
 
-  it('announces finished and failed chats and the test button, nothing else', () => {
-    const finished = pushFor({ action: 'chat', title: 'Ipoh trip', message: 'Start early.', url: 'https://h/3f9c2a1b-77aa' }, token);
-    expect(finished).toMatchObject({ to: token, title: 'Reply ready: Ipoh trip', body: 'Start early.', data: { kind: 'chat.finished', chatId: '3f9c2a1b-77aa' }, threadId: '3f9c2a1b-77aa' });
-    expect(pushFor({ action: 'chat', title: 'New Chat', message: '' }, token)).toMatchObject({ title: 'Reply ready', body: 'Open the chat to read it.' });
-    expect(pushFor({ action: 'chat_failed', title: 'Ipoh trip', message: 'Model timed out' }, token)).toMatchObject({ title: 'Reply failed: Ipoh trip', data: { kind: 'chat.failed' } });
-    expect(pushFor({ action: 'test' }, token)?.data.kind).toBe('test');
-    expect(pushFor({ action: 'channel' }, token)).toBeNull();
+  it('turns finished and failed chat events into notifications, and skips the rest', () => {
+    const finished = chatOutcome({ event: 'chat.finished', data: { user_id: 'u1', chat_id: 'c-123456789', title: 'Ipoh trip', message: 'Start early.' } });
+    expect(finished).toEqual({ userId: 'u1', kind: 'chat.finished', chatId: 'c-123456789', title: 'Ipoh trip', text: 'Start early.' });
+    expect(notificationFor(finished!, phone)).toMatchObject({ to: phone, title: 'Reply ready: Ipoh trip', body: 'Start early.', data: { kind: 'chat.finished', chatId: 'c-123456789' }, threadId: 'c-123456789' });
+
+    const failed = chatOutcome({ event: 'chat.failed', actor: { id: 'u2' }, data: { url: '/c-987654321', message: 'Model timed out' } });
+    expect(failed).toMatchObject({ userId: 'u2', kind: 'chat.failed', chatId: 'c-987654321', title: null });
+    expect(notificationFor(failed!, phone).title).toBe('Reply failed');
+    expect(notificationFor({ ...finished!, title: null, text: '' }, phone)).toMatchObject({ title: 'Reply ready', body: 'Open the chat to read it.' });
+
+    expect(chatOutcome({ event: 'chat.finished', data: { title: 'New Chat', user_id: 'u1' } })?.title).toBeNull();
+    expect(chatOutcome({ event: 'user.signin', data: { user_id: 'u1' } })).toBeNull();
+    expect(chatOutcome({ event: 'chat.finished', data: {} })).toBeNull();
+  });
+});
+
+describe('device list', () => {
+  it('moves a phone between accounts, caps each account and forgets departed phones', () => {
+    const store = new DeviceStore(null);
+    store.add('u1', phone);
+    store.add('u2', phone);
+    expect(store.tokensFor('u1')).toEqual([]);
+    expect(store.tokensFor('u2')).toEqual([phone]);
+    for (let i = 0; i < 12; i++) store.add('u3', `ExponentPushToken[t${i}]`);
+    expect(store.tokensFor('u3')).toHaveLength(10);
+    expect(store.tokensFor('u3')[0]).toBe('ExponentPushToken[t11]');
+    store.forget(phone);
+    expect(store.tokensFor('u2')).toEqual([]);
+    expect(store.remove('u3', 'ExponentPushToken[t11]')).toBe(true);
+    expect(store.remove('u3', 'ExponentPushToken[t11]')).toBe(false);
+  });
+
+  it('keeps the list in a private file across restarts', () => {
+    const file = path.join(mkdtempSync(path.join(tmpdir(), 'relay-')), 'data', 'devices.json');
+    const store = new DeviceStore(file, () => 1_000_000);
+    store.add('u1', phone);
+    store.noteEvent();
+    expect(statSync(file).mode & 0o777).toBe(0o600);
+    expect(readFileSync(file, 'utf8')).not.toContain('message');
+    const reopened = new DeviceStore(file);
+    expect(reopened.tokensFor('u1')).toEqual([phone]);
+    expect(reopened.lastEventAt).toBe(1_000_000);
   });
 });
 
 describe('relay', () => {
-  const config = { key, publicUrl: 'https://push.example.com/', owuiUrl: 'https://chat.example.com' };
   const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
-  const request = (method: string, path: string, body: unknown = '', authorization?: string) => ({
+  const request = (method: string, requestPath: string, body: unknown = '', authorization?: string) => ({
     method,
-    path,
+    path: requestPath,
     body: typeof body === 'string' ? body : JSON.stringify(body),
     authorization,
     ip: '203.0.113.9',
   });
+  /** Open WebUI says the bearer token is user-1; Expo accepts or rejects as told. */
+  function setup(expo: (messages: Array<{ to: string }>) => unknown = (messages) => ({ data: messages.map(() => ({ status: 'ok' })) })) {
+    const store = new DeviceStore(null);
+    const sent: Array<Array<{ to: string; title: string }>> = [];
+    const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/api/v1/auths/')) {
+        const auth = (init?.headers as Record<string, string>).Authorization;
+        return auth === 'Bearer good' ? json(200, { id: 'user-1' }) : json(401, { detail: 'Not authenticated' });
+      }
+      const messages = JSON.parse(String(init?.body)) as Array<{ to: string; title: string }>;
+      sent.push(messages);
+      return json(200, expo(messages));
+    });
+    const handle = createRelay({ eventsSecret: secret, owuiUrl: 'https://chat.example.com/' }, store, fetch);
+    return { handle, store, sent, fetch };
+  }
 
-  it('registers a signed-in phone and hands back a sealed webhook link', async () => {
-    const fetch = vi.fn(async () => json(200, { id: 'user-1' }));
-    const handle = createRelay(config, fetch);
-    const result = await handle(request('POST', '/v1/devices', { pushToken: token }, 'Bearer owui-jwt'));
-    expect(result.status).toBe(200);
-    const url = (result.body as { webhookUrl: string }).webhookUrl;
-    expect(url.startsWith('https://push.example.com/v1/hooks/')).toBe(true);
-    expect(unseal(key, url.split('/').pop() as string)).toEqual({ pushToken: token, userId: 'user-1' });
-    expect(fetch).toHaveBeenCalledWith('https://chat.example.com/api/v1/auths/', expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer owui-jwt' }) }));
+  it('registers and removes a signed-in phone', async () => {
+    const { handle, store } = setup();
+    expect((await handle(request('POST', '/v1/devices', { pushToken: phone }))).status).toBe(401);
+    expect((await handle(request('POST', '/v1/devices', { pushToken: phone }, 'Bearer bad'))).status).toBe(401);
+    expect((await handle(request('POST', '/v1/devices', { pushToken: 'nope' }, 'Bearer good'))).status).toBe(400);
+    const added = await handle(request('POST', '/v1/devices', { pushToken: phone }, 'Bearer good'));
+    expect(added).toEqual({ status: 200, body: { registered: true, lastEventAt: null } });
+    expect(store.tokensFor('user-1')).toEqual([phone]);
+    expect((await handle(request('DELETE', '/v1/devices', { pushToken: phone }, 'Bearer good'))).body).toEqual({ removed: true });
+    expect(store.tokensFor('user-1')).toEqual([]);
   });
 
-  it('refuses registrations without a valid sign-in or token', async () => {
-    const handle = createRelay(config, vi.fn(async () => json(401, { detail: 'Not authenticated' })));
-    expect((await handle(request('POST', '/v1/devices', { pushToken: token }))).status).toBe(401);
-    expect((await handle(request('POST', '/v1/devices', { pushToken: 'nope' }, 'Bearer x'))).status).toBe(400);
-    expect((await handle(request('POST', '/v1/devices', { pushToken: token }, 'Bearer bad'))).status).toBe(401);
+  it("notifies the reply's owner for server-wide events, whatever their permissions", async () => {
+    const { handle, store, sent } = setup();
+    store.add('user-1', phone);
+    store.add('user-2', otherPhone);
+    const event = { event: 'chat.finished', actor: { id: 'user-1' }, data: { user_id: 'user-1', chat_id: 'c-123456789', title: 'Ipoh', message: 'Done' } };
+    expect((await handle(request('POST', `/v1/events/${secret}`, event))).body).toEqual({ sent: 1 });
+    expect(sent[0]).toMatchObject([{ to: phone, title: 'Reply ready: Ipoh' }]);
+    expect(store.lastEventAt).not.toBeNull();
+    expect((await handle(request('POST', `/v1/events/${secret}`, { event: 'user.signin', data: { user_id: 'user-1' } }))).status).toBe(202);
+    expect((await handle(request('POST', `/v1/events/${'b'.repeat(43)}`, event))).status).toBe(404);
+    expect(sent).toHaveLength(1);
   });
 
-  it('sends a push for a finished chat and reports a phone that left', async () => {
-    const sealed = seal(key, { pushToken: token, userId: 'user-1' });
-    const fetch = vi.fn(async () => json(200, { data: [{ status: 'ok', id: 'ticket' }] }));
-    const handle = createRelay(config, fetch);
-    const result = await handle(request('POST', `/v1/hooks/${sealed}`, { action: 'chat', title: 'Ipoh', message: 'Done', url: '/3f9c2a1b-77aa' }));
-    expect(result.status).toBe(200);
-    const sent = JSON.parse(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body)) as Array<{ to: string; title: string }>;
-    expect(sent[0]).toMatchObject({ to: token, title: 'Reply ready: Ipoh' });
-
-    const gone = createRelay(config, vi.fn(async () => json(200, { data: [{ status: 'error', details: { error: 'DeviceNotRegistered' } }] })));
-    expect((await gone(request('POST', `/v1/hooks/${sealed}`, { action: 'chat' }))).status).toBe(410);
+  it('forgets phones Apple no longer reaches', async () => {
+    const { handle, store } = setup(() => ({ data: [{ status: 'error', details: { error: 'DeviceNotRegistered' } }] }));
+    store.add('user-1', phone);
+    await handle(request('POST', `/v1/events/${secret}`, { event: 'chat.finished', data: { user_id: 'user-1' } }));
+    expect(store.tokensFor('user-1')).toEqual([]);
   });
 
-  it('ignores other events and unknown links', async () => {
-    const fetch = vi.fn();
-    const handle = createRelay(config, fetch);
-    const sealed = seal(key, { pushToken: token, userId: 'user-1' });
-    expect((await handle(request('POST', `/v1/hooks/${sealed}`, { action: 'channel' }))).status).toBe(202);
-    expect((await handle(request('POST', '/v1/hooks/not-a-link', { action: 'chat' }))).status).toBe(404);
+  it("sends a test to the caller's phone", async () => {
+    const { handle, store, sent } = setup();
+    expect((await handle(request('POST', '/v1/devices/test', { pushToken: phone }, 'Bearer good'))).status).toBe(404);
+    store.add('user-1', phone);
+    expect((await handle(request('POST', '/v1/devices/test', { pushToken: phone }, 'Bearer good'))).body).toEqual({ sent: 1, lastEventAt: null });
+    expect(sent[0]?.[0]?.title).toBe('MavieChat notifications work');
+  });
+
+  it('answers health and refuses everything else', async () => {
+    const { handle } = setup();
     expect((await handle(request('GET', '/health'))).status).toBe(200);
-    expect((await handle(request('GET', '/anything'))).status).toBe(404);
-    expect(fetch).not.toHaveBeenCalled();
+    expect((await handle(request('GET', '/v1/devices'))).status).toBe(404);
+    expect((await handle(request('POST', '/v1/hooks/anything', {}))).status).toBe(404);
   });
 
-  it('limits registrations per caller', () => {
+  it('limits calls per caller', () => {
     let now = 0;
     const limiter = new RateLimiter(2, () => now);
     expect([limiter.allow('ip'), limiter.allow('ip'), limiter.allow('ip')]).toEqual([true, true, false]);
