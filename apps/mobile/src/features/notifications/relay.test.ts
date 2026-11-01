@@ -26,6 +26,6 @@ describe('push relay client', () => {
   it('names a target per phone and explains server refusals', () => {
     expect(targetIdFor('3F9C2A1B-77AA-4E0B')).toBe('maviechat-3f9c2a1b77aa');
     expect(describePushError(new OwuiHttpError(404, undefined, '/x'))).toContain('turned off');
-    expect(describePushError(new OwuiHttpError(403, undefined, '/x'))).toContain('may not use');
+    expect(describePushError(new OwuiHttpError(403, undefined, '/x'))).toContain('User Webhooks permission');
   });
 });

@@ -32,11 +32,18 @@ export async function registerWithRelay(fetchImpl: Fetch, owuiToken: string, pus
   return body.webhookUrl;
 }
 
+/** The server's admin switched user webhooks off (Admin Panel → Settings). */
+export const WEBHOOKS_OFF = 'Notifications need user webhooks, and this Open WebUI server has them turned off.';
+
+/** The account lacks the "User Webhooks" permission (admins always have it). */
+export const WEBHOOKS_NOT_ALLOWED =
+  'Notifications need the User Webhooks permission, which this Open WebUI account doesn\'t have. Sign in with an admin account, or turn on User Webhooks for it in Open WebUI: Admin Panel → Users → Groups (Default permissions, or its group).';
+
 /** Why notifications can't be switched on, in words. */
 export function describePushError(error: unknown): string {
   if (error instanceof OwuiHttpError) {
-    if (error.status === 404) return 'Your Open WebUI server has notification webhooks turned off.';
-    if (error.status === 403) return 'Your Open WebUI account may not use notification webhooks.';
+    if (error.status === 404) return WEBHOOKS_OFF;
+    if (error.status === 403) return WEBHOOKS_NOT_ALLOWED;
     return error.detail ?? `Open WebUI answered ${error.status}.`;
   }
   return error instanceof Error ? `Notifications couldn't be set up: ${error.message}.` : "Notifications couldn't be set up.";

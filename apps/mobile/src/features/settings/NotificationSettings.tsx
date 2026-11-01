@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { useToast } from '@/components/Toast';
-import { describePushError } from '@/features/notifications/relay';
 import { disablePush, enablePush, sendTestPush, usePushState } from '@/features/notifications/push';
-import { useAuthed } from '@/lib/server';
+import { describePushError, WEBHOOKS_NOT_ALLOWED, WEBHOOKS_OFF } from '@/features/notifications/relay';
+import { useAuthed, useCapabilities, useServerConfig } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
 
 /** Notifications for replies that finish while MavieChat isn't on screen (this iPhone only). */
@@ -11,6 +11,8 @@ export function NotificationSettings() {
   const palette = usePalette();
   const toast = useToast();
   const { client, session } = useAuthed();
+  const capabilities = useCapabilities();
+  const config = useServerConfig();
   const push = usePushState();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -42,7 +44,10 @@ export function NotificationSettings() {
     }
   };
 
-  const enabled = push?.enabled ?? false;
+  // Open WebUI only lets admins and accounts with "User Webhooks" save a notification target.
+  const serverOff = config.data ? config.data.features?.enable_user_webhooks === false : false;
+  const unavailable = serverOff ? WEBHOOKS_OFF : capabilities && !capabilities.feature('userWebhooks') ? WEBHOOKS_NOT_ALLOWED : null;
+  const enabled = (push?.enabled ?? false) && !unavailable;
   return (
     <View style={styles.wrap}>
       <Text style={[styles.section, { color: palette.textMuted }]}>Notifications</Text>
@@ -52,7 +57,12 @@ export function NotificationSettings() {
           {busy ? (
             <ActivityIndicator color={palette.textMuted} />
           ) : (
-            <Switch accessibilityLabel="Notify me when a reply finishes" value={enabled} onValueChange={(on) => void turn(on)} />
+            <Switch
+              accessibilityLabel="Notify me when a reply finishes"
+              value={enabled}
+              disabled={Boolean(unavailable)}
+              onValueChange={(on) => void turn(on)}
+            />
           )}
         </View>
         {enabled ? (
@@ -64,7 +74,11 @@ export function NotificationSettings() {
           </Pressable>
         ) : null}
       </View>
-      {problem ? <Text style={[styles.note, { color: palette.danger }]}>{problem}</Text> : null}
+      {unavailable ? (
+        <Text style={[styles.note, { color: palette.textMuted }]}>{unavailable}</Text>
+      ) : problem ? (
+        <Text style={[styles.note, { color: palette.danger }]}>{problem}</Text>
+      ) : null}
       {blocked ? (
         <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()} hitSlop={6}>
           <Text style={[styles.note, { color: palette.link }]}>Notifications are off for MavieChat in iOS Settings. Open Settings</Text>
