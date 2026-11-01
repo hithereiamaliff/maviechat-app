@@ -33,8 +33,23 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store",
-      "expo-font"
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "MavieChat can use Face ID to unlock your saved sign-in."
+        }
+      ],
+      "expo-font",
+      "expo-image",
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "MavieChat lets you attach photos from your library to a chat.",
+          "cameraPermission": "MavieChat lets you take a photo to attach to a chat.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false,

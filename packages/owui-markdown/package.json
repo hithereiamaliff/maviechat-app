@@ -1,0 +1,16 @@
+{
+  "name": "@maviechat/owui-markdown",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Markdown lexing and code highlighting for MavieChat. Plain TypeScript; the app renders the tokens natively.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "lowlight": "^3.3.0",
+    "marked": "^18.1.2"
+  }
+}

@@ -249,7 +249,20 @@ The server merges these writes: it keeps its own copy of in-progress assistant m
 - **Web search and image generation:** `features.*` flags. With native function calling they are built-in tools.
 - **Direct connections and user tool servers:** executed by the browser in the web app. Out of scope until M5 or later.
 
-## 8. Stability notes
+## 8. Verified by the 0.11.3 write probe (`npm run probe -- --write`, test account)
+
+- **Sidebar lists:** `GET /api/v1/chats/?page=N` returns 60 per page, newest first, **excluding pinned chats and chats in folders** (they have their own lists: `/chats/pinned`, `/chats/folder/{id}/list`).
+  - Rows are `{id, title, updated_at, created_at, last_read_at, snippet, active}`; `active` means a reply is generating.
+- **Rename:** `POST /api/v1/chats/{id} {chat: {title}}` patches only top-level keys. History intact ✓.
+- **Switch branch:** `POST /api/v1/chats/{id} {chat: {history: {messages: {}, currentId}}}` makes the server merge histories.
+  - The incoming `currentId` wins only if that message exists.
+  - Verified ✓: the shown branch is saved, and every message and branch is kept.
+- **Pin / archive:** `POST /api/v1/chats/{id}/pin` and `/archive` toggle and answer with the updated chat ✓.
+- **Delete:** needs the `chat.delete` permission. Without it the server answers **401** "You do not have permission…", so the app hides Delete when the permission is off, as the web does.
+- **A 401 is not always an expired session.** Open WebUI also uses 401 for "not permitted". After a 401 the app re-checks `GET /api/v1/auths/` and signs out only if that fails too (the web app does the same).
+- **Folder open/closed state** is stored on the server: `POST /api/v1/folders/{id}/update/expanded {is_expanded}`.
+
+## 9. Stability notes
 
 - The web app assumes an exact version match and reloads on change. Six releases shipped between 2026-10-10 and 2026-10-29.
 - Many compatibility shims exist: dict-shaped `message_ids`, `parent_message`, `new_chat`, the deprecated `/api/chat/completed`, event aliases, history repair (`sanitizeHistory`), and responses without `modelIdx`.

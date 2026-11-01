@@ -1,11 +1,13 @@
 import {
+  getSessionUser,
   normalizeBaseUrl,
   OwuiClient,
+  OwuiHttpError,
   signIn as requestSignIn,
   signOut as requestSignOut,
 } from '@maviechat/owui-protocol';
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { clearSession, loadLastServerUrl, loadSession, saveSession } from './storage';
 import { isUsable, toStoredSession, type StoredSession } from './stored-session';
 
@@ -22,6 +24,11 @@ interface SessionContextValue {
   client: OwuiClient | null;
   signIn(input: { serverUrl: string; email: string; password: string }): Promise<SignInOutcome>;
   signOut(options?: { notice?: string }): Promise<void>;
+  /**
+   * Call after a 401. Open WebUI also answers 401 for "not permitted", so this re-checks
+   * the session (as the web app does) and signs out only when the session itself is gone.
+   */
+  verifySession(): void;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -92,7 +99,43 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [state, queryClient],
   );
 
-  const value = useMemo(() => ({ state, client, signIn, signOut }), [state, client, signIn, signOut]);
+  // Kept in refs so the query-cache subscription below doesn't resubscribe on every state change.
+  const signOutRef = useRef(signOut);
+  const clientRef = useRef(client);
+  const verifying = useRef(false);
+  useEffect(() => {
+    signOutRef.current = signOut;
+    clientRef.current = client;
+  }, [signOut, client]);
+
+  const verifySession = useCallback(() => {
+    const current = clientRef.current;
+    if (!current || verifying.current) return;
+    verifying.current = true;
+    getSessionUser(current)
+      .catch((error: unknown) => {
+        if (error instanceof OwuiHttpError && error.isUnauthorized) return signOutRef.current({ notice: EXPIRED_NOTICE });
+        return undefined;
+      })
+      .finally(() => {
+        verifying.current = false;
+      });
+  }, []);
+
+  useEffect(
+    () =>
+      queryClient.getQueryCache().subscribe((event) => {
+        if (event.type !== 'updated' || event.action.type !== 'error') return;
+        const error = event.action.error;
+        if (error instanceof OwuiHttpError && error.isUnauthorized) verifySession();
+      }),
+    [queryClient, verifySession],
+  );
+
+  const value = useMemo(
+    () => ({ state, client, signIn, signOut, verifySession }),
+    [state, client, signIn, signOut, verifySession],
+  );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 

@@ -22,7 +22,7 @@ export default function Login() {
     state.status === 'signed-out' && state.notice ? { tone: 'info', text: state.notice } : null,
   );
 
-  if (state.status === 'signed-in') return <Redirect href="/home" />;
+  if (state.status === 'signed-in') return <Redirect href="/" />;
 
   async function submit() {
     if (!serverUrl.trim() || !email.trim() || !password) {
@@ -34,7 +34,7 @@ export default function Login() {
     try {
       const outcome = await signIn({ serverUrl, email, password });
       if (outcome.kind === 'signed-in') {
-        router.replace('/home');
+        router.replace('/');
         return;
       }
       setMessage({

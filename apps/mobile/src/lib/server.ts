@@ -1,0 +1,60 @@
+import {
+  buildCapabilities,
+  getConfig,
+  getSessionUser,
+  getUserSettings,
+  getVersion,
+  listModels,
+  type Capabilities,
+  type OwuiClient,
+} from '@maviechat/owui-protocol';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useSession } from '@/session/SessionProvider';
+import type { StoredSession } from '@/session/stored-session';
+
+/** The signed-in client and session. Only for screens behind the (app) layout's sign-in guard. */
+export function useAuthed(): { client: OwuiClient; session: StoredSession } {
+  const { state, client } = useSession();
+  if (state.status !== 'signed-in' || !client) throw new Error('useAuthed outside a signed-in screen');
+  return { client, session: state.session };
+}
+
+export function useServerVersion() {
+  const { client } = useAuthed();
+  return useQuery({ queryKey: ['version'], queryFn: () => getVersion(client), staleTime: 5 * 60_000 });
+}
+
+export function useServerConfig() {
+  const { client } = useAuthed();
+  return useQuery({ queryKey: ['config'], queryFn: () => getConfig(client), staleTime: 5 * 60_000 });
+}
+
+export function useSessionUser() {
+  const { client } = useAuthed();
+  return useQuery({ queryKey: ['session-user'], queryFn: () => getSessionUser(client), staleTime: 5 * 60_000 });
+}
+
+export function useModels() {
+  const { client } = useAuthed();
+  return useQuery({ queryKey: ['models'], queryFn: () => listModels(client), staleTime: 5 * 60_000 });
+}
+
+export function useUserSettings() {
+  const { client } = useAuthed();
+  return useQuery({ queryKey: ['user-settings'], queryFn: () => getUserSettings(client), staleTime: 5 * 60_000 });
+}
+
+/** Server features for this user (flag + permission), once config and session are loaded. */
+export function useCapabilities(): Capabilities | null {
+  const config = useServerConfig();
+  const user = useSessionUser();
+  const version = useServerVersion();
+  return useMemo(
+    () =>
+      config.data && user.data
+        ? buildCapabilities({ config: config.data, user: user.data, version: version.data?.version })
+        : null,
+    [config.data, user.data, version.data?.version],
+  );
+}

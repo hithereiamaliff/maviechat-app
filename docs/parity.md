@@ -7,6 +7,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | Mark | Meaning |
 |---|---|
 | `[ ]` | to do |
+| `[~]` | partly done (what's done is named in the row) |
 | `[x]` | done |
 | `web` | opens Open WebUI in an in-app browser |
 | `—` | out of scope |
@@ -29,24 +30,24 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [ ] | Routes: `/` new chat, `/c/{id}` chat, `/folders/{id}` folder landing, `/s/{id}` shared chat (read-only, Clone) | `src/routes/(app)/…` | M1 (`/s` M2) |
 | [ ] | Deep-link parameters: `q`, `models`, `web-search`, `image-generation`, `code-interpreter`, `tools`, `temporary-chat`, `message` | `chat/Chat.svelte` | M2 |
 | [ ] | Toasts: "Connection lost / Reconnected", "Session expired" | `src/routes/+layout.svelte` | M1 |
-| [ ] | Swipe-anywhere sidebar overlay; swipe-left controls panel; sideways-scrolling content wins the gesture | `common/MobileSwipePanel.svelte`, `chat/ChatControls.svelte` | M1 / M2 |
+| [x] | Swipe-anywhere sidebar overlay; swipe-left controls panel; sideways-scrolling content wins the gesture | `common/MobileSwipePanel.svelte`, `chat/ChatControls.svelte` | M1 / M2 |
 | [ ] | Pending-approval overlay ("Check Again", Sign Out) | `layout/Overlay/AccountPending.svelte` | M1 |
 
 ## 2. Sidebar (`layout/Sidebar.svelte`, `layout/Sidebar/*`)
 
 | | Item | Mn |
 |---|---|---|
-| [ ] | Logo + server name (tap = new chat), New Chat, Search | M1 |
+| [x] | Logo + server name (tap = new chat), New Chat, Search | M1 |
 | [ ] | Pinned shortcuts (Workspace; Notes, Calendar and Automations open on web) | M1 |
 | [ ] | Section: pinned models (`PinnedModelList.svelte`) opening `/?model=id` | M2 |
-| [ ] | Section: Folders tree, own and shared. Tap opens the folder landing; the chevron expands; unread badge | M1 |
+| [x] | Section: Folders tree, own and shared. Tap opens the folder landing; the chevron expands; unread badge | M1 |
 | [ ] | Folder menu: New Chat, Create subfolder, Mark all read, Edit, Export JSON, Delete (optionally with contents) | M2 |
 | [ ] | Folder settings: name, description, background, default models, system prompt, knowledge, sharing (`Folders/FolderModal.svelte`) | M2 |
-| [ ] | Chats: "Pinned" group, then Today / Yesterday / Previous 7 days / Previous 30 days / month / year (from `updated_at`), infinite scroll | M1 |
-| [ ] | Chat row: generating spinner, unread dot; the "…" button is always visible on phones (no long-press in Open WebUI) | M1 |
-| [ ] | Chat menu: Share, Download (JSON/TXT/PDF), Rename (+ Generate), Mark unread, Pin, Clone, Move to folder, Archive, Delete (`ChatMenu.svelte`) | M1 (rename/pin/archive/delete/move); M2 (rest) |
+| [x] | Chats: "Pinned" group, then Today / Yesterday / Previous 7 days / Previous 30 days / month / year (from `updated_at`), infinite scroll | M1 |
+| [x] | Chat row: generating spinner, unread dot; the "…" button is always visible on phones (no long-press in Open WebUI) | M1 |
+| [~] | Chat menu: Share, Download (JSON/TXT/PDF), Rename (+ Generate), Mark unread, Pin, Clone, Move to folder, Archive, Delete (`ChatMenu.svelte`). Slice 1: Rename, Pin, Archive, Delete (only with the `chat.delete` permission) | M1 (rename/pin/archive/delete/move); M2 (rest) |
 | [ ] | User menu: avatar and name (→ Account), status emoji/message, Workspace, Admin Panel, Settings, Sign Out (`UserMenu.svelte`) | M1 |
-| [ ] | Search modal with type/view/location filters, `tag:`, `folder:`, `pinned:`, `shared:`, `archived:`; empty query shows "Pinned & recent" (`layout/SearchModal.svelte`) | M1 basic, M2 filters |
+| [~] | Search modal with type/view/location filters, `tag:`, `folder:`, `pinned:`, `shared:`, `archived:`; empty query shows "Pinned & recent" (`layout/SearchModal.svelte`). Slice 1: search field in the sidebar (server search) | M1 basic, M2 filters |
 | web | Channels section and channel pages | — |
 | web | Notes section and pages | — |
 
@@ -54,10 +55,10 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Item | Mn |
 |---|---|---|
-| [ ] | Sidebar button, chat title | M1 |
-| [ ] | "…" menu: Scroll to top, Artifacts, Share, Download JSON/TXT/PDF, Rename, Copy chat, Move to folder, Archive, Delete, Tags editor | M1 core, M2 rest |
+| [x] | Sidebar button, chat title | M1 |
+| [~] | "…" menu: Scroll to top, Artifacts, Share, Download JSON/TXT/PDF, Rename, Copy chat, Move to folder, Archive, Delete, Tags editor. Slice 1: Rename, Pin, Archive, Delete | M1 core, M2 rest |
 | [ ] | Temporary Chat toggle (new chat only) / Save Chat (temporary chat with messages) | M1 |
-| [ ] | New Chat button (phone only), Controls (knobs) button | M1 |
+| [x] | New Chat button (phone only), Controls (knobs) button | M1 |
 | [ ] | Admin banners on the new-chat screen | M2 |
 
 ## 4. Model selector — lives in the input bar, bottom right (`chat/ModelSelector.svelte`, `ModelSelector/*`)
@@ -84,7 +85,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Item | Mn |
 |---|---|---|
-| [ ] | Centred input; stacked model avatars; model name or "Hello, {name}"; description; "By author" | M1 |
+| [~] | Centred input; stacked model avatars; model name or "Hello, {name}"; description; "By author". Slice 1: model name, description, centred input (inactive) | M1 |
 | [ ] | "Suggested" prompts (model's own, else admin defaults), shuffled and filtered as you type; tap sends, or inserts if that setting is on | M1 |
 | [ ] | Landing mode "chat" (input pinned to the bottom) | M2 |
 | [ ] | Folder landing page: folder header, input, Chats / Knowledge tabs | M2 |
@@ -117,23 +118,23 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Item | Mn |
 |---|---|---|
-| [ ] | Right-side bubble (or flat row setting); attachments; full-screen image viewer | M1 |
-| [ ] | Edit (Cancel / Save / Send = new branch), Copy, Delete (permission), branch arrows `< n/m >` | M1 |
+| [x] | Right-side bubble (or flat row setting); attachments; full-screen image viewer | M1 |
+| [~] | Edit (Cancel / Save / Send = new branch), Copy, Delete (permission), branch arrows `< n/m >`. Slice 1: Copy, branch arrows (saved like the web) | M1 |
 
 **Assistant message** (`Messages/ResponseMessage.svelte`)
 
 | | Item | Mn |
 |---|---|---|
-| [ ] | Header: model name (avatar hidden on narrow screens), "context compacted" label | M1 |
-| [ ] | Status history (latest, expandable; "Searched N sites", "Retrieved N sources") (`ResponseMessage/StatusHistory*`) | M1 |
-| [ ] | Markdown: GFM, tables (+ Copy / Export CSV), task lists, callouts NOTE/TIP/IMPORTANT/WARNING/CAUTION, footnotes, `[1]` citation chips, mentions, `:::` fences, inline code copy | M1 core, M2 tables export/callouts/fences |
+| [x] | Header: model name (avatar hidden on narrow screens), "context compacted" label | M1 |
+| [x] | Status history (latest, expandable; "Searched N sites", "Retrieved N sources") (`ResponseMessage/StatusHistory*`) | M1 |
+| [~] | Markdown: GFM, tables (+ Copy / Export CSV), task lists, callouts NOTE/TIP/IMPORTANT/WARNING/CAUTION, footnotes, `[1]` citation chips, mentions, `:::` fences, inline code copy. Slice 1: GFM, tables, task lists, citation chips, math as text | M1 core, M2 tables export/callouts/fences |
 | [ ] | Math (KaTeX-equivalent, inline and block) | M2 |
-| [ ] | Code blocks: language label, collapse/expand, Copy, Run (server Jupyter), Preview (HTML/SVG → artifacts), diff blocks; Mermaid and Vega diagrams | M1 copy/collapse; M2 run/preview/diagrams |
-| [ ] | Collapsibles: Reasoning ("Thinking…", "Thought for N seconds"), code interpreter ("Analyzing…/Analyzed"), tool calls ("Executing X…", "View Result from X", input/output, Allow/Deny), grouped "Explored…" | M1 |
-| [ ] | Sources: "N Sources" pill with favicons, expandable list, detail sheet (excerpts, relevance, page, open) | M1 |
+| [~] | Code blocks: language label, collapse/expand, Copy, Run (server Jupyter), Preview (HTML/SVG → artifacts), diff blocks; Mermaid and Vega diagrams. Slice 1: label, highlighting, collapse, Copy | M1 copy/collapse; M2 run/preview/diagrams |
+| [x] | Collapsibles: Reasoning ("Thinking…", "Thought for N seconds"), code interpreter ("Analyzing…/Analyzed"), tool calls ("Executing X…", "View Result from X", input/output, Allow/Deny), grouped "Explored…" | M1 |
+| [x] | Sources: "N Sources" pill with favicons, expandable list, detail sheet (excerpts, relevance, page, open) | M1 |
 | [ ] | Generated images and files; tool HTML embeds (sandboxed) | M1 images, M2 embeds |
-| [ ] | Error box; blinking cursor while streaming | M1 |
-| [ ] | Action bar (always on the last message; tap to reveal on others): branch arrows, Edit (Save / Save As Copy), Copy, Read Aloud, Info (usage), Fork, 👍/👎, Continue (last only), Regenerate menu (Suggest a change / Try again / Add details / More concise), custom actions, Delete (when siblings exist), timestamp | M1 (arrows, copy, regenerate, info, delete); M2 (edit, read aloud, fork, rate, continue, actions) |
+| [x] | Error box; blinking cursor while streaming | M1 |
+| [~] | Action bar (always on the last message; tap to reveal on others): branch arrows, Edit (Save / Save As Copy), Copy, Read Aloud, Info (usage), Fork, 👍/👎, Continue (last only), Regenerate menu (Suggest a change / Try again / Add details / More concise), custom actions, Delete (when siblings exist), timestamp. Slice 1: arrows, Copy, Info | M1 (arrows, copy, regenerate, info, delete); M2 (edit, read aloud, fork, rate, continue, actions) |
 | [ ] | Follow-ups list under the last reply (tap sends, or inserts per setting) | M1 |
 | [ ] | Rating panel: 1–10, reason chips (up/down sets), comment, Save (`Messages/RateComment.svelte`) | M2 |
 | [ ] | Multi-model: full-width swipeable cards; solid border = the branch continued from; per-model arrows; tabs setting; "Merge Responses" | M2 |

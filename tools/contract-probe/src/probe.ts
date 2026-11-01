@@ -1,11 +1,13 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
- * then signs out again (revoking the token). It sends no other writes.
+ * then signs out again (revoking the token). It sends no other writes unless --write
+ * is given: then it also runs the chat actions on a throwaway "APP PROBE:" chat in the
+ * test account and deletes it afterwards (src/write-probe.ts).
  *
  * It never prints or stores tokens, passwords, emails or message text: fixtures
  * hold response shapes, counts and feature flags only (fixtures/<server version>/).
@@ -30,12 +32,14 @@ import {
 import { DEFAULT_ENV_FILE, loadEnvFile } from './env';
 import { shapeOf } from './shape';
 import { summarizeTree } from './tree-summary';
+import { probeChatActions } from './write-probe';
 
 const { values: args } = parseArgs({
   options: {
     url: { type: 'string' },
     env: { type: 'string' },
     'no-fixtures': { type: 'boolean' },
+    write: { type: 'boolean' },
   },
 });
 
@@ -181,6 +185,12 @@ async function main() {
           socket.close();
         }
       });
+
+      if (args.write) {
+        const writeSteps = await probeChatActions(client, { canDelete: capabilities?.can('chat.delete') ?? false });
+        for (const result of writeSteps) results.push({ ...result, name: `write: ${result.name}` });
+        fixtures['write.chat-actions'] = Object.fromEntries(writeSteps.map((result) => [result.name, result.ok]));
+      }
 
       await step('POST /api/v1/auths/signout', async () => {
         await signOut(client);
