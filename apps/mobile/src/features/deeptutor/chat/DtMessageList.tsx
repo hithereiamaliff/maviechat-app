@@ -4,14 +4,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { usePalette } from '@/theme';
-import { DtReplyView, DtUserBubble } from './DtReplyView';
+import { DtReplyView, DtUserBubble, type DtReplyActions } from './DtReplyView';
 
 export type DtListItem = { key: string; kind: 'user'; text: string } | { key: string; kind: 'reply'; reply: DtReply; last: boolean };
 
 interface DtMessageListProps {
   items: DtListItem[];
   baseUrl: string;
-  onRegenerate?: () => void;
+  actions: DtReplyActions;
   /** Changes when a new turn starts; the list then scrolls to the bottom. */
   pinToBottomKey?: string;
 }
@@ -19,7 +19,7 @@ interface DtMessageListProps {
 const NEAR_BOTTOM = 120;
 
 /** A DeepTutor chat, opened at the newest message; follows a streaming reply while you're at the bottom. */
-export function DtMessageList({ items, baseUrl, onRegenerate, pinToBottomKey }: DtMessageListProps) {
+export function DtMessageList({ items, baseUrl, actions, pinToBottomKey }: DtMessageListProps) {
   const palette = usePalette();
   const list = useRef<FlashListRef<DtListItem>>(null);
   const following = useRef(true);
@@ -57,7 +57,7 @@ export function DtMessageList({ items, baseUrl, onRegenerate, pinToBottomKey }: 
           item.kind === 'user' ? (
             <DtUserBubble text={item.text} />
           ) : (
-            <DtReplyView reply={item.reply} baseUrl={baseUrl} onRegenerate={item.last ? onRegenerate : undefined} />
+            <DtReplyView reply={item.reply} baseUrl={baseUrl} stateKey={item.reply.turnId || item.key} last={item.last} {...actions} />
           )
         }
       />

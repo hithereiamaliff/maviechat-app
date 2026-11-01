@@ -117,6 +117,22 @@ Chats in other modes (Solve, Quiz, Research, Visualize…) open read-only with *
 - **Titles:** sessions stay "New conversation" in Chat mode, so the app shows the first message instead.
 - **Choices:** `GET /api/settings/llm-options` lists the models an admin granted to the account (`active` is the default). `GET /api/tools` lists tools; a chat can switch on those marked `toggleable` and not tied to another mode.
 
+## Modes (slice 2, 2026-11-01)
+
+The composer's mode chip picks DeepTutor's mode for a turn, with its settings: Quiz (questions, difficulty), Research (depth, write-up), Visualize (quality). Tools belong to Chat. Each was recorded live on 1.7.1, and `npm run probe:deeptutor -- --modes` checks them.
+
+| Mode (`capability`) | What streams | What the app shows |
+|---|---|---|
+| Solve (`deep_solve`) | The agent loop with `solve_plan` (args: `analysis`, `steps[{goal}]`) and `solve_finish_step` (`step_id`, `summary`), then the answer | The plan and each finished step in their places, then the answer |
+| Quiz (`deep_question`) | Stages exploring → planning → quizzing. Each question arrives whole as a `content` event with `call_kind: "quiz_question_emitted"` and a `qa_pair` (`question_id`, `question`, `question_type`, `options {A: …}`, `correct_answer`, `explanation`, `difficulty`). `result.summary.results[].qa_pair` has them all | Question cards: choices check at once; blanks and true/false by text; written answers are revealed, then you mark them. **Submit Answers** posts `POST /api/sessions/{id}/quiz-results {turn_id, answers[]}`, which adds your results as a message and to DeepTutor's question bank |
+| Research (`deep_research`) | **Two turns.** First rephrasing → decomposing, then `result` with `outline_preview: true`, `topic`, `sub_topics [{title, overview}]` and `research_config`. The research runs as a second turn: same session, `content` = the topic, `config` = `research_config` + `confirmed_outline`, `persist_user_message: false`. It goes researching (literature, preprints, web) → reporting, streaming the report a section at a time (`llm_final_response`). "Quick" took about 9 minutes and wrote about 63k characters | The outline with **Start Research**. The research then streams below it, with its stages |
+| Visualize (`visualize`) | analyzing → generating (`submit_visualization`), then `result` with `render_type` (`chartjs`, `svg`, `mermaid`, `mindmap`, `html`, `geogebra`…), `payload.data`, `presentation` and `code`. The text answer is the payload as a code block | The drawing in a sandboxed web view (`incognito`, links open in the browser), using pinned Chart.js 4.4.6 / Mermaid 11.4.1 from jsDelivr (MIT); SVG without scripts. GeoGebra and the rest offer the web app. The code sits under **Code** |
+| Ask Questions (`ask_questions`) | `progress` events carry `ask_user_draft` as the questions are written; the `ask_user` tool result's `tool_metadata.ask_user` (`intro`, `questions [{id, header, prompt, options [{label, description}], multi_select, allow_free_text, placeholder}]`) leaves the turn waiting. **No `wait_for_input` event.** The reply is `submit_user_reply {turn_id, command_id, answers [{questionId, text}]}`; a saved `progress` event with `trace_kind: "user_reply"` records the answers | The question card: options (one or several) and room to type; **Send Answers**. A reopened chat shows the answers given |
+| Math animation (`math_animator`) | Fails at once on our server: "requires optional dependencies" (the image lacks `deeptutor[math-animator]`) | Not offered (Video lesson likewise) |
+
+- Mode turns stream their opening text with a leading newline, which DeepTutor trims when saving; compare trimmed.
+- Stages come as `stage_start`/`stage_end` with names (`rephrasing`, `quizzing`, …); the app shows them as ticked steps with our own names.
+
 ## M1.5 checklist
 
 | | Item |
@@ -129,4 +145,4 @@ Chats in other modes (Solve, Quiz, Research, Visualize…) open read-only with *
 | [x] | "Reference DeepTutor Chat" in the Open WebUI + menu (a `text` attachment, see above). |
 | [x] | "Send to DeepTutor" in the Open WebUI chat menu (saved chats only): the shown branch as Markdown, filed as a `chat` record in the "From MavieChat" notebook, with our own summary. |
 | [ ] | Phone checks: switch both ways without signing in again; both cross-reference directions; an expired DeepTutor sign-in; offline. |
-| [~] | Native DeepTutor chat over the `/ws` turn protocol 2.0 (see "Native chat"). Slice 1, Chat mode, is done; the other modes come next and open in the web app until then. |
+| [~] | Native DeepTutor chat over the `/ws` turn protocol 2.0 (see "Native chat" and "Modes"). Slice 1 (Chat) and slice 2 (Solve, Quiz, Research, Visualize, Ask Questions) are done. Mastery path, Reading, Audio overview and the animation modes open in the web app. |

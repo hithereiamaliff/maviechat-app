@@ -1,4 +1,4 @@
-import { getLlmOptions, getSession, listChatTools, listSessions, searchSessions, type DtSessionSummary } from '@maviechat/deeptutor-protocol';
+import { getLlmOptions, getSession, listChatTools, listModes, listSessions, searchSessions, type DtSessionSummary } from '@maviechat/deeptutor-protocol';
 import { useQuery } from '@tanstack/react-query';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 
@@ -32,6 +32,12 @@ export function useDtLlmOptions() {
 export function useDtChatTools() {
   const { client, session } = useDtAuthed();
   return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'chat-tools'], queryFn: () => listChatTools(client), staleTime: 5 * 60_000 });
+}
+
+/** The modes (capabilities) the server offers. */
+export function useDtModes() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'modes'], queryFn: () => listModes(client), staleTime: 10 * 60_000 });
 }
 
 /** A session time (Unix seconds or milliseconds, or ISO text) as a short date. */

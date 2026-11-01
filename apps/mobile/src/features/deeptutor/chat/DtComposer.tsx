@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
 import { updateDraft, useDraftText } from '@/features/chat/drafts';
 import { fonts, radius, usePalette } from '@/theme';
+import { capabilityName, modeInfo } from './capabilities';
 
 /** Our names for DeepTutor's switchable chat tools; others show their id, made readable. */
 const TOOL_INFO: Record<string, { label: string; icon: IconName }> = {
@@ -42,13 +43,27 @@ interface DtComposerProps {
   models: DtLlmOption[] | undefined;
   model: DtLlmSelection | null;
   onModelChange: (model: DtLlmSelection) => void;
+  /** The modes on offer, the current one, and its settings. */
+  modes: string[];
+  mode: string;
+  onModeChange: (mode: string) => void;
+  config: Record<string, unknown>;
+  onSettingChange: (key: string, value: unknown) => void;
   placeholder?: string;
   autoFocus?: boolean;
 }
 
+const PLACEHOLDERS: Record<string, string> = {
+  deep_solve: 'Describe the problem',
+  deep_question: 'What should the quiz cover?',
+  deep_research: 'What should DeepTutor research?',
+  visualize: 'What should it draw?',
+  ask_questions: 'What do you need help with?',
+};
+
 /**
- * DeepTutor's input: the text, then a tray with the chat's tools and model, and send or stop.
- * The text is kept per chat while the app runs.
+ * DeepTutor's input: the text, then a tray with the mode (and its settings), the chat's tools
+ * and model, and send or stop. The text is kept per chat while the app runs.
  */
 export function DtComposer({
   draftKey,
@@ -61,14 +76,20 @@ export function DtComposer({
   models,
   model,
   onModelChange,
-  placeholder = 'Ask DeepTutor anything',
+  modes,
+  mode,
+  onModeChange,
+  config,
+  onSettingChange,
+  placeholder,
   autoFocus = false,
 }: DtComposerProps) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
   const text = useDraftText(draftKey);
   const [sending, setSending] = useState(false);
-  const [sheet, setSheet] = useState<'tools' | 'model' | null>(null);
+  const [sheet, setSheet] = useState<'mode' | 'tools' | 'model' | null>(null);
+  const info = modeInfo(mode);
   const canSend = text.trim().length > 0 && !sending && !running;
   const modelLabel = models?.find((option) => sameSelection(option, model))?.label ?? (models?.length ? 'Choose a model' : 'Default model');
   const usable = tools ?? [];
@@ -91,7 +112,7 @@ export function DtComposer({
         <TextInput
           value={text}
           onChangeText={(value) => updateDraft(draftKey, (draft) => ({ ...draft, text: value }))}
-          placeholder={placeholder}
+          placeholder={placeholder ?? PLACEHOLDERS[mode] ?? 'Ask DeepTutor anything'}
           placeholderTextColor={palette.textFaint}
           multiline
           autoFocus={autoFocus}
@@ -99,7 +120,22 @@ export function DtComposer({
           accessibilityLabel="Message"
         />
         <View style={styles.row}>
-          {usable.length > 0 ? (
+          {modes.length > 1 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Mode: ${capabilityName(mode)}. Change mode`}
+              onPress={() => setSheet('mode')}
+              hitSlop={4}
+              style={({ pressed }) => [
+                styles.chip,
+                mode === 'chat' ? { borderColor: palette.border, borderWidth: 1 } : { backgroundColor: palette.active },
+                pressed && { opacity: 0.7 },
+              ]}>
+              <Icon name={info.icon} size={15} color={mode === 'chat' ? palette.textMuted : palette.onActive} />
+              <Text style={[styles.chipText, { color: mode === 'chat' ? palette.textMuted : palette.onActive }]}>{capabilityName(mode)}</Text>
+            </Pressable>
+          ) : null}
+          {mode === 'chat' && usable.length > 0 ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={chosen.length ? `${chosen.length} tools on. Change tools` : 'Tools'}
@@ -150,6 +186,54 @@ export function DtComposer({
           )}
         </View>
       </View>
+
+      <Sheet visible={sheet === 'mode'} title="Mode" onClose={() => setSheet(null)}>
+        <View style={[styles.group, { borderColor: palette.border }]}>
+          {modes.map((id, index) => {
+            const selected = id === mode;
+            const about = modeInfo(id);
+            return (
+              <Pressable
+                key={id}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                onPress={() => onModeChange(id)}
+                style={({ pressed }) => [
+                  styles.sheetRow,
+                  index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: palette.border },
+                  pressed && { backgroundColor: palette.surface },
+                ]}>
+                <Icon name={about.icon} size={18} color={palette.textMuted} />
+                <View style={styles.sheetText}>
+                  <Text style={[styles.sheetLabel, { color: palette.text }]}>{capabilityName(id)}</Text>
+                  <Text style={[styles.sheetHint, { color: palette.textFaint }]}>{about.hint}</Text>
+                </View>
+                {selected ? <Icon name="check" size={18} color={palette.text} strokeWidth={2} /> : null}
+              </Pressable>
+            );
+          })}
+        </View>
+        {info.options.map((option) => (
+          <View key={option.key} style={styles.setting}>
+            <Text style={[styles.settingLabel, { color: palette.textMuted }]}>{option.label}</Text>
+            <View style={styles.choices}>
+              {option.choices.map((choice) => {
+                const selected = config[option.key] === choice.value;
+                return (
+                  <Pressable
+                    key={String(choice.value)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    onPress={() => onSettingChange(option.key, choice.value)}
+                    style={[styles.choice, selected ? { backgroundColor: palette.primary } : { borderColor: palette.border, borderWidth: 1 }]}>
+                    <Text style={[styles.choiceText, { color: selected ? palette.onPrimary : palette.text }]}>{choice.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ))}
+      </Sheet>
 
       <Sheet visible={sheet === 'tools'} title="Tools" onClose={() => setSheet(null)}>
         <Text style={[styles.sheetNote, { color: palette.textMuted }]}>DeepTutor may use the tools you switch on when it answers in this chat.</Text>
@@ -254,4 +338,9 @@ const styles = StyleSheet.create({
   sheetText: { flex: 1, gap: 2 },
   sheetLabel: { fontFamily: fonts.regular, fontSize: 15 },
   sheetHint: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 16 },
+  setting: { gap: 8, marginTop: 6 },
+  settingLabel: { fontFamily: fonts.medium, fontSize: 13, marginHorizontal: 4 },
+  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  choice: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16 },
+  choiceText: { fontFamily: fonts.medium, fontSize: 14 },
 });

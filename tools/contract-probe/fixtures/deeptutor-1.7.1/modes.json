@@ -1,0 +1,31 @@
+{
+  "deep_solve": {
+    "stages": [
+      "responding"
+    ]
+  },
+  "deep_question": {
+    "stages": [
+      "exploring",
+      "planning",
+      "quizzing"
+    ]
+  },
+  "visualize": {
+    "stages": [
+      "analyzing",
+      "generating"
+    ]
+  },
+  "deep_research": {
+    "stages": [
+      "rephrasing",
+      "decomposing"
+    ]
+  },
+  "ask_questions": {
+    "stages": [
+      "responding"
+    ]
+  }
+}

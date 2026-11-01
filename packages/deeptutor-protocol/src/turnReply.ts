@@ -28,6 +28,62 @@ export interface DtSource {
   type: string;
 }
 
+/** A step of a multi-stage mode (Research: rephrasing, decomposing, researching, reporting…). */
+export interface DtStage {
+  name: string;
+  done: boolean;
+}
+
+export type DtQuizQuestionType = 'choice' | 'concept' | 'fill_in_blank' | 'short_answer' | 'written' | 'coding';
+
+/** A Quiz question, with its answer and explanation (DeepTutor sends both up front). */
+export interface DtQuizQuestion {
+  id: string;
+  /** Markdown, maths included. */
+  question: string;
+  type: DtQuizQuestionType;
+  /** Choice questions: "A", "B", … in order. */
+  options: { key: string; text: string }[];
+  answer: string;
+  explanation: string;
+  difficulty: string;
+}
+
+/** What Ask Questions (or any `ask_user` call) wants to know before it carries on. */
+export interface DtAskQuestion {
+  id: string;
+  header: string;
+  prompt: string;
+  options: { label: string; description: string }[];
+  multiSelect: boolean;
+  freeText: boolean;
+  placeholder: string;
+}
+
+export interface DtAsk {
+  intro: string;
+  questions: DtAskQuestion[];
+}
+
+/** A Visualize result: what to draw and how. */
+export interface DtVisual {
+  /** "chartjs", "svg", "mermaid", "mindmap", "html", "geogebra", … */
+  renderType: string;
+  /** The payload as text (JSON for Chart.js). */
+  data: string;
+  title: string;
+  description: string;
+  code: { language: string; content: string };
+}
+
+/** Research's first turn: an outline to confirm before the research runs. */
+export interface DtOutline {
+  topic: string;
+  subTopics: { title: string; overview: string }[];
+  /** The research settings to send again with the confirmed outline. */
+  config: Record<string, unknown>;
+}
+
 /** A reply as DeepTutor's events build it, live or from a saved message. */
 export interface DtReply {
   sessionId: string | null;
@@ -50,6 +106,13 @@ export interface DtReply {
   question: { prompt: string; details: Record<string, unknown> } | null;
   /** The capability's own result (`result` metadata), for modes with more than text. */
   result: Record<string, unknown> | null;
+  stages: DtStage[];
+  quiz: DtQuizQuestion[];
+  ask: DtAsk | null;
+  /** Your answers to `ask`, by question id, once sent. */
+  askAnswers: Record<string, string> | null;
+  visual: DtVisual | null;
+  outline: DtOutline | null;
 }
 
 export function emptyReply(sessionId: string | null = null, turnId: string | null = null): DtReply {
@@ -68,6 +131,12 @@ export function emptyReply(sessionId: string | null = null, turnId: string | nul
     assistantMessageId: null,
     question: null,
     result: null,
+    stages: [],
+    quiz: [],
+    ask: null,
+    askAnswers: null,
+    visual: null,
+    outline: null,
   };
 }
 
@@ -85,6 +154,110 @@ export function isAnswerContent(event: DtStreamEvent): boolean {
   if (!text(event.metadata.call_id)) return true;
   const kind = text(event.metadata.call_kind);
   return kind === 'agent_loop_round' || kind === 'llm_final_response';
+}
+
+const QUIZ_TYPES: Record<string, DtQuizQuestionType> = {
+  choice: 'choice',
+  multiple_choice: 'choice',
+  mcq: 'choice',
+  concept: 'concept',
+  true_false: 'concept',
+  judgement: 'concept',
+  fill_in_blank: 'fill_in_blank',
+  fill_in_the_blank: 'fill_in_blank',
+  cloze: 'fill_in_blank',
+  short_answer: 'short_answer',
+  written: 'written',
+  open_ended: 'written',
+  essay: 'written',
+  coding: 'coding',
+  code: 'coding',
+  programming: 'coding',
+};
+
+/** A question as DeepTutor's `qa_pair` describes it, or null. */
+export function quizQuestion(raw: unknown): DtQuizQuestion | null {
+  const qa = record(raw);
+  const question = text(qa.question);
+  if (!question) return null;
+  const kind = text(qa.question_type).trim().toLowerCase().replace(/[\s-]+/g, '_');
+  const options = Object.entries(record(qa.options))
+    .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+    .map(([key, value]) => ({ key, text: value }));
+  return {
+    id: text(qa.question_id) || question.slice(0, 40),
+    question,
+    type: QUIZ_TYPES[kind] ?? 'short_answer',
+    options,
+    answer: text(qa.correct_answer),
+    explanation: text(qa.explanation),
+    difficulty: text(qa.difficulty),
+  };
+}
+
+function mergeQuiz(current: DtQuizQuestion[], incoming: DtQuizQuestion[]): DtQuizQuestion[] {
+  const next = [...current];
+  for (const question of incoming) {
+    const index = next.findIndex((item) => item.id === question.id);
+    if (index >= 0) next[index] = question;
+    else next.push(question);
+  }
+  return next;
+}
+
+function askOf(raw: unknown): DtAsk | null {
+  const payload = record(raw);
+  const questions = (Array.isArray(payload.questions) ? payload.questions : []).flatMap((item): DtAskQuestion[] => {
+    const question = record(item);
+    const id = text(question.id);
+    if (!id) return [];
+    return [
+      {
+        id,
+        header: text(question.header),
+        prompt: text(question.prompt),
+        options: (Array.isArray(question.options) ? question.options : []).flatMap((option) => {
+          const value = record(option);
+          const label = typeof option === 'string' ? option : text(value.label);
+          return label ? [{ label, description: text(value.description) }] : [];
+        }),
+        multiSelect: question.multi_select === true,
+        // Free text unless DeepTutor says otherwise (it does for strict choices).
+        freeText: question.allow_free_text !== false,
+        placeholder: text(question.placeholder),
+      },
+    ];
+  });
+  const intro = text(payload.intro);
+  return intro || questions.length ? { intro, questions } : null;
+}
+
+function visualOf(meta: Record<string, unknown>): DtVisual | null {
+  const renderType = text(meta.render_type).trim();
+  if (!renderType) return null;
+  const payload = record(meta.payload);
+  const code = record(meta.code);
+  const data = 'data' in payload ? payload.data : code.content;
+  const serialized = typeof data === 'string' ? data : data === undefined || data === null ? '' : JSON.stringify(data, null, 2);
+  if (!serialized.trim()) return null;
+  const presentation = record(meta.presentation);
+  return {
+    renderType,
+    data: serialized,
+    title: text(presentation.title),
+    description: text(presentation.description),
+    code: { language: text(code.language) || 'json', content: text(code.content) || serialized },
+  };
+}
+
+function outlineOf(meta: Record<string, unknown>): DtOutline | null {
+  if (meta.outline_preview !== true) return null;
+  const subTopics = (Array.isArray(meta.sub_topics) ? meta.sub_topics : []).flatMap((item) => {
+    const topic = record(item);
+    const title = text(topic.title);
+    return title ? [{ title, overview: text(topic.overview) }] : [];
+  });
+  return { topic: text(meta.topic), subTopics, config: record(meta.research_config) };
 }
 
 function stageLabel(stage: string): string {
@@ -117,7 +290,7 @@ export function applyTurnEvent(reply: DtReply, event: DtStreamEvent): DtReply {
   if (event.seq > 0 && event.seq <= reply.seq) return reply;
   const next: DtReply = { ...reply, seq: Math.max(reply.seq, event.seq) };
   const meta = event.metadata;
-  if (next.status === 'waiting' && ['content', 'thinking', 'tool_call', 'progress'].includes(event.type)) {
+  if (next.status === 'waiting' && ['content', 'thinking', 'tool_call'].includes(event.type)) {
     // The answer to its question set the turn going again.
     next.status = 'running';
     next.question = null;
@@ -130,6 +303,11 @@ export function applyTurnEvent(reply: DtReply, event: DtStreamEvent): DtReply {
       break;
     case 'content':
       if (isAnswerContent(event)) next.answer += event.content;
+      else if (text(meta.call_kind) === 'quiz_question_emitted') {
+        // Quiz questions stream one at a time, each whole.
+        const question = quizQuestion(meta.qa_pair);
+        if (question) next.quiz = mergeQuiz(next.quiz, [question]);
+      }
       break;
     case 'thinking':
     case 'observation':
@@ -137,6 +315,7 @@ export function applyTurnEvent(reply: DtReply, event: DtStreamEvent): DtReply {
       break;
     case 'tool_call': {
       const args = record(meta.args);
+      if ((text(meta.tool_name) || event.content) === 'ask_user') next.ask = askOf(args) ?? next.ask;
       next.tools = [
         ...next.tools,
         {
@@ -153,6 +332,13 @@ export function applyTurnEvent(reply: DtReply, event: DtStreamEvent): DtReply {
     }
     case 'tool_result': {
       const id = text(meta.call_id);
+      const asked = askOf(record(meta.tool_metadata).ask_user);
+      if (asked) {
+        // The turn now waits for your answers (sent with `submit_user_reply`).
+        next.ask = asked;
+        next.status = 'waiting';
+        next.activity = null;
+      }
       const index = next.tools.findIndex((tool) => tool.id === id && !tool.done);
       if (index >= 0) {
         next.tools = next.tools.map((tool, i) => (i === index ? { ...tool, done: true, result: event.content } : tool));
@@ -163,16 +349,42 @@ export function applyTurnEvent(reply: DtReply, event: DtStreamEvent): DtReply {
       break;
     }
     case 'progress':
-      if (text(meta.call_state) === 'running') next.activity = event.content || text(meta.label) || next.activity;
+      if (text(meta.trace_kind) === 'user_reply') {
+        // Your answers reached the turn (saved with the reply, so a reopened chat shows them).
+        const answers: Record<string, string> = {};
+        for (const item of Array.isArray(meta.answers) ? meta.answers : []) {
+          const answer = record(item);
+          if (text(answer.questionId)) answers[text(answer.questionId)] = text(answer.text);
+        }
+        next.askAnswers = answers;
+        if (next.status === 'waiting') next.status = 'running';
+      } else if (text(meta.trace_kind) === 'ask_user_draft') {
+        // The questions as the model writes them; the tool result settles them.
+        if (next.status !== 'waiting') next.ask = askOf(meta.ask_user_draft) ?? next.ask;
+      } else if (text(meta.call_state) === 'running') next.activity = event.content || text(meta.label) || next.activity;
       break;
     case 'stage_start':
       next.activity = stageLabel(event.stage) || next.activity;
+      if (event.stage && !next.stages.some((stage) => stage.name === event.stage)) next.stages = [...next.stages, { name: event.stage, done: false }];
+      break;
+    case 'stage_end':
+      next.stages = next.stages.map((stage) => (stage.name === event.stage ? { ...stage, done: true } : stage));
       break;
     case 'sources':
       next.sources = mergeSources(next.sources, meta.sources);
       break;
     case 'result': {
       next.result = meta;
+      const summary = record(meta.summary);
+      if (Array.isArray(summary.results)) {
+        const questions = summary.results.flatMap((item) => {
+          const question = quizQuestion(record(item).qa_pair ?? item);
+          return question ? [question] : [];
+        });
+        next.quiz = mergeQuiz(next.quiz, questions);
+      }
+      next.visual = visualOf(meta) ?? next.visual;
+      next.outline = outlineOf(meta) ?? next.outline;
       // Some capabilities send their answer only here.
       const response = text(meta.response);
       if (!next.answer.trim() && response) next.answer = response;
@@ -195,7 +407,6 @@ export function applyTurnEvent(reply: DtReply, event: DtStreamEvent): DtReply {
       next.question = null;
       break;
     }
-    case 'stage_end':
     case 'session_meta':
       break;
   }
@@ -215,7 +426,8 @@ export function savedReply(message: DtMessage): DtReply {
     const event = parseServerEvent(raw);
     return event && 'seq' in event ? [{ ...event, seq: 0 }] : [];
   });
-  const reply = replyFromEvents(events, { ...emptyReply(), status: 'completed' });
+  const first = events[0];
+  const reply = replyFromEvents(events, { ...emptyReply(first?.session_id || null, first?.turn_id || null), status: 'completed' });
   return { ...reply, answer: message.content ?? reply.answer, status: reply.status === 'running' ? 'completed' : reply.status, activity: null };
 }
 

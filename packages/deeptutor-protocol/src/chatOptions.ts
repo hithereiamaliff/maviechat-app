@@ -38,6 +38,49 @@ export async function listChatTools(client: DtClient): Promise<DtChatTool[]> {
   });
 }
 
+/** A DeepTutor mode ("capability") the server offers, with its setting defaults. */
+export interface DtMode {
+  id: string;
+  description: string;
+  defaults: Record<string, unknown>;
+}
+
+/** `GET /api/capabilities/registered`: the turn modes the server offers. */
+export async function listModes(client: DtClient): Promise<DtMode[]> {
+  const response = await client.get<{ capabilities?: Record<string, unknown>[] }>('/api/capabilities/registered');
+  return (response.capabilities ?? []).flatMap((item): DtMode[] => {
+    if (typeof item.id !== 'string' || item.kind !== 'turn' || item.available === false) return [];
+    const manifest = (item.manifest ?? {}) as Record<string, unknown>;
+    return [
+      {
+        id: item.id,
+        description: typeof manifest.description === 'string' ? manifest.description : '',
+        defaults: typeof manifest.config_defaults === 'object' && manifest.config_defaults !== null ? (manifest.config_defaults as Record<string, unknown>) : {},
+      },
+    ];
+  });
+}
+
+/** Saves answered Quiz questions to the session (DeepTutor adds them as your message and to its question bank). */
+export async function saveQuizResults(
+  client: DtClient,
+  sessionId: string,
+  turnId: string,
+  answers: {
+    question_id: string;
+    question: string;
+    question_type: string;
+    options: Record<string, string>;
+    user_answer: string;
+    correct_answer: string;
+    explanation: string;
+    difficulty: string;
+    is_correct: boolean;
+  }[],
+): Promise<void> {
+  await client.post(`/api/sessions/${encodeURIComponent(sessionId)}/quiz-results`, { turn_id: turnId, answers });
+}
+
 export function sameSelection(a: DtLlmSelection | null | undefined, b: DtLlmSelection | null | undefined): boolean {
   return Boolean(a && b && a.profile_id === b.profile_id && a.model_id === b.model_id);
 }

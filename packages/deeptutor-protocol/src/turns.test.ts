@@ -169,3 +169,66 @@ describe('a reply built from events', () => {
     expect(segments.map((segment) => (segment.kind === 'text' ? segment.text : segment.tools.map((tool) => tool.id).join()))).toEqual(['a', 'Hello', 'b']);
   });
 });
+
+describe('DeepTutor modes', () => {
+  it('collects Quiz questions as they stream and from the result', () => {
+    seq = 0;
+    const qa = (id: string, type: string, extra: Record<string, unknown> = {}) => ({ question_id: id, question: `Q ${id}`, question_type: type, correct_answer: 'A', explanation: 'Because.', ...extra });
+    const reply = replyFromEvents([
+      event('stage_start', '', {}, 'quizzing'),
+      event('content', '### Question 1', { call_kind: 'quiz_question_emitted', call_id: 'q1', qa_pair: qa('q_1', 'Multiple Choice', { options: { A: 'Yes', B: 'No' } }) }, 'quizzing'),
+      event('stage_end', '', {}, 'quizzing'),
+      event('result', '', { response: 'Two questions.', summary: { results: [{ qa_pair: qa('q_1', 'choice', { options: { A: 'Yes', B: 'No' } }) }, { qa_pair: qa('q_2', 'fill-in-the-blank') }] } }, ''),
+    ]);
+    expect(reply.answer).toBe('Two questions.');
+    expect(reply.stages).toEqual([{ name: 'quizzing', done: true }]);
+    expect(reply.quiz.map((question) => [question.id, question.type, question.options.map((option) => option.key).join('')])).toEqual([
+      ['q_1', 'choice', 'AB'],
+      ['q_2', 'fill_in_blank', ''],
+    ]);
+  });
+
+  it('reads a visualization and a Research outline from the result', () => {
+    seq = 0;
+    const visual = replyFromEvents([
+      event('result', '', { render_type: 'chartjs', payload: { format: 'application/vnd.chartjs+json', data: { type: 'bar' } }, presentation: { title: 'Moons' } }, ''),
+    ]).visual;
+    expect(visual).toMatchObject({ renderType: 'chartjs', title: 'Moons', code: { language: 'json' } });
+    expect(JSON.parse(visual!.data)).toEqual({ type: 'bar' });
+
+    seq = 0;
+    const outline = replyFromEvents([
+      event('result', '', { response: '', outline_preview: true, topic: 'Water', sub_topics: [{ title: 'Stores', overview: 'Where water sits' }, { title: '' }], research_config: { mode: 'notes', depth: 'quick' } }, ''),
+    ]).outline;
+    expect(outline).toEqual({ topic: 'Water', subTopics: [{ title: 'Stores', overview: 'Where water sits' }], config: { mode: 'notes', depth: 'quick' } });
+  });
+
+  it('waits on Ask Questions until your answers go back, and keeps them', () => {
+    seq = 0;
+    const ask = { intro: 'A few details:', questions: [{ id: 'goal', header: 'Goal', prompt: 'What for?', multi_select: true, options: [{ label: 'Exam', description: 'A test' }], allow_free_text: true }] };
+    let reply = replyFromEvents([
+      event('progress', '', { trace_kind: 'ask_user_draft', ask_user_draft: { intro: 'A few', questions: [] } }),
+      event('tool_call', 'ask_user', { call_id: 't1', tool_name: 'ask_user', args: ask }),
+      event('tool_result', '[awaiting user reply to: What for?]', { call_id: 't1', tool_name: 'ask_user', tool_metadata: { ask_user: ask } }),
+    ]);
+    expect(reply.status).toBe('waiting');
+    expect(reply.ask).toEqual({ intro: 'A few details:', questions: [{ id: 'goal', header: 'Goal', prompt: 'What for?', options: [{ label: 'Exam', description: 'A test' }], multiSelect: true, freeText: true, placeholder: '' }] });
+    reply = applyTurnEvent(reply, event('progress', '', { trace_kind: 'user_reply', answers: [{ questionId: 'goal', text: 'Exam' }] }));
+    expect(reply).toMatchObject({ status: 'running', askAnswers: { goal: 'Exam' } });
+    reply = applyTurnEvent(reply, event('done', '', { status: 'completed' }, ''));
+    expect(reply.status).toBe('completed');
+  });
+
+  it('sends a mode with its settings, and a continuation without a new message', () => {
+    expect(startTurnCommand({ content: 'Water', sessionId: 's', capability: 'deep_research', config: { depth: 'quick', confirmed_outline: [] }, persistUserMessage: false })).toEqual({
+      protocol_version: '2.0',
+      type: 'start_turn',
+      content: 'Water',
+      capability: 'deep_research',
+      session_id: 's',
+      config: { depth: 'quick', confirmed_outline: [] },
+      persist_user_message: false,
+    });
+    expect(startTurnCommand({ content: 'Hi', config: {} })).not.toHaveProperty('config');
+  });
+});

@@ -22,6 +22,8 @@ interface DtLiveValue {
   /** Asks DeepTutor to stop the session's running reply. */
   stop(sessionId: string): Promise<boolean>;
   regenerate(sessionId: string): void;
+  /** Answers the questions the session's running turn asked. */
+  answer(sessionId: string, answers: { questionId: string; text: string }[]): Promise<boolean>;
   /** Shows a turn already running (started before the app restarted, or on another device). */
   follow(sessionId: string, turnId: string): void;
 }
@@ -121,6 +123,10 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
         return turnId ? connection.cancel(turnId) : false;
       },
       regenerate: (sessionId) => connection.regenerate(sessionId),
+      answer: async (sessionId, answers) => {
+        const turnId = turns.get(sessionId)?.turnId;
+        return turnId ? connection.reply(turnId, { answers }) : false;
+      },
       follow: (sessionId, turnId) => {
         if (turns.get(sessionId)?.turnId === turnId) return;
         connection.follow(turnId, 0);

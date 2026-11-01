@@ -5,8 +5,10 @@ export interface LiveTurn {
   sessionId: string;
   /** "" until the server names the turn. */
   turnId: string;
-  /** Your message, shown until the saved session has it. Null for a regenerate or a turn started elsewhere. */
+  /** Your message, shown until the saved session has it. Null for a regenerate, a continuation or a turn started elsewhere. */
   prompt: string | null;
+  /** A regenerate: the reply replaces the last one shown. */
+  replacesLast: boolean;
   reply: DtReply;
 }
 
@@ -35,13 +37,19 @@ export class LiveTurns {
 
   /** Shows a message being sent in a known session, before the server has answered. */
   begin(sessionId: string, prompt: string): void {
-    this.turns.set(sessionId, { sessionId, turnId: '', prompt, reply: emptyReply(sessionId) });
+    this.turns.set(sessionId, { sessionId, turnId: '', prompt, replacesLast: false, reply: emptyReply(sessionId) });
     this.notify();
   }
 
   /** Shows a regenerate starting: the new reply will take the last one's place. */
   beginRegenerate(sessionId: string): void {
-    this.turns.set(sessionId, { sessionId, turnId: '', prompt: null, reply: emptyReply(sessionId) });
+    this.turns.set(sessionId, { sessionId, turnId: '', prompt: null, replacesLast: true, reply: emptyReply(sessionId) });
+    this.notify();
+  }
+
+  /** Shows a turn that carries on without a new message (Research after its outline). */
+  beginContinuation(sessionId: string): void {
+    this.turns.set(sessionId, { sessionId, turnId: '', prompt: null, replacesLast: false, reply: emptyReply(sessionId) });
     this.notify();
   }
 
@@ -61,7 +69,7 @@ export class LiveTurns {
     if (current && (current.turnId === event.turn_id || current.turnId === '')) {
       turn = { ...current, turnId: event.turn_id, reply: applyTurnEvent(current.turnId ? current.reply : { ...current.reply, turnId: event.turn_id }, event) };
     } else {
-      turn = { sessionId, turnId: event.turn_id, prompt: null, reply: applyTurnEvent(emptyReply(sessionId, event.turn_id), event) };
+      turn = { sessionId, turnId: event.turn_id, prompt: null, replacesLast: false, reply: applyTurnEvent(emptyReply(sessionId, event.turn_id), event) };
     }
     if (turn.reply === current?.reply && turn.turnId === current.turnId) return current;
     this.turns.set(sessionId, turn);

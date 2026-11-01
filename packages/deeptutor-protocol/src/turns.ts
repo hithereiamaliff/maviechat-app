@@ -175,6 +175,10 @@ export interface DtTurnRequest {
   sessionId?: string | null;
   /** "chat" unless given. */
   capability?: string;
+  /** The mode's own settings (Quiz: number of questions…; Research: the confirmed outline…). */
+  config?: Record<string, unknown>;
+  /** False for a turn that carries on from the last one without a new message (Research after its outline). */
+  persistUserMessage?: boolean;
   tools?: string[];
   knowledgeBases?: string[];
   llmSelection?: DtLlmSelection | null;
@@ -207,6 +211,8 @@ export function startTurnCommand(request: DtTurnRequest): DtCommand {
   if (request.notebookReferences?.length) command.notebook_references = request.notebookReferences;
   if (request.historyReferences?.length) command.history_references = request.historyReferences;
   if (request.language) command.language = request.language;
+  if (request.config && Object.keys(request.config).length) command.config = request.config;
+  if (request.persistUserMessage === false) command.persist_user_message = false;
   if (request.clientSubmissionId) command.client_submission_id = request.clientSubmissionId;
   return command;
 }

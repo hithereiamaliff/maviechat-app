@@ -16,7 +16,7 @@ import { fonts, usePalette } from '@/theme';
 
 const DT_NEW_CHAT = 'dt:new';
 
-/** A new DeepTutor chat (Chat mode). The first message creates the session, then its screen takes over. */
+/** A new DeepTutor chat, in the mode you pick. The first message creates the session, then its screen takes over. */
 export default function DeepTutorNewChat() {
   const palette = usePalette();
   const toast = useToast();
@@ -28,7 +28,7 @@ export default function DeepTutorNewChat() {
   const send = async (text: string) => {
     setPending(text);
     try {
-      const sessionId = await live.send({ content: text, capability: 'chat', ...choice.request });
+      const sessionId = await live.send({ content: text, ...choice.request });
       live.turns.setPrompt(sessionId, text);
       router.replace({ pathname: '/learn/[id]', params: { id: sessionId } });
       return true;
@@ -61,7 +61,7 @@ export default function DeepTutorNewChat() {
           <View style={styles.welcome}>
             <Text style={[styles.hello, { color: palette.text }]}>What would you like to learn?</Text>
             <Text style={[styles.hint, { color: palette.textMuted }]}>
-              Ask DeepTutor anything. Switch on tools such as web search under the box. Quiz, Research and the other modes are in the DeepTutor web app for now.
+              Ask DeepTutor anything, or pick a mode under the box: Solve, Quiz, Research, Visualize or Ask questions.
             </Text>
           </View>
         )}
@@ -76,6 +76,11 @@ export default function DeepTutorNewChat() {
           models={choice.models}
           model={choice.model}
           onModelChange={choice.setModel}
+          modes={choice.modes}
+          mode={choice.mode}
+          onModeChange={choice.setMode}
+          config={choice.config}
+          onSettingChange={choice.setSetting}
           autoFocus
         />
       </KeyboardAvoidingView>

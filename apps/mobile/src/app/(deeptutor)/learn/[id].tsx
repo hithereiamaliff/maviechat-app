@@ -1,7 +1,7 @@
-import { activeTurnOf, deleteSession, savedReply, sessionTitle, shownMessages } from '@maviechat/deeptutor-protocol';
+import { activeTurnOf, deleteSession, saveQuizResults, savedReply, sessionTitle, shownMessages, type DtOutline, type DtQuizQuestion } from '@maviechat/deeptutor-protocol';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
@@ -13,6 +13,8 @@ import { capabilityName, isNativeCapability } from '@/features/deeptutor/chat/ca
 import { DtComposer } from '@/features/deeptutor/chat/DtComposer';
 import { useDtLive, useLiveTurn } from '@/features/deeptutor/chat/DtLiveProvider';
 import { DtMessageList, type DtListItem } from '@/features/deeptutor/chat/DtMessageList';
+import type { DtReplyActions } from '@/features/deeptutor/chat/DtReplyView';
+import type { QuizAnswer } from '@/features/deeptutor/chat/quiz';
 import { useDtChoice } from '@/features/deeptutor/chat/useDtChoice';
 import { deepTutorAttachment } from '@/features/deeptutor/crossReference';
 import { sessionDate, useDtSession } from '@/features/deeptutor/queries';
@@ -36,11 +38,10 @@ export default function DeepTutorChat() {
   const live = useDtLive();
   const turn = useLiveTurn(id);
   const detail = useDtSession(id);
-  const choice = useDtChoice(detail.data?.preferences);
+  const capability = typeof detail.data?.capability === 'string' ? detail.data.capability : undefined;
+  const choice = useDtChoice(detail.data?.preferences, capability);
   const [pinKey, setPinKey] = useState<string | undefined>(undefined);
   const [attaching, setAttaching] = useState(false);
-
-  const capability = typeof detail.data?.capability === 'string' ? detail.data.capability : undefined;
   const native = isNativeCapability(capability);
   const running = turn?.reply.status === 'running' || turn?.reply.status === 'waiting';
 
@@ -50,20 +51,28 @@ export default function DeepTutorChat() {
     if (activeTurn && !turn) live.follow(id, activeTurn);
   }, [activeTurn, turn, live, id]);
 
+  // Saved messages change only when the session is fetched again, so a streaming reply leaves them be.
+  const saved = useMemo(() => (detail.data ? shownMessages(detail.data) : []), [detail.data]);
+  const savedItems = useMemo(
+    () =>
+      saved.flatMap((message): DtListItem[] =>
+        message.role === 'user'
+          ? [{ key: `m${message.id}`, kind: 'user', text: message.content }]
+          : message.role === 'assistant'
+            ? [{ key: `m${message.id}`, kind: 'reply', reply: savedReply(message), last: false }]
+            : [],
+      ),
+    [saved],
+  );
   const items = useMemo(() => {
-    const saved = detail.data ? shownMessages(detail.data) : [];
-    const list: DtListItem[] = [];
-    for (const message of saved) {
-      if (message.role === 'user') list.push({ key: `m${message.id}`, kind: 'user', text: message.content });
-      else if (message.role === 'assistant') list.push({ key: `m${message.id}`, kind: 'reply', reply: savedReply(message), last: false });
-    }
+    const list = [...savedItems];
     const replySaved = turn?.reply.assistantMessageId != null && saved.some((message) => String(message.id) === String(turn.reply.assistantMessageId));
     if (turn && !replySaved) {
       const lastSaved = saved[saved.length - 1];
       if (turn.prompt !== null) {
         // Your message is saved when the turn starts; until the session shows it, show it here.
         if (!(lastSaved?.role === 'user' && lastSaved.content.trim() === turn.prompt.trim())) list.push({ key: 'live-prompt', kind: 'user', text: turn.prompt });
-      } else if (lastSaved?.role === 'assistant') {
+      } else if (turn.replacesLast && lastSaved?.role === 'assistant') {
         // A regenerate: the new reply takes the old one's place.
         list.pop();
       }
@@ -72,13 +81,13 @@ export default function DeepTutorChat() {
     const last = list[list.length - 1];
     if (last?.kind === 'reply') list[list.length - 1] = { ...last, last: true };
     return list;
-  }, [detail.data, turn]);
+  }, [saved, savedItems, turn]);
 
   const send = async (text: string) => {
     live.turns.begin(id, text);
     setPinKey(`send-${Date.now()}`);
     try {
-      await live.send({ content: text, sessionId: id, capability: 'chat', ...choice.request });
+      await live.send({ content: text, sessionId: id, ...choice.request });
       return true;
     } catch (error) {
       live.turns.remove(id);
@@ -91,6 +100,52 @@ export default function DeepTutorChat() {
     live.turns.beginRegenerate(id);
     setPinKey(`regenerate-${Date.now()}`);
     live.regenerate(id);
+  };
+
+  // Research's outline → the research: the same question again, with the outline confirmed and no new message.
+  const startResearch = async (outline: DtOutline) => {
+    const question = [...saved].reverse().find((message) => message.role === 'user')?.content ?? '';
+    live.turns.beginContinuation(id);
+    setPinKey(`research-${Date.now()}`);
+    try {
+      await live.send({
+        content: outline.topic || question,
+        sessionId: id,
+        capability: 'deep_research',
+        config: { ...outline.config, confirmed_outline: outline.subTopics },
+        persistUserMessage: false,
+        llmSelection: choice.model,
+      });
+    } catch (error) {
+      live.turns.remove(id);
+      toast(`Couldn't start the research: ${describeError(error)}`, 'error');
+    }
+  };
+
+  const answer = async (answers: { questionId: string; text: string }[]) => {
+    const accepted = await live.answer(id, answers);
+    if (!accepted) toast("DeepTutor didn't take the answers. The question may have expired.", 'error');
+    return accepted;
+  };
+
+  const saveQuiz = async (turnId: string, questions: DtQuizQuestion[], answers: Record<string, QuizAnswer>) => {
+    await saveQuizResults(
+      client,
+      id,
+      turnId,
+      questions.map((question) => ({
+        question_id: question.id,
+        question: question.question,
+        question_type: question.type,
+        options: Object.fromEntries(question.options.map((option) => [option.key, option.text])),
+        user_answer: answers[question.id]?.value ?? '',
+        correct_answer: question.answer,
+        explanation: question.explanation,
+        difficulty: question.difficulty,
+        is_correct: answers[question.id]?.correct === true,
+      })),
+    );
+    void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'session', id] });
   };
 
   const stop = () => {
@@ -133,6 +188,21 @@ export default function DeepTutorChat() {
     ]);
 
   const openOnWeb = () => router.push({ pathname: '/learn/web', params: { path: `/chat/${encodeURIComponent(id)}` } });
+  // Replies get handlers that stay the same between frames (the latest version runs when tapped).
+  const handlers = useRef({ regenerate, startResearch, answer, saveQuiz, openOnWeb });
+  useEffect(() => {
+    handlers.current = { regenerate, startResearch, answer, saveQuiz, openOnWeb };
+  });
+  const actions = useMemo<DtReplyActions>(
+    () => ({
+      onRegenerate: native && !running ? () => handlers.current.regenerate() : undefined,
+      onStartResearch: running ? undefined : (outline) => handlers.current.startResearch(outline),
+      onAnswer: (answers) => handlers.current.answer(answers),
+      onSaveQuiz: (turnId, questions, answers) => handlers.current.saveQuiz(turnId, questions, answers),
+      onOpenWeb: () => handlers.current.openOnWeb(),
+    }),
+    [native, running],
+  );
   const menu: MenuItem[] = [
     ...(owui.state.status === 'signed-in' && items.length > 0
       ? [{ key: 'ask', label: attaching ? 'Attaching…' : 'Ask About It in Open WebUI', icon: 'chat-bubble-left' as const, onPress: () => void askInOpenWebUI() }]
@@ -165,7 +235,7 @@ export default function DeepTutorChat() {
         ) : detail.isError && !turn ? (
           <Text style={[styles.empty, { color: palette.textMuted }]}>{`Couldn't load this chat: ${describeError(detail.error)}`}</Text>
         ) : (
-          <DtMessageList items={items} baseUrl={session.baseUrl} onRegenerate={native && !running ? regenerate : undefined} pinToBottomKey={pinKey} />
+          <DtMessageList items={items} baseUrl={session.baseUrl} actions={actions} pinToBottomKey={pinKey} />
         )}
         {native ? (
           <DtComposer
@@ -179,7 +249,11 @@ export default function DeepTutorChat() {
             models={choice.models}
             model={choice.model}
             onModelChange={choice.setModel}
-            placeholder="Send a message"
+            modes={choice.modes}
+            mode={choice.mode}
+            onModeChange={choice.setMode}
+            config={choice.config}
+            onSettingChange={choice.setSetting}
           />
         ) : (
           <View style={[styles.webNote, { backgroundColor: palette.surface }]}>

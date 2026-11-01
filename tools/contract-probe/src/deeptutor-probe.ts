@@ -4,7 +4,9 @@
  *
  * `--turn` also runs one short "APP PROBE:" chat turn over `/ws` (it uses the account's model),
  * drops the socket mid-reply on purpose, checks the resumed reply equals the saved one, and
- * deletes the session.
+ * deletes the session. `--modes` runs one short turn in each mode the app shows natively (Solve,
+ * Quiz, Visualize, Research's outline, Ask Questions answered), checks the app reads each mode's
+ * result, live and saved, and deletes the sessions (about two minutes of model use).
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -53,6 +55,7 @@ const { values: args } = parseArgs({
     env: { type: 'string' },
     'no-fixtures': { type: 'boolean' },
     turn: { type: 'boolean' },
+    modes: { type: 'boolean' },
   },
 });
 
@@ -192,6 +195,14 @@ async function main() {
     return { value: true, note: `no cookie → ${without.location}; Bearer only → ${bearerOnly.status}; cookie → 200` };
   });
 
+  if (args.modes) {
+    await step('modes over /ws: Solve, Quiz, Visualize, Research outline, Ask Questions', async () => {
+      const outcome = await probeModes(baseUrl, session.token as string, client);
+      fixtures.modes = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
   if (args.turn) {
     await step('turn over /ws: stream, drop, resume, compare with the saved reply', async () => {
       const outcome = await probeTurn(baseUrl, session.token as string, client);
@@ -272,6 +283,88 @@ async function probeTurn(baseUrl: string, token: string, client: DtClient) {
   } finally {
     connection.close();
     await deleteSession(client, started.sessionId).catch(() => undefined);
+  }
+}
+
+interface ModeCase {
+  capability: string;
+  content: string;
+  config: Record<string, unknown>;
+  /** What the app must find in the reply (live and saved), or why not. */
+  check(reply: DtReply): string | null;
+}
+
+const MODE_CASES: ModeCase[] = [
+  { capability: 'deep_solve', content: 'Solve 3x = 12 for x.', config: {}, check: (r) => (r.tools.some((tool) => tool.name === 'solve_plan') ? null : 'no plan step') },
+  { capability: 'deep_question', content: 'Fractions', config: { num_questions: 1, difficulty: 'easy' }, check: (r) => (r.quiz.length >= 1 && r.quiz.every((q) => q.answer) ? null : 'no quiz question') },
+  { capability: 'visualize', content: 'A bar chart of the numbers 1, 2 and 3.', config: { quality: 'low' }, check: (r) => (r.visual ? null : 'no visual') },
+  { capability: 'deep_research', content: 'What is rain?', config: { mode: 'notes', depth: 'quick' }, check: (r) => (r.outline?.subTopics.length ? null : 'no outline') },
+  { capability: 'ask_questions', content: 'Help me plan a revision week.', config: {}, check: (r) => (r.ask?.questions.length && r.askAnswers ? null : 'questions or answers missing') },
+];
+
+/** One turn per native mode at once, through the app's own connection; Ask Questions is answered with each question's first option. */
+async function probeModes(baseUrl: string, token: string, client: DtClient) {
+  const replies = new Map<string, DtReply>();
+  const finished = new Map<string, () => void>();
+  const answered = new Set<string>();
+  let connection: DtTurnConnection | null = null;
+  connection = new DtTurnConnection({
+    url: turnSocketUrl(baseUrl),
+    connect: (url, handlers) => {
+      const socket = new NodeWebSocket(url, { headers: { Cookie: socketCookieHeader(token) } });
+      socket.onopen = () => handlers.onOpen();
+      socket.onmessage = (event) => handlers.onMessage(event.data);
+      socket.onclose = (event) => handlers.onClose(event.code);
+      return { send: (data) => socket.send(data), close: () => socket.close() };
+    },
+    onEvent: (event) => {
+      const reply = applyTurnEvent(replies.get(event.session_id) ?? emptyReply(event.session_id, event.turn_id), event);
+      replies.set(event.session_id, reply);
+      if (reply.status === 'waiting' && reply.ask && !answered.has(event.session_id)) {
+        answered.add(event.session_id);
+        const answers = reply.ask.questions.map((question) => ({ questionId: question.id, text: question.options[0]?.label ?? 'No preference' }));
+        setTimeout(() => void connection?.reply(event.turn_id, { answers }), 500);
+      }
+      if (event.type === 'done') finished.get(event.session_id)?.();
+    },
+  });
+  const sessions: string[] = [];
+  try {
+    const runs = MODE_CASES.map(async (mode) => {
+      const started = await connection.startTurn({ content: `${PROBE_PREFIX} ${mode.content}`, capability: mode.capability, config: mode.config, tools: [] });
+      sessions.push(started.sessionId);
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`${mode.capability}: no done event within 5 minutes`)), 300_000);
+        finished.set(started.sessionId, () => {
+          clearTimeout(timer);
+          resolve();
+        });
+        if (replies.get(started.sessionId)?.status === 'completed') finished.get(started.sessionId)?.();
+      });
+      const live = replies.get(started.sessionId) ?? emptyReply();
+      if (live.status !== 'completed') throw new Error(`${mode.capability} ended ${live.status}${live.error ? `: ${live.error}` : ''}`);
+      const liveProblem = mode.check(live);
+      if (liveProblem) throw new Error(`${mode.capability} (live): ${liveProblem}`);
+      const saved = shownMessages(await getSession(client, started.sessionId)).filter((message) => message.role === 'assistant').pop();
+      if (!saved) throw new Error(`${mode.capability}: no saved reply`);
+      const fromSaved = savedReply(saved);
+      // The saved reply keeps tool calls, the result and your answers, so a reopened chat shows the same.
+      const savedProblem = mode.check(fromSaved);
+      if (savedProblem) throw new Error(`${mode.capability} (saved): ${savedProblem}`);
+      // Modes stream their opening text with a leading newline that DeepTutor trims when saving.
+      if (saved.content.trim() !== live.answer.trim()) {
+        throw new Error(`${mode.capability}: streamed answer (${live.answer.trim().length} chars) differs from the saved one (${saved.content.trim().length} chars)`);
+      }
+      return { mode: mode.capability, events: live.seq, stages: live.stages.map((stage) => stage.name) };
+    });
+    const outcomes = await Promise.all(runs);
+    return {
+      fixture: Object.fromEntries(outcomes.map((outcome) => [outcome.mode, { stages: outcome.stages }])),
+      note: outcomes.map((outcome) => `${outcome.mode} ${outcome.events} events`).join('; '),
+    };
+  } finally {
+    connection.close();
+    await Promise.all(sessions.map((id) => deleteSession(client, id).catch(() => undefined)));
   }
 }
 
