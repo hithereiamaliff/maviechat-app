@@ -10,6 +10,8 @@ export interface StreamHooks {
   notify(message: string, tone?: 'info' | 'error' | 'success'): void;
   /** True when the user is looking at this chat right now. */
   isViewing(chatId: string): boolean;
+  /** True when a push notification announces this chat's finished reply, so the app needn't. */
+  pushAnnounces?(chatId: string): boolean;
 }
 
 interface QueuedEvent {
@@ -100,7 +102,7 @@ export class ChatStreams {
     } else if (type === 'chat:completion' && (data as { done?: boolean } | undefined)?.done && chatId) {
       // A reply finished in a chat that isn't open here (another device, or a chat left mid-reply).
       void this.queryClient.invalidateQueries({ queryKey: ['chats'] });
-      if (!this.hooks.isViewing(chatId)) this.hooks.notify(`Reply ready in “${this.titleOf(chatId) ?? 'a chat'}”`, 'success');
+      this.announce(chatId);
     }
   }
 
@@ -127,9 +129,15 @@ export class ChatStreams {
       if (finished) {
         this.converge(chatId);
         // A reply you started here and then left (for another chat or settings) is announced like any other.
-        if (!this.hooks.isViewing(chatId)) this.hooks.notify(`Reply ready in “${this.titleOf(chatId) ?? 'a chat'}”`, 'success');
+        this.announce(chatId);
       }
     }
+  }
+
+  /** "Reply ready" for a chat that isn't on screen, unless a push notification says so already. */
+  private announce(chatId: string): void {
+    if (this.hooks.isViewing(chatId) || this.hooks.pushAnnounces?.(chatId)) return;
+    this.hooks.notify(`Reply ready in “${this.titleOf(chatId) ?? 'a chat'}”`, 'success');
   }
 
   private enqueue(chatId: string, event: QueuedEvent): void {

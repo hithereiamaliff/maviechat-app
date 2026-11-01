@@ -10,7 +10,7 @@ export interface PushMessage {
 }
 
 /**
- * What Open WebUI's server-wide event webhooks post (Admin Panel → Settings → Events): the
+ * What Open WebUI's server-wide event webhooks post (Settings → Admin → System → General → Events): the
  * event as recorded, e.g. `{event: "chat.finished", actor: {id, …}, data: {user_id, chat_id,
  * title, message, url, …}}`. `message` is the reply (or the error), cut to 1000 characters.
  */

@@ -1,21 +1,14 @@
 /**
- * What the app is showing, for deciding whether a push notification needs a banner.
- * While Open WebUI's live connection is up, the app announces finished replies itself.
+ * Which chat is on screen, for deciding whether a push notification gets a banner while the
+ * app is open. Every notification does, except one about the reply you're watching arrive.
  */
 let viewingChatId: string | null = null;
-let liveConnected = false;
 
-export function setPresence(next: { viewingChatId?: string | null; liveConnected?: boolean }): void {
-  if (next.viewingChatId !== undefined) viewingChatId = next.viewingChatId;
-  if (next.liveConnected !== undefined) liveConnected = next.liveConnected;
+export function setViewingChat(chatId: string | null): void {
+  viewingChatId = chatId;
 }
 
-/**
- * Show a banner unless you're looking at that chat, or the app will announce it in its own
- * notice. A test notification always shows: it is sent while you're in the app.
- */
+/** Show a banner unless the notification is about the chat on screen. */
 export function shouldPresent(data: { chatId?: unknown; kind?: unknown } | null | undefined): boolean {
-  if (data?.kind === 'test') return true;
-  if (typeof data?.chatId === 'string' && data.chatId === viewingChatId) return false;
-  return !liveConnected;
+  return !(typeof data?.chatId === 'string' && data.chatId === viewingChatId);
 }

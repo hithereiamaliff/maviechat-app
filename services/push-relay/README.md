@@ -7,7 +7,7 @@ Turns Open WebUI's "chat finished" and "chat failed" events into push notificati
   - A phone belongs to one account at a time, with up to 10 phones per account.
 - **`POST /v1/devices/test`**: a test notification to the caller's phone.
 - **`POST /v1/events/<EVENTS_SECRET>`**: Open WebUI's server-wide webhook.
-  - Set it up once in Admin Panel → Settings → Events → Add webhook, for events `chat.finished` and `chat.failed`, sent for all users.
+  - Set it up once in Open WebUI's Settings window: Admin → System → General → Events → Webhooks → **+**, for events `chat.finished` and `chat.failed`, sent for all users.
   - For each event the relay notifies that user's phones with "Reply ready: <chat title>" and the start of the reply.
   - Phones Apple reports as gone are dropped.
 - **`GET /health`**.

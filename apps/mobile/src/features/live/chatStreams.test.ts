@@ -146,4 +146,13 @@ describe('ChatStreams', () => {
     streams.handle(event('c9', 'x1', 'chat:completion', { done: true }));
     expect(hooks.notify).toHaveBeenCalledWith('Reply ready in “a chat”', 'success');
   });
+
+  it('leaves replies to push notifications when those announce them', () => {
+    const { streams, event, hooks } = setup('somewhere-else');
+    hooks.pushAnnounces = (chatId) => chatId === 'c9';
+    streams.handle(event('c9', 'x1', 'chat:completion', { done: true }));
+    expect(hooks.notify).not.toHaveBeenCalled();
+    streams.handle(event('c8', 'x2', 'chat:completion', { done: true }));
+    expect(hooks.notify).toHaveBeenCalledWith('Reply ready in “a chat”', 'success');
+  });
 });

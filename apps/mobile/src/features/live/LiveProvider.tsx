@@ -4,7 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Alert, AppState, Platform } from 'react-native';
 import { useToast } from '@/components/Toast';
 import { patchChatRow } from '@/features/chats/cache';
-import { setPresence } from '@/features/notifications/presence';
+import { setViewingChat } from '@/features/notifications/presence';
+import { pushAnnouncesReplies } from '@/features/notifications/push';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { ChatStreams } from './chatStreams';
 
@@ -67,11 +68,11 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
     viewing.current = currentChatId;
   }, [currentChatId]);
 
-  // Push banners stay away from the chat on screen, and from replies this connection announces itself.
+  // Push banners show while the app is open too, except for the chat on screen.
   useEffect(() => {
-    setPresence({ viewingChatId: currentChatId, liveConnected: status === 'joined' });
-  }, [currentChatId, status]);
-  useEffect(() => () => setPresence({ viewingChatId: null, liveConnected: false }), []);
+    setViewingChat(currentChatId);
+  }, [currentChatId]);
+  useEffect(() => () => setViewingChat(null), []);
 
   const [streams] = useState(
     () =>
@@ -80,6 +81,8 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
         prompt,
         notify: (message, tone) => toast(message, tone),
         isViewing: (chatId) => viewing.current === chatId,
+        // Open WebUI reports saved chats' replies only, so temporary chats keep the app's own notice.
+        pushAnnounces: (chatId) => !isTemporaryChatId(chatId) && pushAnnouncesReplies(),
       }),
   );
 

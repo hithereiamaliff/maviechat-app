@@ -16,6 +16,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider } from '@/components/Toast';
 import { LaunchSpace } from '@/features/deeptutor/LaunchSpace';
 import { NotificationRoot } from '@/features/notifications/NotificationRoot';
+import { UpdatePrompt } from '@/features/updates/UpdatePrompt';
 import { DeepTutorProvider } from '@/session/DeepTutorProvider';
 import { SessionProvider } from '@/session/SessionProvider';
 import { usePalette } from '@/theme';
@@ -61,6 +62,7 @@ export default function RootLayout() {
                   <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.background } }} />
                   <LaunchSpace />
                   <NotificationRoot />
+                  <UpdatePrompt />
                 </DeepTutorProvider>
               </SessionProvider>
             </ToastProvider>

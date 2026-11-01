@@ -62,6 +62,14 @@ export function usePushState(): PushState | null {
   );
 }
 
+/**
+ * True when finished replies reach this iPhone as push notifications: switched on here, and
+ * Open WebUI's server-wide webhook has reported to the relay.
+ */
+export function pushAnnouncesReplies(): boolean {
+  return Boolean(state?.enabled && state.lastEventAt != null);
+}
+
 async function expoPushToken(): Promise<string> {
   const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId;
   return (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : {})).data;

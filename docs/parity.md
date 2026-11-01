@@ -152,7 +152,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [ ] | Clone (sidebar), Fork from a message, `/fork` | M2 |
 | [x] | Archive / Unarchive, Pin, Move to folder, Delete, Mark unread; reading a chat clears its dot here and on the web (slice 4) | M1 |
 | [~] | Temporary chat (not saved; Save Chat later). Slice 3: temporary chats (photos inline, text files read on the phone; other documents need a saved chat) | M1; Save Chat M2 |
-| [~] | Background completions: toast "reply finished" for a chat you're not viewing (tap to open). Slice 2: toast while the app is open; 2026-11-01: also for a reply you left mid-way; push notifications for every account through `services/push-relay` (Open WebUI's server-wide event webhook → Expo push) from store build 4, with tap to open the chat; working end to end on 2026-11-01 | M1 (while foregrounded); push from build 4 |
+| [~] | Background completions: toast "reply finished" for a chat you're not viewing (tap to open). Slice 2: toast while the app is open; 2026-11-01: also for a reply you left mid-way; push notifications for every account through `services/push-relay` (Open WebUI's server-wide event webhook → Expo push) from store build 4, with tap to open the chat; working end to end on 2026-11-01. While the app is open, banners for every chat but the one on screen (the toast stays for temporary chats and phones without push); Settings says whether a test reached the phone | M1 (while foregrounded); push from build 4 |
 | — | Shared-chat presence and typing (Allow replies) | M5 |
 
 ## 10. Settings modal (`chat/SettingsModal.svelte`): on phones, a tab strip on top with search behind an icon

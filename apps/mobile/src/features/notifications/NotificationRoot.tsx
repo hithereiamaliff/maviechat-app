@@ -5,7 +5,7 @@ import { useSession } from '@/session/SessionProvider';
 import { saveSpace } from '@/session/storage';
 import { shouldPresent } from './presence';
 
-// While the app is open: a banner only when the app won't announce the reply itself.
+// While the app is open: a banner for everything except the chat on screen.
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
     const show = shouldPresent(notification.request.content.data as { chatId?: unknown; kind?: unknown } | null);

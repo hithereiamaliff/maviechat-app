@@ -5,13 +5,22 @@ import { fonts, radius, usePalette } from '@/theme';
 
 type Tone = 'info' | 'error' | 'success';
 
+/** A button on the toast, such as "Restart". */
+export interface ToastAction {
+  label: string;
+  onPress(): void;
+}
+
+type ShowToast = (message: string, tone?: Tone, action?: ToastAction) => void;
+
 interface ToastState {
   id: number;
   message: string;
   tone: Tone;
+  action?: ToastAction;
 }
 
-const ToastContext = createContext<((message: string, tone?: Tone) => void) | null>(null);
+const ToastContext = createContext<ShowToast | null>(null);
 
 /** Short messages at the top of the screen, like the web app's toasts. */
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -21,9 +30,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [opacity] = useState(() => new Animated.Value(0));
   const counter = useRef(0);
 
-  const show = useCallback((message: string, tone: Tone = 'info') => {
+  const show = useCallback((message: string, tone: Tone = 'info', action?: ToastAction) => {
     counter.current += 1;
-    setToast({ id: counter.current, message, tone });
+    setToast({ id: counter.current, message, tone, action });
   }, []);
 
   useEffect(() => {
@@ -33,7 +42,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() =>
         setToast((current) => (current?.id === toast.id ? null : current)),
       );
-    }, 3200);
+    }, toast.action ? 8000 : 3200);
     return () => clearTimeout(timer);
   }, [toast, opacity]);
 
@@ -48,8 +57,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <Pressable
             accessibilityRole="alert"
             onPress={() => setToast(null)}
-            style={[styles.toast, { backgroundColor: palette.menu, borderColor: palette.border, shadowColor: '#000' }]}>
-            <Text style={[styles.text, { color: accent }]}>{toast.message}</Text>
+            style={[styles.toast, toast.action && styles.withAction, { backgroundColor: palette.menu, borderColor: palette.border, shadowColor: '#000' }]}>
+            <Text style={[styles.text, toast.action && styles.flexText, { color: accent }]}>{toast.message}</Text>
+            {toast.action ? (
+              <Pressable
+                accessibilityRole="button"
+                hitSlop={10}
+                onPress={() => {
+                  setToast(null);
+                  toast.action?.onPress();
+                }}>
+                <Text style={[styles.text, styles.action, { color: palette.link }]}>{toast.action.label}</Text>
+              </Pressable>
+            ) : null}
           </Pressable>
         </Animated.View>
       ) : null}
@@ -57,7 +77,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useToast(): (message: string, tone?: Tone) => void {
+export function useToast(): ShowToast {
   const show = useContext(ToastContext);
   if (!show) throw new Error('useToast must be used inside ToastProvider');
   return show;
@@ -86,4 +106,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  withAction: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  flexText: { flexShrink: 1 },
+  action: { fontFamily: fonts.semibold },
 });

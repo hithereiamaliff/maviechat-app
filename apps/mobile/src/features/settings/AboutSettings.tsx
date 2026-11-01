@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import licenses from '@/generated/licenses.json';
 import { Icon } from '@/components/Icon';
 import { supportLabel, useCapabilities, useServerConfig, useServerVersion } from '@/lib/server';
@@ -20,6 +20,21 @@ export function AboutSettings() {
   const version = useServerVersion();
   const capabilities = useCapabilities();
   const [showLicenses, setShowLicenses] = useState(false);
+  const { isUpdatePending, isChecking, isDownloading } = Updates.useUpdates();
+  const [updateNote, setUpdateNote] = useState<string | null>(null);
+  const updating = isChecking || isDownloading;
+
+  // A downloaded update otherwise waits for the next full launch.
+  const checkForUpdate = async () => {
+    setUpdateNote(null);
+    try {
+      const result = await Updates.checkForUpdateAsync();
+      if (result.isAvailable) await Updates.fetchUpdateAsync();
+      else setUpdateNote('This is the latest update.');
+    } catch {
+      setUpdateNote("Couldn't check for updates. Try again in a moment.");
+    }
+  };
 
   const rows: [string, string][] = [
     ['MavieChat', Constants.expoConfig?.version ?? 'unknown'],
@@ -40,6 +55,19 @@ export function AboutSettings() {
           </View>
         ))}
       </View>
+      {Updates.isEnabled ? (
+        <Pressable
+          accessibilityRole="button"
+          disabled={updating}
+          onPress={() => void (isUpdatePending ? Updates.reloadAsync().catch(() => undefined) : checkForUpdate())}
+          style={[styles.group, styles.toggle, { borderColor: palette.border }]}>
+          <Text style={[styles.label, styles.toggleLabel, { color: palette.link }]}>
+            {isUpdatePending ? 'Restart to Use the New Update' : updating ? 'Checking for Updates…' : 'Check for Updates'}
+          </Text>
+          {updating ? <ActivityIndicator color={palette.textMuted} /> : null}
+        </Pressable>
+      ) : null}
+      {updateNote ? <Text style={[styles.note, { color: palette.textMuted }]}>{updateNote}</Text> : null}
       <Text style={[styles.note, { color: palette.textFaint }]}>
         MavieChat is an independent app for Open WebUI servers. It is not affiliated with Open WebUI.
       </Text>
