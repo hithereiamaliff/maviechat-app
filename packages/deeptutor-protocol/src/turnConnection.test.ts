@@ -156,3 +156,52 @@ describe('turn connection', () => {
     expect(latest().sent[latest().sent.length - 1]).toEqual({ protocol_version: '2.0', type: 'ping' });
   });
 });
+
+describe('turn connection while DeepTutor wraps up the last turn', () => {
+  it('sends a start again until the session is free, then resolves', async () => {
+    const { connection, latest, frame, turnEvent, fire } = setup();
+    const waiting: string[] = [];
+    (connection as unknown as { options: { onWaiting?: (id: string) => void } }).options.onWaiting = (id) => waiting.push(id);
+    const started = connection.startTurn({ content: 'Next', sessionId: 'unified_1' });
+    latest().handlers.onOpen();
+    const busy = { type: 'protocol_error', error_code: 'start_turn_rejected', message: 'Session already has an active or recovering turn', session_id: 'unified_1' };
+    frame(busy);
+    fire();
+    frame(busy);
+    fire();
+    expect(latest().sent.filter((command) => command.type === 'start_turn')).toHaveLength(3);
+    expect(new Set(latest().sent.map((command) => command.client_submission_id)).size).toBe(1);
+    turnEvent('session', 1);
+    await expect(started).resolves.toEqual({ sessionId: 'unified_1', turnId: 'turn_1' });
+    expect(waiting).toEqual(['unified_1', 'unified_1']);
+  });
+
+  it('gives up after half a minute, and fails other refusals at once', async () => {
+    let now = 0;
+    const { connection, latest, frame, fire } = setup();
+    (connection as unknown as { options: { now?: () => number } }).options.now = () => now;
+    const started = connection.startTurn({ content: 'Next', sessionId: 'unified_1' });
+    latest().handlers.onOpen();
+    const busy = { type: 'protocol_error', error_code: 'start_turn_rejected', message: 'Session already has an active or recovering turn', session_id: 'unified_1' };
+    frame(busy);
+    fire();
+    now = 31_000;
+    frame(busy);
+    await expect(started).rejects.toThrow('active or recovering');
+
+    const refused = connection.startTurn({ content: 'Again', sessionId: 'unified_1' });
+    frame({ type: 'protocol_error', error_code: 'start_turn_rejected', message: 'No model is available', session_id: 'unified_1' });
+    await expect(refused).rejects.toThrow('No model');
+  });
+
+  it('sends a regenerate again until the session is free', () => {
+    const { connection, latest, frame, turnEvent, fire, timers } = setup();
+    connection.regenerate('unified_1');
+    latest().handlers.onOpen();
+    frame({ type: 'protocol_error', error_code: 'regenerate_rejected', message: 'Session already has an active or recovering turn', session_id: 'unified_1' });
+    fire();
+    expect(latest().sent.filter((command) => command.type === 'regenerate')).toHaveLength(2);
+    turnEvent('session', 1);
+    expect(timers.filter((timer) => timer.ms === 2000)).toHaveLength(0);
+  });
+});

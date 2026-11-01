@@ -85,6 +85,35 @@ DeepTutor is a **spec only**, like Open WebUI and Conduit (see `AGENTS.md`). Rea
 - **Sessions** list as `{sessions}`, search as `{sessions, total, limit, offset}`, and a session comes with all its messages. The shown branch follows `preferences.selected_branches` (`{parent message id: chosen reply id}`), else the newest reply.
 - Not yet checked: a real session's messages, since the test account has none until a model is configured.
 
+## Native chat (slice 1, 2026-11-01)
+
+The DeepTutor space opens on a native list of your DeepTutor chats. **New chat** and each chat are native screens in DeepTutor's **Chat** mode:
+- streaming replies with their reasoning (folded), each tool call where it happened (with its result), and sources;
+- stop, regenerate, copy;
+- the model (from the account's granted models) and the switchable tools, per chat;
+- a reply resumes after a dropped connection or a trip to the background, and a reply started on another device shows as it streams.
+
+Chats in other modes (Solve, Quiz, Research, Visualize…) open read-only with **Open in DeepTutor Web App**. The web app is also in the home menu.
+
+**Code:** `packages/deeptutor-protocol` (`turns.ts`, `turnConnection.ts`, `turnReply.ts`, `chatOptions.ts`); the app's `features/deeptutor/chat/` and `app/(deeptutor)/learn/`.
+
+### Protocol facts (1.7.1, checked with `npm run probe:deeptutor -- --turn`)
+
+- **Signing in on the socket:** `/ws` takes the `dt_token` cookie (or `?token=`, which would put the token in logs). The app sends a `Cookie` header: React Native's WebSocket takes headers as a third argument, and Node 22's built-in WebSocket as `{headers}`. A refused sign-in closes with code 4001.
+- **A Chat-mode turn**, in order:
+  1. `session` (seq 1, names the session and turn);
+  2. `stage_start` (`responding`);
+  3. per round of the agent loop: `progress` ("Exploring"), `thinking` chunks, `content` chunks;
+  4. for each tool: `tool_call` (with `assistant_content_offset`, the answer length when it was called), then `tool_result`;
+  5. `stage_end`, `sources`, `result` (`response` = the last round's text), then `done` (`status`, `user_message_id`, `assistant_message_id`, usage).
+- **The answer** is every `content` chunk whose call is an agent-loop round or a final response (or has no call id), the remarks before tool calls included. The saved message's text equals it exactly (the probe checks this after a deliberate drop).
+- **A saved reply** keeps its `tool_call`, `tool_result`, `result` and `done` events, but not its reasoning. The full events come from `GET /api/sessions/{id}/messages/{message_id}/events`.
+- **A running session:** `status: "running"`, `active_turn_id`, and `active_turns` (`[{id, status, last_seq}]`). The reply is saved only at `done`.
+- **After `done`, the session refuses new turns for about 8 seconds:** "Session already has an active or recovering turn" (`start_turn_rejected`, `regenerate_rejected`) while DeepTutor holds the turn's lease. Nothing is created before a turn is accepted, so the app sends the same command again every 2 s, for up to 30 s, and shows "Waiting for DeepTutor to finish the last reply…". DeepTutor's own web app shows an error instead.
+- **Regenerate replaces the last reply** (deletes it and writes a new one); no branches.
+- **Titles:** sessions stay "New conversation" in Chat mode, so the app shows the first message instead.
+- **Choices:** `GET /api/settings/llm-options` lists the models an admin granted to the account (`active` is the default). `GET /api/tools` lists tools; a chat can switch on those marked `toggleable` and not tied to another mode.
+
 ## M1.5 checklist
 
 | | Item |
@@ -97,4 +126,4 @@ DeepTutor is a **spec only**, like Open WebUI and Conduit (see `AGENTS.md`). Rea
 | [x] | "Reference DeepTutor Chat" in the Open WebUI + menu (a `text` attachment, see above). |
 | [x] | "Send to DeepTutor" in the Open WebUI chat menu (saved chats only): the shown branch as Markdown, filed as a `chat` record in the "From MavieChat" notebook, with our own summary. |
 | [ ] | Phone checks: switch both ways without signing in again; both cross-reference directions; an expired DeepTutor sign-in; offline. |
-| [ ] | Later, decided after use: native DeepTutor chat over the `/ws` turn protocol 2.0. |
+| [~] | Native DeepTutor chat over the `/ws` turn protocol 2.0 (see "Native chat"). Slice 1, Chat mode, is done; the other modes come next and open in the web app until then. |

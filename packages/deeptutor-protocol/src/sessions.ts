@@ -7,6 +7,21 @@ export interface DtSessionSummary {
   created_at?: number | string;
   updated_at?: number | string;
   message_count?: number;
+  /** "running" while a reply is being written, else "completed" (or how the last turn ended). */
+  status?: string;
+  /** The running turn, or "". */
+  active_turn_id?: string;
+  /** The mode the session last used ("chat", "deep_research", …). */
+  capability?: string;
+  [key: string]: unknown;
+}
+
+/** A turn still running in a session, as `GET /api/sessions/{id}` lists it. */
+export interface DtActiveTurn {
+  id: string;
+  status: string;
+  /** Its last event so far; a client that has none of them replays from 0. */
+  last_seq?: number;
   [key: string]: unknown;
 }
 
@@ -23,6 +38,7 @@ export interface DtMessage {
 /** `GET /api/sessions/{id}`: the session with every message, branches included. */
 export interface DtSession extends DtSessionSummary {
   messages: DtMessage[];
+  active_turns?: DtActiveTurn[];
   /** `selected_branches` maps a parent message id to the reply shown under it. */
   preferences?: { selected_branches?: Record<string, number | string> | null; [key: string]: unknown } | null;
 }
@@ -102,4 +118,25 @@ export async function getMessageEvents(client: DtClient, sessionId: string, mess
     `/api/sessions/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(String(messageId))}/events`,
   );
   return { events: Array.isArray(response.events) ? response.events : [], complete: response.complete !== false };
+}
+
+const UNFINISHED = new Set(['queued', 'running', 'waiting_input', 'recovering']);
+
+/** The session's unfinished turn (started here earlier, or on another device), if any. */
+export function activeTurnOf(session: DtSession): string | null {
+  const listed = (session.active_turns ?? []).find((turn) => UNFINISHED.has(turn.status));
+  if (listed) return listed.id;
+  return session.status === 'running' && session.active_turn_id ? session.active_turn_id : null;
+}
+
+/** DeepTutor's name for a session nobody titled yet. */
+export const UNTITLED_SESSION = 'New conversation';
+
+/** The title to show: DeepTutor's, else the start of the conversation. */
+export function sessionTitle(session: Pick<DtSessionSummary, 'title'> & { last_message?: unknown; messages?: DtMessage[] }): string {
+  const title = session.title?.trim();
+  if (title && title !== UNTITLED_SESSION) return title;
+  const first = session.messages?.find((message) => message.role === 'user')?.content ?? (typeof session.last_message === 'string' ? session.last_message : '');
+  const line = first.replace(/\s+/g, ' ').trim();
+  return line ? (line.length > 60 ? `${line.slice(0, 59).trimEnd()}…` : line) : UNTITLED_SESSION;
 }

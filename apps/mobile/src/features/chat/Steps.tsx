@@ -45,7 +45,8 @@ function formatDuration(seconds: number): string {
   return rest ? `${minutes} min ${rest} s` : `${minutes} min`;
 }
 
-function Disclosure({
+/** A one-line step that opens to show its details. */
+export function Disclosure({
   icon,
   label,
   busy,

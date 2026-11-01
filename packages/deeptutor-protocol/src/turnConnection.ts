@@ -47,7 +47,10 @@ export interface DtTurnConnectionOptions {
   /** Refused commands and broken subscriptions. A refused start also rejects its `startTurn`. */
   onError?(error: DtProtocolError): void;
   onState?(state: DtConnectionState): void;
+  /** A start or regenerate is waiting for DeepTutor to finish the session's previous turn. */
+  onWaiting?(sessionId: string): void;
   timers?: DtTimers;
+  now?: () => number;
   random?: () => number;
   /** Keeps proxies from closing a quiet socket. */
   pingIntervalMs?: number;
@@ -63,16 +66,39 @@ export class DtSocketAuthError extends Error {
   }
 }
 
-interface PendingStart {
+/** A command sent again while DeepTutor still holds the session's previous turn. */
+interface Retrying {
   command: DtCommand;
+  busyUntil: number | null;
+  retryTimer: unknown;
+}
+
+interface PendingStart extends Retrying {
   sessionId: string;
   resolve(value: { sessionId: string; turnId: string }): void;
   reject(error: Error): void;
   timer: unknown;
 }
 
+/**
+ * DeepTutor keeps a session's turn lease for a few seconds after `done` (about 8 s in 1.7.1)
+ * and refuses another turn meanwhile. Nothing is created before it accepts, so the command
+ * is simply sent again.
+ */
+const BUSY_RETRY_MS = 2000;
+const BUSY_WAIT_MS = 30_000;
+
+function isBusy(error: DtProtocolError): boolean {
+  return /active or recovering turn|_busy\b/i.test(error.message) || error.error_code.endsWith('_busy');
+}
+
 const SOCKET_AUTH_FAILED = 4001;
-const defaultTimers: DtTimers = { set: (run, ms) => setTimeout(run, ms), clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>) };
+const defaultTimers: DtTimers = {
+  set: (run, ms) => setTimeout(run, ms),
+  clear: (handle) => {
+    if (handle !== null && handle !== undefined) clearTimeout(handle as ReturnType<typeof setTimeout>);
+  },
+};
 
 /**
  * One `/ws` connection for every turn of a signed-in account. It follows turns by their
@@ -98,6 +124,7 @@ export class DtTurnConnection {
   /** Turns whose `session` event arrived, or that were followed rather than started here. */
   private readonly named = new Set<string>();
   private readonly starts: PendingStart[] = [];
+  private readonly regenerates = new Map<string, Retrying>();
   private readonly acks = new Map<string, { resolve(accepted: boolean): void; timer: unknown }>();
   private readonly activeChecks: ((info: DtActiveTurnInfo) => void)[] = [];
   private readonly outbox: DtCommand[] = [];
@@ -117,6 +144,8 @@ export class DtTurnConnection {
     return new Promise((resolve, reject) => {
       const pending: PendingStart = {
         command,
+        busyUntil: null,
+        retryTimer: null,
         sessionId: request.sessionId ?? '',
         resolve,
         reject,
@@ -147,9 +176,13 @@ export class DtTurnConnection {
     return this.awaitAck(commandId, cancelTurnCommand(turnId, commandId));
   }
 
-  /** Answers the session's last message again; the new turn's events follow as usual. */
+  /** Answers the session's last message again (replacing the reply); the new turn's events follow as usual. */
   regenerate(sessionId: string): void {
-    this.queue(regenerateCommand(sessionId));
+    const previous = this.regenerates.get(sessionId);
+    if (previous) this.timers.clear(previous.retryTimer);
+    const command = regenerateCommand(sessionId);
+    this.regenerates.set(sessionId, { command, busyUntil: null, retryTimer: null });
+    this.queue(command);
   }
 
   /** Answers a turn waiting for input. */
@@ -182,6 +215,14 @@ export class DtTurnConnection {
       onMessage: (data) => current() && this.handleMessage(data),
       onClose: (code) => current() && this.handleClose(code),
     });
+  }
+
+  /** Back in the foreground: reconnect at once if anything is unfinished (iOS closes sockets in the background). */
+  wake(): void {
+    if (this.socket || this.stopped || this.state === 'signed-out') return;
+    if (!this.active.size && !this.starts.length && !this.outbox.length) return;
+    this.attempt = 0;
+    this.connect();
   }
 
   /** Closes for good (sign-out): pending starts fail, nothing reconnects. */
@@ -224,9 +265,14 @@ export class DtTurnConnection {
       return;
     }
     if (event.type === 'protocol_error') {
-      if (TERMINAL_ERROR_CODES.has(event.error_code)) {
+      if (event.error_code === 'regenerate_rejected') {
+        const pending = this.regenerates.get(event.session_id);
+        if (pending && isBusy(event) && this.retryLater(pending, event.session_id)) return;
+        this.regenerates.delete(event.session_id);
+      } else if (TERMINAL_ERROR_CODES.has(event.error_code)) {
         const start = this.starts.find((item) => item.sessionId === event.session_id) ?? (event.session_id ? undefined : this.starts[0]);
         if (start) {
+          if (isBusy(event) && this.retryLater(start, event.session_id)) return;
           this.dropStart(start);
           start.reject(new Error(event.message || "DeepTutor couldn't start the reply."));
         }
@@ -260,6 +306,11 @@ export class DtTurnConnection {
     if (event.type === 'session' && !this.named.has(turnId)) {
       this.named.add(turnId);
       this.settleStart(event.session_id, turnId);
+      const regenerate = this.regenerates.get(event.session_id);
+      if (regenerate) {
+        this.timers.clear(regenerate.retryTimer);
+        this.regenerates.delete(event.session_id);
+      }
     }
     if (event.type === 'done') this.active.delete(turnId);
     this.options.onEvent(event);
@@ -305,6 +356,24 @@ export class DtTurnConnection {
     const index = this.starts.indexOf(start);
     if (index >= 0) this.starts.splice(index, 1);
     this.timers.clear(start.timer);
+    this.timers.clear(start.retryTimer);
+  }
+
+  /** Sends a refused command again in a moment, while the session's previous turn wraps up. */
+  private retryLater(item: Retrying, sessionId: string): boolean {
+    const now = (this.options.now ?? Date.now)();
+    item.busyUntil ??= now + BUSY_WAIT_MS;
+    if (now >= item.busyUntil) return false;
+    this.options.onWaiting?.(sessionId);
+    this.timers.clear(item.retryTimer);
+    item.retryTimer = this.timers.set(() => {
+      item.retryTimer = null;
+      // A pending start goes out again on its own when the socket reopens; others wait in the outbox.
+      if (this.open) this.transmit(item.command);
+      else if (this.starts.includes(item as PendingStart)) this.connect();
+      else this.queue(item.command);
+    }, BUSY_RETRY_MS);
+    return true;
   }
 
   private awaitAck(commandId: string, command: DtCommand): Promise<boolean> {
@@ -355,8 +424,11 @@ export class DtTurnConnection {
   private failPending(error: Error): void {
     for (const start of this.starts.splice(0)) {
       this.timers.clear(start.timer);
+      this.timers.clear(start.retryTimer);
       start.reject(error);
     }
+    for (const regenerate of this.regenerates.values()) this.timers.clear(regenerate.retryTimer);
+    this.regenerates.clear();
     for (const [id, waiter] of this.acks) {
       this.timers.clear(waiter.timer);
       waiter.resolve(false);

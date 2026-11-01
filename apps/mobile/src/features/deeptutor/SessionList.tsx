@@ -1,4 +1,4 @@
-import type { DtSessionSummary } from '@maviechat/deeptutor-protocol';
+import { sessionTitle, type DtSessionSummary } from '@maviechat/deeptutor-protocol';
 import { FlashList } from '@shopify/flash-list';
 import { useState, type ReactElement } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -6,6 +6,7 @@ import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { useDebounced } from '@/lib/useDebounced';
 import { fonts, radius, usePalette } from '@/theme';
+import { capabilityName, isNativeCapability } from './chat/capabilities';
 import { sessionDate, useDtSessions } from './queries';
 
 interface SessionListProps {
@@ -61,11 +62,18 @@ export function SessionList({ onOpen, rowHint, empty, header }: SessionListProps
             accessibilityHint={rowHint}
             onPress={() => onOpen(item)}
             style={({ pressed }) => [styles.row, { borderBottomColor: palette.border }, pressed && { backgroundColor: palette.surface }]}>
-            <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
-              {item.title || 'Untitled chat'}
-            </Text>
+            <View style={styles.titleRow}>
+              <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
+                {sessionTitle(item)}
+              </Text>
+              {item.status === 'running' ? <ActivityIndicator size="small" color={palette.textMuted} accessibilityLabel="Replying" /> : null}
+            </View>
             <Text style={[styles.meta, { color: palette.textFaint }]}>
-              {[sessionDate(item.updated_at ?? item.created_at), typeof item.message_count === 'number' ? `${item.message_count} messages` : null]
+              {[
+                sessionDate(item.updated_at ?? item.created_at),
+                typeof item.message_count === 'number' ? `${item.message_count} messages` : null,
+                isNativeCapability(item.capability) ? null : capabilityName(item.capability),
+              ]
                 .filter(Boolean)
                 .join(' · ')}
             </Text>
@@ -93,6 +101,7 @@ const styles = StyleSheet.create({
   loading: { marginVertical: 24 },
   empty: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 32, paddingHorizontal: 32 },
   row: { paddingHorizontal: 16, paddingVertical: 11, gap: 3, borderBottomWidth: StyleSheet.hairlineWidth },
-  title: { fontFamily: fonts.medium, fontSize: 15 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  title: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 15 },
   meta: { fontFamily: fonts.regular, fontSize: 12 },
 });
