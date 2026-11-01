@@ -157,6 +157,15 @@ describe('openSocketSession', () => {
     expect(seen[0]?.data.type).toBe('status');
   });
 
+  it('hands the server reply callback to listeners when one is sent', () => {
+    const { fake, session } = open();
+    const replies: unknown[] = [];
+    session.onChatEvent((_event, reply) => reply?.(true));
+    fake.fire('events', { chat_id: 'c', message_id: 'm', data: { type: 'confirmation', data: {} } }, (answer: unknown) => replies.push(answer));
+    fake.fire('events', { chat_id: 'c', message_id: 'm', data: { type: 'status', data: {} } });
+    expect(replies).toEqual([true]);
+  });
+
   it('close() rejects a pending join and stops everything', async () => {
     const { fake, session } = open();
     session.close();

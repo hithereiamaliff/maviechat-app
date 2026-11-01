@@ -65,11 +65,11 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Item | Mn |
 |---|---|---|
-| [ ] | Search by name/ID/tag; filters All / Local / External / Direct / tag | M1 |
-| [ ] | Rows: avatar, name, tags, badges, description, checkmark | M1 |
+| [~] | Search by name/ID/tag; filters All / Local / External / Direct / tag. Slice 2: search by name, id and tag | M1 |
+| [~] | Rows: avatar, name, tags, badges, description, checkmark. Slice 2: name, description, default badge, checkmark | M1 |
 | [ ] | Row "…": Keep in Sidebar / Hide from Sidebar, Copy link (Edit/Delete for admins → M3) | M2 |
 | [ ] | **Compare** toggle for multi-model (permission `multiple_models`) | M2 |
-| [ ] | "Set as default" (new chat only) | M1 |
+| [x] | "Set as default" (new chat only) | M1 |
 | [ ] | Model controls (preset knobs next to the selector) (`MessageInput/ModelControls.svelte`) | M2 |
 
 ## 5. Controls panel (`chat/ChatControls.svelte`, `chat/Controls/*`)
@@ -86,7 +86,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | | Item | Mn |
 |---|---|---|
 | [~] | Centred input; stacked model avatars; model name or "Hello, {name}"; description; "By author". Slice 1: model name, description, centred input (inactive) | M1 |
-| [ ] | "Suggested" prompts (model's own, else admin defaults), shuffled and filtered as you type; tap sends, or inserts if that setting is on | M1 |
+| [~] | "Suggested" prompts (model's own, else admin defaults), shuffled and filtered as you type; tap sends, or inserts if that setting is on. Slice 2: shown and tap sends | M1 |
 | [ ] | Landing mode "chat" (input pinned to the bottom) | M2 |
 | [ ] | Folder landing page: folder header, input, Chats / Knowledge tabs | M2 |
 
@@ -102,7 +102,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | — | "+" menu: Google Drive / OneDrive, Compare text, Screen capture | — |
 | [ ] | Integrations menu: tools (switch each; OAuth Connect), skills, filters, Web Search, Image, Code Interpreter | M1 (web search/image/code + tools); M2 (skills/filters/OAuth) |
 | [ ] | Active chips (tap to turn off); Chat Variables `{}`; model knobs | M1 chips, M2 rest |
-| [ ] | Last button: Stop (generating, empty input) / Dictate + Voice (empty) / Send | M1 (stop/send); M2 (dictate) |
+| [~] | Last button: Stop (generating, empty input) / Dictate + Voice (empty) / Send. Slice 2: Send and Stop | M1 (stop/send); M2 (dictate) |
 | [ ] | `/` commands + saved prompts with variables form (`InputVariablesModal.svelte`); `@` models/knowledge/files/URL; `#` folders/collections/files/URLs; `$` skills | M2 |
 | [ ] | Built-in variables `{{USER_NAME}}`, `{{CURRENT_DATE}}`, `{{CLIPBOARD}}`, `{{USER_LOCATION}}`, … | M2 |
 | [ ] | Message queue while replying (setting "Enable Message Queue", default on); queue while uploads finish | M1 |
@@ -135,7 +135,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [ ] | Generated images and files; tool HTML embeds (sandboxed) | M1 images, M2 embeds |
 | [x] | Error box; blinking cursor while streaming | M1 |
 | [~] | Action bar (always on the last message; tap to reveal on others): branch arrows, Edit (Save / Save As Copy), Copy, Read Aloud, Info (usage), Fork, 👍/👎, Continue (last only), Regenerate menu (Suggest a change / Try again / Add details / More concise), custom actions, Delete (when siblings exist), timestamp. Slice 1: arrows, Copy, Info | M1 (arrows, copy, regenerate, info, delete); M2 (edit, read aloud, fork, rate, continue, actions) |
-| [ ] | Follow-ups list under the last reply (tap sends, or inserts per setting) | M1 |
+| [x] | Follow-ups list under the last reply (tap sends, or inserts per setting) | M1 |
 | [ ] | Rating panel: 1–10, reason chips (up/down sets), comment, Save (`Messages/RateComment.svelte`) | M2 |
 | [ ] | Multi-model: full-width swipeable cards; solid border = the branch continued from; per-model arrows; tabs setting; "Merge Responses" | M2 |
 | [ ] | Text-selection actions Ask / Explain (`ContentRenderer/FloatingButtons.svelte`) → long-press "Select text" sheet | M2 |
@@ -147,12 +147,12 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [ ] | Artifacts viewer (combined HTML/CSS/JS, versions, Copy, Download, Full screen) | M2 |
 | [ ] | Share (private link; read access to users/groups; mode Clone only / Allow replies; Update and Copy link; delete link) | M2 |
 | [ ] | Download JSON / TXT / PDF (plain-text PDF first); Copy whole chat | M2 |
-| [ ] | Title: live from the server; Rename + Generate | M1 |
+| [~] | Title: live from the server; Rename + Generate. Slice 2: live title and Rename | M1 |
 | [ ] | Tags: editor; `tag:` search | M2 |
 | [ ] | Clone (sidebar), Fork from a message, `/fork` | M2 |
 | [ ] | Archive / Unarchive, Pin, Move to folder, Delete, Mark unread | M1 |
 | [ ] | Temporary chat (not saved; Save Chat later) | M1 |
-| [ ] | Background completions: toast "reply finished" for a chat you're not viewing (tap to open) | M1 (while foregrounded); M6 push |
+| [~] | Background completions: toast "reply finished" for a chat you're not viewing (tap to open). Slice 2: toast while the app is open | M1 (while foregrounded); M6 push |
 | — | Shared-chat presence and typing (Allow replies) | M5 |
 
 ## 10. Settings modal (`chat/SettingsModal.svelte`): on phones, a tab strip on top with search behind an icon

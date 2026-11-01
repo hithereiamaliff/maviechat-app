@@ -47,7 +47,11 @@ export interface SocketSession {
   readonly status: SocketStatus;
   /** The socket id, sent as `session_id` with chat completions so replies stream here. */
   readonly sessionId: string | undefined;
-  onChatEvent(listener: (event: ChatEventEnvelope) => void): () => void;
+  /**
+   * Chat events for every chat of this user (from any device). `reply` is set when the
+   * server waits for an answer (confirmation, input, execute, …) and must then be called.
+   */
+  onChatEvent(listener: (event: ChatEventEnvelope, reply?: (response: unknown) => void) => void): () => void;
   close(): void;
 }
 
@@ -73,7 +77,7 @@ export function openSocketSession(options: SocketSessionOptions): SocketSession 
   let closed = false;
   let settled = false;
   let heartbeat: ReturnType<typeof setInterval> | undefined;
-  const chatListeners = new Set<(event: ChatEventEnvelope) => void>();
+  const chatListeners = new Set<(event: ChatEventEnvelope, reply?: (response: unknown) => void) => void>();
 
   let resolveJoined: (user: JoinedUser) => void = () => {};
   let rejectJoined: (error: Error) => void = () => {};
@@ -147,9 +151,10 @@ export function openSocketSession(options: SocketSessionOptions): SocketSession 
   const onConnectError = (error: unknown) => {
     if (!closed) options.onStatus?.(status, error instanceof Error ? error.message : String(error));
   };
-  const onEvents = (payload: unknown) => {
+  const onEvents = (payload: unknown, ack?: unknown) => {
     if (!isEnvelope(payload)) return;
-    for (const listener of chatListeners) listener(payload);
+    const reply = typeof ack === 'function' ? (ack as (response: unknown) => void) : undefined;
+    for (const listener of chatListeners) listener(payload, reply);
   };
 
   socket.on('connect', onConnect);

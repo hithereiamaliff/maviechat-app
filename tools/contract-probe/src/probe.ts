@@ -32,6 +32,7 @@ import {
 import { DEFAULT_ENV_FILE, loadEnvFile } from './env';
 import { shapeOf } from './shape';
 import { summarizeTree } from './tree-summary';
+import { probeSend } from './send-probe';
 import { probeChatActions } from './write-probe';
 
 const { values: args } = parseArgs({
@@ -187,9 +188,25 @@ async function main() {
       });
 
       if (args.write) {
-        const writeSteps = await probeChatActions(client, { canDelete: capabilities?.can('chat.delete') ?? false });
+        const canDelete = capabilities?.can('chat.delete') ?? false;
+        const writeSteps = await probeChatActions(client, { canDelete });
         for (const result of writeSteps) results.push({ ...result, name: `write: ${result.name}` });
         fixtures['write.chat-actions'] = Object.fromEntries(writeSteps.map((result) => [result.name, result.ok]));
+
+        if (capabilities) {
+          const sendReport = await probeSend({
+            client,
+            baseUrl,
+            token: session.token,
+            userId: session.id,
+            userName: session.name,
+            capabilities,
+            canDelete,
+            modelId: env.OWUI_PROBE_MODEL,
+          });
+          for (const result of sendReport.steps) results.push({ ...result, name: `send: ${result.name}` });
+          fixtures['write.send'] = { steps: Object.fromEntries(sendReport.steps.map((s) => [s.name.replace(/ to .*/, ''), s.ok])), ...sendReport.fixture };
+        }
       }
 
       await step('POST /api/v1/auths/signout', async () => {

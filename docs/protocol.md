@@ -261,6 +261,19 @@ The server merges these writes: it keeps its own copy of in-progress assistant m
 - **Delete:** needs the `chat.delete` permission. Without it the server answers **401** "You do not have permission…", so the app hides Delete when the permission is off, as the web does.
 - **A 401 is not always an expired session.** Open WebUI also uses 401 for "not permitted". After a 401 the app re-checks `GET /api/v1/auths/` and signs out only if that fails too (the web app does the same).
 - **Folder open/closed state** is stored on the server: `POST /api/v1/folders/{id}/update/expanded {is_expanded}`.
+- **Send** (send probe ✓, `tools/contract-probe/src/send-probe.ts`):
+  - A new chat is `POST /api/chat/completions` without `chat_id`.
+  - The server creates the chat and answers `{status: true, task_ids, chat_id}` at once; the reply then streams to `session_id`.
+  - A one-word reply produced `chat:active`, `response:completion` ×2, `chat:completion` ×3, `chat:outlet`, `chat:list` and `chat:title`.
+  - Replaying those events through `applyMessageEvent` gave **exactly** the saved message (text and `output[]`).
+- **`messages`** for saved chats holds only the system prompt (0.11.3 web ✓); the server loads the conversation from `parent_id` and `user_message`.
+- **No client save after a reply.** In 0.11.3 the web client only refreshes the sidebar after a reply; the server persists output and runs outlet filters. `chat:outlet` patches message text (the app keeps `originalContent`).
+- **Answers the app gives to device-execution requests** (so turns never hang):
+  - `execute:python` → `{stdout: '', stderr: …, result: null}`;
+  - `execute`, `execute:tool`, `request:chat:completion`, `request:terminal` → `{error}`;
+  - `request:user_input` → `{status: 'cancelled', answers: {}}`;
+  - `request:elicitation` → `{action: 'cancel'}`;
+  - `confirmation` and `input` are asked with native alerts.
 
 ## 9. Stability notes
 

@@ -42,6 +42,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   isLast,
   baseUrl,
   token,
+  onFollowUp,
 }: {
   message: HistoryMessage;
   modelLabel: string;
@@ -50,6 +51,8 @@ export const AssistantMessage = memo(function AssistantMessage({
   isLast: boolean;
   baseUrl: string;
   token: string;
+  /** Sends a suggested follow-up (shown under the last reply once it's done). */
+  onFollowUp?: (text: string) => void;
 }) {
   const palette = usePalette();
   const toast = useToast();
@@ -103,6 +106,22 @@ export const AssistantMessage = memo(function AssistantMessage({
 
       <Sources sources={sources} />
 
+      {isLast && !streaming && onFollowUp && (message.followUps?.length ?? 0) > 0 ? (
+        <View style={styles.followUps}>
+          <Text style={[styles.followUpTitle, { color: palette.textMuted }]}>Follow up</Text>
+          {message.followUps?.map((followUp, index) => (
+            <Pressable
+              key={index}
+              accessibilityRole="button"
+              onPress={() => onFollowUp(followUp)}
+              style={({ pressed }) => [styles.followUp, { borderColor: palette.border }, pressed && { backgroundColor: palette.surface }]}>
+              <Text style={[styles.followUpText, { color: palette.text }]}>{followUp}</Text>
+              <Icon name="arrow-up" size={14} color={palette.textMuted} strokeWidth={2} />
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
       {showActions && !streaming ? (
         <View style={styles.actions}>
           <BranchNav index={branch.index} count={branch.count} onStep={onStep} />
@@ -147,4 +166,16 @@ const styles = StyleSheet.create({
   },
   errorText: { flex: 1, fontFamily: fonts.regular, fontSize: 14, lineHeight: 20 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4, marginLeft: -8 },
+  followUps: { marginTop: 10, gap: 6 },
+  followUpTitle: { fontFamily: fonts.medium, fontSize: 13 },
+  followUp: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  followUpText: { flex: 1, fontFamily: fonts.regular, fontSize: 14, lineHeight: 20 },
 });

@@ -39,5 +39,8 @@ export function useChatView(chatId: string) {
     [history, client, chatId, toast],
   );
 
-  return { query, messages, position, step };
+  /** Show this leaf (e.g. a reply just sent) without saving the choice; the server already did. */
+  const select = useCallback((leafId: string) => setSelection({ chatId, leaf: leafId }), [chatId]);
+
+  return { query, messages, position, step, select };
 }

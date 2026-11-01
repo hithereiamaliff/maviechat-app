@@ -1,7 +1,9 @@
 import { modelName, type HistoryMessage, type ModelItem } from '@maviechat/owui-protocol';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { useRef } from 'react';
-import { StyleSheet } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Icon } from '@/components/Icon';
+import { usePalette } from '@/theme';
 import { AssistantMessage } from './AssistantMessage';
 import { UserMessage } from './UserMessage';
 
@@ -10,50 +12,106 @@ interface MessageListProps {
   models: ModelItem[] | undefined;
   position: (messageId: string) => { index: number; count: number };
   onStep: (messageId: string, step: -1 | 1) => void;
+  onFollowUp?: (text: string) => void;
+  /** Changes when a new turn starts; the list then scrolls to the bottom. */
+  pinToBottomKey?: string;
   baseUrl: string;
   token: string;
 }
 
-/** The shown branch of a chat, opened at the newest message like the web app. */
-export function MessageList({ messages, models, position, onStep, baseUrl, token }: MessageListProps) {
+const NEAR_BOTTOM = 120;
+
+/** The shown branch of a chat, opened at the newest message; follows a streaming reply while you're at the bottom. */
+export function MessageList({ messages, models, position, onStep, onFollowUp, pinToBottomKey, baseUrl, token }: MessageListProps) {
+  const palette = usePalette();
   const list = useRef<FlashListRef<HistoryMessage>>(null);
+  const following = useRef(true);
+  const [atBottom, setAtBottom] = useState(true);
   const lastId = messages[messages.length - 1]?.id;
 
+  useEffect(() => {
+    if (!pinToBottomKey) return;
+    following.current = true;
+    requestAnimationFrame(() => list.current?.scrollToEnd({ animated: true }));
+  }, [pinToBottomKey]);
+
   return (
-    <FlashList
-      ref={list}
-      data={messages}
-      keyExtractor={(message) => message.id}
-      getItemType={(message) => message.role}
-      contentContainerStyle={styles.content}
-      keyboardDismissMode="interactive"
-      maintainVisibleContentPosition={{ startRenderingFromBottom: true, autoscrollToBottomThreshold: 0.2 }}
-      onLoad={() => list.current?.scrollToEnd({ animated: false })}
-      renderItem={({ item }) =>
-        item.role === 'user' ? (
-          <UserMessage
-            message={item}
-            branch={position(item.id)}
-            onStep={(step) => onStep(item.id, step)}
-            baseUrl={baseUrl}
-            token={token}
-          />
-        ) : (
-          <AssistantMessage
-            message={item}
-            modelLabel={typeof item.modelName === 'string' && item.modelName ? item.modelName : modelName(models, item.model)}
-            branch={position(item.id)}
-            onStep={(step) => onStep(item.id, step)}
-            isLast={item.id === lastId}
-            baseUrl={baseUrl}
-            token={token}
-          />
-        )
-      }
-    />
+    <View style={styles.wrap}>
+      <FlashList
+        ref={list}
+        data={messages}
+        keyExtractor={(message) => message.id}
+        getItemType={(message) => message.role}
+        contentContainerStyle={styles.content}
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+        maintainVisibleContentPosition={{ startRenderingFromBottom: true, autoscrollToBottomThreshold: 0.2 }}
+        onLoad={() => list.current?.scrollToEnd({ animated: false })}
+        scrollEventThrottle={64}
+        onScroll={(event) => {
+          const { contentOffset, layoutMeasurement, contentSize } = event.nativeEvent;
+          const near = contentOffset.y + layoutMeasurement.height >= contentSize.height - NEAR_BOTTOM;
+          following.current = near;
+          if (near !== atBottom) setAtBottom(near);
+        }}
+        onContentSizeChange={() => {
+          if (following.current) list.current?.scrollToEnd({ animated: false });
+        }}
+        renderItem={({ item }) =>
+          item.role === 'user' ? (
+            <UserMessage
+              message={item}
+              branch={position(item.id)}
+              onStep={(step) => onStep(item.id, step)}
+              baseUrl={baseUrl}
+              token={token}
+            />
+          ) : (
+            <AssistantMessage
+              message={item}
+              modelLabel={typeof item.modelName === 'string' && item.modelName ? item.modelName : modelName(models, item.model)}
+              branch={position(item.id)}
+              onStep={(step) => onStep(item.id, step)}
+              isLast={item.id === lastId}
+              baseUrl={baseUrl}
+              token={token}
+              onFollowUp={onFollowUp}
+            />
+          )
+        }
+      />
+      {!atBottom ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Scroll to the newest message"
+          onPress={() => {
+            following.current = true;
+            list.current?.scrollToEnd({ animated: true });
+          }}
+          style={[styles.jump, { backgroundColor: palette.menu, borderColor: palette.border, shadowColor: '#000' }]}>
+          <Icon name="arrow-down" size={18} color={palette.text} strokeWidth={2} />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrap: { flex: 1 },
   content: { paddingHorizontal: 16, paddingBottom: 24 },
+  jump: {
+    position: 'absolute',
+    alignSelf: 'center',
+    bottom: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+  },
 });

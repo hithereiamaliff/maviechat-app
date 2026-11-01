@@ -45,6 +45,17 @@ export async function getUserSettings(client: OwuiClient): Promise<UserSettings>
   return (await client.get<UserSettings | null>('/api/v1/users/user/settings')) ?? {};
 }
 
+/** Replaces the user's settings. Non-admins need the `settings.interface` permission (else 403). */
+export function updateUserSettings(client: OwuiClient, settings: UserSettings): Promise<UserSettings> {
+  return client.post<UserSettings>('/api/v1/users/user/settings/update', settings);
+}
+
+/** Makes `modelIds` the default for new chats, keeping every other setting (read, change, write back). */
+export async function saveDefaultModels(client: OwuiClient, modelIds: string[]): Promise<UserSettings> {
+  const current = await getUserSettings(client);
+  return updateUserSettings(client, { ...current, ui: { ...(current.ui ?? {}), models: modelIds } });
+}
+
 /** The model a new chat starts with: the user's default, then the server's, then the first visible model. */
 export function defaultModelId(models: ModelItem[], settings: UserSettings | undefined, config: ServerConfig | undefined): string | null {
   const visible = new Set(models.map((model) => model.id));
