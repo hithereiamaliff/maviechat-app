@@ -57,14 +57,14 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
   const connection = useMemo(() => {
     const sessionKey = (id: string) => [DT_QUERY_ROOT, baseUrl, 'session', id];
     const watchForPush = (sessionId: string, turnId: string) => {
-      const pushToken = pushTokenIfOn();
-      if (!pushToken || !pushWatch.relayServes || pushWatch.watched.has(turnId)) return;
+      if (!pushWatch.relayServes || pushWatch.watched.has(turnId)) return;
       pushWatch.watched.add(turnId);
       const cached = queryClient.getQueryData<DtSession>(sessionKey(sessionId));
       const prompt = pushWatch.prompts.get(sessionId) ?? pushWatch.prompts.get('');
       pushWatch.prompts.delete('');
       const title = cached ? sessionTitle(cached) : prompt ? sessionTitle({ title: '', last_message: prompt }) : null;
-      watchDeepTutorTurn((input, init) => fetch(input, init), token, { pushToken, sessionId, turnId, title, server: baseUrl })
+      void pushTokenIfOn()
+        .then((pushToken) => (pushToken ? watchDeepTutorTurn((input, init) => fetch(input, init), token, { pushToken, sessionId, turnId, title, server: baseUrl }) : null))
         .then((result) => {
           if (result === 'unsupported') pushWatch.relayServes = false;
         })

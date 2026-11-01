@@ -70,9 +70,18 @@ export function pushAnnouncesReplies(): boolean {
   return Boolean(state?.enabled && state.lastEventAt != null);
 }
 
-/** This phone's push token while notifications are on, else null. */
-export function pushTokenIfOn(): string | null {
-  return state?.enabled && state.pushToken ? state.pushToken : null;
+let freshToken: Promise<string | null> | null = null;
+
+/**
+ * This phone's push token while notifications are on, else null. Loads the saved state itself
+ * (a launch straight into DeepTutor never opens Open WebUI's side, which loads it otherwise),
+ * and asks iOS for the current token once per launch, in case it changed.
+ */
+export async function pushTokenIfOn(): Promise<string | null> {
+  const current = await loadState();
+  if (!current.enabled) return null;
+  freshToken ??= expoPushToken().catch(() => null);
+  return (await freshToken) ?? current.pushToken ?? null;
 }
 
 async function expoPushToken(): Promise<string> {
