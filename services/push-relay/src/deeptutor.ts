@@ -38,6 +38,7 @@ export interface WatchRequest {
 
 interface Watch extends WatchRequest {
   seq: number;
+  events: number;
   socket: WatchSocket | null;
   drops: number;
   asked: boolean;
@@ -55,6 +56,8 @@ export interface TurnWatcherOptions {
   timers?: Timers;
   maxWatches?: number;
   maxPerPhone?: number;
+  /** A line per step (never a token or message text), for diagnosing a missing notification. */
+  log?: (line: string) => void;
 }
 
 /** Research can run for most of an hour; nothing is watched longer than this. */
@@ -71,6 +74,9 @@ const defaultTimers: Timers = {
     if (handle !== null && handle !== undefined) clearTimeout(handle as ReturnType<typeof setTimeout>);
   },
 };
+
+/** The end of a turn id: enough to tell watches apart in the log. */
+const tag = (watch: Pick<WatchRequest, 'turnId'>) => `deeptutor turn …${watch.turnId.slice(-6)}`;
 
 function heading(base: string, title: string | null): string {
   return title ? `${base}: ${title}` : base;
@@ -133,11 +139,27 @@ export class TurnWatcher {
     if (this.watches.has(key)) return 'already';
     const perPhone = [...this.watches.values()].filter((watch) => watch.pushToken === request.pushToken).length;
     if (this.watches.size >= (this.options.maxWatches ?? 200) || perPhone >= (this.options.maxPerPhone ?? 10)) return 'full';
-    const watch: Watch = { ...request, seq: 0, socket: null, drops: 0, asked: false, result: null, expiry: null, retry: null };
-    watch.expiry = this.timers.set(() => this.end(key), MAX_WATCH_MS);
+    const watch: Watch = { ...request, seq: 0, events: 0, socket: null, drops: 0, asked: false, result: null, expiry: null, retry: null };
+    watch.expiry = this.timers.set(() => {
+      this.log(`${tag(watch)}: still running after 3 h, stopped watching`);
+      this.end(key);
+    }, MAX_WATCH_MS);
     this.watches.set(key, watch);
+    this.log(`${tag(watch)}: watching (${this.watches.size} at once)`);
     this.open(key);
     return 'watching';
+  }
+
+  private log(line: string): void {
+    this.options.log?.(line);
+  }
+
+  /** Sends one notification and logs whether Expo took it. */
+  private notify(watch: Watch, what: string, message: PushMessage): void {
+    this.options
+      .send([message])
+      .then((accepted) => this.log(`${tag(watch)}: ${what} after ${watch.events} events → notification ${accepted ? 'accepted' : 'refused'} by Expo`))
+      .catch(() => this.log(`${tag(watch)}: ${what} → couldn't reach Expo`));
   }
 
   /** Shutting down: every socket closes and every sign-in is forgotten. */
@@ -151,7 +173,10 @@ export class TurnWatcher {
     const url = `${this.options.url.replace(/\/+$/, '').replace(/^http/i, 'ws')}/ws`;
     // The same header shape as the app's (see deeptutor-protocol's socketCookieHeader).
     watch.socket = this.options.connect(url, `maviechat=1; dt_token=${watch.token}`, {
-      onOpen: () => watch.socket?.send(JSON.stringify({ protocol_version: '2.0', type: 'resume_from', turn_id: watch.turnId, seq: watch.seq })),
+      onOpen: () => {
+        this.log(`${tag(watch)}: following from event ${watch.seq}`);
+        watch.socket?.send(JSON.stringify({ protocol_version: '2.0', type: 'resume_from', turn_id: watch.turnId, seq: watch.seq }));
+      },
       onMessage: (data) => this.handle(key, data),
       onClose: () => this.dropped(key),
     });
@@ -167,6 +192,7 @@ export class TurnWatcher {
       return;
     }
     if (event.type === 'protocol_error') {
+      this.log(`${tag(watch)}: DeepTutor answered ${text(event.error_code) || 'an error'}${event.retryable === true ? ' (retryable)' : ''}`);
       // An unknown turn, or one this sign-in may not follow: nothing will come.
       if (event.retryable !== true) this.end(key);
       return;
@@ -176,19 +202,21 @@ export class TurnWatcher {
       if (event.seq <= watch.seq) return;
       watch.seq = event.seq;
     }
+    watch.events += 1;
     const meta = record(event.metadata);
     if (event.type === 'result') watch.result = meta;
     if (event.type === 'tool_result' && !watch.asked) {
       const ask = record(record(meta.tool_metadata).ask_user);
       if (Array.isArray(ask.questions) && ask.questions.length) {
         watch.asked = true;
-        void this.options.send([deepTutorQuestion(watch, ask)]).catch(() => 0);
+        this.notify(watch, 'asks a question', deepTutorQuestion(watch, ask));
       }
     }
     if (event.type === 'done') {
-      const status = text(meta.status);
+      const status = text(meta.status) || 'completed';
       // You stopped it yourself: nothing to tell you.
-      if (status !== 'cancelled') void this.options.send([deepTutorDone(watch, status, watch.result)]).catch(() => 0);
+      if (status === 'cancelled') this.log(`${tag(watch)}: stopped by you, no notification`);
+      else this.notify(watch, status, deepTutorDone(watch, status, watch.result));
       this.end(key);
     }
   }
@@ -199,10 +227,13 @@ export class TurnWatcher {
     watch.socket = null;
     watch.drops += 1;
     if (watch.drops > MAX_DROPS) {
+      this.log(`${tag(watch)}: connection lost ${watch.drops} times, gave up`);
       this.end(key);
       return;
     }
-    watch.retry = this.timers.set(() => this.open(key), Math.min(30_000, 1000 * 2 ** Math.min(watch.drops, 5)));
+    const delay = Math.min(30_000, 1000 * 2 ** Math.min(watch.drops, 5));
+    this.log(`${tag(watch)}: connection lost after ${watch.events} events, again in ${delay / 1000} s`);
+    watch.retry = this.timers.set(() => this.open(key), delay);
   }
 
   private end(key: string): void {

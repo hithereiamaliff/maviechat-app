@@ -10,6 +10,8 @@ export interface RelayConfig {
   owuiUrl: string;
   /** Expo's push endpoint (overridable in tests). */
   expoUrl?: string;
+  /** A line per notification outcome (never a token or message text). */
+  log?: (line: string) => void;
   /** DeepTutor reply notifications: the DeepTutor the relay serves, and its turn watcher. Off without it. */
   deeptutor?: {
     /** Where the relay reaches DeepTutor (inside the server). */
@@ -44,7 +46,7 @@ const DT_ID = /^[\w.-]{1,128}$/;
 const EXPO_BATCH = 100;
 
 /** Sends through Expo; phones Apple says are gone leave the list. Resolves with how many were accepted. */
-export function expoSender(fetchImpl: Fetch, store: DeviceStore, expoUrl = EXPO_PUSH_URL) {
+export function expoSender(fetchImpl: Fetch, store: DeviceStore, expoUrl = EXPO_PUSH_URL, log?: (line: string) => void) {
   return async function send(messages: PushMessage[]): Promise<number> {
     let accepted = 0;
     for (let start = 0; start < messages.length; start += EXPO_BATCH) {
@@ -57,11 +59,17 @@ export function expoSender(fetchImpl: Fetch, store: DeviceStore, expoUrl = EXPO_
       const result = (await response.json().catch(() => undefined)) as
         | { data?: Array<{ status?: string; details?: { error?: string } }> }
         | undefined;
+      const refused: string[] = [];
       batch.forEach((message, index) => {
         const ticket = result?.data?.[index];
         if (ticket?.status === 'ok') accepted += 1;
-        else if (ticket?.details?.error === 'DeviceNotRegistered') store.forget(message.to);
+        else {
+          // Expo's error code only: its message would repeat the push token.
+          refused.push(ticket?.details?.error ?? (result?.data ? 'unknown' : `HTTP ${response.status}`));
+          if (ticket?.details?.error === 'DeviceNotRegistered') store.forget(message.to);
+        }
       });
+      if (refused.length) log?.(`expo refused ${refused.length} of ${batch.length}: ${[...new Set(refused)].join(', ')}`);
     }
     return accepted;
   };
@@ -122,7 +130,7 @@ export function createRelay(config: RelayConfig, store: DeviceStore, fetchImpl: 
   const events = new RateLimiter(600, now);
   const watchCalls = new RateLimiter(30, now);
   const owuiUrl = config.owuiUrl.replace(/\/+$/, '');
-  const send = expoSender(fetchImpl, store, config.expoUrl);
+  const send = expoSender(fetchImpl, store, config.expoUrl, config.log);
 
   /** The Open WebUI user behind a bearer token, or a response refusing the call. */
   async function signedInUser(request: RelayRequest): Promise<string | RelayResponse> {
@@ -218,8 +226,11 @@ export function createRelay(config: RelayConfig, store: DeviceStore, fetchImpl: 
     const tokens = store.tokensFor(outcome.userId);
     if (tokens.length === 0) return { status: 202, body: { ignored: true } };
     try {
-      return { status: 200, body: { sent: await send(tokens.map((token) => notificationFor(outcome, token))) } };
+      const sent = await send(tokens.map((token) => notificationFor(outcome, token)));
+      config.log?.(`owui ${outcome.kind} → ${sent} of ${tokens.length} notifications accepted by Expo`);
+      return { status: 200, body: { sent } };
     } catch {
+      config.log?.(`owui ${outcome.kind} → couldn't reach Expo`);
       return { status: 502, body: { error: 'Could not reach the push service' } };
     }
   }

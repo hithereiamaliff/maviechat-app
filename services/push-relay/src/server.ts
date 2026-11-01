@@ -31,12 +31,14 @@ const connectDeepTutor: WatchSocketFactory = (url, cookie, handlers) => {
 // DeepTutor reply notifications, when the relay is told which DeepTutor it serves.
 const dtUrl = process.env.DT_URL;
 const dtPublicUrl = process.env.DT_PUBLIC_URL;
-const watcher = dtUrl && dtPublicUrl ? new TurnWatcher({ url: dtUrl, connect: connectDeepTutor, send: expoSender(fetchWithTimeout, store) }) : null;
+const log = (line: string) => console.log(line);
+const watcher = dtUrl && dtPublicUrl ? new TurnWatcher({ url: dtUrl, connect: connectDeepTutor, send: expoSender(fetchWithTimeout, store, undefined, log), log }) : null;
 
 const handle = createRelay(
   {
     eventsSecret,
     owuiUrl: required('OWUI_URL'),
+    log,
     deeptutor: watcher && dtUrl && dtPublicUrl ? { url: dtUrl, publicUrl: dtPublicUrl, watcher } : undefined,
   },
   store,
