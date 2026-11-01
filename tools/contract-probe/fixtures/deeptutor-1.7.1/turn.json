@@ -1,0 +1,182 @@
+{
+  "eventTypes": {
+    "content": "seen",
+    "done": "seen",
+    "progress": "seen",
+    "result": "seen",
+    "session": "seen",
+    "stage_end": "seen",
+    "stage_start": "seen",
+    "thinking": "seen"
+  },
+  "shapes": {
+    "session": {
+      "content": "string",
+      "metadata": {
+        "session_id": "string",
+        "turn_id": "string"
+      },
+      "seq": "number",
+      "session_id": "string",
+      "source": "string",
+      "stage": "string",
+      "timestamp": "number",
+      "turn_id": "string",
+      "type": "string"
+    },
+    "stage_start": {
+      "content": "string",
+      "metadata": {},
+      "seq": "number",
+      "session_id": "string",
+      "source": "string",
+      "stage": "string",
+      "timestamp": "number",
+      "turn_id": "string",
+      "type": "string"
+    },
+    "progress": {
+      "content": "string",
+      "metadata": {
+        "call_id": "string",
+        "call_kind": "string",
+        "call_state": "string",
+        "current": "number",
+        "label": "string",
+        "phase": "string",
+        "total": "number",
+        "trace_group": "string",
+        "trace_id": "string",
+        "trace_kind": "string",
+        "trace_role": "string"
+      },
+      "seq": "number",
+      "session_id": "string",
+      "source": "string",
+      "stage": "string",
+      "timestamp": "number",
+      "turn_id": "string",
+      "type": "string"
+    },
+    "thinking": {
+      "content": "string",
+      "metadata": {
+        "call_id": "string",
+        "call_kind": "string",
+        "label": "string",
+        "phase": "string",
+        "request_cache": {
+          "first_change": "string",
+          "shared_prefix_messages": "number"
+        },
+        "trace_group": "string",
+        "trace_id": "string",
+        "trace_kind": "string",
+        "trace_role": "string"
+      },
+      "seq": "number",
+      "session_id": "string",
+      "source": "string",
+      "stage": "string",
+      "timestamp": "number",
+      "turn_id": "string",
+      "type": "string"
+    },
+    "content": {
+      "content": "string",
+      "metadata": {
+        "call_id": "string",
+        "call_kind": "string",
+        "label": "string",
+        "phase": "string",
+        "request_cache": {
+          "first_change": "string",
+          "shared_prefix_messages": "number"
+        },
+        "trace_group": "string",
+        "trace_id": "string",
+        "trace_kind": "string",
+        "trace_role": "string"
+      },
+      "seq": "number",
+      "session_id": "string",
+      "source": "string",
+      "stage": "string",
+      "timestamp": "number",
+      "turn_id": "string",
+      "type": "string"
+    },
+    "stage_end": {
+      "content": "string",
+      "metadata": {},
+      "seq": "number",
+      "session_id": "string",
+      "source": "string",
+      "stage": "string",
+      "timestamp": "number",
+      "turn_id": "string",
+      "type": "string"
+    },
+    "result": {
+      "content": "string",
+      "metadata": {
+        "completed": "boolean",
+        "engine": "string",
+        "metadata": {
+          "context_budget": "object",
+          "cost_summary": "object",
+          "usage_summary": "object"
+        },
+        "response": "string",
+        "rounds": "number",
+        "scheduler": "string",
+        "settlement_rounds": "number",
+        "tool_steps": "number"
+      },
+      "seq": "number",
+      "session_id": "string",
+      "source": "string",
+      "stage": "string",
+      "timestamp": "number",
+      "turn_id": "string",
+      "type": "string"
+    },
+    "done": {
+      "content": "string",
+      "metadata": {
+        "assistant_message_id": "number",
+        "status": "string",
+        "usage_summary": {
+          "cache_creation_input_tokens": "number",
+          "cache_hit_rate": "number",
+          "cache_input_tokens": "number",
+          "cache_read_input_tokens": "number",
+          "cache_reported_calls": "number",
+          "call_details": [
+            "object"
+          ],
+          "completion_tokens": "number",
+          "duration_seconds": "number",
+          "estimated_calls": "number",
+          "generation_seconds": "number",
+          "prompt_tokens": "number",
+          "reasoning_tokens": "number",
+          "timed_completion_tokens": "number",
+          "tokens_per_second": "number",
+          "total_calls": "number",
+          "total_tokens": "number",
+          "ttft_calls": "number",
+          "ttft_seconds": "number"
+        },
+        "user_message_id": "number"
+      },
+      "seq": "number",
+      "session_id": "string",
+      "source": "string",
+      "stage": "string",
+      "timestamp": "number",
+      "turn_id": "string",
+      "type": "string"
+    }
+  }
+}

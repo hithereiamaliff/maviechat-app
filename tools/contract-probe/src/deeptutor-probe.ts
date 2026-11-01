@@ -1,7 +1,10 @@
 /**
  * DeepTutor contract probe (milestone M1.5):
- *   npm run probe:deeptutor -- [--url http://127.0.0.1:3782] [--env ~/.config/maviechat/deeptutor-test.env] [--no-fixtures]
+ *   npm run probe:deeptutor -- [--url http://127.0.0.1:3782] [--env ~/.config/maviechat/deeptutor-test.env] [--no-fixtures] [--turn]
  *
+ * `--turn` also runs one short "APP PROBE:" chat turn over `/ws` (it uses the account's model),
+ * drops the socket mid-reply on purpose, checks the resumed reply equals the saved one, and
+ * deletes the session.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -12,9 +15,18 @@ import path from 'node:path';
 import { parseArgs } from 'node:util';
 import {
   addChatRecord,
+  applyTurnEvent,
   createNotebook,
   deleteNotebook,
+  deleteSession,
   DtClient,
+  DtTurnConnection,
+  emptyReply,
+  savedReply,
+  shownMessages,
+  turnSocketUrl,
+  type DtReply,
+  type DtStreamEvent,
   getAuthStatus,
   getNotebook,
   getServerVersion,
@@ -39,6 +51,7 @@ const { values: args } = parseArgs({
     url: { type: 'string' },
     env: { type: 'string' },
     'no-fixtures': { type: 'boolean' },
+    turn: { type: 'boolean' },
   },
 });
 
@@ -178,12 +191,87 @@ async function main() {
     return { value: true, note: `no cookie → ${without.location}; Bearer only → ${bearerOnly.status}; cookie → 200` };
   });
 
+  if (args.turn) {
+    await step('turn over /ws: stream, drop, resume, compare with the saved reply', async () => {
+      const outcome = await probeTurn(baseUrl, session.token as string, client);
+      fixtures.turn = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
   await step('POST /api/auth/logout', async () => {
     await signOut(client);
     return { value: true, note: 'cookie cleared (the token stays valid until it expires)' };
   });
 
   report(version ?? 'unknown');
+}
+
+// Node's built-in WebSocket takes headers (not in the DOM typings), which carries the sign-in cookie.
+const NodeWebSocket = WebSocket as unknown as new (url: string, init: { headers: Record<string, string> }) => WebSocket;
+
+/**
+ * One short turn through the app's own connection code. After the first answer text arrives the
+ * socket is closed on purpose: the connection must reconnect, resume after the last event it
+ * applied, and end with exactly the reply DeepTutor saved.
+ */
+async function probeTurn(baseUrl: string, token: string, client: DtClient) {
+  let reply: DtReply = emptyReply();
+  let socket: WebSocket | null = null;
+  let sockets = 0;
+  let dropped = false;
+  const types = new Map<string, number>();
+  const samples: Partial<Record<DtStreamEvent['type'], DtStreamEvent>> = {};
+  let finish: () => void = () => undefined;
+  const finished = new Promise<void>((resolve) => (finish = resolve));
+  const connection = new DtTurnConnection({
+    url: turnSocketUrl(baseUrl),
+    connect: (url, handlers) => {
+      sockets += 1;
+      const current = new NodeWebSocket(url, { headers: { Cookie: `${TOKEN_COOKIE}=${token}` } });
+      socket = current;
+      current.onopen = () => handlers.onOpen();
+      current.onmessage = (event) => handlers.onMessage(event.data);
+      current.onclose = (event) => handlers.onClose(event.code);
+      return { send: (data) => current.send(data), close: () => current.close() };
+    },
+    onEvent: (event) => {
+      reply = applyTurnEvent(reply, event);
+      types.set(event.type, (types.get(event.type) ?? 0) + 1);
+      samples[event.type] ??= event;
+      if (!dropped && reply.answer.length > 0) {
+        dropped = true;
+        socket?.close();
+      }
+      if (event.type === 'done') finish();
+    },
+  });
+  const started = await connection.startTurn({ content: `${PROBE_PREFIX} Count from one to fifteen in words, separated by commas.`, tools: [] });
+  try {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      finished,
+      new Promise((_, reject) => (timer = setTimeout(() => reject(new Error('no done event within 3 minutes')), 180_000))),
+    ]).finally(() => clearTimeout(timer));
+    if (reply.status !== 'completed') throw new Error(`the turn ended ${reply.status}${reply.error ? `: ${reply.error}` : ''}`);
+    if (sockets < 2) throw new Error('the dropped socket was not reopened');
+    const saved = shownMessages(await getSession(client, started.sessionId));
+    const last = saved[saved.length - 1];
+    if (last?.role !== 'assistant') throw new Error('no saved reply');
+    if (last.content !== reply.answer) throw new Error(`the streamed answer (${reply.answer.length} chars) differs from the saved one (${last.content.length} chars)`);
+    if (reply.assistantMessageId !== null && String(last.id) !== String(reply.assistantMessageId)) throw new Error('done named a different reply');
+    if (savedReply(last).tools.length !== reply.tools.length) throw new Error('the saved tool steps differ from the streamed ones');
+    return {
+      fixture: {
+        eventTypes: Object.fromEntries([...types.keys()].sort().map((type) => [type, 'seen'])),
+        shapes: Object.fromEntries(Object.entries(samples).map(([type, event]) => [type, shapeOf(event, 3)])),
+      },
+      note: `${[...types.values()].reduce((a, b) => a + b, 0)} events over ${sockets} sockets; the resumed answer equals the saved reply; session deleted`,
+    };
+  } finally {
+    connection.close();
+    await deleteSession(client, started.sessionId).catch(() => undefined);
+  }
 }
 
 function report(version: string) {

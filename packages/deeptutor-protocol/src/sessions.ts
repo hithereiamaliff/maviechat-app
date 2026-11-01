@@ -83,3 +83,23 @@ export function shownMessages(session: DtSession): DtMessage[] {
   }
   return path;
 }
+
+/** Moves a session to DeepTutor's recycle bin (with its threads). */
+export async function deleteSession(client: DtClient, id: string): Promise<void> {
+  await client.delete(`/api/sessions/${encodeURIComponent(id)}`);
+}
+
+export async function renameSession(client: DtClient, id: string, title: string): Promise<void> {
+  await client.send('PATCH', `/api/sessions/${encodeURIComponent(id)}`, { body: { title: title.trim() } });
+}
+
+/**
+ * Every event of the turn that wrote a reply, reasoning included (a saved message keeps only
+ * its tool calls and result). `complete` is false while the turn still runs.
+ */
+export async function getMessageEvents(client: DtClient, sessionId: string, messageId: number | string): Promise<{ events: unknown[]; complete: boolean }> {
+  const response = await client.get<{ events?: unknown[]; complete?: boolean }>(
+    `/api/sessions/${encodeURIComponent(sessionId)}/messages/${encodeURIComponent(String(messageId))}/events`,
+  );
+  return { events: Array.isArray(response.events) ? response.events : [], complete: response.complete !== false };
+}
