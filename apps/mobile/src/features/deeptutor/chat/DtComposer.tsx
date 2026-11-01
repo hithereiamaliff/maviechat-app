@@ -1,11 +1,15 @@
-import { sameSelection, type DtChatTool, type DtLlmOption, type DtLlmSelection } from '@maviechat/deeptutor-protocol';
+import { sameSelection, sessionTitle, type DtChatTool, type DtKnowledgeBase, type DtLlmOption, type DtLlmSelection } from '@maviechat/deeptutor-protocol';
 import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
+import { useAnchoredMenu, type MenuItem } from '@/components/Menu';
 import { updateDraft, useDraftText } from '@/features/chat/drafts';
+import { useDtAttachmentLimits, useDtNotebooks, useDtSessions } from '@/features/deeptutor/queries';
 import { fonts, radius, usePalette } from '@/theme';
 import { capabilityName, modeInfo } from './capabilities';
+import { DtExtrasStrip, DtPickSheet, type ExtraChip, type PickItem } from './DtExtrasViews';
+import { clearExtras, hasExtras, useDtAttach, type DtExtras } from './extras';
 
 /** Our names for DeepTutor's switchable chat tools; others show their id, made readable. */
 const TOOL_INFO: Record<string, { label: string; icon: IconName }> = {
@@ -34,8 +38,8 @@ interface DtComposerProps {
   /** Which chat's draft this is (`dt:new` on the new-chat screen). */
   draftKey: string;
   running: boolean;
-  /** Resolves true when the message went out (the input stays cleared). */
-  onSend: (text: string) => Promise<boolean>;
+  /** Resolves true when the message went out (the input and its extras stay cleared). */
+  onSend: (text: string, extras: DtExtras) => Promise<boolean>;
   onStop: () => void;
   tools: DtChatTool[] | undefined;
   selectedTools: string[];
@@ -49,6 +53,12 @@ interface DtComposerProps {
   onModeChange: (mode: string) => void;
   config: Record<string, unknown>;
   onSettingChange: (key: string, value: unknown) => void;
+  /** The account's knowledge bases and the ones this chat searches. */
+  knowledgeBases: DtKnowledgeBase[] | undefined;
+  selectedKnowledgeBases: string[];
+  onKnowledgeBasesChange: (names: string[]) => void;
+  /** Kept out of the "earlier chat" list. */
+  sessionId?: string;
   placeholder?: string;
   autoFocus?: boolean;
 }
@@ -81,6 +91,10 @@ export function DtComposer({
   onModeChange,
   config,
   onSettingChange,
+  knowledgeBases,
+  selectedKnowledgeBases,
+  onKnowledgeBasesChange,
+  sessionId,
   placeholder,
   autoFocus = false,
 }: DtComposerProps) {
@@ -88,27 +102,76 @@ export function DtComposer({
   const insets = useSafeAreaInsets();
   const text = useDraftText(draftKey);
   const [sending, setSending] = useState(false);
-  const [sheet, setSheet] = useState<'mode' | 'tools' | 'model' | null>(null);
+  const [sheet, setSheet] = useState<'mode' | 'tools' | 'model' | 'notebook' | 'chat' | 'knowledge' | null>(null);
   const info = modeInfo(mode);
-  const canSend = text.trim().length > 0 && !sending && !running;
+  const limits = useDtAttachmentLimits();
+  const attach = useDtAttach(draftKey, limits.data ?? { maxFileBytes: 20 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024 });
+  const { extras, setExtras } = attach;
+  const notebooks = useDtNotebooks(sheet === 'notebook');
+  const chats = useDtSessions('');
+  const canSend = (text.trim().length > 0 || extras.attachments.length > 0) && !sending && !running;
+  const plusItems: MenuItem[] = [
+    { key: 'photos', label: 'Photos', icon: 'photo', onPress: () => void attach.pickPhotos() },
+    { key: 'camera', label: 'Take Photo', icon: 'camera', onPress: () => void attach.takePhoto() },
+    { key: 'files', label: 'Files', icon: 'paper-clip', onPress: () => void attach.pickFiles() },
+    { key: 'notebook', label: 'Notebook', icon: 'book-open', onPress: () => setSheet('notebook') },
+    { key: 'chat', label: 'Earlier Chat', icon: 'chat-bubble-left', onPress: () => setSheet('chat') },
+    { key: 'knowledge', label: 'Knowledge Bases', icon: 'archive-box', onPress: () => setSheet('knowledge') },
+  ];
+  const { ref: plusRef, open: openPlus, menu: plusMenu } = useAnchoredMenu(plusItems);
+  const chips: ExtraChip[] = [
+    ...extras.attachments.map((item) => ({
+      key: `a${item.id}`,
+      icon: 'document-text' as const,
+      label: item.filename,
+      image: item.preview,
+      onRemove: () => setExtras({ ...extras, attachments: extras.attachments.filter((other) => other.id !== item.id) }),
+    })),
+    ...extras.notebooks.map((item) => ({
+      key: `n${item.id}`,
+      icon: 'book-open' as const,
+      label: item.name,
+      onRemove: () => setExtras({ ...extras, notebooks: extras.notebooks.filter((other) => other.id !== item.id) }),
+    })),
+    ...extras.chats.map((item) => ({
+      key: `c${item.id}`,
+      icon: 'chat-bubble-left' as const,
+      label: item.title,
+      onRemove: () => setExtras({ ...extras, chats: extras.chats.filter((other) => other.id !== item.id) }),
+    })),
+    ...selectedKnowledgeBases.map((name) => ({
+      key: `k${name}`,
+      icon: 'archive-box' as const,
+      label: name,
+      onRemove: () => onKnowledgeBasesChange(selectedKnowledgeBases.filter((other) => other !== name)),
+    })),
+  ];
+  const toggle = <T extends { id: string }>(list: T[], item: T) => (list.some((other) => other.id === item.id) ? list.filter((other) => other.id !== item.id) : [...list, item]);
+  const chatItems: PickItem[] = (chats.data ?? []).filter((chat) => chat.id !== sessionId).map((chat) => ({ id: chat.id, label: sessionTitle(chat) }));
   const modelLabel = models?.find((option) => sameSelection(option, model))?.label ?? (models?.length ? 'Choose a model' : 'Default model');
   const usable = tools ?? [];
   const chosen = selectedTools.filter((name) => usable.some((tool) => tool.name === name));
 
   const submit = async () => {
     const message = text.trim();
-    if (!message || sending || running) return;
+    if ((!message && !extras.attachments.length) || sending || running) return;
     setSending(true);
+    const going = extras;
     updateDraft(draftKey, (draft) => ({ ...draft, text: '' }));
-    const sent = await onSend(message);
-    // A message that didn't go out comes back for another try.
-    if (!sent) updateDraft(draftKey, (draft) => ({ ...draft, text: draft.text || message }));
+    if (hasExtras(going)) clearExtras(draftKey);
+    const sent = await onSend(message, going);
+    // A message that didn't go out comes back for another try, with what went with it.
+    if (!sent) {
+      updateDraft(draftKey, (draft) => ({ ...draft, text: draft.text || message }));
+      if (hasExtras(going)) setExtras(going);
+    }
     setSending(false);
   };
 
   return (
     <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       <View style={[styles.box, { borderColor: palette.border, backgroundColor: palette.background }]}>
+        <DtExtrasStrip chips={chips} />
         <TextInput
           value={text}
           onChangeText={(value) => updateDraft(draftKey, (draft) => ({ ...draft, text: value }))}
@@ -120,6 +183,15 @@ export function DtComposer({
           accessibilityLabel="Message"
         />
         <View style={styles.row}>
+          <Pressable
+            ref={plusRef}
+            accessibilityRole="button"
+            accessibilityLabel="Attach photos or files, or refer to a notebook, chat or knowledge base"
+            onPress={openPlus}
+            hitSlop={4}
+            style={({ pressed }) => [styles.round, { borderColor: palette.border }, pressed && { backgroundColor: palette.surfaceStrong }]}>
+            <Icon name="plus" size={18} color={palette.textMuted} />
+          </Pressable>
           {modes.length > 1 ? (
             <Pressable
               accessibilityRole="button"
@@ -186,6 +258,43 @@ export function DtComposer({
           )}
         </View>
       </View>
+
+      {plusMenu}
+      <DtPickSheet
+        visible={sheet === 'notebook'}
+        title="Notebook"
+        note="DeepTutor reads the notebooks you pick when it answers your next message."
+        items={(notebooks.data ?? []).map((notebook) => ({ id: notebook.id, label: notebook.name, hint: notebook.description || undefined }))}
+        selected={extras.notebooks.map((notebook) => notebook.id)}
+        loading={notebooks.isLoading}
+        empty="No notebooks yet. Send an Open WebUI chat to DeepTutor, or make one in the DeepTutor web app."
+        onToggle={(item) => setExtras({ ...extras, notebooks: toggle(extras.notebooks, { id: item.id, name: item.label }) })}
+        onClose={() => setSheet(null)}
+      />
+      <DtPickSheet
+        visible={sheet === 'chat'}
+        title="Earlier Chat"
+        note="DeepTutor reads the chats you pick when it answers your next message."
+        items={chatItems}
+        selected={extras.chats.map((chat) => chat.id)}
+        loading={chats.isLoading}
+        empty="No other DeepTutor chats yet."
+        onToggle={(item) => setExtras({ ...extras, chats: toggle(extras.chats, { id: item.id, title: item.label }) })}
+        onClose={() => setSheet(null)}
+      />
+      <DtPickSheet
+        visible={sheet === 'knowledge'}
+        title="Knowledge Bases"
+        note="This chat searches the knowledge bases you pick, until you change them."
+        items={(knowledgeBases ?? []).map((kb) => ({ id: kb.name, label: kb.name, hint: kb.status || undefined }))}
+        selected={selectedKnowledgeBases}
+        loading={knowledgeBases === undefined}
+        empty="No knowledge bases yet. Make one in the DeepTutor web app; it needs an embedding model in DeepTutor's settings."
+        onToggle={(item) =>
+          onKnowledgeBasesChange(selectedKnowledgeBases.includes(item.id) ? selectedKnowledgeBases.filter((name) => name !== item.id) : [...selectedKnowledgeBases, item.id])
+        }
+        onClose={() => setSheet(null)}
+      />
 
       <Sheet visible={sheet === 'mode'} title="Mode" onClose={() => setSheet(null)}>
         <View style={[styles.group, { borderColor: palette.border }]}>
@@ -326,6 +435,7 @@ const styles = StyleSheet.create({
   modelText: { fontFamily: fonts.medium, fontSize: 13, flexShrink: 1 },
   spacer: { flex: 1 },
   send: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  round: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   stopSquare: { width: 11, height: 11, borderRadius: 2 },
   sheet: { flex: 1 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10 },

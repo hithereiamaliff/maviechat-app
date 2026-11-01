@@ -232,3 +232,44 @@ describe('DeepTutor modes', () => {
     expect(startTurnCommand({ content: 'Hi', config: {} })).not.toHaveProperty('config');
   });
 });
+
+describe('attachments and references', () => {
+  it('reads what a saved message was sent with', async () => {
+    const { messageAttachments, messageReferences } = await import('./sessions');
+    const message = {
+      id: 77,
+      role: 'user',
+      content: 'Q',
+      attachments: [
+        { type: 'image', url: '/files/attachments/s/1/red.png?dt_workspace=', filename: 'red.png', mime_type: 'image/png', base64: '' },
+        { type: 'file', url: '/files/attachments/s/2/note.txt', filename: 'note.txt', mime_type: 'text/plain', extracted_text: 'x' },
+        { type: 'file' },
+      ],
+      metadata: { request_snapshot: { notebookReferences: [{ notebook_id: 'nb1' }, {}], historyReferences: ['unified_1', 3], knowledgeBases: ['physics'] } },
+    };
+    expect(messageAttachments(message)).toEqual([
+      { type: 'image', filename: 'red.png', url: '/files/attachments/s/1/red.png?dt_workspace=', mimeType: 'image/png' },
+      { type: 'file', filename: 'note.txt', url: '/files/attachments/s/2/note.txt', mimeType: 'text/plain' },
+    ]);
+    expect(messageReferences(message)).toEqual({ notebooks: ['nb1'], chats: ['unified_1'], knowledgeBases: ['physics'] });
+    expect(messageReferences({ id: 1, role: 'user', content: '' })).toEqual({ notebooks: [], chats: [], knowledgeBases: [] });
+  });
+
+  it('sends attachments and references with a turn', () => {
+    expect(
+      startTurnCommand({
+        content: '',
+        attachments: [{ type: 'image', filename: 'a.png', base64: 'AAAA', mime_type: 'image/png' }],
+        notebookReferences: [{ notebook_id: 'nb1' }],
+        historyReferences: ['unified_1'],
+        knowledgeBases: ['physics'],
+      }),
+    ).toMatchObject({
+      content: '',
+      attachments: [{ type: 'image', filename: 'a.png', base64: 'AAAA', mime_type: 'image/png' }],
+      notebook_references: [{ notebook_id: 'nb1' }],
+      history_references: ['unified_1'],
+      knowledge_bases: ['physics'],
+    });
+  });
+});

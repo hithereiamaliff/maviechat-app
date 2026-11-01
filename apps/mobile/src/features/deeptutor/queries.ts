@@ -1,4 +1,16 @@
-import { getLlmOptions, getSession, listChatTools, listModes, listSessions, searchSessions, type DtSessionSummary } from '@maviechat/deeptutor-protocol';
+import {
+  DEFAULT_ATTACHMENT_LIMITS,
+  getAttachmentLimits,
+  getLlmOptions,
+  getSession,
+  listChatTools,
+  listKnowledgeBases,
+  listModes,
+  listNotebooks,
+  listSessions,
+  searchSessions,
+  type DtSessionSummary,
+} from '@maviechat/deeptutor-protocol';
 import { useQuery } from '@tanstack/react-query';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 
@@ -38,6 +50,29 @@ export function useDtChatTools() {
 export function useDtModes() {
   const { client, session } = useDtAuthed();
   return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'modes'], queryFn: () => listModes(client), staleTime: 10 * 60_000 });
+}
+
+/** Knowledge bases a turn can search. */
+export function useDtKnowledgeBases() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'knowledge-bases'], queryFn: () => listKnowledgeBases(client), staleTime: 60_000 });
+}
+
+/** Notebooks a turn can refer to. */
+export function useDtNotebooks(enabled = true) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'notebooks'], queryFn: () => listNotebooks(client), enabled, staleTime: 60_000 });
+}
+
+/** How large attachments may be (DeepTutor's defaults until the server answers). */
+export function useDtAttachmentLimits() {
+  const { client, session } = useDtAuthed();
+  return useQuery({
+    queryKey: [DT_QUERY_ROOT, session.baseUrl, 'attachment-limits'],
+    queryFn: () => getAttachmentLimits(client),
+    staleTime: 10 * 60_000,
+    placeholderData: DEFAULT_ATTACHMENT_LIMITS,
+  });
 }
 
 /** A session time (Unix seconds or milliseconds, or ISO text) as a short date. */

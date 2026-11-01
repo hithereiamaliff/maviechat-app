@@ -84,3 +84,41 @@ export async function saveQuizResults(
 export function sameSelection(a: DtLlmSelection | null | undefined, b: DtLlmSelection | null | undefined): boolean {
   return Boolean(a && b && a.profile_id === b.profile_id && a.model_id === b.model_id);
 }
+
+/** A knowledge base a turn can search (DeepTutor needs an embedding model to build one). */
+export interface DtKnowledgeBase {
+  name: string;
+  isDefault: boolean;
+  /** "ready" once indexed; DeepTutor's own words otherwise. */
+  status: string;
+}
+
+/** `GET /api/knowledge-bases`: the account's knowledge bases. */
+export async function listKnowledgeBases(client: DtClient): Promise<DtKnowledgeBase[]> {
+  const response = await client.get<unknown>('/api/knowledge-bases');
+  const list = Array.isArray(response) ? response : [];
+  return list.flatMap((item): DtKnowledgeBase[] => {
+    const kb = (item ?? {}) as Record<string, unknown>;
+    if (typeof kb.name !== 'string' || !kb.name || kb.available === false) return [];
+    return [{ name: kb.name, isDefault: kb.is_default === true, status: typeof kb.status === 'string' ? kb.status : '' }];
+  });
+}
+
+export interface DtAttachmentLimits {
+  maxFileBytes: number;
+  maxTotalBytes: number;
+}
+
+/** DeepTutor's own defaults, used until (or if) the server's are read. */
+export const DEFAULT_ATTACHMENT_LIMITS: DtAttachmentLimits = { maxFileBytes: 20 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024 };
+
+/** `GET /api/settings/chat-attachments`: how large a message's attachments may be. */
+export async function getAttachmentLimits(client: DtClient): Promise<DtAttachmentLimits> {
+  const response = await client.get<{ effective?: { max_file_bytes?: unknown; max_total_bytes?: unknown } }>('/api/settings/chat-attachments');
+  const file = response.effective?.max_file_bytes;
+  const total = response.effective?.max_total_bytes;
+  return {
+    maxFileBytes: typeof file === 'number' && file > 0 ? file : DEFAULT_ATTACHMENT_LIMITS.maxFileBytes,
+    maxTotalBytes: typeof total === 'number' && total > 0 ? total : DEFAULT_ATTACHMENT_LIMITS.maxTotalBytes,
+  };
+}

@@ -133,6 +133,23 @@ The composer's mode chip picks DeepTutor's mode for a turn, with its settings: Q
 - Mode turns stream their opening text with a leading newline, which DeepTutor trims when saving; compare trimmed.
 - Stages come as `stage_start`/`stage_end` with names (`rephrasing`, `quizzing`, …); the app shows them as ticked steps with our own names.
 
+## Attachments and references (slice 3, 2026-11-01)
+
+- **Attachments go inline.** Each turn's `attachments` are `{type: "image"|"file", filename, base64, mime_type}`; there is no upload step.
+  - DeepTutor accepts images, PDFs, Office files and text-like files.
+  - Limits come from `GET /api/settings/chat-attachments` (`effective.max_file_bytes`, `max_total_bytes`): 20 MB a file and 25 MB a message on our server.
+  - DeepTutor reads files itself; the saved message keeps `extracted_text`.
+- **Saved attachments** are `{type, url, filename, mime_type, id}` (base64 emptied). `url` is `/files/attachments/<session>/<id>/<name>`, served through the front end with the sign-in (401 without). The app loads photos with `Authorization: Bearer`.
+- **References:**
+  - `notebook_references` is `[{notebook_id}]` (whole notebooks);
+  - `history_references` is earlier session ids;
+  - `knowledge_bases` is names, kept by the session like its tools.
+  - The saved user message's `metadata.request_snapshot` records them (`notebookReferences`, `historyReferences`, `knowledgeBases`), and the app shows them as chips.
+- **Knowledge bases** are listed by `GET /api/knowledge-bases` (`name`, `status`, …). Building one needs an embedding model (not configured on our server yet); until then the list is empty.
+- **Rename:** `PATCH /api/sessions/{id} {title}`.
+- **Find in Chat** searches the shown messages on the phone and scrolls to the one you tap.
+- `npm run probe:deeptutor -- --refs` checks all of it against the server (passes on 1.7.1).
+
 ## M1.5 checklist
 
 | | Item |

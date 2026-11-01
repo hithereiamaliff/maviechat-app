@@ -1,4 +1,17 @@
-import { activeTurnOf, deleteSession, saveQuizResults, savedReply, sessionTitle, shownMessages, type DtOutline, type DtQuizQuestion } from '@maviechat/deeptutor-protocol';
+import {
+  activeTurnOf,
+  deleteSession,
+  messageAttachments,
+  messageReferences,
+  renameSession,
+  saveQuizResults,
+  savedReply,
+  sessionTitle,
+  shownMessages,
+  type DtMessage,
+  type DtOutline,
+  type DtQuizQuestion,
+} from '@maviechat/deeptutor-protocol';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -12,12 +25,15 @@ import { NEW_CHAT, updateDraft } from '@/features/chat/drafts';
 import { capabilityName, isNativeCapability } from '@/features/deeptutor/chat/capabilities';
 import { DtComposer } from '@/features/deeptutor/chat/DtComposer';
 import { useDtLive, useLiveTurn } from '@/features/deeptutor/chat/DtLiveProvider';
-import { DtMessageList, type DtListItem } from '@/features/deeptutor/chat/DtMessageList';
+import { DtFindSheet } from '@/features/deeptutor/chat/DtFind';
+import { DtMessageList, type DtListItem, type DtMessageListHandle } from '@/features/deeptutor/chat/DtMessageList';
+import { extrasRequest, promptExtras, type DtExtras } from '@/features/deeptutor/chat/extras';
+import type { PromptExtras } from '@/features/deeptutor/chat/liveTurns';
 import type { DtReplyActions } from '@/features/deeptutor/chat/DtReplyView';
 import type { QuizAnswer } from '@/features/deeptutor/chat/quiz';
 import { useDtChoice } from '@/features/deeptutor/chat/useDtChoice';
 import { deepTutorAttachment } from '@/features/deeptutor/crossReference';
-import { sessionDate, useDtSession } from '@/features/deeptutor/queries';
+import { sessionDate, useDtNotebooks, useDtSession, useDtSessions } from '@/features/deeptutor/queries';
 import { SpaceHeader } from '@/features/deeptutor/SpaceHeader';
 import { SwitchToOpenWebUIButton } from '@/features/deeptutor/SpaceSwitch';
 import { switchToOpenWebUI } from '@/features/deeptutor/switch';
@@ -43,6 +59,11 @@ export default function DeepTutorChat() {
   const choice = useDtChoice(detail.data?.preferences, capability);
   const [pinKey, setPinKey] = useState<string | undefined>(undefined);
   const [attaching, setAttaching] = useState(false);
+  const [finding, setFinding] = useState(false);
+  const listRef = useRef<DtMessageListHandle>(null);
+  // Names for what earlier messages referred to (saved as ids).
+  const notebooks = useDtNotebooks();
+  const chats = useDtSessions('');
   const native = isNativeCapability(capability);
   const running = turn?.reply.status === 'running' || turn?.reply.status === 'waiting';
 
@@ -62,17 +83,41 @@ export default function DeepTutorChat() {
 
   // Saved messages change only when the session is fetched again, so a streaming reply leaves them be.
   const saved = useMemo(() => (detail.data ? shownMessages(detail.data) : []), [detail.data]);
-  const savedItems = useMemo(
-    () =>
-      saved.flatMap((message): DtListItem[] =>
-        message.role === 'user'
-          ? [{ key: `m${message.id}`, kind: 'user', text: message.content }]
-          : message.role === 'assistant'
-            ? [{ key: `m${message.id}`, kind: 'reply', reply: savedReply(message), last: false }]
-            : [],
-      ),
-    [saved],
-  );
+  const savedItems = useMemo(() => {
+    const signedIn = { Authorization: `Bearer ${session.token}` };
+    const notebookName = (id: string) => notebooks.data?.find((notebook) => notebook.id === id)?.name ?? 'Notebook';
+    const chatTitle = (id: string) => {
+      const chat = chats.data?.find((item) => item.id === id);
+      return chat ? sessionTitle(chat) : 'Earlier chat';
+    };
+    const userItem = (message: DtMessage): DtListItem => {
+      const references = messageReferences(message);
+      return {
+        key: `m${message.id}`,
+        kind: 'user',
+        text: message.content,
+        attachments: messageAttachments(message).map((attachment, index) => ({
+          key: `${message.id}-${index}`,
+          type: attachment.type,
+          filename: attachment.filename,
+          uri: attachment.url ? `${session.baseUrl}${attachment.url}` : null,
+          headers: signedIn,
+        })),
+        references: [
+          ...references.notebooks.map((id) => ({ key: `n${id}`, icon: 'book-open' as const, label: notebookName(id) })),
+          ...references.chats.map((id) => ({ key: `c${id}`, icon: 'chat-bubble-left' as const, label: chatTitle(id) })),
+          ...references.knowledgeBases.map((name) => ({ key: `k${name}`, icon: 'archive-box' as const, label: name })),
+        ],
+      };
+    };
+    return saved.flatMap((message): DtListItem[] =>
+      message.role === 'user'
+        ? [userItem(message)]
+        : message.role === 'assistant'
+          ? [{ key: `m${message.id}`, kind: 'reply', reply: savedReply(message), last: false }]
+          : [],
+    );
+  }, [saved, session.baseUrl, session.token, notebooks.data, chats.data]);
   const items = useMemo(() => {
     const list = [...savedItems];
     const replySaved = turn?.reply.assistantMessageId != null && saved.some((message) => String(message.id) === String(turn.reply.assistantMessageId));
@@ -80,7 +125,7 @@ export default function DeepTutorChat() {
       const lastSaved = saved[saved.length - 1];
       if (turn.prompt !== null) {
         // Your message is saved when the turn starts; until the session shows it, show it here.
-        if (!(lastSaved?.role === 'user' && lastSaved.content.trim() === turn.prompt.trim())) list.push({ key: 'live-prompt', kind: 'user', text: turn.prompt });
+        if (!(lastSaved?.role === 'user' && lastSaved.content.trim() === turn.prompt.trim())) list.push({ key: 'live-prompt', kind: 'user', text: turn.prompt, ...pendingExtras(turn.promptExtras) });
       } else if (turn.replacesLast && lastSaved?.role === 'assistant') {
         // A regenerate: the new reply takes the old one's place.
         list.pop();
@@ -92,11 +137,11 @@ export default function DeepTutorChat() {
     return list;
   }, [saved, savedItems, turn]);
 
-  const send = async (text: string) => {
-    live.turns.begin(id, text);
+  const send = async (text: string, extras: DtExtras) => {
+    live.turns.begin(id, text, promptExtras(extras, choice.selectedKnowledgeBases));
     setPinKey(`send-${Date.now()}`);
     try {
-      await live.send({ content: text, sessionId: id, ...choice.request });
+      await live.send({ content: text, sessionId: id, ...choice.request, ...extrasRequest(extras) });
       return true;
     } catch (error) {
       live.turns.remove(id);
@@ -178,6 +223,30 @@ export default function DeepTutorChat() {
     }
   };
 
+  const rename = () =>
+    Alert.prompt(
+      'Rename chat',
+      undefined,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Rename',
+          onPress: (value?: string) => {
+            const title = value?.trim();
+            if (!title) return;
+            void renameSession(client, id, title)
+              .then(() => {
+                void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'session', id] });
+                void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'sessions'] });
+              })
+              .catch((error: unknown) => toast(`Couldn't rename: ${describeError(error)}`, 'error'));
+          },
+        },
+      ],
+      'plain-text',
+      detail.data ? sessionTitle(detail.data) : '',
+    );
+
   const confirmDelete = () =>
     Alert.alert('Delete this chat?', 'It moves to the recycle bin in DeepTutor.', [
       { text: 'Cancel', style: 'cancel' },
@@ -216,6 +285,8 @@ export default function DeepTutorChat() {
     ...(owui.state.status === 'signed-in' && items.length > 0
       ? [{ key: 'ask', label: attaching ? 'Attaching…' : 'Ask About It in Open WebUI', icon: 'chat-bubble-left' as const, onPress: () => void askInOpenWebUI() }]
       : []),
+    { key: 'find', label: 'Find in Chat', icon: 'magnifying-glass', onPress: () => setFinding(true) },
+    { key: 'rename', label: 'Rename Chat', icon: 'pencil', onPress: rename },
     { key: 'web', label: 'Open in DeepTutor Web App', icon: 'arrow-top-right-on-square', onPress: openOnWeb },
     { key: 'delete', label: 'Delete Chat', icon: 'trash', destructive: true, onPress: confirmDelete },
   ];
@@ -244,7 +315,7 @@ export default function DeepTutorChat() {
         ) : detail.isError && !turn ? (
           <Text style={[styles.empty, { color: palette.textMuted }]}>{`Couldn't load this chat: ${describeError(detail.error)}`}</Text>
         ) : (
-          <DtMessageList items={items} baseUrl={session.baseUrl} actions={actions} pinToBottomKey={pinKey} />
+          <DtMessageList ref={listRef} items={items} baseUrl={session.baseUrl} actions={actions} pinToBottomKey={pinKey} />
         )}
         {native ? (
           <DtComposer
@@ -263,6 +334,10 @@ export default function DeepTutorChat() {
             onModeChange={choice.setMode}
             config={choice.config}
             onSettingChange={choice.setSetting}
+            knowledgeBases={choice.knowledgeBases}
+            selectedKnowledgeBases={choice.selectedKnowledgeBases}
+            onKnowledgeBasesChange={choice.setSelectedKnowledgeBases}
+            sessionId={id}
           />
         ) : (
           <View style={[styles.webNote, { backgroundColor: palette.surface }]}>
@@ -273,8 +348,28 @@ export default function DeepTutorChat() {
           </View>
         )}
       </KeyboardAvoidingView>
+      <DtFindSheet
+        visible={finding}
+        items={items}
+        onClose={() => setFinding(false)}
+        onPick={(key) => {
+          setFinding(false);
+          // After the sheet has gone, so the list can move.
+          setTimeout(() => listRef.current?.scrollToKey(key), 400);
+        }}
+      />
     </View>
   );
+}
+
+/** Your message's photos, files and references, shown until the saved session has it. */
+function pendingExtras(extras: PromptExtras | undefined): Pick<Extract<DtListItem, { kind: 'user' }>, 'attachments' | 'references'> {
+  if (!extras) return {};
+  const icons = { notebook: 'book-open', chat: 'chat-bubble-left', knowledge: 'archive-box' } as const;
+  return {
+    attachments: extras.attachments,
+    references: extras.references.map((reference) => ({ key: reference.key, icon: icons[reference.kind], label: reference.label })),
+  };
 }
 
 const styles = StyleSheet.create({

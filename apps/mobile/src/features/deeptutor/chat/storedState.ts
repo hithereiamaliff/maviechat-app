@@ -24,3 +24,9 @@ export function useStoredState<T>(key: string, initial: T): [T, (value: T) => vo
   );
   return [value, set];
 }
+
+/** Sets a stored value from outside a component (clearing a sent draft, say). */
+export function setStoredState<T>(key: string, value: T): void {
+  values.set(key, value);
+  for (const listener of listeners) listener();
+}

@@ -2,7 +2,7 @@ import { replySegments, toolSummary, type DtOutline, type DtQuizQuestion, type D
 import * as Clipboard from 'expo-clipboard';
 import { memo, useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Icon } from '@/components/Icon';
+import { Icon, type IconName } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { useToast } from '@/components/Toast';
 import { Disclosure } from '@/features/chat/Steps';
@@ -10,6 +10,7 @@ import { openLink } from '@/lib/links';
 import { Markdown } from '@/markdown/Markdown';
 import { fonts, radius, usePalette } from '@/theme';
 import { toolIcon, toolLabel } from './DtComposer';
+import { DtSentExtras, type SentAttachment } from './DtExtrasViews';
 import { DtAskView, DtOutlineView, DtQuizView, DtStages, DtVisualView } from './DtModeViews';
 import type { QuizAnswer } from './quiz';
 
@@ -203,14 +204,27 @@ export const DtReplyView = memo(function DtReplyView({ reply, baseUrl, stateKey,
   );
 });
 
-/** Your message, as a bubble on the right. */
-export function DtUserBubble({ text: message }: { text: string }) {
+/** Your message, as a bubble on the right, with what it went with underneath. */
+export function DtUserBubble({
+  text: message,
+  attachments = [],
+  references = [],
+}: {
+  text: string;
+  attachments?: SentAttachment[];
+  references?: { key: string; icon: IconName; label: string }[];
+}) {
   const palette = usePalette();
   return (
-    <View style={[styles.bubble, { backgroundColor: palette.bubble }]}>
-      <Text selectable style={[styles.userText, { color: palette.text }]}>
-        {message.trim()}
-      </Text>
+    <View style={styles.userWrap}>
+      {message.trim() ? (
+        <View style={[styles.bubble, { backgroundColor: palette.bubble }]}>
+          <Text selectable style={[styles.userText, { color: palette.text }]}>
+            {message.trim()}
+          </Text>
+        </View>
+      ) : null}
+      <DtSentExtras attachments={attachments} references={references} />
     </View>
   );
 }
@@ -231,6 +245,7 @@ const styles = StyleSheet.create({
   sourceTitle: { fontFamily: fonts.regular, fontSize: 14 },
   sourceHost: { fontFamily: fonts.regular, fontSize: 12 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4, marginLeft: -8 },
-  bubble: { alignSelf: 'flex-end', maxWidth: '85%', borderRadius: radius.xl, paddingHorizontal: 14, paddingVertical: 10, marginTop: 18 },
+  userWrap: { marginTop: 18, alignItems: 'flex-end' },
+  bubble: { maxWidth: '85%', borderRadius: radius.xl, paddingHorizontal: 14, paddingVertical: 10 },
   userText: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 23 },
 });

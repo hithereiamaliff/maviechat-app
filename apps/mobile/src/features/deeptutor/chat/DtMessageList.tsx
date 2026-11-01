@@ -1,14 +1,23 @@
 import type { DtReply } from '@maviechat/deeptutor-protocol';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Icon } from '@/components/Icon';
+import { Icon, type IconName } from '@/components/Icon';
 import { usePalette } from '@/theme';
+import type { SentAttachment } from './DtExtrasViews';
 import { DtReplyView, DtUserBubble, type DtReplyActions } from './DtReplyView';
 
-export type DtListItem = { key: string; kind: 'user'; text: string } | { key: string; kind: 'reply'; reply: DtReply; last: boolean };
+export type DtListItem =
+  | { key: string; kind: 'user'; text: string; attachments?: SentAttachment[]; references?: { key: string; icon: IconName; label: string }[] }
+  | { key: string; kind: 'reply'; reply: DtReply; last: boolean };
+
+export interface DtMessageListHandle {
+  /** Brings a message into view (Find in Chat). */
+  scrollToKey(key: string): void;
+}
 
 interface DtMessageListProps {
+  ref?: Ref<DtMessageListHandle>;
   items: DtListItem[];
   baseUrl: string;
   actions: DtReplyActions;
@@ -19,11 +28,24 @@ interface DtMessageListProps {
 const NEAR_BOTTOM = 120;
 
 /** A DeepTutor chat, opened at the newest message; follows a streaming reply while you're at the bottom. */
-export function DtMessageList({ items, baseUrl, actions, pinToBottomKey }: DtMessageListProps) {
+export function DtMessageList({ ref, items, baseUrl, actions, pinToBottomKey }: DtMessageListProps) {
   const palette = usePalette();
   const list = useRef<FlashListRef<DtListItem>>(null);
   const following = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToKey: (key) => {
+        const index = items.findIndex((item) => item.key === key);
+        if (index < 0) return;
+        following.current = false;
+        list.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+      },
+    }),
+    [items],
+  );
 
   useEffect(() => {
     if (!pinToBottomKey) return;
@@ -55,7 +77,7 @@ export function DtMessageList({ items, baseUrl, actions, pinToBottomKey }: DtMes
         }}
         renderItem={({ item }) =>
           item.kind === 'user' ? (
-            <DtUserBubble text={item.text} />
+            <DtUserBubble text={item.text} attachments={item.attachments} references={item.references} />
           ) : (
             <DtReplyView reply={item.reply} baseUrl={baseUrl} stateKey={item.reply.turnId || item.key} last={item.last} {...actions} />
           )

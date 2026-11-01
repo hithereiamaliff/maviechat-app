@@ -6,7 +6,9 @@
  * drops the socket mid-reply on purpose, checks the resumed reply equals the saved one, and
  * deletes the session. `--modes` runs one short turn in each mode the app shows natively (Solve,
  * Quiz, Visualize, Research's outline, Ask Questions answered), checks the app reads each mode's
- * result, live and saved, and deletes the sessions (about two minutes of model use).
+ * result, live and saved, and deletes the sessions (about two minutes of model use). `--refs`
+ * sends a photo, a text file, a notebook and an earlier chat with one turn, checks the saved
+ * message reads back (and its photo loads signed in), and deletes everything it made.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -22,6 +24,8 @@ import {
   deleteNotebook,
   deleteSession,
   DtClient,
+  messageAttachments,
+  messageReferences,
   DtTurnConnection,
   emptyReply,
   savedReply,
@@ -56,6 +60,7 @@ const { values: args } = parseArgs({
     'no-fixtures': { type: 'boolean' },
     turn: { type: 'boolean' },
     modes: { type: 'boolean' },
+    refs: { type: 'boolean' },
   },
 });
 
@@ -200,6 +205,13 @@ async function main() {
       const outcome = await probeModes(baseUrl, session.token as string, client);
       fixtures.modes = outcome.fixture;
       return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.refs) {
+    await step('attachments and references: photo, text file, notebook, earlier chat', async () => {
+      const outcome = await probeRefs(baseUrl, session.token as string, client);
+      return { value: true, note: outcome };
     });
   }
 
@@ -365,6 +377,81 @@ async function probeModes(baseUrl: string, token: string, client: DtClient) {
   } finally {
     connection.close();
     await Promise.all(sessions.map((id) => deleteSession(client, id).catch(() => undefined)));
+  }
+}
+
+/** A 1×1 PNG. */
+const DOT_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC';
+
+/** One turn with everything slice 3 sends, through the app's own connection; the saved message must read back. */
+async function probeRefs(baseUrl: string, token: string, client: DtClient): Promise<string> {
+  const replies = new Map<string, DtReply>();
+  const done = new Map<string, () => void>();
+  const connection = new DtTurnConnection({
+    url: turnSocketUrl(baseUrl),
+    connect: (url, handlers) => {
+      const socket = new NodeWebSocket(url, { headers: { Cookie: socketCookieHeader(token) } });
+      socket.onopen = () => handlers.onOpen();
+      socket.onmessage = (event) => handlers.onMessage(event.data);
+      socket.onclose = (event) => handlers.onClose(event.code);
+      return { send: (data) => socket.send(data), close: () => socket.close() };
+    },
+    onEvent: (event) => {
+      replies.set(event.session_id, applyTurnEvent(replies.get(event.session_id) ?? emptyReply(event.session_id, event.turn_id), event));
+      if (event.type === 'done') done.get(event.session_id)?.();
+    },
+  });
+  const run = async (request: Parameters<DtTurnConnection['startTurn']>[0]) => {
+    const started = await connection.startTurn(request);
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('no done event within 3 minutes')), 180_000);
+      done.set(started.sessionId, () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      if (replies.get(started.sessionId)?.status === 'completed') resolve();
+    });
+    return started.sessionId;
+  };
+  const notebook = await createNotebook(client, `${PROBE_PREFIX} references`, 'Written and deleted by the MavieChat probe');
+  const sessions: string[] = [];
+  try {
+    await addChatRecord(client, {
+      notebookIds: [notebook.id],
+      title: `${PROBE_PREFIX} record`,
+      summary: 'A fact for the probe.',
+      userQuery: 'What is the capital of Atlantis?',
+      output: 'The capital of Atlantis is Coralia.',
+      metadata: { source: 'maviechat-probe' },
+    });
+    const earlier = await run({ content: `${PROBE_PREFIX} Remember that my favourite fruit is durian. Just say OK.`, tools: [] });
+    sessions.push(earlier);
+    const main = await run({
+      content: `${PROBE_PREFIX} From the attached note, my notebook and my earlier chat: the secret word, the capital of Atlantis, my favourite fruit. One line each.`,
+      tools: [],
+      attachments: [
+        { type: 'image', filename: 'dot.png', base64: DOT_PNG, mime_type: 'image/png' },
+        { type: 'file', filename: 'note.txt', base64: Buffer.from('The secret word is PAPAYA.\n').toString('base64'), mime_type: 'text/plain' },
+      ],
+      notebookReferences: [{ notebook_id: notebook.id }],
+      historyReferences: [earlier],
+    });
+    sessions.push(main);
+    if (replies.get(main)?.status !== 'completed' || !replies.get(main)?.answer.trim()) throw new Error('the turn with attachments did not answer');
+    const user = shownMessages(await getSession(client, main)).find((message) => message.role === 'user');
+    if (!user) throw new Error('no saved message');
+    const attachments = messageAttachments(user);
+    if (attachments.map((item) => item.filename).join() !== 'dot.png,note.txt' || attachments.some((item) => !item.url)) throw new Error('the saved attachments do not read back');
+    const references = messageReferences(user);
+    if (references.notebooks.join() !== notebook.id || references.chats.join() !== earlier) throw new Error('the saved references do not read back');
+    const image = await fetch(`${baseUrl}${attachments[0]!.url}`, { headers: { Authorization: `Bearer ${token}` } });
+    await image.body?.cancel();
+    if (image.status !== 200 || !String(image.headers.get('content-type')).startsWith('image/')) throw new Error(`the saved photo answered ${image.status}`);
+    return 'sent inline; saved message reads back; its photo loads signed in; everything deleted';
+  } finally {
+    connection.close();
+    await Promise.all(sessions.map((id) => deleteSession(client, id).catch(() => undefined)));
+    await deleteNotebook(client, notebook.id).catch(() => undefined);
   }
 }
 

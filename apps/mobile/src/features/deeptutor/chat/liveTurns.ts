@@ -1,5 +1,12 @@
 import { applyTurnEvent, emptyReply, type DtReply, type DtStreamEvent } from '@maviechat/deeptutor-protocol';
 
+/** What your message went with, shown under it until the saved session has it. */
+export interface PromptExtras {
+  /** Photos as data: URLs; files by name. */
+  attachments: { key: string; type: string; filename: string; uri: string | null }[];
+  references: { key: string; kind: 'notebook' | 'chat' | 'knowledge'; label: string }[];
+}
+
 /** A turn the app shows as it streams. */
 export interface LiveTurn {
   sessionId: string;
@@ -7,6 +14,7 @@ export interface LiveTurn {
   turnId: string;
   /** Your message, shown until the saved session has it. Null for a regenerate, a continuation or a turn started elsewhere. */
   prompt: string | null;
+  promptExtras?: PromptExtras;
   /** A regenerate: the reply replaces the last one shown. */
   replacesLast: boolean;
   reply: DtReply;
@@ -36,8 +44,8 @@ export class LiveTurns {
   };
 
   /** Shows a message being sent in a known session, before the server has answered. */
-  begin(sessionId: string, prompt: string): void {
-    this.turns.set(sessionId, { sessionId, turnId: '', prompt, replacesLast: false, reply: emptyReply(sessionId) });
+  begin(sessionId: string, prompt: string, promptExtras?: PromptExtras): void {
+    this.turns.set(sessionId, { sessionId, turnId: '', prompt, promptExtras, replacesLast: false, reply: emptyReply(sessionId) });
     this.notify();
   }
 
@@ -53,10 +61,10 @@ export class LiveTurns {
     this.notify();
   }
 
-  setPrompt(sessionId: string, prompt: string): void {
+  setPrompt(sessionId: string, prompt: string, promptExtras?: PromptExtras): void {
     const turn = this.turns.get(sessionId);
-    if (!turn || turn.prompt === prompt) return;
-    this.turns.set(sessionId, { ...turn, prompt });
+    if (!turn || (turn.prompt === prompt && turn.promptExtras === promptExtras)) return;
+    this.turns.set(sessionId, { ...turn, prompt, promptExtras });
     this.notify();
   }
 

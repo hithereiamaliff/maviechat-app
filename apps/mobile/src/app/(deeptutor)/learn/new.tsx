@@ -7,6 +7,8 @@ import { useToast } from '@/components/Toast';
 import { DtComposer } from '@/features/deeptutor/chat/DtComposer';
 import { useDtLive } from '@/features/deeptutor/chat/DtLiveProvider';
 import { DtUserBubble } from '@/features/deeptutor/chat/DtReplyView';
+import { extrasRequest, promptExtras, type DtExtras } from '@/features/deeptutor/chat/extras';
+import type { PromptExtras } from '@/features/deeptutor/chat/liveTurns';
 import { useDtChoice } from '@/features/deeptutor/chat/useDtChoice';
 import { SpaceHeader } from '@/features/deeptutor/SpaceHeader';
 import { SwitchToOpenWebUIButton } from '@/features/deeptutor/SpaceSwitch';
@@ -23,13 +25,14 @@ export default function DeepTutorNewChat() {
   const { session } = useDtAuthed();
   const live = useDtLive();
   const choice = useDtChoice(null);
-  const [pending, setPending] = useState<string | null>(null);
+  const [pending, setPending] = useState<{ text: string; extras?: PromptExtras } | null>(null);
 
-  const send = async (text: string) => {
-    setPending(text);
+  const send = async (text: string, extras: DtExtras) => {
+    const shown = promptExtras(extras, choice.selectedKnowledgeBases);
+    setPending({ text, extras: shown });
     try {
-      const sessionId = await live.send({ content: text, ...choice.request });
-      live.turns.setPrompt(sessionId, text);
+      const sessionId = await live.send({ content: text, ...choice.request, ...extrasRequest(extras) });
+      live.turns.setPrompt(sessionId, text, shown);
       router.replace({ pathname: '/learn/[id]', params: { id: sessionId } });
       return true;
     } catch (error) {
@@ -54,7 +57,15 @@ export default function DeepTutorNewChat() {
       <KeyboardAvoidingView behavior="padding" style={styles.body}>
         {pending ? (
           <ScrollView contentContainerStyle={styles.pending}>
-            <DtUserBubble text={pending} />
+            <DtUserBubble
+              text={pending.text}
+              attachments={pending.extras?.attachments}
+              references={pending.extras?.references.map((reference) => ({
+                key: reference.key,
+                icon: reference.kind === 'notebook' ? 'book-open' : reference.kind === 'chat' ? 'chat-bubble-left' : 'archive-box',
+                label: reference.label,
+              }))}
+            />
             <ActivityIndicator style={styles.spinner} color={palette.textMuted} />
           </ScrollView>
         ) : (
@@ -81,6 +92,9 @@ export default function DeepTutorNewChat() {
           onModeChange={choice.setMode}
           config={choice.config}
           onSettingChange={choice.setSetting}
+          knowledgeBases={choice.knowledgeBases}
+          selectedKnowledgeBases={choice.selectedKnowledgeBases}
+          onKnowledgeBasesChange={choice.setSelectedKnowledgeBases}
           autoFocus
         />
       </KeyboardAvoidingView>

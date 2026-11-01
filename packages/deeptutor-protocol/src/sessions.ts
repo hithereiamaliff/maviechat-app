@@ -140,3 +140,47 @@ export function sessionTitle(session: Pick<DtSessionSummary, 'title'> & { last_m
   const line = first.replace(/\s+/g, ' ').trim();
   return line ? (line.length > 60 ? `${line.slice(0, 59).trimEnd()}…` : line) : UNTITLED_SESSION;
 }
+
+/** An attachment a message was sent with, as DeepTutor keeps it (served at `url`, signed in). */
+export interface DtSavedAttachment {
+  type: string;
+  filename: string;
+  /** Relative to DeepTutor's address, e.g. `/files/attachments/<session>/<id>/<name>`. */
+  url: string;
+  mimeType: string;
+}
+
+export function messageAttachments(message: DtMessage): DtSavedAttachment[] {
+  const list = Array.isArray(message.attachments) ? message.attachments : [];
+  return list.flatMap((item): DtSavedAttachment[] => {
+    const attachment = (item ?? {}) as Record<string, unknown>;
+    const filename = typeof attachment.filename === 'string' ? attachment.filename : '';
+    if (!filename) return [];
+    return [
+      {
+        type: typeof attachment.type === 'string' ? attachment.type : 'file',
+        filename,
+        url: typeof attachment.url === 'string' ? attachment.url : '',
+        mimeType: typeof attachment.mime_type === 'string' ? attachment.mime_type : '',
+      },
+    ];
+  });
+}
+
+/** What a message referred to: notebooks, earlier chats, knowledge bases (from the request DeepTutor saved with it). */
+export interface DtMessageReferences {
+  notebooks: string[];
+  chats: string[];
+  knowledgeBases: string[];
+}
+
+export function messageReferences(message: DtMessage): DtMessageReferences {
+  const metadata = (message.metadata ?? {}) as Record<string, unknown>;
+  const snapshot = (metadata.request_snapshot ?? {}) as Record<string, unknown>;
+  const texts = (value: unknown) => (Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item !== '') : []);
+  const notebooks = (Array.isArray(snapshot.notebookReferences) ? snapshot.notebookReferences : []).flatMap((item) => {
+    const id = (item as Record<string, unknown> | null)?.notebook_id;
+    return typeof id === 'string' && id ? [id] : [];
+  });
+  return { notebooks, chats: texts(snapshot.historyReferences), knowledgeBases: texts(snapshot.knowledgeBases) };
+}

@@ -1,6 +1,6 @@
 import { sameSelection, type DtLlmSelection, type DtTurnRequest } from '@maviechat/deeptutor-protocol';
 import { useState } from 'react';
-import { useDtChatTools, useDtLlmOptions, useDtModes } from '@/features/deeptutor/queries';
+import { useDtChatTools, useDtKnowledgeBases, useDtLlmOptions, useDtModes } from '@/features/deeptutor/queries';
 import { isNativeCapability, modeConfig, NATIVE_MODES } from './capabilities';
 
 const isText = (value: unknown): value is string => typeof value === 'string';
@@ -20,7 +20,9 @@ export function useDtChoice(preferences: Record<string, unknown> | null | undefi
   const llm = useDtLlmOptions();
   const tools = useDtChatTools();
   const modes = useDtModes();
+  const knowledgeBases = useDtKnowledgeBases();
   const [pickedTools, setPickedTools] = useState<string[] | null>(null);
+  const [pickedKnowledgeBases, setPickedKnowledgeBases] = useState<string[] | null>(null);
   const [pickedModel, setPickedModel] = useState<DtLlmSelection | null>(null);
   const [pickedMode, setPickedMode] = useState<string | null>(null);
   const [settings, setSettings] = useState<Record<string, Record<string, unknown>>>({});
@@ -31,18 +33,22 @@ export function useDtChoice(preferences: Record<string, unknown> | null | undefi
   const usable = (selection: DtLlmSelection | null) => (selection && options?.some((option) => sameSelection(option, selection)) ? selection : null);
   const model = usable(pickedModel) ?? usable(savedModel) ?? llm.data?.active ?? null;
   const selectedTools = pickedTools ?? savedTools ?? [];
+  const savedKnowledgeBases = Array.isArray(preferences?.knowledge_bases) ? preferences.knowledge_bases.filter(isText) : null;
+  const selectedKnowledgeBases = pickedKnowledgeBases ?? savedKnowledgeBases ?? [];
   // Modes the server offers that the app runs natively, in our order.
   const available = NATIVE_MODES.filter((id) => id === 'chat' || modes.data?.some((mode) => mode.id === id));
   const saved = sessionMode ?? (isText(preferences?.capability) ? preferences.capability : undefined);
   const mode = pickedMode ?? (saved && isNativeCapability(saved) ? saved : 'chat');
   const config = modeConfig(mode, settings[mode]);
 
-  const request: Pick<DtTurnRequest, 'capability' | 'config' | 'tools' | 'llmSelection'> = {
+  const request: Pick<DtTurnRequest, 'capability' | 'config' | 'tools' | 'llmSelection' | 'knowledgeBases'> = {
     capability: mode,
     config,
     // Tools belong to Chat; other modes bring their own, and the session keeps its list.
     tools: mode === 'chat' ? selectedTools : undefined,
     llmSelection: model,
+    // Kept by the session, like DeepTutor's own composer does.
+    knowledgeBases: selectedKnowledgeBases,
   };
 
   return {
@@ -51,6 +57,9 @@ export function useDtChoice(preferences: Record<string, unknown> | null | undefi
     modes: available,
     selectedTools,
     setSelectedTools: setPickedTools,
+    knowledgeBases: knowledgeBases.data,
+    selectedKnowledgeBases,
+    setSelectedKnowledgeBases: setPickedKnowledgeBases,
     model,
     setModel: setPickedModel,
     mode,
