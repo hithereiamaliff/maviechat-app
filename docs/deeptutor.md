@@ -69,14 +69,30 @@ DeepTutor is a **spec only**, like Open WebUI and Conduit (see `AGENTS.md`). Rea
 | Open WebUI → DeepTutor | Render the shown branch as Markdown and add it to the "From MavieChat" notebook (`POST /api/notebooks`, `POST /api/notebooks/actions/add-record`, `record_type: "chat"`). Reference that notebook in any DeepTutor chat. |
 | Everything else | DeepTutor's own web UI in a web view, signed in. |
 
+## Spike results (1.7.1, `npm run probe:deeptutor` ✓)
+
+- **Native sign-in works with a Bearer token.**
+  - `POST /api/auth/login` answers `{ok, user_id, username, role, is_admin, must_change_password}`; the token travels only in `Set-Cookie: dt_token=…; HttpOnly; Max-Age=2592000; Path=/; SameSite=None; Secure`.
+  - `/api/*` through the front end accepts `Authorization: Bearer <token>` or the cookie. Without either: 401.
+  - `GET /api/auth/status` works signed out too (`authenticated: false`), so the app can check a stored sign-in.
+- **Web pages want the cookie.** `/chat` with only a Bearer header redirects to `/login?next=%2Fchat` (a relative redirect, so the proxy setup is fine); with the cookie it answers 200.
+  - Plan for the web view: native sign-in leaves `dt_token` in iOS's shared cookie store, which `react-native-webview` can share (`sharedCookiesEnabled`).
+  - Fallback if that fails on the phone: open `/login` (outside the sign-in gate), set a `dt_token` cookie from the stored token, then go to `/chat`.
+  - DeepTutor's session hand-off isn't usable: it needs private sign-in hosts, which would block password sign-in from the app.
+- **Signing out only clears the cookie.** Tokens are stateless, so a copied token keeps working until it expires. The app must forget its copy.
+- **Notebook records:** always send a `summary`. An empty one makes the server ask its own model for one, which costs tokens and fails while no model is set.
+- **Version:** `GET /api/system/update` (signed in) → `current_version`.
+- **Sessions** list as `{sessions}`, search as `{sessions, total, limit, offset}`, and a session comes with all its messages. The shown branch follows `preferences.selected_branches` (`{parent message id: chosen reply id}`), else the newest reply.
+- Not yet checked: a real session's messages, since the test account has none until a model is configured.
+
 ## M1.5 checklist
 
 | | Item |
 |---|---|
-| [ ] | Spike: native sign-in (cookie store or Bearer); a web view reusing the sign-in; `GET /api/sessions` and a notebook record written from the app. |
+| [~] | Spike: native sign-in (cookie store or Bearer); a web view reusing the sign-in; `GET /api/sessions` and a notebook record written from the app. Done from Node: Bearer sign-in, sessions, notebook record. The web view and the phone's cookie store wait for store build 3 |
 | [ ] | Saved servers and a switcher (Keychain per server; caches kept apart). |
-| [ ] | `packages/deeptutor-protocol`, a DeepTutor contract probe, and fixtures per version. |
-| [ ] | `.ref/deeptutor` pinned at the deployed tag, and the copy check extended to cover it. |
+| [x] | `packages/deeptutor-protocol`, a DeepTutor contract probe (`npm run probe:deeptutor`), and fixtures per version (`tools/contract-probe/fixtures/deeptutor-1.7.1/`). |
+| [x] | `.ref/deeptutor` pinned at the deployed tag (`packages/deeptutor-protocol/src/support.json`), and the copy check extended to cover it. |
 | [ ] | The DeepTutor space: web view plus a native bar (store build 3, `react-native-webview`). |
 | [ ] | "Reference DeepTutor chat" in the Open WebUI + menu. |
 | [ ] | "Send to DeepTutor" in the Open WebUI chat menu (saved chats only). |

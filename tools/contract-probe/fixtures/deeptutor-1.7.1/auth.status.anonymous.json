@@ -1,0 +1,15 @@
+{
+  "shape": {
+    "authenticated": "boolean",
+    "avatar": "string",
+    "enabled": "boolean",
+    "is_admin": "boolean",
+    "learning_policy": "null",
+    "preset": "null",
+    "role": "null",
+    "user_id": "null",
+    "username": "null"
+  },
+  "enabled": true,
+  "authenticated": false
+}

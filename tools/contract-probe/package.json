@@ -2,13 +2,15 @@
   "name": "@maviechat/contract-probe",
   "version": "0.1.0",
   "private": true,
-  "description": "Checks the Open WebUI contract against a live server and records response shapes (never content or secrets).",
+  "description": "Checks the Open WebUI and DeepTutor contracts against live servers and records response shapes (never content or secrets).",
   "type": "module",
   "scripts": {
     "probe": "tsx src/probe.ts",
+    "probe:deeptutor": "tsx src/deeptutor-probe.ts",
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
+    "@maviechat/deeptutor-protocol": "*",
     "@maviechat/owui-protocol": "*"
   }
 }

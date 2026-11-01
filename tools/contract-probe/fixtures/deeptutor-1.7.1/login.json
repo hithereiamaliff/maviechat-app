@@ -1,0 +1,11 @@
+{
+  "shape": {
+    "is_admin": "boolean",
+    "must_change_password": "boolean",
+    "ok": "boolean",
+    "role": "string",
+    "user_id": "string",
+    "username": "string"
+  },
+  "tokenInCookie": true
+}

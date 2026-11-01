@@ -1,0 +1,152 @@
+export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+
+export type QueryValue = string | number | boolean | null | undefined;
+
+export interface DtClientOptions {
+  /** The address of DeepTutor's web front end, e.g. `https://learn.example.com`. The API lives behind it. */
+  baseUrl: string;
+  /** The sign-in token, sent as `Authorization: Bearer`. Without one, the platform's cookie store carries the sign-in. */
+  token?: string | null;
+  fetch?: FetchLike;
+  timeoutMs?: number;
+}
+
+export interface DtRequestOptions {
+  query?: Record<string, QueryValue>;
+  body?: unknown;
+  signal?: AbortSignal;
+}
+
+/** DeepTutor answered with an error status. `detail` is its message when it sent one. */
+export class DtHttpError extends Error {
+  readonly status: number;
+  readonly detail: string | undefined;
+  readonly path: string;
+
+  constructor(status: number, detail: string | undefined, path: string) {
+    super(detail ? `${detail} (HTTP ${status})` : `HTTP ${status} from ${path}`);
+    this.name = 'DtHttpError';
+    this.status = status;
+    this.detail = detail;
+    this.path = path;
+  }
+
+  /** The sign-in is missing or no longer accepted. */
+  get isUnauthorized(): boolean {
+    return this.status === 401;
+  }
+}
+
+/** No HTTP answer at all: offline, DNS, TLS, timeout or abort. */
+export class DtNetworkError extends Error {
+  readonly path: string;
+  readonly timedOut: boolean;
+
+  constructor(path: string, cause: unknown, timedOut: boolean) {
+    super(timedOut ? `Timed out waiting for ${path}` : `Could not reach DeepTutor (${cause instanceof Error ? cause.message : String(cause)})`);
+    this.name = 'DtNetworkError';
+    this.path = path;
+    this.timedOut = timedOut;
+  }
+}
+
+/** Accepts an address as typed (spaces, trailing slashes) and checks it is http(s). */
+export function normalizeDtUrl(input: string): string {
+  const address = input.trim().replace(/\/+$/, '');
+  if (!/^https?:\/\/[^/\s]+/i.test(address)) throw new Error('Enter the DeepTutor address starting with https:// or http://');
+  return address;
+}
+
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+/** A small JSON client for DeepTutor's REST API, reached through its web front end. */
+export class DtClient {
+  readonly baseUrl: string;
+  readonly token: string | null;
+  private readonly options: DtClientOptions;
+  private readonly fetchImpl: FetchLike;
+
+  constructor(options: DtClientOptions) {
+    this.options = options;
+    this.baseUrl = normalizeDtUrl(options.baseUrl);
+    this.token = options.token ?? null;
+    this.fetchImpl = options.fetch ?? ((input, init) => fetch(input, init));
+  }
+
+  withToken(token: string | null): DtClient {
+    return new DtClient({ ...this.options, token });
+  }
+
+  url(path: string, query?: Record<string, QueryValue>): string {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query ?? {})) {
+      if (value !== undefined && value !== null) params.set(key, String(value));
+    }
+    const search = params.toString();
+    return `${this.baseUrl}${path.startsWith('/') ? path : `/${path}`}${search ? `?${search}` : ''}`;
+  }
+
+  async get<T>(path: string, options?: Omit<DtRequestOptions, 'body'>): Promise<T> {
+    return (await this.send<T>('GET', path, options)).data;
+  }
+
+  async post<T>(path: string, body?: unknown, options?: Omit<DtRequestOptions, 'body'>): Promise<T> {
+    return (await this.send<T>('POST', path, { ...options, body })).data;
+  }
+
+  async delete<T>(path: string, options?: Omit<DtRequestOptions, 'body'>): Promise<T> {
+    return (await this.send<T>('DELETE', path, options)).data;
+  }
+
+  /** Sends a request and keeps the response headers (sign-in reads its cookie from them). */
+  async send<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, options: DtRequestOptions = {}): Promise<{ data: T; headers: Headers }> {
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (this.token) headers.Authorization = `Bearer ${this.token}`;
+    let body: string | undefined;
+    if (options.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify(options.body);
+    }
+
+    const controller = new AbortController();
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    const forwardAbort = () => controller.abort();
+    options.signal?.addEventListener('abort', forwardAbort);
+
+    let response: Response;
+    try {
+      response = await this.fetchImpl(this.url(path, options.query), { method, headers, body, signal: controller.signal });
+    } catch (error) {
+      throw new DtNetworkError(path, error, timedOut);
+    } finally {
+      clearTimeout(timer);
+      options.signal?.removeEventListener('abort', forwardAbort);
+    }
+
+    const text = await response.text();
+    let data: unknown;
+    try {
+      data = text ? JSON.parse(text) : undefined;
+    } catch {
+      data = text;
+    }
+    if (!response.ok) throw new DtHttpError(response.status, detailOf(data), path);
+    return { data: data as T, headers: response.headers };
+  }
+}
+
+/** FastAPI errors: `{detail: "text"}`, or `{detail: [{msg}]}` when the input was invalid. */
+function detailOf(data: unknown): string | undefined {
+  if (typeof data !== 'object' || data === null || !('detail' in data)) return undefined;
+  const { detail } = data as { detail: unknown };
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail.flatMap((item) => (typeof item === 'object' && item !== null && 'msg' in item ? [String((item as { msg: unknown }).msg)] : []));
+    return messages.length ? messages.join('; ') : undefined;
+  }
+  return undefined;
+}

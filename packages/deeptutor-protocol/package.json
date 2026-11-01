@@ -1,0 +1,12 @@
+{
+  "name": "@maviechat/deeptutor-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DeepTutor client protocol for MavieChat: sign-in, sessions and notebooks. Plain TypeScript that runs in React Native and in Node.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  }
+}

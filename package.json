@@ -16,6 +16,7 @@
     "check": "npm run typecheck && npm run lint && npm test && npm run check:licenses && npm run check:copies",
     "bundle": "npm run bundle --workspace @maviechat/mobile",
     "probe": "npm run probe --workspace @maviechat/contract-probe --",
+    "probe:deeptutor": "npm run probe:deeptutor --workspace @maviechat/contract-probe --",
     "ref:sync": "bash scripts/ref-sync.sh",
     "icons": "node scripts/gen-icons.mjs",
     "licenses": "node scripts/check-licenses.mjs --write"

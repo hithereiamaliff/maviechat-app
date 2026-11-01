@@ -1,0 +1,39 @@
+{
+  "shape": {
+    "color": "string",
+    "created_at": "number",
+    "description": "string",
+    "icon": "string",
+    "id": "string",
+    "name": "string",
+    "records": [
+      {
+        "created_at": "number",
+        "id": "string",
+        "kb_name": "null",
+        "metadata": {
+          "source": "string"
+        },
+        "output": "string",
+        "summary": "string",
+        "title": "string",
+        "type": "string",
+        "user_query": "string"
+      }
+    ],
+    "updated_at": "number"
+  },
+  "record": {
+    "created_at": "number",
+    "id": "string",
+    "kb_name": "null",
+    "metadata": {
+      "source": "string"
+    },
+    "output": "string",
+    "summary": "string",
+    "title": "string",
+    "type": "string",
+    "user_query": "string"
+  }
+}

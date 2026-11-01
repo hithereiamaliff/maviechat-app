@@ -1,17 +1,34 @@
-// Clean-room guard: fails when our source shares a copied passage with the pinned
-// Open WebUI reference checkout (.ref/open-webui, made by `npm run ref:sync`).
-// Clones inside Open WebUI itself are ignored; only ours ↔ theirs pairs count.
+// Clean-room guard: fails when our source shares a copied passage with a pinned
+// reference checkout (.ref/open-webui and .ref/deeptutor, made by `npm run ref:sync`).
+// Clones inside a reference itself are ignored; only ours ↔ theirs pairs count.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
 const root = path.resolve(import.meta.dirname, '..');
 const refRoot = path.join(root, '.ref');
-const reference = path.join(refRoot, 'open-webui', 'src');
-const tag = JSON.parse(readFileSync(path.join(root, 'packages/owui-protocol/src/support.json'), 'utf8')).referenceTag;
+const tagOf = (support) => JSON.parse(readFileSync(path.join(root, support), 'utf8')).referenceTag;
 
-if (!existsSync(reference)) {
-  const message = 'No Open WebUI reference checkout: run `npm run ref:sync` first.';
+const references = [
+  {
+    name: 'Open WebUI',
+    dir: path.join(refRoot, 'open-webui'),
+    code: path.join(refRoot, 'open-webui', 'src'),
+    tag: tagOf('packages/owui-protocol/src/support.json'),
+    spec: 'docs/protocol.md',
+  },
+  {
+    name: 'DeepTutor',
+    dir: path.join(refRoot, 'deeptutor'),
+    code: path.join(refRoot, 'deeptutor', 'web'),
+    tag: tagOf('packages/deeptutor-protocol/src/support.json'),
+    spec: 'docs/deeptutor.md',
+  },
+];
+
+const missing = references.filter((reference) => !existsSync(reference.code));
+if (missing.length > 0) {
+  const message = `No ${missing.map((reference) => reference.name).join(' or ')} reference checkout: run \`npm run ref:sync\` first.`;
   if (process.env.CI) {
     console.error(`✗ ${message}`);
     process.exit(1);
@@ -32,23 +49,24 @@ const output = path.join(root, '.jscpd-report');
 rmSync(output, { recursive: true, force: true });
 execFileSync(
   path.join(root, 'node_modules/.bin/jscpd'),
-  [...ours, reference, '--min-tokens', '50', '--reporters', 'json', '--output', output, '--absolute', '--silent'],
+  [...ours, ...references.map((reference) => reference.code), '--min-tokens', '50', '--reporters', 'json', '--output', output, '--absolute', '--silent'],
   { cwd: root, stdio: ['ignore', 'ignore', 'inherit'] },
 );
 
 const report = JSON.parse(readFileSync(path.join(output, 'jscpd-report.json'), 'utf8'));
-const inReference = (file) => file.startsWith(refRoot + path.sep);
-const shared = report.duplicates.filter((dup) => inReference(dup.firstFile.name) !== inReference(dup.secondFile.name));
+const referenceOf = (file) => references.find((reference) => file.startsWith(reference.dir + path.sep));
+const shared = report.duplicates.filter((dup) => Boolean(referenceOf(dup.firstFile.name)) !== Boolean(referenceOf(dup.secondFile.name)));
 
 if (shared.length > 0) {
   for (const dup of shared) {
-    const [mine, theirs] = inReference(dup.firstFile.name) ? [dup.secondFile, dup.firstFile] : [dup.firstFile, dup.secondFile];
+    const [mine, theirs] = referenceOf(dup.firstFile.name) ? [dup.secondFile, dup.firstFile] : [dup.firstFile, dup.secondFile];
+    const reference = referenceOf(theirs.name);
     console.error(
-      `✗ ${path.relative(root, mine.name)}:${mine.start} matches ${path.relative(root, theirs.name)}:${theirs.start} (${dup.lines} lines)`,
+      `✗ ${path.relative(root, mine.name)}:${mine.start} matches ${path.relative(root, theirs.name)}:${theirs.start} (${dup.lines} lines, ${reference?.name})`,
     );
   }
-  console.error(`✗ ${shared.length} passage(s) match Open WebUI ${tag}. Rewrite them from the spec (docs/protocol.md) instead of copying.`);
+  console.error(`✗ ${shared.length} passage(s) match a reference checkout. Rewrite them from the spec (docs/protocol.md, docs/deeptutor.md) instead of copying.`);
   process.exit(1);
 }
 
-console.log(`✓ no passages shared with Open WebUI ${tag}`);
+console.log(`✓ no passages shared with ${references.map((reference) => `${reference.name} ${reference.tag}`).join(' or ')}`);
