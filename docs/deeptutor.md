@@ -99,7 +99,10 @@ Chats in other modes (Solve, Quiz, Research, Visualize…) open read-only with *
 
 ### Protocol facts (1.7.1, checked with `npm run probe:deeptutor -- --turn`)
 
-- **Signing in on the socket:** `/ws` takes the `dt_token` cookie (or `?token=`, which would put the token in logs). The app sends a `Cookie` header: React Native's WebSocket takes headers as a third argument, and Node 22's built-in WebSocket as `{headers}`. A refused sign-in closes with code 4001.
+- **Signing in on the socket:** `/ws` takes the `dt_token` cookie or `?token=`. Don't use `?token=`: DeepTutor's log records socket query strings. A refused sign-in fails the handshake (uvicorn answers 403; DeepTutor's own close code is 4001).
+  - **iOS quirk (found on the phone, 2026-11-01):** React Native's iOS WebSocket first adds the cookies iOS holds for the site (the `dt_token` saved at sign-in) and then *appends* a `Cookie` header given in its options after a comma. A plain `dt_token=…` header therefore arrived as `dt_token=A,dt_token=B`, one unreadable value, and every socket got 403.
+  - The fix, `socketCookieHeader()`, sends `maviechat=1; dt_token=…`. Our `dt_token` then sits in a pair of its own at the end, and DeepTutor (Starlette) keeps the last value of a repeated cookie. Checked locally and through the public address with a stored cookie, none, and a stale one.
+  - Node 22's built-in WebSocket takes `{headers}`; the probe sends the same header.
 - **A Chat-mode turn**, in order:
   1. `session` (seq 1, names the session and turn);
   2. `stage_start` (`responding`);
@@ -119,7 +122,7 @@ Chats in other modes (Solve, Quiz, Research, Visualize…) open read-only with *
 | | Item |
 |---|---|
 | [~] | Spike: native sign-in (cookie store or Bearer); a web view reusing the sign-in; `GET /api/sessions` and a notebook record written from the app. Done from Node: Bearer sign-in, sessions, notebook record. The web view and the phone's cookie store wait for store build 3 |
-| [~] | Saved servers and a switcher (Keychain per server; caches kept apart). Done: an Open WebUI and a DeepTutor sign-in side by side, each in the Keychain, with DeepTutor's data cached under its own keys. Switch to (or Connect) DeepTutor sits in the account menu, Switch to Open WebUI in the DeepTutor bar, and a launch returns to the space used last. A longer list (several Open WebUI servers) comes with M4's scratch instance |
+| [~] | Saved servers and a switcher (Keychain per server; caches kept apart). Done: an Open WebUI and a DeepTutor sign-in side by side, each in the Keychain, with DeepTutor's data cached under its own keys. The switch button sits at the top left in both spaces (beside the sidebar button in Open WebUI, beside Back on DeepTutor's inner screens), and Connect DeepTutor is in the account menu. Each space records itself while it shows, and a launch opens straight into the last one (read before the first frame, so Open WebUI doesn't flash first; a launch from a notification goes to its chat). A longer list (several Open WebUI servers) comes with M4's scratch instance |
 | [x] | `packages/deeptutor-protocol`, a DeepTutor contract probe (`npm run probe:deeptutor`), and fixtures per version (`tools/contract-probe/fixtures/deeptutor-1.7.1/`). |
 | [x] | `.ref/deeptutor` pinned at the deployed tag (`packages/deeptutor-protocol/src/support.json`), and the copy check extended to cover it. |
 | [~] | The DeepTutor space: web view plus a native bar (store build 3, `react-native-webview`). Built with react-native-webview 14.0.1: DeepTutor's `/chat` under a slim bar (Switch to Open WebUI; menu: Chats for Open WebUI, Reload, Open in Browser, Sign out). The sign-in comes from iOS's shared cookie store (native requests use `credentials: 'include'`); if the web view still lands on `/login`, it sets the cookie from the stored token once per visit. Links to other sites open in the browser, swipe goes back, and the app now declares the microphone for DeepTutor's voice features. Not yet tried on a phone |

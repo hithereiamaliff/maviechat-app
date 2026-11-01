@@ -9,6 +9,7 @@ import { useDtLive } from '@/features/deeptutor/chat/DtLiveProvider';
 import { DtUserBubble } from '@/features/deeptutor/chat/DtReplyView';
 import { useDtChoice } from '@/features/deeptutor/chat/useDtChoice';
 import { SpaceHeader } from '@/features/deeptutor/SpaceHeader';
+import { SwitchToOpenWebUIButton } from '@/features/deeptutor/SpaceSwitch';
 import { describeError } from '@/lib/errors';
 import { useDtAuthed } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
@@ -41,7 +42,12 @@ export default function DeepTutorNewChat() {
   return (
     <View style={styles.screen}>
       <SpaceHeader
-        leading={<IconButton icon="chevron-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/learn'))} />}
+        leading={
+          <>
+            <IconButton icon="chevron-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/learn'))} />
+            <SwitchToOpenWebUIButton />
+          </>
+        }
         title="New chat"
         subtitle={session.account.username}
       />

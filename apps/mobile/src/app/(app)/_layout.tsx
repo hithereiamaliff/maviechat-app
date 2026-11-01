@@ -1,12 +1,15 @@
 import { Redirect, Stack, usePathname } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { Drawer } from 'react-native-drawer-layout';
+import { useLaunchTarget } from '@/features/deeptutor/launch';
 import { LiveProvider } from '@/features/live/LiveProvider';
 import { PushSetup } from '@/features/notifications/PushSetup';
 import { Sidebar } from '@/features/sidebar/Sidebar';
 import { SidebarContext } from '@/features/sidebar/SidebarContext';
+import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
+import { saveSpace } from '@/session/storage';
 import { SIDEBAR_WIDTH, usePalette } from '@/theme';
 
 /** Signed-in area: the web app's phone layout, with the sidebar as an overlay you can swipe open from anywhere. */
@@ -18,7 +21,16 @@ export default function AppLayout() {
   const [open, setOpen] = useState(false);
   const controls = useMemo(() => ({ isOpen: open, open: () => setOpen(true), close: () => setOpen(false) }), [open]);
   const currentChatId = pathname.startsWith('/c/') ? decodeURIComponent(pathname.slice(3)) : null;
+  const launch = useLaunchTarget(useDeepTutor().state.status);
+  const showing = launch === 'here' && state.status === 'signed-in';
 
+  // The app reopens in the space you were in, however you got here.
+  useEffect(() => {
+    if (showing) void saveSpace('owui');
+  }, [showing]);
+
+  if (launch === 'pending') return null;
+  if (launch === 'deeptutor') return <Redirect href="/learn" />;
   if (state.status === 'loading') return null;
   if (state.status !== 'signed-in') return <Redirect href="/login" />;
 

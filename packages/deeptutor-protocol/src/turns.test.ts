@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyTurnEvent, emptyReply, replyFromEvents, replySegments, savedReply, toolSummary } from './turnReply';
-import { parseServerEvent, resumeTurnCommand, startTurnCommand, turnSocketUrl, type DtStreamEvent } from './turns';
+import { parseServerEvent, resumeTurnCommand, socketCookieHeader, startTurnCommand, turnSocketUrl, type DtStreamEvent } from './turns';
 
 const turn = 'turn_1';
 const session = 'unified_1';
@@ -67,6 +67,28 @@ describe('turn protocol frames', () => {
     expect(resumeTurnCommand('t', 4.7)).toEqual({ protocol_version: '2.0', type: 'resume_from', turn_id: 't', seq: 4 });
     expect(turnSocketUrl('https://learn.example.com/')).toBe('wss://learn.example.com/ws');
     expect(turnSocketUrl('http://127.0.0.1:3782')).toBe('ws://127.0.0.1:3782/ws');
+  });
+});
+
+/** How DeepTutor's server (Starlette) reads a Cookie header: split on ";", the last value of a name wins. */
+function serverCookies(header: string): Record<string, string> {
+  const cookies: Record<string, string> = {};
+  for (const chunk of header.split(';')) {
+    const [key = '', ...rest] = chunk.split('=');
+    if (key.trim() || rest.length) cookies[key.trim()] = rest.join('=').trim();
+  }
+  return cookies;
+}
+
+describe('signing a socket in', () => {
+  it('survives iOS appending our cookie to the ones it holds', () => {
+    const ours = socketCookieHeader('tok.en');
+    // iOS joins its stored cookies and ours with a comma.
+    expect(serverCookies(`dt_token=old.tok,${ours}`).dt_token).toBe('tok.en');
+    expect(serverCookies(`other=1; dt_token=tok.en,${ours}`).dt_token).toBe('tok.en');
+    expect(serverCookies(ours).dt_token).toBe('tok.en');
+    // What a plain cookie turned into on the phone:
+    expect(serverCookies('dt_token=tok.en,dt_token=tok.en').dt_token).not.toBe('tok.en');
   });
 });
 

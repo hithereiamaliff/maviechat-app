@@ -24,6 +24,7 @@ import {
   emptyReply,
   savedReply,
   shownMessages,
+  socketCookieHeader,
   turnSocketUrl,
   type DtReply,
   type DtStreamEvent,
@@ -228,7 +229,7 @@ async function probeTurn(baseUrl: string, token: string, client: DtClient) {
     url: turnSocketUrl(baseUrl),
     connect: (url, handlers) => {
       sockets += 1;
-      const current = new NodeWebSocket(url, { headers: { Cookie: `${TOKEN_COOKIE}=${token}` } });
+      const current = new NodeWebSocket(url, { headers: { Cookie: socketCookieHeader(token) } });
       socket = current;
       current.onopen = () => handlers.onOpen();
       current.onmessage = (event) => handlers.onMessage(event.data);

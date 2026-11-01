@@ -5,6 +5,7 @@ import { MenuButton } from '@/components/Menu';
 import { hostOf } from '@/features/deeptutor/crossReference';
 import { SessionList } from '@/features/deeptutor/SessionList';
 import { SpaceHeader } from '@/features/deeptutor/SpaceHeader';
+import { SwitchToOpenWebUIButton } from '@/features/deeptutor/SpaceSwitch';
 import { switchToOpenWebUI } from '@/features/deeptutor/switch';
 import { useDeepTutor, useDtAuthed } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
@@ -33,7 +34,7 @@ export default function DeepTutorHome() {
   return (
     <View style={styles.screen}>
       <SpaceHeader
-        leading={owuiSignedIn ? <IconButton icon="arrows-right-left" label="Switch to Open WebUI" onPress={switchToOpenWebUI} /> : null}
+        leading={<SwitchToOpenWebUIButton />}
         title="DeepTutor"
         subtitle={`${session.account.username} · ${hostOf(session.baseUrl)}`}
         trailing={

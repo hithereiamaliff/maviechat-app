@@ -9,6 +9,7 @@ import { IconButton } from '@/components/IconButton';
 import { MenuButton } from '@/components/Menu';
 import { hostOf } from '@/features/deeptutor/crossReference';
 import { SpaceHeader } from '@/features/deeptutor/SpaceHeader';
+import { SwitchToOpenWebUIButton } from '@/features/deeptutor/SpaceSwitch';
 import { switchToOpenWebUI } from '@/features/deeptutor/switch';
 import { isLoginPage, SIGN_OUT_SCRIPT, signInScript } from '@/features/deeptutor/webSignIn';
 import { useDeepTutor, useDtAuthed } from '@/session/DeepTutorProvider';
@@ -80,7 +81,12 @@ export default function DeepTutorWeb() {
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
       <SpaceHeader
-        leading={<IconButton icon="chevron-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/learn'))} />}
+        leading={
+          <>
+            <IconButton icon="chevron-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/learn'))} />
+            <SwitchToOpenWebUIButton />
+          </>
+        }
         title="DeepTutor web app"
         subtitle={`${session.account.username} · ${hostOf(session.baseUrl)}`}
         trailing={

@@ -20,9 +20,12 @@ import {
 export interface DtSocketHandlers {
   onOpen(): void;
   onMessage(data: unknown): void;
-  /** `code` 4001: DeepTutor refused the sign-in. */
+  /** `code` 4001: DeepTutor refused the sign-in (a socket refused with HTTP 401/403 counts too). */
   onClose(code: number | undefined): void;
 }
+
+/** DeepTutor's close code for a refused sign-in. */
+export const SOCKET_AUTH_FAILED = 4001;
 
 export interface DtSocketHandle {
   send(data: string): void;
@@ -92,7 +95,6 @@ function isBusy(error: DtProtocolError): boolean {
   return /active or recovering turn|_busy\b/i.test(error.message) || error.error_code.endsWith('_busy');
 }
 
-const SOCKET_AUTH_FAILED = 4001;
 const defaultTimers: DtTimers = {
   set: (run, ms) => setTimeout(run, ms),
   clear: (handle) => {
@@ -140,6 +142,7 @@ export class DtTurnConnection {
 
   /** Starts a turn. Resolves when the server names its session and turn (for a new chat, the new session). */
   startTurn(request: DtTurnRequest): Promise<{ sessionId: string; turnId: string }> {
+    if (this.state === 'signed-out') return Promise.reject(new DtSocketAuthError());
     const command = startTurnCommand({ ...request, clientSubmissionId: request.clientSubmissionId ?? randomId() });
     return new Promise((resolve, reject) => {
       const pending: PendingStart = {

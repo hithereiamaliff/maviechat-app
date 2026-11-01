@@ -17,6 +17,7 @@ import { useDtChoice } from '@/features/deeptutor/chat/useDtChoice';
 import { deepTutorAttachment } from '@/features/deeptutor/crossReference';
 import { sessionDate, useDtSession } from '@/features/deeptutor/queries';
 import { SpaceHeader } from '@/features/deeptutor/SpaceHeader';
+import { SwitchToOpenWebUIButton } from '@/features/deeptutor/SpaceSwitch';
 import { switchToOpenWebUI } from '@/features/deeptutor/switch';
 import { describeError } from '@/lib/errors';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
@@ -143,7 +144,12 @@ export default function DeepTutorChat() {
   return (
     <View style={styles.screen}>
       <SpaceHeader
-        leading={<IconButton icon="chevron-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/learn'))} />}
+        leading={
+          <>
+            <IconButton icon="chevron-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/learn'))} />
+            <SwitchToOpenWebUIButton />
+          </>
+        }
         title={detail.data ? sessionTitle(detail.data) : turn?.prompt ? sessionTitle({ title: '', last_message: turn.prompt }) : 'DeepTutor chat'}
         subtitle={[sessionDate(detail.data?.updated_at ?? detail.data?.created_at), native ? null : capabilityName(capability)].filter(Boolean).join(' · ')}
         trailing={

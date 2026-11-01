@@ -245,6 +245,18 @@ export function pingCommand(): DtCommand {
   return { protocol_version: TURN_PROTOCOL_VERSION, type: 'ping' };
 }
 
+/**
+ * The `Cookie` header that signs a socket in. iOS adds the cookies it already holds for the
+ * site (the `dt_token` from signing in) and then appends ours after a comma, so a plain
+ * `dt_token=…` arrives as `dt_token=A,dt_token=B`, one unreadable value. Starting ours with a
+ * throwaway pair puts our `dt_token` in a pair of its own at the end, and DeepTutor (Starlette)
+ * keeps the last value of a repeated cookie. The token never goes in the URL: DeepTutor's log
+ * records socket query strings.
+ */
+export function socketCookieHeader(token: string): string {
+  return `maviechat=1; dt_token=${token}`;
+}
+
 /** The `/ws` address behind a DeepTutor web address. */
 export function turnSocketUrl(baseUrl: string): string {
   return `${baseUrl.replace(/\/+$/, '').replace(/^http/i, 'ws')}/ws`;

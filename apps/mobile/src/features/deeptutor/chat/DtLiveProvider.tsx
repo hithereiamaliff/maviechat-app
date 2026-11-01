@@ -1,7 +1,8 @@
 import {
   DtTurnConnection,
   getAuthStatus,
-  TOKEN_COOKIE,
+  SOCKET_AUTH_FAILED,
+  socketCookieHeader,
   turnSocketUrl,
   type DtConnectionState,
   type DtTurnRequest,
@@ -53,10 +54,19 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
     return new DtTurnConnection({
       url: turnSocketUrl(baseUrl),
       connect: (url, handlers) => {
-        const socket = new SocketWithHeaders(url, undefined, { headers: { Cookie: `${TOKEN_COOKIE}=${token}` } });
-        socket.onopen = () => handlers.onOpen();
+        const socket = new SocketWithHeaders(url, undefined, { headers: { Cookie: socketCookieHeader(token) } });
+        let opened = false;
+        let refused = false;
+        socket.onopen = () => {
+          opened = true;
+          handlers.onOpen();
+        };
         socket.onmessage = (event) => handlers.onMessage(event.data);
-        socket.onclose = (event) => handlers.onClose(event.code);
+        // A refused sign-in fails the handshake (HTTP 401/403) before the socket opens.
+        socket.onerror = (event) => {
+          if (!opened && /\b40[13]\b/.test(String((event as { message?: unknown }).message ?? ''))) refused = true;
+        };
+        socket.onclose = (event) => handlers.onClose(refused ? SOCKET_AUTH_FAILED : event.code);
         return { send: (data) => socket.send(data), close: () => socket.close() };
       },
       onEvent: (event) => {

@@ -14,7 +14,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider } from '@/components/Toast';
-import { LaunchSpace } from '@/features/deeptutor/LaunchSpace';
+import { prepareLaunchSpace } from '@/features/deeptutor/launch';
 import { NotificationRoot } from '@/features/notifications/NotificationRoot';
 import { UpdatePrompt } from '@/features/updates/UpdatePrompt';
 import { DeepTutorProvider } from '@/session/DeepTutorProvider';
@@ -45,7 +45,8 @@ export default function RootLayout() {
   // The saved theme is applied before the first frame, so a dark-theme user never sees a light flash.
   const [themeReady, setThemeReady] = useState(false);
   useEffect(() => {
-    void loadThemePreference().finally(() => setThemeReady(true));
+    // The space open last is read now too, so a launch opens straight into it.
+    void Promise.all([loadThemePreference(), prepareLaunchSpace()]).finally(() => setThemeReady(true));
   }, []);
 
   if (!fontsLoaded || !themeReady) return null;
@@ -60,7 +61,6 @@ export default function RootLayout() {
                 <DeepTutorProvider>
                   <StatusBar style="auto" />
                   <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.background } }} />
-                  <LaunchSpace />
                   <NotificationRoot />
                   <UpdatePrompt />
                 </DeepTutorProvider>
