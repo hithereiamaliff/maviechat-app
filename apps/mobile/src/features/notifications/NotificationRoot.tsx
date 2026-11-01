@@ -8,7 +8,7 @@ import { shouldPresent } from './presence';
 // While the app is open: a banner only when the app won't announce the reply itself.
 Notifications.setNotificationHandler({
   handleNotification: async (notification) => {
-    const show = shouldPresent((notification.request.content.data as { chatId?: unknown } | null)?.chatId);
+    const show = shouldPresent(notification.request.content.data as { chatId?: unknown; kind?: unknown } | null);
     return { shouldShowBanner: show, shouldShowList: show, shouldPlaySound: show, shouldSetBadge: false };
   },
 });

@@ -10,8 +10,12 @@ export function setPresence(next: { viewingChatId?: string | null; liveConnected
   if (next.liveConnected !== undefined) liveConnected = next.liveConnected;
 }
 
-/** Show a banner unless you're looking at that chat, or the app will announce it in its own notice. */
-export function shouldPresent(chatId: unknown): boolean {
-  if (typeof chatId === 'string' && chatId === viewingChatId) return false;
+/**
+ * Show a banner unless you're looking at that chat, or the app will announce it in its own
+ * notice. A test notification always shows: it is sent while you're in the app.
+ */
+export function shouldPresent(data: { chatId?: unknown; kind?: unknown } | null | undefined): boolean {
+  if (data?.kind === 'test') return true;
+  if (typeof data?.chatId === 'string' && data.chatId === viewingChatId) return false;
   return !liveConnected;
 }
