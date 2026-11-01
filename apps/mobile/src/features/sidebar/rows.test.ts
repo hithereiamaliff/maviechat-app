@@ -84,6 +84,9 @@ describe('isUnread', () => {
   it('compares the last update with the last read time', () => {
     expect(isUnread(chat('a', 200, { last_read_at: 100 }))).toBe(true);
     expect(isUnread(chat('a', 100, { last_read_at: 200 }))).toBe(false);
-    expect(isUnread(chat('a', 100))).toBe(false);
+    // Never read, or marked unread (read time 0), as on the web.
+    expect(isUnread(chat('a', 100))).toBe(true);
+    expect(isUnread(chat('a', 100, { last_read_at: 0 }))).toBe(true);
+    expect(isUnread(chat('a', 200, { last_read_at: 100, active: true }))).toBe(false);
   });
 });

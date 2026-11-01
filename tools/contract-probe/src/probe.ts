@@ -34,6 +34,7 @@ import { shapeOf } from './shape';
 import { summarizeTree } from './tree-summary';
 import { probeSend } from './send-probe';
 import { probeSlice3 } from './slice3-probe';
+import { probeSlice4 } from './slice4-probe';
 import { probeChatActions } from './write-probe';
 
 const { values: args } = parseArgs({
@@ -220,6 +221,18 @@ async function main() {
           });
           for (const result of slice3.steps) results.push({ ...result, name: `slice 3: ${result.name}` });
           fixtures['write.slice3'] = slice3.fixture;
+
+          const slice4 = await probeSlice4({
+            client,
+            baseUrl,
+            token: session.token,
+            userId: session.id,
+            capabilities,
+            canDelete,
+            modelId: env.OWUI_PROBE_MODEL,
+          });
+          for (const result of slice4.steps) results.push({ ...result, name: `slice 4: ${result.name}` });
+          fixtures['write.slice4'] = slice4.fixture;
         }
       }
 

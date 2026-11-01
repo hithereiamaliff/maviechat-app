@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -14,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider } from '@/components/Toast';
 import { SessionProvider } from '@/session/SessionProvider';
 import { usePalette } from '@/theme';
+import { loadThemePreference } from '@/theme/preference';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,7 +36,13 @@ export default function RootLayout() {
     JetBrainsMono_400Regular,
   });
 
-  if (!fontsLoaded) return null;
+  // The saved theme is applied before the first frame, so a dark-theme user never sees a light flash.
+  const [themeReady, setThemeReady] = useState(false);
+  useEffect(() => {
+    void loadThemePreference().finally(() => setThemeReady(true));
+  }, []);
+
+  if (!fontsLoaded || !themeReady) return null;
 
   return (
     <GestureHandlerRootView style={styles.root}>

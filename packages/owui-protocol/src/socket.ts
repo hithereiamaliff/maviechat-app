@@ -52,6 +52,11 @@ export interface SocketSession {
    * server waits for an answer (confirmation, input, execute, …) and must then be called.
    */
   onChatEvent(listener: (event: ChatEventEnvelope, reply?: (response: unknown) => void) => void): () => void;
+  /**
+   * Tells the server you've read a chat (the sidebar's unread dot, here and on the web).
+   * Sent once the socket has joined; until then the latest requests wait.
+   */
+  markRead(chatId: string): void;
   close(): void;
 }
 
@@ -114,6 +119,13 @@ export function openSocketSession(options: SocketSessionOptions): SocketSession 
     }, seconds * 1000);
   };
 
+  // The server ignores events from a socket that hasn't joined yet, so reads wait for the join.
+  const unsentReads = new Set<string>();
+  const flushReads = () => {
+    for (const chatId of unsentReads) socket.emit('events:chat', { chat_id: chatId, data: { type: 'last_read_at' } });
+    unsentReads.clear();
+  };
+
   const join = () => {
     socket
       .timeout(options.joinTimeoutMs ?? 10_000)
@@ -133,6 +145,7 @@ export function openSocketSession(options: SocketSessionOptions): SocketSession 
           return;
         }
         setStatus('joined');
+        flushReads();
         if (!settled) {
           settled = true;
           resolveJoined(ack);
@@ -190,6 +203,11 @@ export function openSocketSession(options: SocketSessionOptions): SocketSession 
     onChatEvent(listener) {
       chatListeners.add(listener);
       return () => chatListeners.delete(listener);
+    },
+    markRead(chatId) {
+      if (closed) return;
+      unsentReads.add(chatId);
+      if (status === 'joined' && socket.connected) flushReads();
     },
     close,
   };

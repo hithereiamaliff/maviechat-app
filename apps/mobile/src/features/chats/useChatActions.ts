@@ -1,4 +1,20 @@
-import { deleteChat, OwuiHttpError, renameChat, toggleArchived, togglePinned } from '@maviechat/owui-protocol';
+import {
+  branchPath,
+  deleteChat,
+  generateTitle,
+  getChat,
+  initialLeaf,
+  markChatUnread,
+  moveChatToFolder,
+  OwuiHttpError,
+  renameChat,
+  titleMessages,
+  titleModel,
+  toggleArchived,
+  togglePinned,
+  unarchiveAllChats,
+  type ChatRecord,
+} from '@maviechat/owui-protocol';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert, Platform } from 'react-native';
 import { useToast } from '@/components/Toast';
@@ -10,7 +26,7 @@ export interface ChatRef {
   title: string;
 }
 
-/** Rename, pin, archive and delete a chat; shared by the sidebar rows and the chat menu. */
+/** The chat menu's actions (rename and generate, unread, pin, move, archive, delete); shared by the sidebar rows and the chat screen. */
 export function useChatActions() {
   const { client } = useAuthed();
   const { verifySession } = useSession();
@@ -21,6 +37,8 @@ export function useChatActions() {
   const refresh = (id: string) => {
     void queryClient.invalidateQueries({ queryKey: ['chats'] });
     void queryClient.invalidateQueries({ queryKey: ['folder-chats'] });
+    void queryClient.invalidateQueries({ queryKey: ['folders'] });
+    void queryClient.invalidateQueries({ queryKey: ['archived'] });
     void queryClient.invalidateQueries({ queryKey: ['chat', id] });
   };
 
@@ -37,6 +55,25 @@ export function useChatActions() {
     }
   };
 
+  // As the web's Generate: the shown branch's text, sent to the model that answered last.
+  const generateFor = async (chat: ChatRef) => {
+    try {
+      const record = queryClient.getQueryData<ChatRecord>(['chat', chat.id]) ?? (await getChat(client, chat.id));
+      const history = record.chat?.history ?? { messages: {}, currentId: null };
+      const branch = branchPath(history, initialLeaf(history, record.current_message_id));
+      const model = titleModel(branch, record.chat?.models);
+      if (!model || branch.length === 0) {
+        toast('This chat has nothing to title yet.', 'error');
+        return;
+      }
+      const title = await generateTitle(client, { model, messages: titleMessages(branch), chatId: chat.id });
+      if (title !== chat.title) await run('rename', chat.id, () => renameChat(client, chat.id, title));
+    } catch (error) {
+      toast(`Couldn't generate a title: ${error instanceof OwuiHttpError ? (error.detail ?? `HTTP ${error.status}`) : error instanceof Error ? error.message : 'unknown error'}`, 'error');
+      if (error instanceof OwuiHttpError && error.isUnauthorized) verifySession();
+    }
+  };
+
   return {
     /** The web app hides Delete unless the account holds the `chat.delete` permission. */
     canDelete: capabilities?.can('chat.delete') ?? false,
@@ -48,6 +85,7 @@ export function useChatActions() {
         undefined,
         [
           { text: 'Cancel', style: 'cancel' },
+          { text: 'Generate', onPress: () => void generateFor(chat) },
           {
             text: 'Save',
             onPress: (value?: string) => {
@@ -61,6 +99,20 @@ export function useChatActions() {
       );
     },
 
+    /** The unread dot comes back (here and on the web) until the chat is opened again. */
+    markUnread(chat: ChatRef) {
+      void run('mark', chat.id, () => markChatUnread(client, chat.id));
+    },
+
+    /** Folders need the server's folders feature for this account; `null` takes the chat out of its folder. */
+    canMove: capabilities?.feature('folders') ?? false,
+
+    async move(chat: ChatRef, folder: { id: string; name: string } | null) {
+      if (await run('move', chat.id, () => moveChatToFolder(client, chat.id, folder?.id ?? null))) {
+        toast(folder ? `Moved to ${folder.name}` : 'Moved out of the folder');
+      }
+    },
+
     togglePin(chat: ChatRef, pinned: boolean) {
       void run(pinned ? 'unpin' : 'pin', chat.id, () => togglePinned(client, chat.id));
     },
@@ -70,6 +122,30 @@ export function useChatActions() {
         toast('Chat archived');
         onDone?.();
       }
+    },
+
+    async unarchive(chat: ChatRef) {
+      if (await run('unarchive', chat.id, () => toggleArchived(client, chat.id))) toast('Chat unarchived');
+    },
+
+    unarchiveAll() {
+      Alert.alert('Unarchive all?', 'Are you sure you want to unarchive all archived chats?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Unarchive All',
+          onPress: () => {
+            unarchiveAllChats(client)
+              .then(() => {
+                refresh('');
+                toast('All chats have been unarchived.', 'success');
+              })
+              .catch((error: unknown) => {
+                toast(`Couldn't unarchive: ${error instanceof OwuiHttpError ? (error.detail ?? `HTTP ${error.status}`) : 'unknown error'}`, 'error');
+                if (error instanceof OwuiHttpError && error.isUnauthorized) verifySession();
+              });
+          },
+        },
+      ]);
     },
 
     remove(chat: ChatRef, onDone?: () => void) {

@@ -103,6 +103,20 @@ describe('openSocketSession', () => {
     expect(statuses).toContain('joined');
   });
 
+  it('marks chats read once joined, like the web app', async () => {
+    const { fake, session } = open();
+    session.markRead('c1');
+    expect(fake.emitted.filter((e) => e.event === 'events:chat')).toEqual([]);
+    fake.serverConnects();
+    fake.pendingAcks[0]?.ack(null, { id: 'u1', name: 'Test' });
+    await session.joined;
+    session.markRead('c2');
+    expect(fake.emitted.filter((e) => e.event === 'events:chat').map((e) => e.args[0])).toEqual([
+      { chat_id: 'c1', data: { type: 'last_read_at' } },
+      { chat_id: 'c2', data: { type: 'last_read_at' } },
+    ]);
+  });
+
   it('closes when the socket signs in as someone else', async () => {
     const { fake, session } = open({ expectedUserId: 'u1' });
     fake.serverConnects();

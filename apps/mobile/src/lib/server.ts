@@ -8,6 +8,7 @@ import {
   listTools,
   type Capabilities,
   type OwuiClient,
+  type SupportStatus,
 } from '@maviechat/owui-protocol';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
@@ -64,4 +65,18 @@ export function useCapabilities(): Capabilities | null {
         : null,
     [config.data, user.data, version.data?.version],
   );
+}
+
+/** How this server's version compares with what MavieChat was tested against, in words. */
+export function supportLabel(status: SupportStatus | undefined): string {
+  switch (status) {
+    case 'supported':
+      return 'tested';
+    case 'newer-than-validated':
+      return 'newer than MavieChat has been tested with';
+    case 'too-old':
+      return 'older than MavieChat supports';
+    default:
+      return 'checking…';
+  }
 }

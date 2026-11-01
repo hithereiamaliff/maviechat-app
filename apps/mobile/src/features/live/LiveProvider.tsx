@@ -1,8 +1,9 @@
-import { openSocketSession, type SocketSession, type SocketStatus } from '@maviechat/owui-protocol';
+import { isTemporaryChatId, openSocketSession, type SocketSession, type SocketStatus } from '@maviechat/owui-protocol';
 import { useQueryClient } from '@tanstack/react-query';
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Alert, AppState, Platform } from 'react-native';
 import { useToast } from '@/components/Toast';
+import { patchChatRow } from '@/features/chats/cache';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { ChatStreams } from './chatStreams';
 
@@ -11,7 +12,12 @@ interface LiveContextValue {
   streams: ChatStreams;
   /** The socket id to send as `session_id`; waits up to `timeoutMs` for the socket to join. */
   waitForSession(timeoutMs?: number): Promise<string>;
+  /** Tells the server (and the sidebar) you've read this chat, as the web does on open, on leave and when a reply lands. */
+  markRead(chatId: string): void;
 }
+
+/** The web waits this long before saying the connection was lost, so brief drops pass silently. */
+const LOST_NOTICE_DELAY_MS = 2000;
 
 const LiveContext = createContext<LiveContextValue | null>(null);
 
@@ -53,6 +59,8 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
   const viewing = useRef<string | null>(currentChatId);
   const socketRef = useRef<SocketSession | null>(null);
   const [status, setStatus] = useState<SocketStatus | 'idle'>('idle');
+  const lostTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const warnedLost = useRef(false);
 
   useEffect(() => {
     viewing.current = currentChatId;
@@ -81,16 +89,33 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
       expectedUserId: userId,
       websocketOnly,
       heartbeatIntervalSec,
-      onStatus: (next) => setStatus(next),
+      onStatus: (next) => {
+        setStatus(next);
+        if (next === 'reconnecting' && !lostTimer.current) {
+          lostTimer.current = setTimeout(() => {
+            lostTimer.current = null;
+            if (socketRef.current?.status === 'joined' || AppState.currentState !== 'active') return;
+            warnedLost.current = true;
+            toast('Connection lost. Reconnecting…', 'error');
+          }, LOST_NOTICE_DELAY_MS);
+        } else if (next === 'joined') {
+          if (lostTimer.current) clearTimeout(lostTimer.current);
+          lostTimer.current = null;
+          if (warnedLost.current) toast('Reconnected', 'success');
+          warnedLost.current = false;
+        }
+      },
     });
     socketRef.current = socket;
     const stop = socket.onChatEvent((event, reply) => streams.handle(event, reply));
     return () => {
       stop();
+      if (lostTimer.current) clearTimeout(lostTimer.current);
+      lostTimer.current = null;
       socket.close();
       socketRef.current = null;
     };
-  }, [baseUrl, token, userId, websocketOnly, heartbeatIntervalSec, streams]);
+  }, [baseUrl, token, userId, websocketOnly, heartbeatIntervalSec, streams, toast]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -100,6 +125,16 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
     });
     return () => subscription.remove();
   }, [queryClient]);
+
+  // Stable, so screens can mark read in effects without re-running them on every socket status change.
+  const markRead = useCallback(
+    (chatId: string) => {
+      if (!chatId || isTemporaryChatId(chatId)) return;
+      socketRef.current?.markRead(chatId);
+      patchChatRow(queryClient, chatId, { last_read_at: Math.floor(Date.now() / 1000) });
+    },
+    [queryClient],
+  );
 
   const value = useMemo<LiveContextValue>(
     () => ({
@@ -114,8 +149,9 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
       },
+      markRead,
     }),
-    [status, streams],
+    [status, streams, markRead],
   );
 
   return <LiveContext.Provider value={value}>{children}</LiveContext.Provider>;

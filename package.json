@@ -17,7 +17,8 @@
     "bundle": "npm run bundle --workspace @maviechat/mobile",
     "probe": "npm run probe --workspace @maviechat/contract-probe --",
     "ref:sync": "bash scripts/ref-sync.sh",
-    "icons": "node scripts/gen-icons.mjs"
+    "icons": "node scripts/gen-icons.mjs",
+    "licenses": "node scripts/check-licenses.mjs --write"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

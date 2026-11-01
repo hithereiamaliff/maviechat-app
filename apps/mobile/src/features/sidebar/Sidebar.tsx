@@ -13,12 +13,14 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, usePathname } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
-import { MenuButton, MenuTrigger } from '@/components/Menu';
+import { MenuButton, MenuTrigger, type MenuItem } from '@/components/Menu';
+import { useFolderPicker } from '@/features/chats/FolderPicker';
 import { useChatActions } from '@/features/chats/useChatActions';
 import { useAuthed, useCapabilities, useServerConfig } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
@@ -37,8 +39,10 @@ export function Sidebar() {
   const capabilities = useCapabilities();
   const config = useServerConfig();
   const actions = useChatActions();
+  const picker = useFolderPicker();
   const pathname = usePathname();
   const currentChatId = pathname.startsWith('/c/') ? decodeURIComponent(pathname.slice(3)) : null;
+  const currentFolderId = pathname.startsWith('/folders/') ? decodeURIComponent(pathname.slice('/folders/'.length)) : null;
 
   const [search, setSearch] = useState<string | null>(null);
   const query = useDebounced(search?.trim() ?? '', 300);
@@ -111,6 +115,39 @@ export function Sidebar() {
     setExpanded((state) => ({ ...state, [folder.id]: next }));
     setFolderExpanded(client, folder.id, next).catch(() => {});
   };
+  const openFolder = (folder: FolderNode) => {
+    sidebar.close();
+    if (folder.id !== currentFolderId) router.replace({ pathname: '/folders/[id]', params: { id: folder.id } });
+  };
+  const openOnWeb = (path: string) => {
+    sidebar.close();
+    void WebBrowser.openBrowserAsync(`${session.baseUrl}${path}`);
+  };
+  const userMenu: MenuItem[] = [
+    ...(['workspace.models', 'workspace.knowledge', 'workspace.prompts', 'workspace.tools'].some((permission) => capabilities?.can(permission))
+      ? [{ key: 'workspace', label: 'Workspace', icon: 'squares-2x2' as const, onPress: () => openOnWeb('/workspace') }]
+      : []),
+    ...(capabilities?.isAdmin ? [{ key: 'admin', label: 'Admin Panel', icon: 'wrench-screwdriver' as const, onPress: () => openOnWeb('/admin') }] : []),
+    {
+      key: 'settings',
+      label: 'Settings',
+      icon: 'cog-6-tooth',
+      onPress: () => {
+        sidebar.close();
+        router.push('/settings');
+      },
+    },
+    {
+      key: 'connection',
+      label: 'Connection',
+      icon: 'signal',
+      onPress: () => {
+        sidebar.close();
+        router.push('/connection');
+      },
+    },
+    { key: 'signout', label: 'Sign Out', icon: 'arrow-right-start-on-rectangle', onPress: () => void signOut() },
+  ];
 
   const renderRow = ({ item }: { item: SidebarRow }) => {
     switch (item.type) {
@@ -119,13 +156,26 @@ export function Sidebar() {
       case 'note':
         return <Text style={[styles.note, { color: palette.textFaint, paddingLeft: 12 + item.depth * 14 }]}>{item.label}</Text>;
       case 'folder':
+        // As on the web: the row opens the folder's page, the chevron opens or closes it here.
         return (
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ expanded: item.expanded }}
-            onPress={() => toggleFolder(item.folder)}
-            style={({ pressed }) => [styles.row, { paddingLeft: 8 + item.depth * 14 }, pressed && { backgroundColor: palette.sidebarActive }]}>
-            <Icon name={item.expanded ? 'chevron-down' : 'chevron-right'} size={12} color={palette.textMuted} strokeWidth={2} />
+            accessibilityHint="Opens the folder"
+            onPress={() => openFolder(item.folder)}
+            style={({ pressed }) => [
+              styles.row,
+              { paddingLeft: 2 + item.depth * 14 },
+              (pressed || item.folder.id === currentFolderId) && { backgroundColor: palette.sidebarActive },
+            ]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={item.expanded ? `Collapse ${item.folder.name}` : `Expand ${item.folder.name}`}
+              accessibilityState={{ expanded: item.expanded }}
+              hitSlop={8}
+              onPress={() => toggleFolder(item.folder)}
+              style={styles.chevron}>
+              <Icon name={item.expanded ? 'chevron-down' : 'chevron-right'} size={12} color={palette.textMuted} strokeWidth={2} />
+            </Pressable>
             <Icon name={item.expanded ? 'folder-open' : 'folder'} size={17} color={palette.textMuted} />
             <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
               {item.folder.name}
@@ -145,12 +195,14 @@ export function Sidebar() {
             onOpen={() => openChat(item.chat.id)}
             menu={[
               { key: 'rename', label: 'Rename', icon: 'pencil', onPress: () => actions.rename(item.chat) },
+              { key: 'unread', label: 'Mark as unread', icon: 'envelope', onPress: () => actions.markUnread(item.chat) },
               {
                 key: 'pin',
                 label: item.pinned ? 'Unpin' : 'Pin',
                 icon: item.pinned ? 'bookmark-slash' : 'bookmark',
                 onPress: () => actions.togglePin(item.chat, item.pinned),
               },
+              ...(actions.canMove ? [{ key: 'move', label: 'Move', icon: 'folder' as const, onPress: () => picker.open(item.chat) }] : []),
               { key: 'archive', label: 'Archive', icon: 'archive-box', onPress: () => void actions.archive(item.chat, leaveIfCurrent(item.chat.id)) },
               ...(actions.canDelete
                 ? [
@@ -219,20 +271,7 @@ export function Sidebar() {
       </View>
 
       <View style={[styles.footer, { borderTopColor: palette.border, paddingBottom: insets.bottom + 6 }]}>
-        <MenuTrigger
-          label="Account"
-          items={[
-            {
-              key: 'connection',
-              label: 'Connection',
-              icon: 'signal',
-              onPress: () => {
-                sidebar.close();
-                router.push('/connection');
-              },
-            },
-            { key: 'signout', label: 'Sign out', icon: 'arrow-right-start-on-rectangle', onPress: () => void signOut() },
-          ]}>
+        <MenuTrigger label="Account" items={userMenu}>
           <View style={styles.user}>
             <View style={[styles.avatar, { backgroundColor: palette.surfaceStrong }]}>
               <Text style={[styles.avatarText, { color: palette.text }]}>{initials(session.user.name)}</Text>
@@ -243,6 +282,7 @@ export function Sidebar() {
           </View>
         </MenuTrigger>
       </View>
+      {picker.element}
     </View>
   );
 }
@@ -329,6 +369,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, paddingRight: 0, borderRadius: radius.md },
   title: { flex: 1, fontFamily: fonts.regular, fontSize: 14 },
   dot: { width: 7, height: 7, borderRadius: 4 },
+  chevron: { width: 22, height: 30, alignItems: 'center', justifyContent: 'center' },
   badge: { overflow: 'hidden', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, fontFamily: fonts.medium, fontSize: 11, marginRight: 8 },
   more: { marginVertical: 12 },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 6 },

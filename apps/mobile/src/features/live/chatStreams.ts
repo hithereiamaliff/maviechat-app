@@ -146,7 +146,10 @@ export class ChatStreams {
         return;
       }
       case 'chat:list':
+        // Also sent when a chat is read or marked unread, with new folder unread counts.
         void this.queryClient.invalidateQueries({ queryKey: ['chats'] });
+        void this.queryClient.invalidateQueries({ queryKey: ['folder-chats'] });
+        void this.queryClient.invalidateQueries({ queryKey: ['folders'] });
         return;
       case 'chat:title':
         if (chatId && typeof data === 'string') {

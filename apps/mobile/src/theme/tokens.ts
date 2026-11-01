@@ -112,6 +112,22 @@ export const dark: Palette = {
   onActive: '#7DD3FC',
 };
 
+/** Dark with true-black surfaces, for OLED screens (the web's "OLED Dark" theme). */
+export const oled: Palette = {
+  ...dark,
+  background: '#000000',
+  surface: gray[950],
+  surfaceStrong: gray[900],
+  border: gray[900],
+  sidebar: '#000000',
+  sidebarActive: gray[950],
+  bubble: gray[900],
+  codeBackground: '#000000',
+  codeHeader: gray[950],
+  menu: gray[950],
+  overlay: 'rgba(0, 0, 0, 0.7)',
+};
+
 /** Code colours by highlight.js scope (GitHub's Primer palette, MIT). */
 export type SyntaxColors = Record<string, string>;
 

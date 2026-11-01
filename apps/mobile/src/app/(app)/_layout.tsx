@@ -43,6 +43,7 @@ export default function AppLayout() {
               contentStyle: { backgroundColor: palette.background },
             }}>
             <Stack.Screen name="connection" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+            <Stack.Screen name="settings" options={{ presentation: 'modal', animation: 'slide_from_bottom', gestureEnabled: true }} />
           </Stack>
         </Drawer>
       </SidebarContext.Provider>

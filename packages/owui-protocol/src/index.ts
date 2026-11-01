@@ -15,6 +15,7 @@ export * from './socket';
 export * from './sources';
 export * from './stream';
 export * from './time-groups';
+export * from './titles';
 export * from './tools';
 export * from './variables';
 export * from './version';

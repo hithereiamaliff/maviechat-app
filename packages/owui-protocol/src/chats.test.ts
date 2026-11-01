@@ -5,8 +5,10 @@ import {
   deleteMessage,
   getChat,
   listChats,
+  listArchivedChats,
   listFolderChats,
   listPinnedChats,
+  markChatUnread,
   moveChatToFolder,
   renameChat,
   saveMessage,
@@ -14,6 +16,7 @@ import {
   selectBranch,
   toggleArchived,
   togglePinned,
+  unarchiveAllChats,
 } from './chats';
 import { listFolders, setFolderExpanded } from './folders';
 import { OwuiClient, type FetchLike } from './http';
@@ -86,5 +89,21 @@ describe('message-level chat calls', () => {
       'POST /api/v1/chats/new',
     ]);
     expect(calls[1]?.body).toEqual({ chat: { history: { messages: { m1: message }, currentId: 'a9' } } });
+  });
+});
+
+describe('archive and read state', () => {
+  it('lists archived chats, unarchives all and marks unread', async () => {
+    const { client, calls } = recordingClient();
+    await listArchivedChats(client, 2, 'tax');
+    await listArchivedChats(client);
+    await unarchiveAllChats(client);
+    await markChatUnread(client, 'c/1');
+    expect(calls.map((c) => `${c.method} ${c.url.replace('https://x.test', '')}`)).toEqual([
+      'GET /api/v1/chats/archived?page=2&query=tax',
+      'GET /api/v1/chats/archived?page=1',
+      'POST /api/v1/chats/unarchive/all',
+      'POST /api/v1/chats/c%2F1/unread',
+    ]);
   });
 });

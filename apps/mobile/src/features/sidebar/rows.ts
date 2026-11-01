@@ -60,7 +60,13 @@ export function buildSidebarRows(input: BuildInput): SidebarRow[] {
   return rows;
 }
 
-/** A chat has news when it changed after you last read it. */
+/**
+ * A chat has news when it changed after you last read it, or was never read (marking a chat
+ * unread sets the read time to 0). Like the web, a chat that is still replying shows its
+ * spinner instead.
+ */
 export function isUnread(chat: ChatListItem): boolean {
-  return typeof chat.last_read_at === 'number' && chat.updated_at > chat.last_read_at;
+  if (chat.active) return false;
+  const readAt = typeof chat.last_read_at === 'number' && chat.last_read_at > 0 ? chat.last_read_at : null;
+  return readAt === null || chat.updated_at > readAt;
 }

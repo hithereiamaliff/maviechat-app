@@ -93,6 +93,20 @@ export function toggleArchived(client: OwuiClient, id: string): Promise<ChatReco
   return client.post<ChatRecord>(`${chatPath(id)}/archive`);
 }
 
+/** Archived chats, 60 a page, newest first; `query` filters by title. */
+export function listArchivedChats(client: OwuiClient, page = 1, query?: string): Promise<ChatListItem[]> {
+  return client.get<ChatListItem[]>('/api/v1/chats/archived', { query: { page, ...(query ? { query } : {}) } });
+}
+
+export function unarchiveAllChats(client: OwuiClient): Promise<boolean> {
+  return client.post<boolean>('/api/v1/chats/unarchive/all');
+}
+
+/** Brings the unread dot back (reading is reported over the socket: `SocketSession.markRead`). */
+export function markChatUnread(client: OwuiClient, id: string): Promise<unknown> {
+  return client.post<unknown>(`${chatPath(id)}/unread`);
+}
+
 export function deleteChat(client: OwuiClient, id: string): Promise<boolean> {
   return client.delete<boolean>(chatPath(id));
 }

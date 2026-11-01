@@ -27,11 +27,11 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Item | Source | Mn |
 |---|---|---|---|
-| [ ] | Routes: `/` new chat, `/c/{id}` chat, `/folders/{id}` folder landing, `/s/{id}` shared chat (read-only, Clone) | `src/routes/(app)/…` | M1 (`/s` M2) |
+| [~] | Routes: `/` new chat, `/c/{id}` chat, `/folders/{id}` folder landing, `/s/{id}` shared chat (read-only, Clone). Slice 4: `/folders/{id}` | `src/routes/(app)/…` | M1 (`/s` M2) |
 | [ ] | Deep-link parameters: `q`, `models`, `web-search`, `image-generation`, `code-interpreter`, `tools`, `temporary-chat`, `message` | `chat/Chat.svelte` | M2 |
-| [ ] | Toasts: "Connection lost / Reconnected", "Session expired" | `src/routes/+layout.svelte` | M1 |
+| [x] | Toasts: "Connection lost / Reconnected" (after 2 s, only while the app is open; slice 4), "Session expired" (shown on the sign-in screen; slice 1) | `src/routes/+layout.svelte` | M1 |
 | [x] | Swipe-anywhere sidebar overlay; swipe-left controls panel; sideways-scrolling content wins the gesture | `common/MobileSwipePanel.svelte`, `chat/ChatControls.svelte` | M1 / M2 |
-| [ ] | Pending-approval overlay ("Check Again", Sign Out) | `layout/Overlay/AccountPending.svelte` | M1 |
+| [~] | Pending-approval overlay ("Check Again", Sign Out). The app doesn't sign a pending account in; the sign-in screen says it awaits approval, and signing in again is the "Check Again" | `layout/Overlay/AccountPending.svelte` | M1 |
 
 ## 2. Sidebar (`layout/Sidebar.svelte`, `layout/Sidebar/*`)
 
@@ -40,13 +40,13 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [x] | Logo + server name (tap = new chat), New Chat, Search | M1 |
 | [ ] | Pinned shortcuts (Workspace; Notes, Calendar and Automations open on web) | M1 |
 | [ ] | Section: pinned models (`PinnedModelList.svelte`) opening `/?model=id` | M2 |
-| [x] | Section: Folders tree, own and shared. Tap opens the folder landing; the chevron expands; unread badge | M1 |
+| [x] | Section: Folders tree, own and shared. Tap opens the folder landing; the chevron expands; unread badge (folder landing from slice 4) | M1 |
 | [ ] | Folder menu: New Chat, Create subfolder, Mark all read, Edit, Export JSON, Delete (optionally with contents) | M2 |
 | [ ] | Folder settings: name, description, background, default models, system prompt, knowledge, sharing (`Folders/FolderModal.svelte`) | M2 |
 | [x] | Chats: "Pinned" group, then Today / Yesterday / Previous 7 days / Previous 30 days / month / year (from `updated_at`), infinite scroll | M1 |
 | [x] | Chat row: generating spinner, unread dot; the "…" button is always visible on phones (no long-press in Open WebUI) | M1 |
-| [~] | Chat menu: Share, Download (JSON/TXT/PDF), Rename (+ Generate), Mark unread, Pin, Clone, Move to folder, Archive, Delete (`ChatMenu.svelte`). Slice 1: Rename, Pin, Archive, Delete (only with the `chat.delete` permission) | M1 (rename/pin/archive/delete/move); M2 (rest) |
-| [ ] | User menu: avatar and name (→ Account), status emoji/message, Workspace, Admin Panel, Settings, Sign Out (`UserMenu.svelte`) | M1 |
+| [~] | Chat menu: Share, Download (JSON/TXT/PDF), Rename (+ Generate), Mark unread, Pin, Clone, Move to folder, Archive, Delete (`ChatMenu.svelte`). Slice 1: Rename, Pin, Archive, Delete (only with the `chat.delete` permission); slice 4: Rename + Generate, Mark as unread, Move (needs the folders feature) | M1 (rename/pin/archive/delete/move); M2 (rest) |
+| [~] | User menu: avatar and name (→ Account), status emoji/message, Workspace, Admin Panel, Settings, Sign Out (`UserMenu.svelte`). Slice 4: Workspace and Admin Panel (open on the web until M3/M4), Settings, Connection, Sign Out; status and Account → M2 | M1 |
 | [~] | Search modal with type/view/location filters, `tag:`, `folder:`, `pinned:`, `shared:`, `archived:`; empty query shows "Pinned & recent" (`layout/SearchModal.svelte`). Slice 1: search field in the sidebar (server search) | M1 basic, M2 filters |
 | web | Channels section and channel pages | — |
 | web | Notes section and pages | — |
@@ -56,7 +56,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | | Item | Mn |
 |---|---|---|
 | [x] | Sidebar button, chat title | M1 |
-| [~] | "…" menu: Scroll to top, Artifacts, Share, Download JSON/TXT/PDF, Rename, Copy chat, Move to folder, Archive, Delete, Tags editor. Slice 1: Rename, Pin, Archive, Delete | M1 core, M2 rest |
+| [~] | "…" menu: Scroll to top, Artifacts, Share, Download JSON/TXT/PDF, Rename, Copy chat, Move to folder, Archive, Delete, Tags editor. Slice 1: Rename, Pin, Archive, Delete; slice 4: Move, and Unarchive on an archived chat | M1 core, M2 rest |
 | [~] | Temporary Chat toggle (new chat only) / Save Chat (temporary chat with messages). Slice 3: the toggle, with the `chat.temporary` / `temporary_enforced` rules | M1 toggle, M2 Save Chat |
 | [x] | New Chat button (phone only), Controls (knobs) button | M1 |
 | [ ] | Admin banners on the new-chat screen | M2 |
@@ -147,10 +147,10 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [ ] | Artifacts viewer (combined HTML/CSS/JS, versions, Copy, Download, Full screen) | M2 |
 | [ ] | Share (private link; read access to users/groups; mode Clone only / Allow replies; Update and Copy link; delete link) | M2 |
 | [ ] | Download JSON / TXT / PDF (plain-text PDF first); Copy whole chat | M2 |
-| [~] | Title: live from the server; Rename + Generate. Slice 2: live title and Rename | M1 |
+| [x] | Title: live from the server; Rename + Generate. Slice 2: live title and Rename; slice 4: Generate | M1 |
 | [ ] | Tags: editor; `tag:` search | M2 |
 | [ ] | Clone (sidebar), Fork from a message, `/fork` | M2 |
-| [ ] | Archive / Unarchive, Pin, Move to folder, Delete, Mark unread | M1 |
+| [x] | Archive / Unarchive, Pin, Move to folder, Delete, Mark unread; reading a chat clears its dot here and on the web (slice 4) | M1 |
 | [~] | Temporary chat (not saved; Save Chat later). Slice 3: temporary chats (photos inline, text files read on the phone; other documents need a saved chat) | M1; Save Chat M2 |
 | [~] | Background completions: toast "reply finished" for a chat you're not viewing (tap to open). Slice 2: toast while the app is open | M1 (while foregrounded); M6 push |
 | — | Shared-chat presence and typing (Allow replies) | M5 |
@@ -159,7 +159,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Tab and contents | Mn |
 |---|---|---|
-| [ ] | General: theme (System/Dark/OLED/Light), language, system prompt, advanced params | M1 theme; M2 rest |
+| [~] | General: theme (System/Dark/OLED/Light), language, system prompt, advanced params. Slice 4: theme (kept on the device, as the web keeps it per browser) | M1 theme; M2 rest |
 | [ ] | Interface, chat: message queue, landing mode, chat bubbles, show username, widescreen (n/a), temporary chat by default, fade-in streaming, markdown in user messages, auto title/follow-ups/tags, auto-copy, auto-scroll, scroll on branch change, insert prompt instead of send, keep follow-ups, insert follow-up, regenerate menu, always collapse code, always expand details, multi-model as tabs, web search Always | M2 |
 | [ ] | Interface, input: rich text (n/a), prompt autocomplete, paste long text as file | M2 |
 | [ ] | Interface, file: default upload mode; image compression | M2 |
@@ -167,9 +167,9 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [ ] | Personalization: Memory switch, Manage memories, Clear all | M2 |
 | [ ] | Audio: STT engine (server / on-device), language, auto-send; TTS engine (server / on-device), voice, auto-play, speed | M2 |
 | [ ] | Data controls: import/export chats, archive all, delete all, shared chats list, manage files | M2 |
-| [ ] | Archived chats: search, Unarchive or Delete each, Unarchive all, Export | M2 |
+| [~] | Archived chats: search, Unarchive or Delete each, Unarchive all, Export. Slice 4: all but Export | M2 (export) |
 | [ ] | Account: photo, name, bio, gender, birth date, user variables, password change, 2FA (0.12.x), API keys, copy session token | M2 (2FA M5) |
-| [ ] | About: server version, app version, licences | M1 |
+| [x] | About: server version, app version, licences (slice 4; the list is `npm run licenses`) | M1 |
 | — | Connections (direct connections), Integrations (tool servers/terminals), Keyboard, Usage | — / later |
 
 ## 11. Workspace (M3) (`workspace/*`)

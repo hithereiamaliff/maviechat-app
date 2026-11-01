@@ -1,10 +1,10 @@
-import { FEATURES, openSocketSession, type FeatureId, type SocketStatus, type SupportStatus } from '@maviechat/owui-protocol';
+import { FEATURES, openSocketSession, type FeatureId, type SocketStatus } from '@maviechat/owui-protocol';
 import { router } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconButton } from '@/components/IconButton';
-import { useAuthed, useCapabilities, useServerConfig, useServerVersion, useSessionUser } from '@/lib/server';
+import { supportLabel, useAuthed, useCapabilities, useServerConfig, useServerVersion, useSessionUser } from '@/lib/server';
 import { fonts, radius, usePalette, type Palette } from '@/theme';
 
 const FEATURE_LABELS: Record<FeatureId, string> = {
@@ -86,19 +86,6 @@ export default function Connection() {
       </ScrollView>
     </View>
   );
-}
-
-function supportLabel(status: SupportStatus | undefined): string {
-  switch (status) {
-    case 'supported':
-      return 'tested';
-    case 'newer-than-validated':
-      return 'newer than MavieChat has been tested with';
-    case 'too-old':
-      return 'older than MavieChat supports';
-    default:
-      return 'checking…';
-  }
 }
 
 function liveLabel(live: LiveState): string {

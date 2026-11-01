@@ -45,6 +45,8 @@ export interface SendInput extends Extras {
   files?: FileItem[];
   /** With `chatId: null`: start a temporary chat, which the server doesn't keep. */
   temporary?: boolean;
+  /** With `chatId: null`: create the chat inside this folder (the folder page's input). */
+  folderId?: string;
 }
 
 export interface RegenerateInput extends Extras {
@@ -89,7 +91,9 @@ export function useSendMessage() {
   const user = useSessionUser();
 
   const dispatch = useCallback(
-    async (job: Extras & { chatId: string | null; temporary: boolean; turn: Turn; model: ModelItem; regenerationPrompt?: string }): Promise<Sent | null> => {
+    async (
+      job: Extras & { chatId: string | null; temporary: boolean; turn: Turn; model: ModelItem; regenerationPrompt?: string; folderId?: string },
+    ): Promise<Sent | null> => {
       const { turn, model } = job;
       let sessionId: string;
       try {
@@ -141,6 +145,7 @@ export function useSendMessage() {
         toolIds: job.toolIds,
         files: requestFiles(parentId ? branchPath(turn.history, parentId) : [], turn.userMessage),
         regenerationPrompt: job.regenerationPrompt,
+        folderId: job.chatId === null && !job.temporary ? job.folderId : undefined,
         temporaryMessages: job.temporary ? temporaryChatMessages(branchPath(turn.history, turn.userMessage.id), system) : undefined,
       });
 
@@ -152,6 +157,10 @@ export function useSendMessage() {
           live.streams.bind(replyIds, id);
         }
         if (!job.temporary) void queryClient.invalidateQueries({ queryKey: ['chats'] });
+        if (job.folderId) {
+          void queryClient.invalidateQueries({ queryKey: ['folder-chats', job.folderId] });
+          void queryClient.invalidateQueries({ queryKey: ['folders'] });
+        }
         return { chatId: id, replyId };
       } catch (error) {
         live.streams.untrack(replyIds);
@@ -178,11 +187,11 @@ export function useSendMessage() {
   );
 
   const send = useCallback(
-    async ({ chatId, parentId, content, model, files = [], temporary = false, toggles, toolIds }: SendInput): Promise<Sent | null> => {
+    async ({ chatId, parentId, content, model, files = [], temporary = false, toggles, toolIds, folderId }: SendInput): Promise<Sent | null> => {
       const text = content.trim();
       if (!text && files.length === 0) return null;
       const turn = buildTurn({ history: historyOf(chatId), content: text, models: [model], files, parentId });
-      return dispatch({ chatId, temporary: temporary || isTemporaryChatId(chatId), turn, model, toggles, toolIds });
+      return dispatch({ chatId, temporary: temporary || isTemporaryChatId(chatId), turn, model, toggles, toolIds, folderId });
     },
     [dispatch, historyOf],
   );

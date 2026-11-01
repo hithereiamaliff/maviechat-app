@@ -33,6 +33,7 @@ const ICONS = [
   'command-line',
   'document-text',
   'ellipsis-horizontal',
+  'envelope',
   'exclamation-triangle',
   'eye-slash',
   'folder',

@@ -6,6 +6,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import type { MenuItem } from '@/components/Menu';
 import { ChatHeader } from '@/features/chat/ChatHeader';
+import { useFolderPicker } from '@/features/chats/FolderPicker';
 import { Composer, type OutgoingMessage } from '@/features/chat/Composer';
 import { getDraft, updateDraft, useQueue } from '@/features/chat/drafts';
 import { MessageList, type MessageActions } from '@/features/chat/MessageList';
@@ -15,6 +16,7 @@ import { useMessageActions } from '@/features/chat/useMessageActions';
 import { useModelChoice } from '@/features/chat/useModelChoice';
 import { useSendMessage } from '@/features/chat/useSendMessage';
 import { useChatActions } from '@/features/chats/useChatActions';
+import { useLive } from '@/features/live/LiveProvider';
 import { useAuthed, useModels, useUserSettings } from '@/lib/server';
 import { fonts, usePalette } from '@/theme';
 
@@ -27,6 +29,8 @@ export default function ChatScreen() {
   const models = useModels();
   const settings = useUserSettings();
   const actions = useChatActions();
+  const picker = useFolderPicker();
+  const live = useLive();
   const messageActions = useMessageActions(chatId);
   const { query, messages, position, step, select } = useChatView(chatId);
   const choice = useModelChoice(query.data);
@@ -46,7 +50,10 @@ export default function ChatScreen() {
       ? [
           { key: 'rename', label: 'Rename', icon: 'pencil', onPress: () => actions.rename(ref) },
           { key: 'pin', label: pinned ? 'Unpin' : 'Pin', icon: pinned ? 'bookmark-slash' : 'bookmark', onPress: () => actions.togglePin(ref, pinned) },
-          { key: 'archive', label: 'Archive', icon: 'archive-box', onPress: () => void actions.archive(ref, toNewChat) },
+          ...(actions.canMove ? [{ key: 'move', label: 'Move', icon: 'folder' as const, onPress: () => picker.open(ref) }] : []),
+          chat.archived
+            ? { key: 'unarchive', label: 'Unarchive', icon: 'archive-box-arrow-down', onPress: () => void actions.unarchive(ref) }
+            : { key: 'archive', label: 'Archive', icon: 'archive-box', onPress: () => void actions.archive(ref, toNewChat) },
           ...(actions.canDelete
             ? [{ key: 'delete', label: 'Delete', icon: 'trash' as const, destructive: true, onPress: () => actions.remove(ref, toNewChat) }]
             : []),
@@ -60,6 +67,20 @@ export default function ChatScreen() {
   const lastId = messages[messages.length - 1]?.id ?? null;
   const queueEnabled = (settings.data?.ui as { enableMessageQueue?: boolean } | null | undefined)?.enableMessageQueue ?? true;
   const model = choice.model;
+
+  // Like the web: the chat counts as read when you open it, when you leave it, and when a reply lands while you watch.
+  const loaded = Boolean(chat);
+  const { markRead } = live;
+  useEffect(() => {
+    if (!loaded) return;
+    markRead(chatId);
+    return () => markRead(chatId);
+  }, [loaded, chatId, markRead]);
+  const wasStreaming = useRef(false);
+  useEffect(() => {
+    if (wasStreaming.current && !streaming) markRead(chatId);
+    wasStreaming.current = streaming;
+  }, [streaming, chatId, markRead]);
 
   const deliver = async ({ text, files, toggles, toolIds }: OutgoingMessage, parentId: string | null) => {
     if (!model) return false;
@@ -216,6 +237,7 @@ export default function ChatScreen() {
           />
         )}
       </KeyboardAvoidingView>
+      {picker.element}
       <ModelPicker
         visible={pickerOpen}
         models={choice.models}

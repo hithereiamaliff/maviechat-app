@@ -1,8 +1,9 @@
 // Fails when anything the app ships depends on copyleft or Open WebUI-licensed code.
 // Only production dependencies of the app and the protocol package are checked;
 // dev tools are not shipped. Packages without a declared licence are listed as warnings.
+// With --write it also saves the list the About screen shows (apps/mobile/src/generated/licenses.json).
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { acceptable, FORBIDDEN } from './lib/spdx.mjs';
 
@@ -53,9 +54,11 @@ function describe(value) {
 const forbidden = [];
 const unknown = [];
 const dual = [];
+const shipped = [];
 for (const [key, info] of packages) {
   if (key.startsWith('@maviechat/')) continue;
   const licence = licenceOf(info);
+  shipped.push({ name: key.slice(0, key.lastIndexOf('@')), version: info.version, license: licence ?? 'unknown' });
   if (!licence) unknown.push(key);
   else if (!acceptable(licence)) forbidden.push(`${key} (${licence})`);
   else if (FORBIDDEN.test(licence)) dual.push(`${key} (${licence})`);
@@ -68,3 +71,11 @@ if (forbidden.length > 0) {
   process.exit(1);
 }
 console.log(`✓ ${packages.size} production packages, no copyleft or Open WebUI-licensed code`);
+
+if (process.argv.includes('--write')) {
+  const target = path.join(root, 'apps/mobile/src/generated/licenses.json');
+  mkdirSync(path.dirname(target), { recursive: true });
+  shipped.sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
+  writeFileSync(target, `${JSON.stringify(shipped, null, 2)}\n`);
+  console.log(`✓ ${shipped.length} packages → ${path.relative(root, target)}`);
+}
