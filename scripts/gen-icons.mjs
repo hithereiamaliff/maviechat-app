@@ -8,6 +8,7 @@ const source = path.join(root, 'node_modules/heroicons/24/outline');
 const target = path.join(root, 'apps/mobile/src/components/icons.generated.ts');
 
 const ICONS = [
+  'academic-cap',
   'adjustments-horizontal',
   'archive-box',
   'archive-box-arrow-down',
@@ -16,6 +17,7 @@ const ICONS = [
   'arrow-right-start-on-rectangle',
   'arrow-up',
   'arrows-pointing-out',
+  'arrows-right-left',
   'bars-3',
   'bars-arrow-down',
   'bars-arrow-up',

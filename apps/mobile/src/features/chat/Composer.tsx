@@ -15,7 +15,9 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { useAnchoredMenu, type MenuItem } from '@/components/Menu';
+import { DeepTutorPicker } from '@/features/deeptutor/DeepTutorPicker';
 import { useAuthed, useCapabilities, useTools, useUserSettings } from '@/lib/server';
+import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
 import { AttachmentStrip } from './AttachmentStrip';
 import { getDraft, updateDraft, useDraft } from './drafts';
@@ -92,6 +94,8 @@ export function Composer({
   const [sending, setSending] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [deepTutorOpen, setDeepTutorOpen] = useState(false);
+  const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }), []);
 
@@ -124,6 +128,9 @@ export function Composer({
     { key: 'files', label: 'Upload Files', icon: 'paper-clip', onPress: () => void attach.pickFiles() },
     { key: 'photos', label: 'Photo Library', icon: 'photo', onPress: () => void attach.pickPhotos() },
     { key: 'camera', label: 'Capture', icon: 'camera', onPress: () => void attach.capture() },
+    ...(deepTutorSignedIn
+      ? [{ key: 'deeptutor', label: 'Reference DeepTutor Chat', icon: 'academic-cap' as const, onPress: () => setDeepTutorOpen(true) }]
+      : []),
   ] satisfies MenuItem[]);
 
   const setToggle = (key: ToggleKey, on: boolean) =>
@@ -268,6 +275,9 @@ export function Composer({
         </View>
       </View>
       {plusMenu}
+      {deepTutorSignedIn ? (
+        <DeepTutorPicker visible={deepTutorOpen} onClose={() => setDeepTutorOpen(false)} onPick={(session) => void attach.attachDeepTutorChat(session)} />
+      ) : null}
       <FullScreenInput
         visible={expanded}
         value={draft.text}

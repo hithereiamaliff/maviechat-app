@@ -2,6 +2,7 @@ export * from './auth';
 export * from './capabilities';
 export * from './chats';
 export * from './completions';
+export * from './export';
 export * from './files';
 export * from './folders';
 export * from './history';

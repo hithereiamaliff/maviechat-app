@@ -25,8 +25,10 @@ import { IconButton } from '@/components/IconButton';
 import { MenuButton, MenuTrigger, type MenuItem } from '@/components/Menu';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
 import { useChatActions } from '@/features/chats/useChatActions';
+import { switchToDeepTutor } from '@/features/deeptutor/switch';
 import { useAuthed, useCapabilities, useServerConfig, useUserSettings } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
+import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
 import { fonts, radius, usePalette } from '@/theme';
 import { buildSidebarRows, isUnread, type SidebarRow } from './rows';
@@ -47,6 +49,7 @@ export function Sidebar() {
   const sidebar = useSidebar();
   const { client, session } = useAuthed();
   const { signOut } = useSession();
+  const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
   const queryClient = useQueryClient();
   const capabilities = useCapabilities();
   const config = useServerConfig();
@@ -153,6 +156,15 @@ export function Sidebar() {
       onPress: () => {
         sidebar.close();
         router.push('/settings');
+      },
+    },
+    {
+      key: 'deeptutor',
+      label: deepTutorSignedIn ? 'Switch to DeepTutor' : 'Connect DeepTutor',
+      icon: deepTutorSignedIn ? 'arrows-right-left' : 'academic-cap',
+      onPress: () => {
+        sidebar.close();
+        switchToDeepTutor(deepTutorSignedIn);
       },
     },
     {

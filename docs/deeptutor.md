@@ -65,7 +65,7 @@ DeepTutor is a **spec only**, like Open WebUI and Conduit (see `AGENTS.md`). Rea
 
 | Direction | How |
 |---|---|
-| DeepTutor → Open WebUI | Pick a session (`GET /api/sessions`, `/search`), fetch it (`GET /api/sessions/{id}`), render it as Markdown and upload it to Open WebUI as a document (`POST /api/v1/files/?process=true`, then wait for processing). It shows as a file chip on your message. |
+| DeepTutor → Open WebUI | Pick a session (`GET /api/sessions`, `/search`), fetch it (`GET /api/sessions/{id}`) and render its shown branch as Markdown. It is attached as a `text` item that travels with the message: Open WebUI reads such items' `content` directly, as the web does for attached web pages, so nothing is uploaded. Chats over 60,000 characters keep their newest part. It shows as a file chip on your message. |
 | Open WebUI → DeepTutor | Render the shown branch as Markdown and add it to the "From MavieChat" notebook (`POST /api/notebooks`, `POST /api/notebooks/actions/add-record`, `record_type: "chat"`). Reference that notebook in any DeepTutor chat. |
 | Everything else | DeepTutor's own web UI in a web view, signed in. |
 
@@ -90,11 +90,11 @@ DeepTutor is a **spec only**, like Open WebUI and Conduit (see `AGENTS.md`). Rea
 | | Item |
 |---|---|
 | [~] | Spike: native sign-in (cookie store or Bearer); a web view reusing the sign-in; `GET /api/sessions` and a notebook record written from the app. Done from Node: Bearer sign-in, sessions, notebook record. The web view and the phone's cookie store wait for store build 3 |
-| [ ] | Saved servers and a switcher (Keychain per server; caches kept apart). |
+| [~] | Saved servers and a switcher (Keychain per server; caches kept apart). Done: an Open WebUI and a DeepTutor sign-in side by side, each in the Keychain, with DeepTutor's data cached under its own keys. Switch to (or Connect) DeepTutor sits in the account menu, Switch to Open WebUI in the DeepTutor bar, and a launch returns to the space used last. A longer list (several Open WebUI servers) comes with M4's scratch instance |
 | [x] | `packages/deeptutor-protocol`, a DeepTutor contract probe (`npm run probe:deeptutor`), and fixtures per version (`tools/contract-probe/fixtures/deeptutor-1.7.1/`). |
 | [x] | `.ref/deeptutor` pinned at the deployed tag (`packages/deeptutor-protocol/src/support.json`), and the copy check extended to cover it. |
-| [ ] | The DeepTutor space: web view plus a native bar (store build 3, `react-native-webview`). |
-| [ ] | "Reference DeepTutor chat" in the Open WebUI + menu. |
-| [ ] | "Send to DeepTutor" in the Open WebUI chat menu (saved chats only). |
+| [~] | The DeepTutor space: web view plus a native bar (store build 3, `react-native-webview`). Until then: your DeepTutor chats in a native list (search, read-only view, "Ask about it in Open WebUI"), and Open DeepTutor in the browser |
+| [x] | "Reference DeepTutor Chat" in the Open WebUI + menu (a `text` attachment, see above). |
+| [x] | "Send to DeepTutor" in the Open WebUI chat menu (saved chats only): the shown branch as Markdown, filed as a `chat` record in the "From MavieChat" notebook, with our own summary. |
 | [ ] | Phone checks: switch both ways without signing in again; both cross-reference directions; an expired DeepTutor sign-in; offline. |
 | [ ] | Later, decided after use: native DeepTutor chat over the `/ws` turn protocol 2.0. |

@@ -1,3 +1,4 @@
+import { DtHttpError, DtNetworkError } from '@maviechat/deeptutor-protocol';
 import { OwuiHttpError, OwuiNetworkError } from '@maviechat/owui-protocol';
 
 /** A sign-in failure in words a person can act on. The server's own message wins when it sent one. */
@@ -11,6 +12,21 @@ export function describeSignInError(error: unknown): string {
     return error.timedOut
       ? 'The server took too long to answer. Try again in a moment.'
       : "Couldn't reach the server. Check the address and your connection.";
+  }
+  if (error instanceof Error && error.message) return error.message;
+  return 'Sign-in failed. Please try again.';
+}
+
+/** The same for DeepTutor, whose wrong-password answer is a plain 401. */
+export function describeDtSignInError(error: unknown): string {
+  if (error instanceof DtHttpError) {
+    if (error.status === 401) return 'Wrong username or password.';
+    if (error.status === 404) return "That address doesn't look like a DeepTutor server.";
+    if (error.detail) return error.detail;
+    return `DeepTutor answered with an error (HTTP ${error.status}).`;
+  }
+  if (error instanceof DtNetworkError) {
+    return error.timedOut ? 'DeepTutor took too long to answer. Try again in a moment.' : "Couldn't reach DeepTutor. Check the address and your connection.";
   }
   if (error instanceof Error && error.message) return error.message;
   return 'Sign-in failed. Please try again.';

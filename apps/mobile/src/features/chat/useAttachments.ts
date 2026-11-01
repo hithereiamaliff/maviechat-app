@@ -15,8 +15,10 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useToast } from '@/components/Toast';
+import { deepTutorAttachment } from '@/features/deeptutor/crossReference';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useServerConfig } from '@/lib/server';
+import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
 import { getDraft, patchFile, removeFile, updateDraft } from './drafts';
 
@@ -73,6 +75,7 @@ export function useAttachments({ draftKey, model, temporary }: { draftKey: strin
   const capabilities = useCapabilities();
   const config = useServerConfig();
   const toast = useToast();
+  const deepTutor = useDeepTutor();
 
   const upload = async (file: Picked, image: boolean) => {
     const itemId = uuidv4();
@@ -173,7 +176,29 @@ export function useAttachments({ draftKey, model, temporary }: { draftKey: strin
     }
   };
 
+  // A DeepTutor chat travels as text with the message (nothing is uploaded), so only the file count applies.
+  const attachDeepTutorChat = async (session: { id: string; title: string }) => {
+    const dtClient = deepTutor.client;
+    if (!dtClient) return;
+    const limit = uploadLimitError(config.data, getDraft(draftKey).files.length, [{ size: 1 }]);
+    if (limit) {
+      toast(limit, 'error');
+      return;
+    }
+    const itemId = uuidv4();
+    const name = `DeepTutor - ${session.title || 'chat'}`;
+    const placeholder: FileItem = { type: 'text', file: '', id: null, url: '', name, collection_name: '', status: 'uploading', size: 0, error: '', itemId };
+    updateDraft(draftKey, (draft) => ({ ...draft, files: [...draft.files, placeholder] }));
+    try {
+      patchFile(draftKey, itemId, await deepTutorAttachment(dtClient, session.id, itemId));
+    } catch (error) {
+      removeFile(draftKey, itemId);
+      toast(`Couldn't attach the DeepTutor chat: ${describeError(error)}`, 'error');
+    }
+  };
+
   return {
+    attachDeepTutorChat,
     pickFiles: () =>
       run(async () => {
         const result = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true });

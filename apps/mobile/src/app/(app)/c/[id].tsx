@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import type { MenuItem } from '@/components/Menu';
+import { useToast } from '@/components/Toast';
 import { ChatHeader } from '@/features/chat/ChatHeader';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
 import { Composer, type OutgoingMessage } from '@/features/chat/Composer';
@@ -16,8 +17,11 @@ import { useMessageActions } from '@/features/chat/useMessageActions';
 import { useModelChoice } from '@/features/chat/useModelChoice';
 import { useSendMessage } from '@/features/chat/useSendMessage';
 import { useChatActions } from '@/features/chats/useChatActions';
+import { sendChatToDeepTutor } from '@/features/deeptutor/crossReference';
 import { useLive } from '@/features/live/LiveProvider';
+import { describeError } from '@/lib/errors';
 import { useAuthed, useModels, useUserSettings } from '@/lib/server';
+import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
 
 export default function ChatScreen() {
@@ -31,6 +35,8 @@ export default function ChatScreen() {
   const actions = useChatActions();
   const picker = useFolderPicker();
   const live = useLive();
+  const toast = useToast();
+  const deepTutor = useDeepTutor();
   const messageActions = useMessageActions(chatId);
   const { query, messages, position, step, select } = useChatView(chatId);
   const choice = useModelChoice(query.data);
@@ -45,12 +51,27 @@ export default function ChatScreen() {
   const ref = { id: chatId, title: chat?.title ?? 'this chat' };
   const pinned = chat?.pinned === true;
   const toNewChat = () => router.replace('/');
+  // Open WebUI → DeepTutor: a copy of the shown branch goes into DeepTutor's "From MavieChat" notebook.
+  const sendToDeepTutor = async () => {
+    const dtClient = deepTutor.client;
+    if (!chat || !dtClient) return;
+    toast('Sending to DeepTutor…');
+    try {
+      await sendChatToDeepTutor(dtClient, chat, models.data, session.baseUrl);
+      toast('Sent to DeepTutor\'s "From MavieChat" notebook.', 'success');
+    } catch (error) {
+      toast(`Couldn't send to DeepTutor: ${describeError(error)}`, 'error');
+    }
+  };
   const menu: MenuItem[] =
     chat && !temporary
       ? [
           { key: 'rename', label: 'Rename', icon: 'pencil', onPress: () => actions.rename(ref) },
           { key: 'pin', label: pinned ? 'Unpin' : 'Pin', icon: pinned ? 'bookmark-slash' : 'bookmark', onPress: () => actions.togglePin(ref, pinned) },
           ...(actions.canMove ? [{ key: 'move', label: 'Move', icon: 'folder' as const, onPress: () => picker.open(ref) }] : []),
+          ...(deepTutor.client
+            ? [{ key: 'deeptutor', label: 'Send to DeepTutor', icon: 'academic-cap' as const, onPress: () => void sendToDeepTutor() }]
+            : []),
           chat.archived
             ? { key: 'unarchive', label: 'Unarchive', icon: 'archive-box-arrow-down', onPress: () => void actions.unarchive(ref) }
             : { key: 'archive', label: 'Archive', icon: 'archive-box', onPress: () => void actions.archive(ref, toNewChat) },
