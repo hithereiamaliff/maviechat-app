@@ -1,0 +1,14 @@
+{
+  "name": "@maviechat/push-relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turns Open WebUI's chat-finished webhooks into push notifications for MavieChat, through Expo's push service. Stores nothing.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.ts",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

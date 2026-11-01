@@ -38,7 +38,7 @@ if (missing.length > 0) {
 }
 
 const ours = [path.join(root, 'apps/mobile/src')];
-for (const group of ['packages', 'tools']) {
+for (const group of ['packages', 'tools', 'services']) {
   for (const entry of readdirSync(path.join(root, group), { withFileTypes: true })) {
     const src = path.join(root, group, entry.name, 'src');
     if (entry.isDirectory() && existsSync(src)) ours.push(src);
