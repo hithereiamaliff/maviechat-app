@@ -1,7 +1,7 @@
 import { activeTurnOf, deleteSession, saveQuizResults, savedReply, sessionTitle, shownMessages, type DtOutline, type DtQuizQuestion } from '@maviechat/deeptutor-protocol';
 import { useQueryClient } from '@tanstack/react-query';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
@@ -21,6 +21,7 @@ import { sessionDate, useDtSession } from '@/features/deeptutor/queries';
 import { SpaceHeader } from '@/features/deeptutor/SpaceHeader';
 import { SwitchToOpenWebUIButton } from '@/features/deeptutor/SpaceSwitch';
 import { switchToOpenWebUI } from '@/features/deeptutor/switch';
+import { setViewingChat } from '@/features/notifications/presence';
 import { describeError } from '@/lib/errors';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
@@ -44,6 +45,14 @@ export default function DeepTutorChat() {
   const [attaching, setAttaching] = useState(false);
   const native = isNativeCapability(capability);
   const running = turn?.reply.status === 'running' || turn?.reply.status === 'waiting';
+
+  // A notification about the chat on screen needs no banner.
+  useFocusEffect(
+    useCallback(() => {
+      setViewingChat(id);
+      return () => setViewingChat(null);
+    }, [id]),
+  );
 
   // A reply still being written (started before the app restarted, or elsewhere): follow it.
   const activeTurn = detail.data ? activeTurnOf(detail.data) : null;

@@ -8,6 +8,9 @@ describe('push presence', () => {
     expect(shouldPresent({ chatId: 'c2' })).toBe(true);
     expect(shouldPresent({ kind: 'test' })).toBe(true);
     expect(shouldPresent(undefined)).toBe(true);
+    setViewingChat('unified_1');
+    expect(shouldPresent({ kind: 'deeptutor.finished', sessionId: 'unified_1' })).toBe(false);
+    expect(shouldPresent({ kind: 'deeptutor.finished', sessionId: 'unified_2' })).toBe(true);
     setViewingChat(null);
     expect(shouldPresent({ chatId: 'c1' })).toBe(true);
   });

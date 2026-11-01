@@ -1,6 +1,8 @@
 import {
   DtTurnConnection,
   getAuthStatus,
+  sessionTitle,
+  type DtSession,
   SOCKET_AUTH_FAILED,
   socketCookieHeader,
   turnSocketUrl,
@@ -11,6 +13,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import { useToast } from '@/components/Toast';
+import { pushTokenIfOn } from '@/features/notifications/push';
+import { watchDeepTutorTurn } from '@/features/notifications/relay';
 import { DT_EXPIRED_NOTICE, DT_QUERY_ROOT, useDeepTutor, useDtAuthed } from '@/session/DeepTutorProvider';
 import { LiveTurns, type LiveTurn } from './liveTurns';
 
@@ -45,9 +49,27 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
   const [turns] = useState(() => new LiveTurns());
   const [state, setState] = useState<DtConnectionState>('idle');
   const { baseUrl, token } = session;
+  // DeepTutor has no hook of its own: the push relay follows each turn and notifies the phone.
+  // Which turns it follows, whether it serves this DeepTutor, and what you asked (by session,
+  // "" for a new chat) for the notification's title.
+  const [pushWatch] = useState(() => ({ watched: new Set<string>(), relayServes: true, prompts: new Map<string, string>() }));
 
   const connection = useMemo(() => {
     const sessionKey = (id: string) => [DT_QUERY_ROOT, baseUrl, 'session', id];
+    const watchForPush = (sessionId: string, turnId: string) => {
+      const pushToken = pushTokenIfOn();
+      if (!pushToken || !pushWatch.relayServes || pushWatch.watched.has(turnId)) return;
+      pushWatch.watched.add(turnId);
+      const cached = queryClient.getQueryData<DtSession>(sessionKey(sessionId));
+      const prompt = pushWatch.prompts.get(sessionId) ?? pushWatch.prompts.get('');
+      pushWatch.prompts.delete('');
+      const title = cached ? sessionTitle(cached) : prompt ? sessionTitle({ title: '', last_message: prompt }) : null;
+      watchDeepTutorTurn((input, init) => fetch(input, init), token, { pushToken, sessionId, turnId, title, server: baseUrl })
+        .then((result) => {
+          if (result === 'unsupported') pushWatch.relayServes = false;
+        })
+        .catch(() => pushWatch.watched.delete(turnId));
+    };
     // The reply is saved when its turn ends: refetch, then let the saved message take over.
     const settle = (live: LiveTurn) => {
       void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, baseUrl, 'sessions'] });
@@ -73,7 +95,10 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
       },
       onEvent: (event) => {
         const live = turns.apply(event);
-        if (event.type === 'session') void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, baseUrl, 'sessions'] });
+        if (event.type === 'session') {
+          void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, baseUrl, 'sessions'] });
+          watchForPush(event.session_id, event.turn_id);
+        }
         if (event.type === 'done' && live) settle(live);
       },
       onError: (error) => {
@@ -91,7 +116,7 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
       },
       onState: setState,
     });
-  }, [baseUrl, token, queryClient, turns, toast]);
+  }, [baseUrl, token, queryClient, turns, toast, pushWatch]);
 
   useEffect(() => () => connection.close(), [connection]);
 
@@ -117,7 +142,10 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
     () => ({
       turns,
       state,
-      send: async (request) => (await connection.startTurn(request)).sessionId,
+      send: async (request) => {
+        if (request.persistUserMessage !== false) pushWatch.prompts.set(request.sessionId ?? '', request.content);
+        return (await connection.startTurn(request)).sessionId;
+      },
       stop: async (sessionId) => {
         const turnId = turns.get(sessionId)?.turnId;
         return turnId ? connection.cancel(turnId) : false;
@@ -132,7 +160,7 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
         connection.follow(turnId, 0);
       },
     }),
-    [connection, state, turns],
+    [connection, state, turns, pushWatch.prompts],
   );
 
   return <DtLiveContext.Provider value={value}>{children}</DtLiveContext.Provider>;

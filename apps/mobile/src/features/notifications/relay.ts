@@ -47,6 +47,27 @@ export async function testThroughRelay(fetchImpl: Fetch, owuiToken: string, push
   return lastEvent(await call(fetchImpl, 'POST', '/v1/devices/test', owuiToken, pushToken, relayUrl));
 }
 
+/**
+ * Asks the relay to notify this phone when a DeepTutor turn ends or asks a question. DeepTutor
+ * has no hook of its own, so the relay follows the turn inside the server, with this DeepTutor
+ * sign-in, for that one turn. "unsupported": the relay serves another DeepTutor (or none).
+ */
+export async function watchDeepTutorTurn(
+  fetchImpl: Fetch,
+  dtToken: string,
+  watch: { pushToken: string; sessionId: string; turnId: string; title: string | null; server: string },
+  relayUrl = PUSH_RELAY_URL,
+): Promise<'watching' | 'unsupported'> {
+  const response = await fetchImpl(`${relayUrl}/v1/deeptutor/watch`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${dtToken}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(watch),
+  });
+  if (response.status === 404) return 'unsupported';
+  if (!response.ok) throw new Error(`the notification service answered ${response.status}`);
+  return 'watching';
+}
+
 /** Why notifications couldn't be switched on, in words. */
 export function describePushError(error: unknown): string {
   if (error instanceof OwuiHttpError) return error.detail ?? `Open WebUI answered ${error.status}.`;

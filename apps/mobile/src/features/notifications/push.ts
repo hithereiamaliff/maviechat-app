@@ -70,6 +70,11 @@ export function pushAnnouncesReplies(): boolean {
   return Boolean(state?.enabled && state.lastEventAt != null);
 }
 
+/** This phone's push token while notifications are on, else null. */
+export function pushTokenIfOn(): string | null {
+  return state?.enabled && state.pushToken ? state.pushToken : null;
+}
+
 async function expoPushToken(): Promise<string> {
   const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId;
   return (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : {})).data;

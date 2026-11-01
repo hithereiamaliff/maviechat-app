@@ -3,7 +3,13 @@ export interface PushMessage {
   to: string;
   title: string;
   body: string;
-  data: { kind: 'chat.finished' | 'chat.failed' | 'test'; chatId?: string };
+  data: {
+    kind: 'chat.finished' | 'chat.failed' | 'test' | 'deeptutor.finished' | 'deeptutor.failed' | 'deeptutor.question';
+    /** An Open WebUI chat. */
+    chatId?: string;
+    /** A DeepTutor session. */
+    sessionId?: string;
+  };
   sound: 'default';
   priority: 'high';
   threadId?: string;
