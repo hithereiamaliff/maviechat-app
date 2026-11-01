@@ -1,0 +1,15 @@
+{
+  "name": "@maviechat/owui-protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open WebUI client protocol for MavieChat. Plain TypeScript that runs in React Native and in Node.",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "socket.io-client": "^4.8.4"
+  }
+}

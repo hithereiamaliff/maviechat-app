@@ -1,0 +1,35 @@
+{
+  "name": "maviechat-app",
+  "private": true,
+  "description": "MavieChat: a native iPhone client for Open WebUI that follows the web app's layout.",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "tools/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "vitest run",
+    "check:licenses": "node scripts/check-licenses.mjs",
+    "check:copies": "node scripts/check-copies.mjs",
+    "check": "npm run typecheck && npm run lint && npm test && npm run check:licenses && npm run check:copies",
+    "bundle": "npm run bundle --workspace @maviechat/mobile",
+    "probe": "npm run probe --workspace @maviechat/contract-probe --",
+    "ref:sync": "bash scripts/ref-sync.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "jscpd": "^5.4.2",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5"
+  },
+  "overrides": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

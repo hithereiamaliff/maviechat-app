@@ -1,0 +1,29 @@
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+*.tsbuildinfo
+.metro-health-check*
+npm-debug.*
+.DS_Store
+
+# Pinned Open WebUI checkout, read as a spec only (npm run ref:sync)
+.ref/
+
+# Copy-check reports
+.jscpd-report/
+
+# Secrets never live in the repo (they are in ~/.config/maviechat/)
+.env
+.env.*
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+*.jks
+
+# Generated native folders
+/apps/mobile/ios
+/apps/mobile/android

@@ -1,0 +1,14 @@
+{
+  "name": "@maviechat/contract-probe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Checks the Open WebUI contract against a live server and records response shapes (never content or secrets).",
+  "type": "module",
+  "scripts": {
+    "probe": "tsx src/probe.ts",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@maviechat/owui-protocol": "*"
+  }
+}
