@@ -127,6 +127,20 @@ describe('ChatStreams', () => {
     expect(answers.some((value) => typeof value === 'object' && value !== null && 'error' in value)).toBe(true);
   });
 
+  it('announces a reply you left mid-way, but not the one on screen', () => {
+    const left = setup('c2');
+    left.seed('c1');
+    left.streams.handle(left.event('c1', 'a1', 'chat:completion', { done: true, content: 'Done' }));
+    left.frames[0]?.();
+    expect(left.hooks.notify).toHaveBeenCalledWith('Reply ready in “Chat”', 'success');
+
+    const watching = setup('c1');
+    watching.seed('c1');
+    watching.streams.handle(watching.event('c1', 'a1', 'chat:completion', { done: true, content: 'Done' }));
+    watching.frames[0]?.();
+    expect(watching.hooks.notify).not.toHaveBeenCalled();
+  });
+
   it('announces replies finishing in chats you are not viewing', () => {
     const { streams, event, hooks } = setup('somewhere-else');
     streams.handle(event('c9', 'x1', 'chat:completion', { done: true }));

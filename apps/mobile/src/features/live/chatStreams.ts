@@ -124,7 +124,11 @@ export class ChatStreams {
         }
         return { ...record, chat: { ...record.chat, history: { ...history, messages } } };
       });
-      if (finished) this.converge(chatId);
+      if (finished) {
+        this.converge(chatId);
+        // A reply you started here and then left (for another chat or settings) is announced like any other.
+        if (!this.hooks.isViewing(chatId)) this.hooks.notify(`Reply ready in “${this.titleOf(chatId) ?? 'a chat'}”`, 'success');
+      }
     }
   }
 
