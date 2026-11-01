@@ -325,6 +325,11 @@
     "license": "BSD-2-Clause"
   },
   {
+    "name": "escape-string-regexp",
+    "version": "4.0.0",
+    "license": "MIT"
+  },
+  {
     "name": "expo",
     "version": "58.0.22",
     "license": "MIT"
@@ -612,6 +617,11 @@
   {
     "name": "react-native-svg",
     "version": "15.16.0",
+    "license": "MIT"
+  },
+  {
+    "name": "react-native-webview",
+    "version": "14.0.1",
     "license": "MIT"
   },
   {

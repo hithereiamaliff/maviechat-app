@@ -47,7 +47,7 @@
         {
           "photosPermission": "MavieChat lets you attach photos from your library to a chat.",
           "cameraPermission": "MavieChat lets you take a photo to attach to a chat.",
-          "microphonePermission": false
+          "microphonePermission": "MavieChat uses the microphone when you speak to DeepTutor in the app."
         }
       ]
     ],

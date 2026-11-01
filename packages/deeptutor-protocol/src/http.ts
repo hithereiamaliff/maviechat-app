@@ -119,7 +119,8 @@ export class DtClient {
 
     let response: Response;
     try {
-      response = await this.fetchImpl(this.url(path, options.query), { method, headers, body, signal: controller.signal });
+      // `include`: on iOS the sign-in cookie then lands in the shared cookie store, where the web view finds it.
+      response = await this.fetchImpl(this.url(path, options.query), { method, headers, body, signal: controller.signal, credentials: 'include' });
     } catch (error) {
       throw new DtNetworkError(path, error, timedOut);
     } finally {

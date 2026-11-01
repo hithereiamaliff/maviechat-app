@@ -32,6 +32,7 @@ describe('client', () => {
     expect((await listSessions(client, { limit: 5 })).map((session) => session.id)).toEqual(['s1']);
     expect(calls[0]?.url).toBe('https://learn.example.com/api/sessions?limit=5&offset=0');
     expect((calls[0]?.init?.headers as Record<string, string>).Authorization).toBe('Bearer abc');
+    expect(calls[0]?.init?.credentials).toBe('include');
   });
 
   it('turns error answers into DtHttpError with the server detail', async () => {

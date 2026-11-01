@@ -48,7 +48,7 @@ export default function DeepTutorSession() {
   return (
     <View style={styles.screen}>
       <SpaceHeader
-        leading={<IconButton icon="chevron-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/learn'))} />}
+        leading={<IconButton icon="chevron-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/learn/chats'))} />}
         title={detail.data?.title || 'DeepTutor chat'}
         subtitle={sessionDate(detail.data?.updated_at ?? detail.data?.created_at)}
       />
