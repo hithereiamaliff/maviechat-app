@@ -5,6 +5,7 @@ export * from './http';
 export * from './markdown';
 export * from './notebooks';
 export * from './organize';
+export * from './practice';
 export * from './sessions';
 export * from './turnConnection';
 export * from './turnReply';

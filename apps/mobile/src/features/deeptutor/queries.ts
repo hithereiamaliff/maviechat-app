@@ -2,7 +2,9 @@ import {
   DEFAULT_ATTACHMENT_LIMITS,
   getAttachmentLimits,
   getLlmOptions,
+  getPracticeSummary,
   getProfile,
+  getQuestionBankStats,
   getSuggestions,
   getUiSettings,
   getServerVersion,
@@ -11,6 +13,7 @@ import {
   listKnowledgeBases,
   listModes,
   listNotebooks,
+  listQuestionCategories,
   listSessions,
   searchSessions,
   type DtSessionSummary,
@@ -103,6 +106,34 @@ export function useDtSuggestions() {
     staleTime: 5 * 60_000,
     refetchInterval: (query) => (query.state.data?.stale && query.state.dataUpdateCount < 10 ? 3500 : false),
   });
+}
+
+/** This phone's time zone, which DeepTutor counts practice days in. */
+export function deviceTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
+/** Today's practice: what's due, mistakes, the bank's size, the next review. */
+export function useDtPracticeSummary() {
+  const { client, session } = useDtAuthed();
+  const timeZone = deviceTimeZone();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'practice', 'summary', timeZone], queryFn: () => getPracticeSummary(client, timeZone) });
+}
+
+/** The question bank's categories (yours to make on the web). */
+export function useDtQuestionCategories() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'practice', 'categories'], queryFn: () => listQuestionCategories(client), staleTime: 60_000 });
+}
+
+/** Counts for the question bank: all, wrong, bookmarked. */
+export function useDtQuestionBankStats() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'practice', 'stats'], queryFn: () => getQuestionBankStats(client) });
 }
 
 /** The DeepTutor version the server runs (null when it doesn't say). */

@@ -1,11 +1,13 @@
 import type { IconName } from '@/components/Icon';
 
-/** A DeepTutor page the app doesn't have natively yet: it opens DeepTutor's own page, signed in. */
+/** A DeepTutor page: native when it has a `route`, else DeepTutor's own page (`path`), signed in. */
 export interface DtPage {
   key: string;
   label: string;
   icon: IconName;
   path: string;
+  /** The app's own screen for it. */
+  route?: '/learn/practice' | '/learn/questions';
   /** Hidden from learner accounts, which DeepTutor limits to chat and some learning. */
   notForLearners?: boolean;
 }
@@ -47,6 +49,7 @@ export const DT_SHELVES: DtShelf[] = [
         pages: [
           { key: 'learning-new', label: 'New Learning Activity', icon: 'plus', path: '/learning/new' },
           { key: 'learning', label: 'All Learning', icon: 'squares-2x2', path: '/learning' },
+          { key: 'practice', label: 'Practice', icon: 'arrow-path', path: '/learning/practice', route: '/learn/practice' },
         ],
       },
     ],
@@ -64,7 +67,7 @@ export const DT_SHELVES: DtShelf[] = [
           { key: 'chat-history', label: 'Chat History', icon: 'clock', path: '/space/chat-history' },
           { key: 'notebooks', label: 'Favorites', icon: 'bookmark', path: '/notebooks' },
           { key: 'journal', label: 'Learning Journal', icon: 'book-open', path: '/space/journal' },
-          { key: 'questions', label: 'Question Bank', icon: 'question-mark-circle', path: '/space/questions' },
+          { key: 'questions', label: 'Question Bank', icon: 'question-mark-circle', path: '/space/questions', route: '/learn/questions' },
           { key: 'knowledge', label: 'Knowledge Center', icon: 'circle-stack', path: '/knowledge-bases' },
         ],
       },

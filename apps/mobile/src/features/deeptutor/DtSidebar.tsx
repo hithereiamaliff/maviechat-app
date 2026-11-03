@@ -12,7 +12,7 @@ import { useDebounced } from '@/lib/useDebounced';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
 import { radius, usePalette } from '@/theme';
-import { DT_ADMIN_PAGE, shelvesFor, type DtShelfKey } from './pages';
+import { DT_ADMIN_PAGE, shelvesFor, type DtPage, type DtShelfKey } from './pages';
 import { useDtProfile } from './queries';
 import { buildDtSidebarRows, type DtSidebarRow } from './sidebarRows';
 import { switchToOpenWebUI } from './switch';
@@ -20,7 +20,7 @@ import { useDtChatActions } from './useDtChatActions';
 import { useDtSignOut } from './useDtSignOut';
 
 const PAGE_SIZE = 100;
-const NOT_CHATS = new Set(['web', 'settings', 'connection']);
+const NOT_CHATS = new Set(['web', 'settings', 'connection', 'practice', 'questions']);
 
 /**
  * DeepTutor's sidebar, laid out like Open WebUI's (new chat, search, you at the bottom) and
@@ -87,6 +87,12 @@ export function DtSidebar() {
     sidebar.close();
     if (path !== currentPagePath) router.replace({ pathname: '/learn/web', params: { path, title } });
   };
+  // Native pages open the app's own screen; the rest, DeepTutor's page.
+  const openShelfPage = (page: DtPage) => {
+    if (!page.route) return openPage(page.path, page.label);
+    sidebar.close();
+    if (pathname !== page.route) router.replace(page.route);
+  };
   const leaveIfCurrent = (id: string) => () => {
     if (id === currentChatId) router.replace('/learn');
   };
@@ -135,9 +141,9 @@ export function DtSidebar() {
           <SidebarAction
             icon={item.page.icon}
             label={item.page.label}
-            hint="Opens DeepTutor's page"
-            current={item.page.path === currentPagePath}
-            onPress={() => openPage(item.page.path, item.page.label)}
+            hint={item.page.route ? undefined : "Opens DeepTutor's page"}
+            current={item.page.route ? pathname === item.page.route : item.page.path === currentPagePath}
+            onPress={() => openShelfPage(item.page)}
           />
         );
       case 'learning-chat': {

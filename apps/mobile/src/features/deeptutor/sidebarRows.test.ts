@@ -61,8 +61,8 @@ describe('buildDtSidebarRows', () => {
       failed: false,
       now,
     });
-    expect(labels(rows)).toEqual(['[New Learning Activity]', '[All Learning]', 'Learning chats', 'book']);
-    expect(rows[3]).toMatchObject({ type: 'learning-chat', path: '/learning/books/b1/pages/p1?chat=book' });
+    expect(labels(rows)).toEqual(['[New Learning Activity]', '[All Learning]', '[Practice]', 'Learning chats', 'book']);
+    expect(rows[4]).toMatchObject({ type: 'learning-chat', path: '/learning/books/b1/pages/p1?chat=book' });
   });
 
   it('says why a list is empty', () => {

@@ -189,6 +189,42 @@ The owner asked for DeepTutor to be treated equally with Open WebUI: a home page
 - **Languages:** `GET /api/settings/ui` → `theme`, `language` (DeepTutor's interface), `response_language` (17 reply languages, Malay included); `PUT` merges only the fields sent.
 - **Ideas:** `GET /api/dashboard/suggestions` → `{suggestions: [{label, prompt}], stale}`; it answers at once and writes a fresh set behind the answer when stale (the app asks again every 3.5 s, up to 10 times). `POST /api/dashboard/suggestions/refresh` writes a new set now (uses DeepTutor's model). An empty list means DeepTutor has nothing about you to go on yet.
 
+## Practice and Question Bank (B1, 2026-11-03)
+
+The owner asked for DeepTutor's quizzes to be native beyond the chat's Quiz mode. **Practice** (Learning shelf) and **Question Bank** (Resources shelf) are now native screens; DeepTutor's web app shows both on one page (`/learning/practice`, `/space/questions`).
+
+- **Practice:**
+  - Today's counts: due now, mistakes, in your bank, reviewed today; categories if you made any; **Start Review**.
+  - A round asks each due question in turn:
+    - Choice questions are checked by DeepTutor: right → **Next**, wrong → **Practise Again**, which brings it back at the end of the round.
+    - Written ones show DeepTutor's answer and you rate yourself: Again, Hard, Good, Easy.
+    - **I Know This** and **Skip** are there too.
+  - With nothing due, it says when the next review is and offers **Make a Quiz**, which opens the home page in Quiz mode.
+- **Question Bank:**
+  - Search; filters for All, Mistakes, Bookmarked and your categories.
+  - Each question opens with the choices (yours and the right one marked) or both answers, and the explanation.
+  - From there: the chat it came from, **Practise This Question**, Bookmark, Delete.
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --practice`)
+
+- **Saving.** Quiz answers reach the bank through `POST /api/sessions/{id}/quiz-results` (the chat's Submit Answers).
+  - The bank is `/api/question-notebook`: `entries` (filters `mistakes_only`, `bookmarked`, `category_id`, `search`, `limit`/`offset`; answers `{items, total}`), `PATCH entries/{id}` (`bookmarked`, `resolved`), `DELETE entries/{id}`, `categories`, `stats`.
+  - Deleting a chat hides its questions but doesn't delete them.
+- **When questions are due.** A wrong answer is due the next day; a right one three days later. After a review, the schedule decides:
+  - **again**: 10 minutes;
+  - **hard**: ×1.2;
+  - **good**: 3 days at first, then × ease;
+  - **easy**: like good, ×1.3.
+- **Practice** is `/api/question-notebook/practice`:
+  - `summary?timezone=` → total, mistakes, due, overdue, reviewed today, next due;
+  - `queue?timezone=&category_id=&limit=` → `[{entry, state}]`, due now;
+  - `questions/{id}` → one question, due or not;
+  - `questions/{id}/check {answer}` → `{correct}`, true or false for choice questions and null when it can't check.
+- **Reviews:** `questions/{id}/review {request_id, version, rating, answer, self_report}`.
+  - The same `request_id` gets the same answer, so a lost reply can be retried.
+  - An old `version` gets 409.
+  - A wrong objective answer rated anything but `again` gets 422.
+
 ## M1.5 checklist
 
 | | Item |

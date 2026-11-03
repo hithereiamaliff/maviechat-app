@@ -1,14 +1,14 @@
 import { refreshSuggestions } from '@maviechat/deeptutor-protocol';
 import { useQueryClient } from '@tanstack/react-query';
-import { router } from 'expo-router';
-import { useRef, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { useToast } from '@/components/Toast';
 import { updateDraft } from '@/features/chat/drafts';
-import { modeInfo } from '@/features/deeptutor/chat/capabilities';
+import { isNativeCapability, modeInfo } from '@/features/deeptutor/chat/capabilities';
 import { DtComposer, type DtComposerHandle } from '@/features/deeptutor/chat/DtComposer';
 import { useDtLive } from '@/features/deeptutor/chat/DtLiveProvider';
 import { DtUserBubble } from '@/features/deeptutor/chat/DtReplyView';
@@ -43,6 +43,12 @@ export default function DeepTutorHome() {
   const live = useDtLive();
   const choice = useDtChoice(null);
   const ideas = useDtSuggestions();
+  // `?mode=deep_question` (Practice's "Make a Quiz") opens with that mode picked.
+  const asked = useLocalSearchParams<{ mode?: string }>().mode;
+  const { setMode } = choice;
+  useEffect(() => {
+    if (typeof asked === 'string' && isNativeCapability(asked)) setMode(asked);
+  }, [asked, setMode]);
   const composer = useRef<DtComposerHandle>(null);
   const [pending, setPending] = useState<{ text: string; extras?: PromptExtras } | null>(null);
   const [greeting] = useState(() => greetingFor(session.account.username, new Date()));

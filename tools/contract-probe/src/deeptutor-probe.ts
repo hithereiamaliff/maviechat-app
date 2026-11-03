@@ -12,7 +12,10 @@
  * checks what the app's DeepTutor space reads and writes: the profile, the reply language (saved
  * back unchanged), the home screen's ideas, a wrong current password refused (so nothing
  * changes), and one short "APP PROBE:" chat pinned, archived, restored and unpinned, read back
- * from the list after each step, then deleted.
+ * from the list after each step, then deleted. `--practice` runs one one-question Quiz turn,
+ * saves the answer as wrong, and walks DeepTutor's practice loop with it: question bank, summary
+ * (a wrong answer is due the next day), checking, reviewing (a wrong answer must be "again", a retried review is answered the
+ * same, an old version is refused), bookmarking; then deletes the question and the chat.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -25,7 +28,17 @@ import {
   addChatRecord,
   applyTurnEvent,
   changePassword,
+  checkPracticeAnswer,
+  deleteSavedQuestion,
   DtHttpError,
+  getPracticeQuestion,
+  getPracticeQueue,
+  getPracticeSummary,
+  getQuestionBankStats,
+  listSavedQuestions,
+  reviewPracticeQuestion,
+  saveQuizResults,
+  updateSavedQuestion,
   getProfile,
   getSuggestions,
   getUiSettings,
@@ -78,6 +91,7 @@ const { values: args } = parseArgs({
     modes: { type: 'boolean' },
     refs: { type: 'boolean' },
     space: { type: 'boolean' },
+    practice: { type: 'boolean' },
   },
 });
 
@@ -236,6 +250,14 @@ async function main() {
     await step('space: profile, reply language, ideas, password check, pin and archive', async () => {
       const outcome = await probeSpace(baseUrl, session.token as string, client);
       fixtures.space = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.practice) {
+    await step('practice: quiz result saved, bank, summary, queue, check, review, bookmark', async () => {
+      const outcome = await probePractice(baseUrl, session.token as string, client);
+      fixtures.practice = outcome.fixture;
       return { value: true, note: outcome.note };
     });
   }
@@ -544,6 +566,114 @@ async function probeSpace(baseUrl: string, token: string, client: DtClient): Pro
     note: `profile ok (${profile.preset ?? 'no preset'}); reply language ${ui.response_language} saved back; ${ideas.suggestions.length} ideas${ideas.stale ? ' (being written)' : ''}; wrong password refused; pin, archive, restore, unpin read back; chat deleted`,
     fixture: { profile: shapeOf(profile), ui: shapeOf(ui), suggestions: shapeOf(ideas) },
   };
+}
+
+/** DeepTutor's practice loop on one throwaway quiz question; the question and its chat are deleted. */
+async function probePractice(baseUrl: string, token: string, client: DtClient): Promise<{ note: string; fixture: Record<string, unknown> }> {
+  let reply: DtReply = emptyReply();
+  let finished: () => void = () => undefined;
+  const done = new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('no done event within 3 minutes')), 180_000);
+    finished = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+  });
+  const connection = new DtTurnConnection({
+    url: turnSocketUrl(baseUrl),
+    connect: (url, handlers) => {
+      const socket = new NodeWebSocket(url, { headers: { Cookie: socketCookieHeader(token) } });
+      socket.onopen = () => handlers.onOpen();
+      socket.onmessage = (event) => handlers.onMessage(event.data);
+      socket.onclose = (event) => handlers.onClose(event.code);
+      return { send: (data) => socket.send(data), close: () => socket.close() };
+    },
+    onEvent: (event) => {
+      reply = applyTurnEvent(reply.sessionId ? reply : emptyReply(event.session_id, event.turn_id), event);
+      if (event.type === 'done') finished();
+    },
+  });
+  let sessionId: string | null = null;
+  let entryId: number | null = null;
+  try {
+    const started = await connection.startTurn({
+      content: `${PROBE_PREFIX} Fractions, as a multiple-choice question`,
+      capability: 'deep_question',
+      config: { num_questions: 1, difficulty: 'easy' },
+      tools: [],
+    });
+    sessionId = started.sessionId;
+    await done;
+    const question = reply.quiz[0];
+    if (!question || !reply.turnId) throw new Error('the quiz turn wrote no question');
+    const options = Object.fromEntries(question.options.map((option) => [option.key, option.text]));
+    const right = question.options.map((option) => option.key).filter((key) => question.answer.toUpperCase().split(/[,;\s]+/).includes(key.toUpperCase()));
+    const wrong = question.options.map((option) => option.key).find((key) => !right.includes(key));
+    const objective = question.type === 'choice' && right.length > 0 && wrong !== undefined;
+    const answer = objective ? (wrong as string) : 'not sure';
+    await saveQuizResults(client, sessionId, reply.turnId, [
+      {
+        question_id: question.id,
+        question: question.question,
+        question_type: question.type,
+        options,
+        user_answer: answer,
+        correct_answer: question.answer,
+        explanation: question.explanation,
+        difficulty: question.difficulty,
+        is_correct: false,
+      },
+    ]);
+
+    const saved = (await listSavedQuestions(client, { search: question.question.slice(0, 60) })).items.find((item) => item.question === question.question);
+    if (!saved) throw new Error('the saved question is missing from the question bank');
+    entryId = saved.id;
+    if (saved.is_correct !== false) throw new Error('the saved question is not marked wrong');
+    const stats = await getQuestionBankStats(client);
+    if (stats.total < 1 || stats.wrong < 1) throw new Error('the question bank counts are off');
+    // DeepTutor brings a wrong quiz answer back the next day (a right one three days later), so it isn't due yet.
+    const summary = await getPracticeSummary(client, 'Asia/Kuala_Lumpur');
+    const nextDay = Date.now() / 1000 + 86_400 + 600;
+    if (summary.total < 1 || summary.next_due_at === null || summary.next_due_at > nextDay) {
+      throw new Error(`the wrong answer isn't scheduled within a day (total ${summary.total}, next ${summary.next_due_at})`);
+    }
+    const queue = await getPracticeQueue(client, 'Asia/Kuala_Lumpur', { limit: 100 });
+    const queued = await getPracticeQuestion(client, entryId);
+    if (queued.entry.id !== entryId) throw new Error('the question does not open for practice');
+    if (objective) {
+      if ((await checkPracticeAnswer(client, entryId, right.join(','))) !== true) throw new Error('the right answer did not check as right');
+      if ((await checkPracticeAnswer(client, entryId, answer)) !== false) throw new Error('the wrong answer did not check as wrong');
+      const refused = await reviewPracticeQuestion(client, entryId, { requestId: randomId(), version: 0, rating: 'good', answer }).then(
+        () => null,
+        (error: unknown) => error,
+      );
+      if (!(refused instanceof DtHttpError) || refused.status !== 422) throw new Error('a wrong answer rated "good" was not refused');
+    }
+    const request = { requestId: randomId(), version: queued.state.version, rating: 'again' as const, answer };
+    const first = await reviewPracticeQuestion(client, entryId, request);
+    if (first.version !== queued.state.version + 1 || first.mastered) throw new Error('the review did not move the schedule on');
+    const retried = await reviewPracticeQuestion(client, entryId, request);
+    if (retried.version !== first.version || retried.due_at !== first.due_at) throw new Error('a retried review was not answered the same');
+    const stale = await reviewPracticeQuestion(client, entryId, { ...request, requestId: randomId() }).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    if (!(stale instanceof DtHttpError) || stale.status !== 409) throw new Error('a review of an old version was not refused');
+    if ((await getPracticeQuestion(client, entryId)).state.version !== first.version) throw new Error('the question does not show its new schedule');
+
+    await updateSavedQuestion(client, entryId, { bookmarked: true });
+    const bookmarked = await listSavedQuestions(client, { bookmarked: true, limit: 200 });
+    if (!bookmarked.items.some((item) => item.id === entryId)) throw new Error('the bookmark did not stick');
+
+    return {
+      note: `${objective ? 'choice' : `"${question.type}"`} question saved wrong; in the bank, due within a day; ${objective ? 'checked right and wrong; "good" refused; ' : ''}reviewed "again" (v${first.version}), retry answered the same, old version refused; bookmarked; deleted`,
+      fixture: { summary: shapeOf(summary), queue: shapeOf(queue.slice(0, 1)), entry: shapeOf(saved), review: shapeOf(first) },
+    };
+  } finally {
+    connection.close();
+    if (entryId !== null) await deleteSavedQuestion(client, entryId).catch(() => undefined);
+    if (sessionId) await deleteSession(client, sessionId).catch(() => undefined);
+  }
 }
 
 function report(version: string) {
