@@ -135,5 +135,6 @@ describe('downloads', () => {
     expect(JSON.parse(chatJson(chat))).toEqual([chat]);
     expect(exportFileName(chat.title, 'txt')).toBe('chat-Taxes 2026 27.txt');
     expect(exportFileName('', 'json')).toBe('chat-export-chat.json');
+    expect(exportFileName(chat.title, 'pdf')).toBe('chat-Taxes 2026 27.pdf');
   });
 });

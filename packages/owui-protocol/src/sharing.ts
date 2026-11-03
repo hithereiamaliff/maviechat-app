@@ -238,5 +238,5 @@ export function exportFileName(title: string, extension: 'txt' | 'json' | 'pdf')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 80);
-  return extension === 'json' ? `chat-export-${name || 'chat'}.json` : `chat-${name || 'chat'}.txt`;
+  return extension === 'json' ? `chat-export-${name || 'chat'}.json` : `chat-${name || 'chat'}.${extension}`;
 }
