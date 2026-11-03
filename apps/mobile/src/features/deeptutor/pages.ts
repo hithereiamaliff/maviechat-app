@@ -7,7 +7,7 @@ export interface DtPage {
   icon: IconName;
   path: string;
   /** The app's own screen for it. */
-  route?: '/learn/practice' | '/learn/questions' | '/learn/favorites' | '/learn/journal' | '/learn/history' | '/learn/knowledge';
+  route?: '/learn/practice' | '/learn/questions' | '/learn/favorites' | '/learn/journal' | '/learn/history' | '/learn/knowledge' | '/learn/calendar' | '/learn/tasks';
   /** Hidden from learner accounts, which DeepTutor limits to chat and some learning. */
   notForLearners?: boolean;
 }
@@ -33,8 +33,8 @@ export const DT_SHELVES: DtShelf[] = [
       {
         heading: 'Workspace',
         pages: [
-          { key: 'calendar', label: 'Calendar', icon: 'calendar', path: '/calendar' },
-          { key: 'kanban', label: 'Task Board', icon: 'view-columns', path: '/kanban' },
+          { key: 'calendar', label: 'Calendar', icon: 'calendar', path: '/calendar', route: '/learn/calendar' },
+          { key: 'kanban', label: 'Task Board', icon: 'view-columns', path: '/kanban', route: '/learn/tasks' },
           { key: 'co-writer', label: 'Co-Writer', icon: 'pencil', path: '/co-writer', notForLearners: true },
         ],
       },

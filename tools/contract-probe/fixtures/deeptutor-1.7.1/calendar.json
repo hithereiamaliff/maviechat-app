@@ -1,0 +1,79 @@
+{
+  "board": {
+    "cards": [
+      {
+        "archived": "boolean",
+        "createdAt": "string",
+        "dueDate": "null|string",
+        "id": "string",
+        "note": "string",
+        "status": "string",
+        "title": "string",
+        "updatedAt": "string"
+      }
+    ],
+    "colors": {
+      "doing": "string",
+      "done": "string",
+      "todo": "string"
+    },
+    "revision": "number",
+    "sessionLinks": [
+      {
+        "sessionId": "string",
+        "statusLinkEnabled": "boolean",
+        "taskIds": []
+      }
+    ]
+  },
+  "occurrence": {
+    "allDay": "boolean",
+    "calendarId": "string",
+    "color": "null",
+    "end": "string",
+    "eventId": "string",
+    "id": "string",
+    "location": "string",
+    "notes": "string",
+    "occurrence": "string",
+    "recurring": "boolean",
+    "reminders": [
+      "number"
+    ],
+    "rrule": "null",
+    "seriesId": "null",
+    "source": "string",
+    "start": "string",
+    "taskId": "string",
+    "title": "string",
+    "tzid": "string"
+  },
+  "layers": {
+    "automations": [],
+    "footprints": [
+      {
+        "date": "string",
+        "masteryEvidence": "number",
+        "practiceReviews": "number",
+        "sessionCount": "number",
+        "sessions": [
+          {
+            "id": "string",
+            "title": "string"
+          }
+        ]
+      }
+    ],
+    "reviews": []
+  },
+  "hits": [
+    {
+      "allDay": "boolean",
+      "id": "string",
+      "location": "string",
+      "nextStart": "string",
+      "start": "string",
+      "title": "string"
+    }
+  ]
+}

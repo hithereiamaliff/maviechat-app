@@ -1,4 +1,4 @@
-import { listSessions, searchSessions, sessionTitle } from '@maviechat/deeptutor-protocol';
+import { listSessions, searchSessions, sessionStatusColor, sessionTitle } from '@maviechat/deeptutor-protocol';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useGlobalSearchParams, usePathname } from 'expo-router';
@@ -13,14 +13,14 @@ import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
 import { radius, usePalette } from '@/theme';
 import { DT_ADMIN_PAGE, shelvesFor, type DtPage, type DtShelfKey } from './pages';
-import { useDtProfile } from './queries';
+import { useDtProfile, useDtTaskBoard } from './queries';
 import { buildDtSidebarRows, type DtSidebarRow } from './sidebarRows';
 import { switchToOpenWebUI } from './switch';
 import { useDtChatActions } from './useDtChatActions';
 import { useDtSignOut } from './useDtSignOut';
 
 const PAGE_SIZE = 100;
-const NOT_CHATS = new Set(['web', 'settings', 'connection', 'practice', 'questions', 'favorites', 'journal', 'history', 'knowledge']);
+const NOT_CHATS = new Set(['web', 'settings', 'connection', 'practice', 'questions', 'favorites', 'journal', 'history', 'knowledge', 'calendar', 'tasks']);
 
 /**
  * DeepTutor's sidebar, laid out like Open WebUI's (new chat, search, you at the bottom) and
@@ -36,6 +36,8 @@ export function DtSidebar() {
   const queryClient = useQueryClient();
   const actions = useDtChatActions();
   const profile = useDtProfile();
+  // A chat linked to a task shows that task's column colour, as on DeepTutor's web app.
+  const board = useDtTaskBoard();
   const pathname = usePathname();
   const params = useGlobalSearchParams<{ path?: string }>();
   const segment = pathname.startsWith('/learn/') ? decodeURIComponent(pathname.slice('/learn/'.length)) : null;
@@ -171,6 +173,7 @@ export function DtSidebar() {
             current={id === currentChatId}
             busy={item.session.status === 'running'}
             pinned={item.pinned}
+            mark={sessionStatusColor(board.data, id)}
             onOpen={() => openChat(id)}
             menu={[
               { key: 'rename', label: 'Rename', icon: 'pencil', onPress: () => actions.rename(id, title) },

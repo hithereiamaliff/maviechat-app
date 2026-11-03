@@ -23,6 +23,12 @@
  * (PageIndex OSS, Flash), followed to ready; a chat turn that picks it must find the PDF's word;
  * a second PDF added and removed, a re-index, Make Default (the old default is put back), then
  * the knowledge base and the chat are deleted. Uses the account's model for a minute or two.
+ * `--calendar` checks the Task Board and the Calendar: two "APP PROBE:" tasks made, moved and
+ * dated; one linked to a short chat (its status colour, then unlinked; the chat is asked which
+ * task is its own); a timed event blocking time for a task, an all-day weekly event over three
+ * weeks with one date deleted and undone and the rest renamed from the second date; search and
+ * the layers read. Events and the chat are deleted; the tasks are archived (DeepTutor has no
+ * delete for tasks).
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -65,6 +71,27 @@ import {
   createNotebook,
   deleteNotebook,
   createKnowledgeBase,
+  addDaysKey,
+  createEvent,
+  createTask,
+  dateKey,
+  deleteEvent,
+  deviceTimeZone,
+  fromDateKey,
+  getCalendarLayers,
+  getTaskBlocks,
+  getTaskBoard,
+  instant,
+  linkSessionTasks,
+  listCalendars,
+  listOccurrences,
+  repeatRule,
+  searchEvents,
+  sessionStatusColor,
+  setTaskStatusLink,
+  undoCalendarChange,
+  updateEvent,
+  updateTask,
   deleteKbFile,
   deleteKnowledgeBase,
   getKbProgress,
@@ -120,6 +147,7 @@ const { values: args } = parseArgs({
     practice: { type: 'boolean' },
     library: { type: 'boolean' },
     knowledge: { type: 'boolean' },
+    calendar: { type: 'boolean' },
   },
 });
 
@@ -302,6 +330,14 @@ async function main() {
     await step('knowledge: create from a PDF, index, chat finds it, add and remove a file, re-index, default, delete', async () => {
       const outcome = await probeKnowledge(baseUrl, session.token as string, client);
       fixtures.knowledge = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.calendar) {
+    await step('calendar: tasks, a chat link, events, a repeating event, undo, search, layers', async () => {
+      const outcome = await probeCalendar(baseUrl, session.token as string, client);
+      fixtures.calendar = outcome.fixture;
       return { value: true, note: outcome.note };
     });
   }
@@ -914,6 +950,124 @@ async function probeKnowledge(baseUrl: string, token: string, client: DtClient):
     connection.close();
     if (sessionId) await deleteSession(client, sessionId).catch(() => undefined);
     if (created) await deleteKnowledgeBase(client, name).catch(() => undefined);
+  }
+}
+
+/** The Task Board and the Calendar on throwaway items; events and the chat are deleted, tasks archived. */
+async function probeCalendar(baseUrl: string, token: string, client: DtClient): Promise<{ note: string; fixture: Record<string, unknown> }> {
+  const notes: string[] = [];
+  const word = `zq${randomId().slice(0, 6)}`;
+  const other = `zx${randomId().slice(0, 6)}`;
+  const today = dateKey(new Date());
+  const tomorrow = addDaysKey(today, 1);
+  const taskIds: string[] = [];
+  const eventIds: string[] = [];
+  let sessionId: string | null = null;
+  let reply: DtReply = emptyReply();
+  let finished: () => void = () => undefined;
+  const connection = new DtTurnConnection({
+    url: turnSocketUrl(baseUrl),
+    connect: (url, handlers) => {
+      const socket = new NodeWebSocket(url, { headers: { Cookie: socketCookieHeader(token) } });
+      socket.onopen = () => handlers.onOpen();
+      socket.onmessage = (event) => handlers.onMessage(event.data);
+      socket.onclose = (event) => handlers.onClose(event.code);
+      return { send: (data) => socket.send(data), close: () => socket.close() };
+    },
+    onEvent: (event) => {
+      reply = applyTurnEvent(reply, event);
+      if (event.type === 'done') finished();
+    },
+  });
+  const turn = async (content: string, continuing: string | null): Promise<{ answer: string; id: string }> => {
+    reply = emptyReply();
+    const done = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('no done event within 3 minutes')), 180_000);
+      finished = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+    });
+    const started = await connection.startTurn({ content, tools: [], ...(continuing ? { sessionId: continuing } : {}) });
+    sessionId = started.sessionId;
+    await done;
+    return { answer: reply.answer, id: started.sessionId };
+  };
+  try {
+    // Tasks: made, moved, dated and cleared.
+    let board = await createTask(client, { title: `${PROBE_PREFIX} task ${word}`, note: 'Written by the MavieChat probe', dueDate: tomorrow });
+    const mine = board.cards.find((card) => card.title.endsWith(word));
+    if (!mine || mine.status !== 'todo' || mine.dueDate !== tomorrow) throw new Error('the new task did not read back as To do, due tomorrow');
+    taskIds.push(mine.id);
+    board = await createTask(client, { title: `${PROBE_PREFIX} other task ${other}` });
+    const second = board.cards.find((card) => card.title.endsWith(other));
+    if (!second) throw new Error('the second task is missing');
+    taskIds.push(second.id);
+    board = await updateTask(client, mine.id, { status: 'doing', note: 'Moved by the probe' });
+    if (board.cards.find((card) => card.id === mine.id)?.status !== 'doing') throw new Error('the move to In progress did not stick');
+    board = await updateTask(client, second.id, { dueDate: today });
+    board = await updateTask(client, second.id, { dueDate: null });
+    if (board.cards.find((card) => card.id === second.id)?.dueDate !== null) throw new Error('clearing the due date did not stick');
+    notes.push('tasks made, moved and dated');
+
+    // A chat linked to one task: its colour, the model told which task is its own, then unlinked.
+    const chat = (await turn(`${PROBE_PREFIX} Just say OK.`, null)).id;
+    board = await linkSessionTasks(client, chat, [mine.id]);
+    if (sessionStatusColor(board, chat) !== board.colors.doing) throw new Error("the linked chat doesn't take the In progress colour");
+    board = await setTaskStatusLink(client, chat, false);
+    if (sessionStatusColor(board, chat) !== undefined) throw new Error('turning the status link off left the colour');
+    const { answer } = await turn(`${PROBE_PREFIX} Which of my tasks is linked to this conversation? Reply with its title only.`, chat);
+    const knows = answer.includes(word) && !answer.includes(other);
+    board = await linkSessionTasks(client, chat, []);
+    if (board.sessionLinks.some((link) => link.sessionId === chat && link.taskIds.length)) throw new Error('unlinking left a link');
+    notes.push(`chat linked (colour on, then off) and unlinked; ${knows ? 'the model named the linked task' : 'the model did not single out the linked task'}`);
+
+    // A timed event that blocks out time for the task.
+    const timeZone = deviceTimeZone();
+    const calendars = await listCalendars(client);
+    const home = calendars.find((calendar) => calendar.isDefault);
+    if (!home) throw new Error('no default calendar');
+    const start = fromDateKey(tomorrow);
+    start.setHours(10);
+    const end = new Date(start.getTime() + 3600_000);
+    eventIds.push(await createEvent(client, { title: `${PROBE_PREFIX} study ${word}`, allDay: false, start: instant(start), end: instant(end), tzid: timeZone, reminders: [10], taskId: mine.id }));
+    const span = await listOccurrences(client, fromDateKey(tomorrow), fromDateKey(addDaysKey(tomorrow, 1)), timeZone);
+    const timed = span.find((item) => item.eventId === eventIds[0]);
+    if (!timed || timed.taskId !== mine.id || timed.reminders.join() !== '10' || timed.calendarId !== home.id) throw new Error('the timed event did not read back');
+    if ((await getTaskBlocks(client))[mine.id] !== 1) throw new Error('the task does not count its time block');
+
+    // An all-day weekly event, three times: one date deleted and undone, then renamed from the second on.
+    const weekly = await createEvent(client, { title: `${PROBE_PREFIX} weekly ${word}`, allDay: true, start: tomorrow, end: addDaysKey(tomorrow, 1), tzid: timeZone, rrule: repeatRule('weekly', fromDateKey(tomorrow), true, { kind: 'count', count: 3 }) });
+    eventIds.push(weekly);
+    // "This and following" splits a series into a new one with its own id, so its dates are found by title.
+    const weeks = async () => (await listOccurrences(client, fromDateKey(today), fromDateKey(addDaysKey(today, 30)), timeZone)).filter((item) => item.title.startsWith(`${PROBE_PREFIX} weekly ${word}`));
+    const three = await weeks();
+    if (three.length !== 3) throw new Error(`the weekly event shows ${three.length} times, not 3`);
+    const { undoToken } = await deleteEvent(client, weekly, 'this', three[1]!.occurrence);
+    if ((await weeks()).length !== 2) throw new Error('deleting one date did not leave two');
+    if (!undoToken) throw new Error('no undo token');
+    await undoCalendarChange(client, undoToken);
+    if ((await weeks()).length !== 3) throw new Error('undo did not bring the date back');
+    await updateEvent(client, weekly, { title: `${PROBE_PREFIX} weekly ${word} renamed` }, 'following', three[1]!.occurrence);
+    const renamed = (await weeks()).map((item) => item.title.endsWith('renamed'));
+    if (renamed.join() !== 'false,true,true') throw new Error(`renaming from the second date gave ${renamed.join()}`);
+    notes.push('a timed event blocks time for a task (counted); a weekly event: one date deleted, undone, renamed from the second on');
+
+    const hits = await searchEvents(client, word);
+    if (!hits.some((hit) => hit.id === eventIds[0] && hit.nextStart)) throw new Error('search did not find the event with its next start');
+    const layers = await getCalendarLayers(client, fromDateKey(today), fromDateKey(addDaysKey(today, 7)), timeZone);
+    notes.push(`search found it; layers read (${layers.reviews.length} review days, ${layers.automations.length} automations, ${layers.footprints.length} footprint days)`);
+    return {
+      note: `${notes.join('; ')}; events and the chat deleted, tasks archived`,
+      fixture: { board: shapeOf(board), occurrence: shapeOf(timed), layers: shapeOf(layers), hits: shapeOf(hits) },
+    };
+  } finally {
+    connection.close();
+    for (const id of eventIds.reverse()) await deleteEvent(client, id, 'all').catch(() => undefined);
+    // Anything else this run made (a series split off by a change) carries its word.
+    for (const hit of await searchEvents(client, word).catch(() => [])) await deleteEvent(client, hit.id, 'all').catch(() => undefined);
+    for (const id of taskIds) await updateTask(client, id, { archived: true }).catch(() => undefined);
+    if (sessionId) await deleteSession(client, sessionId).catch(() => undefined);
   }
 }
 

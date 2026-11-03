@@ -1,5 +1,7 @@
 export * from './account';
 export * from './auth';
+export * from './calendar';
+export * from './calendarTime';
 export * from './chatOptions';
 export * from './http';
 export * from './journal';
@@ -9,6 +11,7 @@ export * from './notebooks';
 export * from './organize';
 export * from './practice';
 export * from './sessions';
+export * from './tasks';
 export * from './turnConnection';
 export * from './turnReply';
 export * from './turns';

@@ -288,6 +288,62 @@ DeepTutor's knowledge bases are native, on the Resources shelf.
 - **Size:** DeepTutor takes up to 200 MB a file. Its web front end streams uploads to the backend, and our Traefik route sets no limit.
 - **A chat** that picks a PageIndex knowledge base searches it through PageIndex's own tools; other engines go through the `rag` tool.
 
+## Calendar and Task Board (B4, 2026-11-03)
+
+Both are native, on the Home shelf.
+
+- **Task Board:** To do, In progress and Done, one column at a time (tabs with counts and colours), filtered by All dates, Due today or This week.
+  - Each task shows its note, due day (red when overdue), its calendar time blocks and linked chats.
+  - **‹ ›** move a task between columns; its menu moves it anywhere or archives it.
+  - **+** adds a task (title, note, due day).
+  - Tapping a task edits it (title, note, due day, column; Archive or Restore).
+  - The menu: Show Archived, Column Colours, Open Calendar.
+- **Calendar:** the month (from Monday) with a dot for each colour of item on a day and a ring for days you studied, then the chosen day.
+  - The day lists events, tasks due, reviews coming due and automations. All-day ones come first; multi-day ones show on each day.
+  - **+** adds an event: title, all day, start and end (our own day and time pickers, since build 4 has no native one), repeat (presets, ending never, on a day or after some times; a custom rule from the web is kept), reminders, calendar, place and notes.
+  - Tapping an item shows it:
+    - an event can be edited or deleted. For a repeating one, you choose this date, this and the following, or all. A delete can be undone from the toast;
+    - a task can be marked done, reopened or edited;
+    - reviews open Practice;
+    - an automation opens its chat or is stopped.
+  - Search finds events and jumps to their next date.
+  - **Calendars and What Shows** turns calendars on and off, adds, renames and deletes them (not the default), and turns tasks, reviews, automations and footprints on and off.
+  - Export (an .ics file) stays on the web: build 4 has no file-sharing module.
+- **Chats and tasks:** a DeepTutor chat's menu has **Linked Tasks**:
+  - tick tasks to link them;
+  - **Show task status** colours the chat in the sidebar with its most recently linked task's column.
+- **Reminders** are stored and shown in DeepTutor's web app; the phone doesn't notify yet.
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --calendar`)
+
+- **Board:**
+  - `GET /api/task-board` → `{cards, colors{todo, doing, done}, session_links[{workspace_id, session_id, task_ids, status_link_enabled}], revision}`. Each change answers with the whole board.
+  - `POST /cards {title, note?, due_date?}` adds to To do.
+  - `PATCH /cards/{id}` with any of `title, note, status, archived, due_date` (`null` clears the date; other fields refuse null).
+  - `PUT /colors`.
+  - There is no delete: cards are archived.
+  - Cards come in the order they were made; titles at most 160 characters, notes 2,000. A due date is a plain local day.
+  - One board per workspace; the app uses the default one (no header).
+- **Chat links:**
+  - `PUT /api/task-board/sessions/{id} {workspace_id: '', task_ids}` replaces the list; linking a new one turns the status colour back on.
+  - `PATCH …/status {workspace_id: '', enabled}`.
+  - Every chat (not side chats) gives the model the workspace's open tasks, up to 40, as reference data. Linked ones come first, marked `linked_to_conversation`. The probe's chat named its linked task.
+  - A turn can also link tasks with `config.linked_task_ids`.
+- **Calendar (`/api/calendar`):**
+  - `GET /calendars` → `{calendars[{id, name, color, visible, position, is_default}], revision}`; `POST`, `PATCH /{id}` (name, color, visible, position) and `DELETE /{id}`. Deleting a calendar deletes its events; the default one can't be deleted.
+  - `GET /events?start&end&tz` (at most 400 days) → `{occurrences[{id, event_id, series_id, occurrence, recurring, calendar_id, title, notes, location, all_day, start, end, tzid, rrule, reminders, color, task_id, task_workspace_id, source, reminder_times}]}`.
+    - All-day events use plain days, the end exclusive; timed ones UTC instants.
+    - `source` is `user`, `dito` (DeepTutor made it) or `import`.
+  - `POST /events` (`calendar_id` null for the default, `tzid` the phone's zone, `rrule` without "RRULE:", `reminders` as minutes before, up to five, negative only for all-day ones, `task_id` + `task_workspace_id` for a time block).
+  - `PATCH /events/{id} {changes, scope: this|following|all, occurrence}`:
+    - send only what changed, with start, end, all_day and tzid together; the server moves a series by the start's shift;
+    - **"following" splits the series into a new event with its own id**, so find its dates by title, not by the old id.
+  - `DELETE /events/{id}?scope&occurrence` → `{revision, undo_token}`; `POST /undo/{token}` within 15 minutes.
+  - `GET /search?q&limit` → events with `next_start`, coming ones first.
+  - `GET /layers?start&end&tz` → `reviews[{date, mastery, practice, paths}]`, `automations[{id, job_id, name, message, at, kind, expr, every_seconds, session_id}]`, `footprints[{date, session_count, sessions, practice_reviews, mastery_evidence}]`.
+  - `DELETE /automations/{job_id}` stops one; `GET /task-blocks` → `{task_id: count}`; `GET /export.ics`; `GET /stream` is a change feed (Server-Sent Events) the app doesn't use.
+- Learner accounts may use both (DeepTutor files them under chat).
+
 ## M1.5 checklist
 
 | | Item |

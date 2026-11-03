@@ -89,6 +89,7 @@ export function SidebarChatRow({
   busy = false,
   unread = false,
   pinned = false,
+  mark,
   onOpen,
   menu,
 }: {
@@ -98,6 +99,8 @@ export function SidebarChatRow({
   busy?: boolean;
   unread?: boolean;
   pinned?: boolean;
+  /** A colour before the title (DeepTutor: the status of the task the chat is linked to). */
+  mark?: string;
   onOpen: () => void;
   menu: MenuItem[];
 }) {
@@ -107,6 +110,7 @@ export function SidebarChatRow({
       accessibilityRole="button"
       onPress={onOpen}
       style={({ pressed }) => [styles.row, { paddingLeft: 12 + depth * 14 }, (current || pressed) && { backgroundColor: palette.sidebarActive }]}>
+      {mark ? <View style={[styles.mark, { backgroundColor: mark }]} accessibilityLabel="Linked task status" /> : null}
       <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
         {title}
       </Text>
@@ -175,6 +179,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, paddingRight: 0, borderRadius: radius.md },
   title: { flex: 1, fontFamily: fonts.regular, fontSize: 14 },
   dot: { width: 7, height: 7, borderRadius: 4 },
+  mark: { width: 8, height: 8, borderRadius: 2 },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 6 },
   user: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8 },
   avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },

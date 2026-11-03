@@ -35,6 +35,7 @@ import { deepTutorAttachment } from '@/features/deeptutor/crossReference';
 import { useDtNotebooks, useDtSession, useDtSessions } from '@/features/deeptutor/queries';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { switchToOpenWebUI } from '@/features/deeptutor/switch';
+import { TaskLinkSheet } from '@/features/deeptutor/tasks/TaskLinkSheet';
 import { useDtChatActions } from '@/features/deeptutor/useDtChatActions';
 import { setViewingChat } from '@/features/notifications/presence';
 import { describeError } from '@/lib/errors';
@@ -60,6 +61,7 @@ export default function DeepTutorChat() {
   const [pinKey, setPinKey] = useState<string | undefined>(undefined);
   const [attaching, setAttaching] = useState(false);
   const [finding, setFinding] = useState(false);
+  const [linkingTasks, setLinkingTasks] = useState(false);
   const listRef = useRef<DtMessageListHandle>(null);
   // Names for what earlier messages referred to (saved as ids).
   const notebooks = useDtNotebooks();
@@ -259,6 +261,7 @@ export default function DeepTutorChat() {
       : []),
     { key: 'find', label: 'Find in Chat', icon: 'magnifying-glass', onPress: () => setFinding(true) },
     { key: 'rename', label: 'Rename Chat', icon: 'pencil', onPress: () => chatActions.rename(id, detail.data ? sessionTitle(detail.data) : '') },
+    ...(detail.data ? [{ key: 'tasks', label: 'Linked Tasks', icon: 'view-columns' as const, onPress: () => setLinkingTasks(true) }] : []),
     ...(detail.data
       ? [
           {
@@ -326,6 +329,7 @@ export default function DeepTutorChat() {
           setTimeout(() => listRef.current?.scrollToKey(key), 400);
         }}
       />
+      <TaskLinkSheet sessionId={id} visible={linkingTasks} onClose={() => setLinkingTasks(false)} />
     </View>
   );
 }

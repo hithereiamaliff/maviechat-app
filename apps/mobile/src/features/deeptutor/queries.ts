@@ -1,4 +1,13 @@
 import {
+  addDaysKey,
+  deviceTimeZone,
+  fromDateKey,
+  getCalendarLayers,
+  getTaskBlocks,
+  getTaskBoard,
+  listCalendars,
+  listOccurrences,
+  type DateKey,
   DEFAULT_ATTACHMENT_LIMITS,
   getAttachmentLimits,
   getKbProgress,
@@ -164,14 +173,8 @@ export function useDtSuggestions() {
   });
 }
 
-/** This phone's time zone, which DeepTutor counts practice days in. */
-export function deviceTimeZone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  } catch {
-    return 'UTC';
-  }
-}
+/** The phone's time zone (DeepTutor's practice and calendar take it). */
+export { deviceTimeZone };
 
 /** Today's practice: what's due, mistakes, the bank's size, the next review. */
 export function useDtPracticeSummary() {
@@ -204,3 +207,43 @@ export function sessionDate(value: number | string | undefined): string {
   const time = typeof value === 'number' ? (value < 1e12 ? value * 1000 : value) : Date.parse(value);
   return Number.isFinite(time) ? new Date(time).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 }
+
+/** The Task Board (the default workspace's); changes answer with the whole board, which replaces this. */
+export function useDtTaskBoard(enabled = true) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'task-board'], queryFn: () => getTaskBoard(client), enabled, staleTime: 30_000 });
+}
+
+/** How many calendar time blocks each task has. */
+export function useDtTaskBlocks() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'calendar', 'task-blocks'], queryFn: () => getTaskBlocks(client), staleTime: 60_000 });
+}
+
+export function useDtCalendars() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'calendar', 'calendars'], queryFn: () => listCalendars(client), staleTime: 60_000 });
+}
+
+/** Events and DeepTutor's own schedule for the days from `from` up to (not including) `to`, in the phone's time zone. */
+export function useDtCalendarRange(from: DateKey, to: DateKey) {
+  const { client, session } = useDtAuthed();
+  const timeZone = deviceTimeZone();
+  const start = fromDateKey(from);
+  const end = fromDateKey(to);
+  const occurrences = useQuery({
+    queryKey: [DT_QUERY_ROOT, session.baseUrl, 'calendar', 'events', from, to, timeZone],
+    queryFn: () => listOccurrences(client, start, end, timeZone),
+    staleTime: 30_000,
+  });
+  const layers = useQuery({
+    queryKey: [DT_QUERY_ROOT, session.baseUrl, 'calendar', 'layers', from, to, timeZone],
+    queryFn: () => getCalendarLayers(client, start, end, timeZone),
+    staleTime: 60_000,
+  });
+  return { occurrences, layers };
+}
+
+/** The six weeks a month view shows: from its first row's Monday, 42 days. */
+export const monthRange = (firstShown: DateKey) => ({ from: firstShown, to: addDaysKey(firstShown, 42) });
+
