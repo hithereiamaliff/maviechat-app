@@ -1,16 +1,31 @@
-import { combineQueued, isTemporaryChatId, modelActions, OwuiHttpError, uuidv4, type FileItem, type HistoryMessage } from '@maviechat/owui-protocol';
+import {
+  combineQueued,
+  isTemporaryChatId,
+  modelActions,
+  newestLeaf,
+  OwuiHttpError,
+  selectBranch,
+  updateChatControls,
+  uuidv4,
+  type ChatRecord,
+  type FileItem,
+  type HistoryMessage,
+} from '@maviechat/owui-protocol';
+import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
+import { IconButton } from '@/components/IconButton';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
 import { ChatHeader } from '@/features/chat/ChatHeader';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
 import { Composer, type OutgoingMessage } from '@/features/chat/Composer';
+import { ControlsSheet, type ControlChanges } from '@/features/chat/controls/ControlsSheet';
 import { getDraft, updateDraft, useQueue } from '@/features/chat/drafts';
-import { MessageList, type MessageActions } from '@/features/chat/MessageList';
+import { MessageList, type MessageActions, type MessageListHandle } from '@/features/chat/MessageList';
 import { ModelPicker } from '@/features/chat/ModelPicker';
 import { useChatView } from '@/features/chat/useChatView';
 import { useMessageActions } from '@/features/chat/useMessageActions';
@@ -29,7 +44,8 @@ export default function ChatScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const chatId = Array.isArray(params.id) ? (params.id[0] ?? '') : (params.id ?? '');
   const temporary = isTemporaryChatId(chatId);
-  const { session } = useAuthed();
+  const { client, session } = useAuthed();
+  const queryClient = useQueryClient();
   const models = useModels();
   const settings = useUserSettings();
   const actions = useChatActions();
@@ -43,6 +59,8 @@ export default function ChatScreen() {
   const { send, regenerate, continueReply, stop } = useSendMessage();
   const queue = useQueue(chatId);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const list = useRef<MessageListHandle>(null);
   const busy = useRef(false);
   // After a failed send the queue waits for the next reply or your next message, instead of retrying in a loop.
   const stalled = useRef(false);
@@ -80,6 +98,22 @@ export default function ChatScreen() {
             : []),
         ]
       : [];
+
+  // Controls: the cached chat changes at once; a saved chat is saved too (the server patches only these keys).
+  const saveControls = (changes: ControlChanges) => {
+    queryClient.setQueryData<ChatRecord>(['chat', chatId], (current) => (current ? { ...current, chat: { ...current.chat, ...changes } } : current));
+    if (!temporary) void updateChatControls(client, chatId, changes).catch((error: unknown) => toast(`Couldn't save the controls: ${describeError(error)}`, 'error'));
+  };
+  // Overview: show the tapped message's branch (down to its newest reply), as the web does, then bring it into view.
+  const showMessage = (messageId: string) => {
+    const history = chat?.chat?.history;
+    if (!history?.messages[messageId]) return;
+    const leaf = newestLeaf(history, messageId);
+    select(leaf);
+    if (!temporary) void selectBranch(client, chatId, leaf).catch(() => toast("Couldn't save which version is shown", 'error'));
+    setControlsOpen(false);
+    setTimeout(() => list.current?.scrollToMessage(messageId), 400);
+  };
 
   const status = query.error instanceof OwuiHttpError ? query.error.status : null;
   const notFound = status === 404 || (temporary && !chat);
@@ -217,7 +251,11 @@ export default function ChatScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
-      <ChatHeader title={temporary ? 'Temporary Chat' : chat?.title} menu={menu} />
+      <ChatHeader
+        title={temporary ? 'Temporary Chat' : chat?.title}
+        menu={menu}
+        accessory={chat ? <IconButton icon="adjustments-horizontal" label="Controls" onPress={() => setControlsOpen(true)} /> : null}
+      />
       <KeyboardAvoidingView behavior="padding" style={styles.screen}>
         {query.isLoading ? (
           <ActivityIndicator style={styles.center} color={palette.textMuted} />
@@ -242,6 +280,7 @@ export default function ChatScreen() {
           </View>
         ) : (
           <MessageList
+            ref={list}
             messages={messages}
             actions={listActions}
             models={models.data}
@@ -271,6 +310,14 @@ export default function ChatScreen() {
         )}
       </KeyboardAvoidingView>
       {picker.element}
+      <ControlsSheet
+        visible={controlsOpen}
+        onClose={() => setControlsOpen(false)}
+        params={(chat?.chat?.params ?? {}) as Record<string, unknown>}
+        files={(chat?.chat?.files ?? []) as unknown[]}
+        onChange={saveControls}
+        overview={chat?.chat?.history ? { history: chat.chat.history, leafId: lastId, models: models.data, onShow: showMessage } : undefined}
+      />
       <ModelPicker
         visible={pickerOpen}
         models={choice.models}

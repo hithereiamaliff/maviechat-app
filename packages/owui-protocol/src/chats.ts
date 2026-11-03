@@ -76,6 +76,15 @@ export function renameChat(client: OwuiClient, id: string, title: string): Promi
 }
 
 /**
+ * Saves a chat's controls: its own system prompt and parameters (`params`) and the documents it
+ * keeps sending (`files`). The server patches only the keys given, so a reply being written is
+ * untouched.
+ */
+export function updateChatControls(client: OwuiClient, id: string, controls: { params?: Record<string, unknown>; files?: unknown[] }): Promise<ChatRecord> {
+  return client.post<ChatRecord>(chatPath(id), { chat: controls });
+}
+
+/**
  * Records which branch is shown. Sends no messages: the server merges histories
  * (union of messages, `currentId` kept only if that message exists), so nothing is lost.
  */

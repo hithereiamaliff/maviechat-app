@@ -68,6 +68,7 @@ const ICONS = [
   'pencil-square',
   'photo',
   'play',
+  'minus',
   'plus',
   'puzzle-piece',
   'question-mark-circle',

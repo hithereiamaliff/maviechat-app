@@ -1,6 +1,6 @@
 import { modelName, type HistoryMessage, type ModelAction, type ModelItem, type ReplyAnnotation } from '@maviechat/owui-protocol';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { usePalette } from '@/theme';
@@ -26,7 +26,13 @@ export interface MessageActions {
   canDeleteReply: boolean;
 }
 
+export interface MessageListHandle {
+  /** Brings a message into view (Overview). */
+  scrollToMessage(id: string): void;
+}
+
 interface MessageListProps {
+  ref?: Ref<MessageListHandle>;
   messages: HistoryMessage[];
   actions: MessageActions;
   models: ModelItem[] | undefined;
@@ -42,10 +48,23 @@ interface MessageListProps {
 const NEAR_BOTTOM = 120;
 
 /** The shown branch of a chat, opened at the newest message; follows a streaming reply while you're at the bottom. */
-export function MessageList({ messages, actions, models, position, onStep, onFollowUp, pinToBottomKey, baseUrl, token }: MessageListProps) {
+export function MessageList({ ref, messages, actions, models, position, onStep, onFollowUp, pinToBottomKey, baseUrl, token }: MessageListProps) {
   const palette = usePalette();
   const list = useRef<FlashListRef<HistoryMessage>>(null);
   const following = useRef(true);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      scrollToMessage: (id) => {
+        const index = messages.findIndex((message) => message.id === id);
+        if (index < 0) return;
+        following.current = false;
+        list.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+      },
+    }),
+    [messages],
+  );
   const [atBottom, setAtBottom] = useState(true);
   const [editing, setEditing] = useState<HistoryMessage | null>(null);
   const lastId = messages[messages.length - 1]?.id;

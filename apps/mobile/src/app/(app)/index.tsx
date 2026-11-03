@@ -8,6 +8,7 @@ import { IconButton } from '@/components/IconButton';
 import { useToast } from '@/components/Toast';
 import { ChatHeader } from '@/features/chat/ChatHeader';
 import { Composer, type ComposerHandle, type OutgoingMessage } from '@/features/chat/Composer';
+import { ControlsSheet } from '@/features/chat/controls/ControlsSheet';
 import { carryOver, getDraft, NEW_CHAT, updateDraft, useDraftText } from '@/features/chat/drafts';
 import { ModelAvatar } from '@/features/chat/ModelAvatar';
 import { ModelPicker } from '@/features/chat/ModelPicker';
@@ -36,6 +37,10 @@ export default function NewChat() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [temporaryOn, setTemporaryOn] = useState(false);
   const [fullDescription, setFullDescription] = useState(false);
+  // The new chat's own system prompt and parameters (Controls), saved with it once it exists.
+  const [chatParams, setChatParams] = useState<Record<string, unknown>>({});
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const controlsAllowed = capabilities?.can('chat.controls', true) ?? false;
 
   // As on the web: admins and permitted users may start temporary chats; some accounts only get temporary chats.
   const enforced = capabilities ? !capabilities.isAdmin && capabilities.can('chat.temporary_enforced') : false;
@@ -53,7 +58,7 @@ export default function NewChat() {
       toast(choice.loading ? 'Loading models…' : 'No model is available to this account.', 'error');
       return false;
     }
-    const result = await send({ chatId: null, parentId: null, content: text, files, model, toggles, toolIds, temporary });
+    const result = await send({ chatId: null, parentId: null, content: text, files, model, toggles, toolIds, temporary, params: chatParams });
     if (!result) return false;
     carryOver(NEW_CHAT, result.chatId);
     router.replace({ pathname: '/c/[id]', params: { id: result.chatId } });
@@ -79,7 +84,9 @@ export default function NewChat() {
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
       <ChatHeader
         accessory={
-          allowed && !enforced ? (
+          <>
+            {controlsAllowed ? <IconButton icon="adjustments-horizontal" label="Controls" onPress={() => setControlsOpen(true)} /> : null}
+            {allowed && !enforced ? (
             <IconButton
               icon="eye-slash"
               label={temporaryOn ? 'Temporary chat on. Turn off' : 'Temporary chat'}
@@ -93,7 +100,8 @@ export default function NewChat() {
                 setTemporaryOn((value) => !value);
               }}
             />
-          ) : null
+            ) : null}
+          </>
         }
       />
       <KeyboardAvoidingView behavior="padding" style={styles.screen}>
@@ -165,6 +173,15 @@ export default function NewChat() {
         defaultId={choice.defaultId}
         onSelect={choice.pick}
         onClose={() => setPickerOpen(false)}
+      />
+      <ControlsSheet
+        visible={controlsOpen}
+        onClose={() => setControlsOpen(false)}
+        params={chatParams}
+        files={[]}
+        onChange={(changes) => {
+          if (changes.params) setChatParams(changes.params);
+        }}
       />
     </View>
   );

@@ -134,21 +134,35 @@ export function isContextFile(item: unknown): boolean {
   return CONTEXT_TYPES.has(file.type) || (file.type === 'file' && !(file.content_type ?? '').startsWith('image/'));
 }
 
+/** A file item's name as people see it: its own name, its upload's, or what kind of item it is. */
+export function attachmentName(item: unknown): string {
+  if (!item || typeof item !== 'object') return 'File';
+  const file = item as Partial<FileItem>;
+  const upload = file.file && typeof file.file === 'object' ? (file.file as { filename?: unknown; meta?: { name?: unknown } | null }) : null;
+  const named = [file.name, upload?.meta?.name, upload?.filename].find((name): name is string => typeof name === 'string' && name.trim().length > 0);
+  return named ?? ((item as { type?: unknown }).type === 'collection' ? 'Knowledge' : 'File');
+}
+
+const fileKey = (file: unknown) => (file as FileItem).id ?? JSON.stringify(file);
+
 /**
- * The request's `files`: documents attached anywhere in the shown conversation plus the
- * new message's, without duplicates. Photos travel in `user_message.files` instead.
+ * The request's `files`, as the web picks them: the chat's documents (`chat.files`) that are
+ * still in the shown conversation, plus the new message's, without duplicates. The server then
+ * keeps this list as the chat's files, so one removed in Controls stays out. A chat without the
+ * list (a temporary one) sends every document in the shown conversation. Photos travel in
+ * `user_message.files` instead.
  */
-export function requestFiles(branch: HistoryMessage[], userMessage: HistoryMessage): unknown[] {
+export function requestFiles(branch: HistoryMessage[], userMessage: HistoryMessage, chatFiles?: unknown[]): unknown[] {
+  const inBranch = branch.flatMap((message) => (message.files ?? []).filter(isContextFile));
+  const branchKeys = new Set(inBranch.map(fileKey));
+  const carried = chatFiles ? chatFiles.filter((file) => branchKeys.has(fileKey(file))) : inBranch;
   const seen = new Set<string>();
   const files: unknown[] = [];
-  for (const message of [...branch, userMessage]) {
-    for (const file of message.files ?? []) {
-      if (!isContextFile(file)) continue;
-      const key = (file as FileItem).id ?? JSON.stringify(file);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      files.push(file);
-    }
+  for (const file of [...carried, ...(userMessage.files ?? []).filter(isContextFile)]) {
+    const key = fileKey(file);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    files.push(file);
   }
   return files;
 }

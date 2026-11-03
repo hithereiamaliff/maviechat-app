@@ -10,11 +10,14 @@ import {
   isTemporaryChatId,
   OwuiHttpError,
   requestFiles,
+  requestParams,
   startCompletion,
   stopChatTasks,
+  streamResponse,
   temporaryChatId,
   temporaryChatMessages,
   templateVariables,
+  updateChatControls,
   type ChatHistory,
   type ChatRecord,
   type FeatureToggles,
@@ -48,6 +51,8 @@ export interface SendInput extends Extras {
   temporary?: boolean;
   /** With `chatId: null`: create the chat inside this folder (the folder page's input). */
   folderId?: string;
+  /** With `chatId: null`: the new chat's own system prompt and parameters (Controls). */
+  params?: Record<string, unknown>;
 }
 
 export interface RegenerateInput extends Extras {
@@ -74,7 +79,7 @@ export interface Sent {
 
 const EMPTY_HISTORY: ChatHistory = { messages: {}, currentId: null };
 
-function localRecord(id: string, model: ModelItem, history: ChatHistory): ChatRecord {
+function localRecord(id: string, model: ModelItem, history: ChatHistory, controls: { params?: Record<string, unknown>; files?: unknown[] } = {}): ChatRecord {
   const now = Math.floor(Date.now() / 1000);
   return {
     id,
@@ -82,7 +87,7 @@ function localRecord(id: string, model: ModelItem, history: ChatHistory): ChatRe
     updated_at: now,
     created_at: now,
     current_message_id: history.currentId,
-    chat: { id, title: 'New Chat', models: [model.id], history, messages: [], tags: [], timestamp: now * 1000 },
+    chat: { id, title: 'New Chat', models: [model.id], history, messages: [], tags: [], timestamp: now * 1000, ...controls },
   };
 }
 
@@ -109,6 +114,8 @@ export function useSendMessage() {
         folderId?: string;
         /** "Continue Response": the reply that carries on. */
         continueMessageId?: string;
+        /** A new chat's own params (Controls); a saved chat's come from its record. */
+        params?: Record<string, unknown>;
       },
     ): Promise<Sent | null> => {
       const { turn, model } = job;
@@ -129,24 +136,29 @@ export function useSendMessage() {
         queryClient.setQueryData<ChatRecord>(['chat', routeId], (current) =>
           current && job.chatId
             ? { ...current, current_message_id: turn.history.currentId, chat: { ...current.chat, history: turn.history } }
-            : localRecord(routeId, model, turn.history),
+            : localRecord(routeId, model, turn.history, { params: job.params }),
         );
       }
       live.streams.track(replyIds, routeId);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
       const ui = (settings.data?.ui ?? {}) as Record<string, unknown>;
-      const chatParams = (record?.chat?.params ?? {}) as Record<string, unknown>;
+      const userParams = ui.params as Record<string, unknown> | undefined;
+      const chatParams = job.params ?? ((record?.chat?.params ?? {}) as Record<string, unknown>);
       const system = (chatParams.system as string | undefined) ?? (ui.system as string | undefined);
-      const memory = (ui.memory as boolean | undefined) ?? config.data?.features?.enable_memories === true;
       const parentId = turn.userMessage.parentId;
+      // A saved chat sends the documents it keeps (`chat.files`, see Controls); a temporary one everything shown.
+      const chatFiles = job.temporary ? undefined : ((record?.chat?.files as unknown[] | undefined) ?? (job.chatId ? [] : undefined));
+      const files = requestFiles(parentId ? branchPath(turn.history, parentId) : [], turn.userMessage, chatFiles);
+      const memory = (ui.memory as boolean | undefined) ?? config.data?.features?.enable_memories === true;
       const body = buildCompletionRequest({
         turn,
         chatId: job.temporary ? temporaryChatId(sessionId) : routeId,
         sessionId,
         model,
         system,
-        params: { ...((ui.params as Record<string, unknown> | undefined) ?? {}), ...chatParams },
+        params: requestParams(userParams, chatParams),
+        stream: streamResponse(model, userParams, chatParams),
         features: capabilities
           ? chatFeatures(capabilities, effectiveToggles(job.toggles ?? {}, availableToggles(capabilities, model)), memory)
           : { voice: false, image_generation: false, code_interpreter: false, web_search: false },
@@ -160,7 +172,7 @@ export function useSendMessage() {
           followUps: ui.autoFollowUps as boolean | undefined,
         },
         toolIds: job.toolIds,
-        files: requestFiles(parentId ? branchPath(turn.history, parentId) : [], turn.userMessage),
+        files,
         regenerationPrompt: job.regenerationPrompt,
         continueMessageId: job.continueMessageId,
         folderId: job.chatId === null && !job.temporary ? job.folderId : undefined,
@@ -172,8 +184,15 @@ export function useSendMessage() {
         const started = await startCompletion(client, body);
         const id = routeId ?? started.chat_id;
         if (!routeId) {
-          queryClient.setQueryData<ChatRecord>(['chat', id], localRecord(id, model, turn.history));
+          queryClient.setQueryData<ChatRecord>(['chat', id], localRecord(id, model, turn.history, { params: job.params, files }));
           live.streams.bind(replyIds, id);
+        } else if (!job.temporary && files.length > 0) {
+          // The server keeps the request's files as the chat's; so does the cached copy.
+          queryClient.setQueryData<ChatRecord>(['chat', id], (current) => (current ? { ...current, chat: { ...current.chat, files } } : current));
+        }
+        // The request doesn't save a new chat's own params; as on the web, they're saved once it exists.
+        if (job.chatId === null && !job.temporary && job.params && Object.keys(job.params).length > 0) {
+          void updateChatControls(client, id, { params: job.params }).catch((error: unknown) => toast(`Couldn't save this chat's controls: ${describeError(error)}`, 'error'));
         }
         if (!job.temporary) void queryClient.invalidateQueries({ queryKey: ['chats'] });
         if (job.folderId) {
@@ -206,11 +225,11 @@ export function useSendMessage() {
   );
 
   const send = useCallback(
-    async ({ chatId, parentId, content, model, files = [], temporary = false, toggles, toolIds, folderId }: SendInput): Promise<Sent | null> => {
+    async ({ chatId, parentId, content, model, files = [], temporary = false, toggles, toolIds, folderId, params }: SendInput): Promise<Sent | null> => {
       const text = content.trim();
       if (!text && files.length === 0) return null;
       const turn = buildTurn({ history: historyOf(chatId), content: text, models: [model], files, parentId });
-      return dispatch({ chatId, temporary: temporary || isTemporaryChatId(chatId), turn, model, toggles, toolIds, folderId });
+      return dispatch({ chatId, temporary: temporary || isTemporaryChatId(chatId), turn, model, toggles, toolIds, folderId, params: chatId === null ? params : undefined });
     },
     [dispatch, historyOf],
   );

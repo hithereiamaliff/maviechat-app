@@ -200,6 +200,16 @@ The response is `{status: true, task_ids: [...], chat_id}`.
 
 The server merges these writes: it keeps its own copy of in-progress assistant messages, and the union of messages wins. **Never write a full history while a reply streams; refetch before saving.**
 
+**Chat controls (0.11.3 ✓, `npm run probe -- --a3`)**
+- A chat's own system prompt and parameters live in `chat.params` (`system`, `temperature`, `stop`, …; the web stores `null` for a parameter set back to Default). The Controls panel saves them with `POST /api/v1/chats/{id} {chat: {params, files}}`, 400 ms after the last change. The server patches only the keys sent, so this is safe while a reply streams.
+- The request carries `params: {...user settings params, ...chat params}` (nulls mean unset) with `stop` as a list (the web stores a comma-separated string and reads escapes such as `\n`), and `messages: [{role: 'system', content}]` when the chat or the user has a system prompt.
+- `stream` comes from the model's `info.params.stream_response`, then the user's, then the chat's; default true. With `stream: false` the reply still arrives over the socket (`chat:completion` with the whole text) and is saved the same way.
+- **A new chat's params aren't saved by the request**: the web saves them with the update call once the chat exists. The app does the same.
+- **Files:** the server stores the request's `files` as the chat's `files` on creation (`files or []`) and on every later turn that sends `files`. The web sends the chat's files that are still in the shown conversation, plus the new message's documents. So a document removed in Controls stays out. Photos travel in `user_message.files` instead.
+- **Valves:** `GET /api/v1/tools/` and `GET /api/v1/functions/` (any signed-in user) list them; `GET /api/v1/{tools|functions}/id/{id}/valves/user/spec` gives the JSON schema (null without `UserValves`); `GET …/valves/user` your values; `POST …/valves/user/update` saves (the server drops nulls, validates, answers with what it kept). Options may be strings or `{value, label}`.
+- **Overview** is the web's graph of `history.messages`; tapping a message follows its newest children to a leaf and shows that branch (saved as `currentId`).
+- Permissions (all default to allowed; admins always): `chat.controls` (the Controls tab), `chat.valves`, `chat.system_prompt`, `chat.params`. Some parameters are admin-only on the web: stream chunk size, compaction threshold, `use_mmap`, `use_mlock`, `num_thread`, `num_gpu`, custom params.
+
 ## 6. Socket.IO
 
 **Connection**

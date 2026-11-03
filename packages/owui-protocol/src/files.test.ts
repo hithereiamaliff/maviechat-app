@@ -8,6 +8,7 @@ import {
   isImageItem,
   readableAsText,
   requestFiles,
+  attachmentName,
   textFileItem,
   uploadFile,
   waitForProcessing,
@@ -69,6 +70,23 @@ describe('requestFiles', () => {
     const branch = [message('u1', [doc, photo]), message('u2', [doc])];
     const files = requestFiles(branch, message('u3', [{ ...doc, id: 'f2', url: 'f2' }, photo]));
     expect(files.map((file) => (file as FileItem).id)).toEqual(['f1', 'f2']);
+  });
+
+  it("keeps to the chat's files when it has the list, so one removed in Controls stays out", () => {
+    const second = { ...doc, id: 'f2', url: 'f2' };
+    const third = { ...doc, id: 'f3', url: 'f3' };
+    const branch = [message('u1', [doc]), message('u2', [second])];
+    // f2 was removed from the chat's files; f9 is no longer in the shown conversation.
+    const files = requestFiles(branch, message('u3', [third]), [doc, { ...doc, id: 'f9' }]);
+    expect(files.map((file) => (file as FileItem).id)).toEqual(['f1', 'f3']);
+    expect(requestFiles(branch, message('u3', []), [])).toEqual([]);
+  });
+
+  it('names a file item for people', () => {
+    expect(attachmentName(doc)).toBe((doc as FileItem).name);
+    expect(attachmentName({ type: 'file', name: '', file: { filename: 'x.pdf', meta: { name: 'Report.pdf' } } })).toBe('Report.pdf');
+    expect(attachmentName({ type: 'collection', id: 'k1' })).toBe('Knowledge');
+    expect(attachmentName(null)).toBe('File');
   });
 
   it('accepts knowledge-style items and rejects junk', () => {

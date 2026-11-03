@@ -18,7 +18,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 **Phone behaviour in Open WebUI:** "mobile" means narrower than 768 px.
 - Sidebar: an overlay over a dark backdrop that opens with a right swipe anywhere except the leftmost 16 px. It commits at about 35% of its width or on a flick, settles in about 210 ms, and closes on any navigation.
-- Controls panel: opens with a left swipe in the chat.
+- Controls panel: opens with a left swipe in the chat (on phones, the Controls button in the bar opens it as a full-height sheet; MavieChat uses the button).
 - Modals: nearly full screen.
 - Menus: anchored popovers.
 - Enter: inserts a new line; only the button sends.
@@ -76,9 +76,9 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Item | Mn |
 |---|---|---|
-| [ ] | Controls tab: chat files, Valves (tool/function user valves), System prompt | M2 |
-| [ ] | Advanced params (Default/Custom each): stream, function calling, reasoning tags, seed, stop, temperature, reasoning effort, logit_bias, max_tokens, top_k, top_p, min_p, frequency/presence penalties, mirostat set, repeat_*, tfs_z, Ollama options (think, format, num_ctx, keep_alive, …), custom params (`Settings/Advanced/AdvancedParams.svelte`) | M2 |
-| [ ] | Overview tab: graph of the message tree; tap to jump (`chat/Overview/*`) | M5 |
+| [x] | Controls tab: chat files (remove one to stop sending it), Valves (tool/function user valves, saved as you change them), System prompt. A3 (2026-11-03): a full-height sheet from the bar's Controls button, in a chat and on New Chat | M2 |
+| [~] | Advanced params (Default/Custom each): stream, function calling, reasoning tags, seed, stop, temperature, reasoning effort, logit_bias, max_tokens, top_k, top_p, min_p, frequency/presence penalties, mirostat set, repeat_*, tfs_z, Ollama options (think, format, num_ctx, keep_alive, …) in their own group. Numbers step with − and + (no slider: that needs a native module). Not yet: admins' custom params (`Settings/Advanced/AdvancedParams.svelte`) | M2 |
+| [x] | Overview tab: the message tree, every version, the shown branch marked; tap to show that branch and jump to it. The web draws a graph; the phone shows an indented tree (`chat/Overview/*`) | M5 |
 | — | Files tab: terminal file browser / Pyodide file system | — |
 
 ## 6. New-chat placeholder (`chat/Placeholder.svelte`, `chat/Suggestions.svelte`)

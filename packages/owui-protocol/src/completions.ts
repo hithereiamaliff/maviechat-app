@@ -209,7 +209,10 @@ export interface CompletionRequestInput {
   sessionId: string;
   model: ModelItem;
   system?: string | null;
+  /** Ready to send (see `requestParams`). */
   params?: Record<string, unknown>;
+  /** False when the parameters turn streaming off (see `streamResponse`). */
+  stream?: boolean;
   features: Record<string, boolean>;
   variables: Record<string, string>;
   /** User settings (`ui.title.auto`, `ui.autoTags`, `ui.autoFollowUps`); all default to on. */
@@ -234,7 +237,7 @@ export function buildCompletionRequest(input: CompletionRequestInput): Record<st
   const isNewChat = input.chatId === null;
   const messages = input.temporaryMessages ?? (system ? [{ role: 'system', content: system }] : []);
   return {
-    stream: true,
+    stream: input.stream ?? true,
     model: input.model.id,
     // Saved chats send only the system prompt (the server loads the conversation); temporary chats send everything.
     ...(messages.length > 0 ? { messages } : {}),
