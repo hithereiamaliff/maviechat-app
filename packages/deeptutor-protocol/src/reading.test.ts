@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { DtClient } from './http';
 import {
+  bilibiliVideo,
   citedLocators,
+  citedTimes,
   clock,
   collectionOf,
   createCollection,
@@ -10,6 +12,7 @@ import {
   importLinks,
   isMedia,
   isPreparing,
+  linkStart,
   linksIn,
   markdownQuote,
   materialDetailOf,
@@ -18,10 +21,12 @@ import {
   readingTurnFields,
   saveAnnotation,
   savePosition,
+  segmentAt,
   textBlocks,
   timeOf,
   uploadMaterial,
   videoLinkAt,
+  youtubeId,
   type DtAnnotation,
 } from './reading';
 import { startTurnCommand } from './turns';
@@ -205,5 +210,37 @@ describe('reading chats', () => {
   it('knows a reading chat from its preferences', () => {
     expect(readingOfPreferences({ workspace_mode: 'immersive_reading', reading_workspace_id: 'rw_1', reading_material_id: 'm1' })).toEqual({ collectionId: 'rw_1', materialId: 'm1' });
     expect(readingOfPreferences({ workspace_mode: 'mastery_path' })).toBeNull();
+  });
+});
+
+describe('videos', () => {
+  it('reads YouTube and Bilibili links and their start times', () => {
+    expect(youtubeId('https://youtu.be/jNQXAC9IVRw?t=12')).toBe('jNQXAC9IVRw');
+    expect(youtubeId('https://www.youtube.com/watch?v=jNQXAC9IVRw&t=1m5s')).toBe('jNQXAC9IVRw');
+    expect(youtubeId('https://m.youtube.com/shorts/abcdefghijk')).toBe('abcdefghijk');
+    expect(youtubeId('https://example.com/watch?v=x')).toBeNull();
+    // Nothing but an id's characters gets through (the id goes into a page).
+    expect(youtubeId('https://www.youtube.com/watch?v=</script><script>x()</script>')).toBeNull();
+    expect(youtubeId('https://youtu.be/%3Cb%3Eabcdef')).toBeNull();
+    expect(bilibiliVideo('https://www.bilibili.com/video/BV1GJ411x7h7?p=3')).toEqual({ bvid: 'BV1GJ411x7h7', part: 3 });
+    expect(bilibiliVideo('https://example.com/x')).toBeNull();
+    expect(linkStart('https://youtu.be/x?t=90')).toBe(90);
+    expect(linkStart('https://www.youtube.com/watch?v=x&t=1m5s')).toBe(65);
+    expect(linkStart('https://youtu.be/x')).toBe(0);
+  });
+
+  it('reads the times a reply cites and the segment playing', () => {
+    expect(citedTimes('At [1:23] and [01:02:03], again [1:23]; `[9:99]` ```\n[0:10]\n```')).toEqual([83, 3723]);
+    // Minutes past 59 aren't a time (as the web app reads them).
+    expect(citedTimes('[75:30] [1:75:30] [59:59]')).toEqual([3599]);
+    const segments = [
+      { locator: 1, text: 'a', title: '', start: 0 },
+      { locator: 2, text: 'b', title: '', start: 30 },
+      { locator: 3, text: 'c', title: '', start: 75 },
+    ];
+    expect(segmentAt(segments, 0)?.locator).toBe(1);
+    expect(segmentAt(segments, 29.9)?.locator).toBe(2);
+    expect(segmentAt(segments, 400)?.locator).toBe(3);
+    expect(segmentAt([], 10)).toBeNull();
   });
 });

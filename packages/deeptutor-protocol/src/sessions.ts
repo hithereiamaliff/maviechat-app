@@ -71,6 +71,21 @@ export function getSession(client: DtClient, id: string): Promise<DtSession> {
 }
 
 /**
+ * Moves a video chat saved before DeepTutor 1.7.1 folded Videos into Reading: the video becomes a
+ * material in a reading collection and the chat one of its chats. Answers with the chat (an
+ * ordinary chat comes back as it is). 409 when the video couldn't be moved; the chat is kept.
+ */
+export function migrateWatchingChat(client: DtClient, id: string): Promise<DtSession> {
+  return client.post<DtSession>(`/api/sessions/${encodeURIComponent(id)}/migrate-watching`);
+}
+
+/** Whether a chat is a video chat from before 1.7.1 (`immersive_watching`), still to be moved into Reading. */
+export function isLegacyWatching(session: { preferences?: unknown; capability?: unknown }): boolean {
+  const preferences = (typeof session.preferences === 'object' && session.preferences !== null ? session.preferences : {}) as Record<string, unknown>;
+  return session.capability === 'immersive_watching' || ['capability', 'workspace_mode', 'session_kind'].some((key) => preferences[key] === 'immersive_watching');
+}
+
+/**
  * The conversation as DeepTutor shows it: from the first message down, taking the chosen
  * reply wherever there are several (else the newest). Messages without parent links
  * (older sessions) are taken in order.

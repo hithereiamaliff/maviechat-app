@@ -375,6 +375,69 @@ export function videoLinkAt(sourceUrl: string, seconds: number): string {
   }
 }
 
+/** A YouTube link's video id (watch, youtu.be, shorts, embed and live links), or null. Only an id's characters pass. */
+export function youtubeId(sourceUrl: string): string | null {
+  const valid = (id: string | null | undefined) => (id && /^[\w-]{6,20}$/.test(id) ? id : null);
+  try {
+    const url = new URL(sourceUrl);
+    const host = url.hostname.replace(/^(www|m|music)\./, '');
+    if (host === 'youtu.be') return valid(url.pathname.slice(1).split('/')[0]);
+    if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+      const fromQuery = url.searchParams.get('v');
+      if (fromQuery) return valid(fromQuery);
+      return valid(/^\/(?:shorts|embed|live|v)\/([\w-]{6,20})(?:[/?#]|$)/.exec(url.pathname)?.[1]);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** A Bilibili link's video (`BV…` id and part number), or null. */
+export function bilibiliVideo(sourceUrl: string): { bvid: string; part: number } | null {
+  const bvid = /(BV[0-9A-Za-z]{10})/.exec(sourceUrl)?.[1];
+  if (!bvid) return null;
+  let part = 1;
+  try {
+    part = Math.max(1, Number(new URL(sourceUrl).searchParams.get('p')) || 1);
+  } catch {
+    // Not a full address: the first part.
+  }
+  return { bvid, part };
+}
+
+/** The start time a link asks for (`t=90`, `t=1m30s`), in seconds; 0 when none. */
+export function linkStart(sourceUrl: string): number {
+  try {
+    const value = new URL(sourceUrl).searchParams.get('t') ?? '';
+    if (/^\d+(\.\d+)?$/.test(value)) return Number(value);
+    const match = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(value);
+    return match ? Number(match[1] ?? 0) * 3600 + Number(match[2] ?? 0) * 60 + Number(match[3] ?? 0) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** The times a reply cites in a video (`[1:23]`, `[1:02:03]`), in seconds, in order and once each. */
+export function citedTimes(reply: string): number[] {
+  const found: number[] = [];
+  for (const match of reply.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '').matchAll(/\[(?:(\d{1,2}):)?([0-5]?\d):([0-5]\d)\]/g)) {
+    const seconds = Number(match[1] ?? 0) * 3600 + Number(match[2]) * 60 + Number(match[3]);
+    if (!found.includes(seconds)) found.push(seconds);
+  }
+  return found;
+}
+
+/** The transcript segment playing at `seconds` (the last one started), or null. */
+export function segmentAt(segments: DtTranscriptSegment[], seconds: number): DtTranscriptSegment | null {
+  let current: DtTranscriptSegment | null = null;
+  for (const segment of segments) {
+    if (segment.start <= seconds + 0.25) current = segment;
+    else break;
+  }
+  return current;
+}
+
 // ── Your place, bookmarks and highlights ─────────────────────────────────────
 
 export interface DtReadingPosition {

@@ -3,12 +3,15 @@ import {
   bookOfPreferences,
   bookTurnFields,
   citedLocators,
+  citedTimes,
   getSession,
+  isLegacyWatching,
   isPinned,
   masteryOfPreferences,
   masteryTurnFields,
   messageAttachments,
   messageReferences,
+  migrateWatchingChat,
   newlyMastered,
   readingOfPreferences,
   readingTurnFields,
@@ -25,7 +28,7 @@ import {
   type DtOutline,
   type DtQuizQuestion,
 } from '@maviechat/deeptutor-protocol';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -94,6 +97,24 @@ export default function DeepTutorChat() {
   const reading = path || page ? null : readingOfPreferences(detail.data?.preferences);
   const readingId = reading?.collectionId ?? '';
   const native = isNativeCapability(capability) || Boolean(path) || Boolean(page) || Boolean(reading);
+  // A video chat from before DeepTutor 1.7.1 moves into Reading when it's opened, as on the web:
+  // the video joins a collection, and the chat carries on as one of its chats.
+  const legacy = detail.data ? isLegacyWatching(detail.data) : false;
+  const migration = useQuery({
+    queryKey: [DT_QUERY_ROOT, session.baseUrl, 'migrate-watching', id],
+    queryFn: async () => {
+      const moved = await migrateWatchingChat(client, id);
+      if (moved.id === id) queryClient.setQueryData([DT_QUERY_ROOT, session.baseUrl, 'session', id], moved);
+      for (const family of ['sessions', 'learning-index', 'reading']) void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, session.baseUrl, family] });
+      return moved.id || id;
+    },
+    enabled: legacy,
+    retry: false,
+    staleTime: Infinity,
+  });
+  useEffect(() => {
+    if (migration.data && migration.data !== id) router.replace({ pathname: '/learn/[id]', params: { id: migration.data } });
+  }, [migration.data, id]);
   const running = turn?.reply.status === 'running' || turn?.reply.status === 'waiting';
 
   // After each reply in a path chat, the path is read again; a point newly mastered gets a note
@@ -303,11 +324,10 @@ export default function DeepTutorChat() {
   };
 
   // Rulings on the tutor's questions arrive with later replies, so they're gathered across the chat.
-  // The pages the tutor's latest answer cites, a tap away in the reader.
+  // The pages and moments the tutor's latest answer cites, a tap away in the reader.
   const cited = useMemo(() => {
-    if (!readingId) return [];
-    const last = [...items].reverse().find((item) => item.kind === 'reply');
-    return last?.kind === 'reply' ? citedLocators(last.reply.answer) : [];
+    const last = readingId ? [...items].reverse().find((item) => item.kind === 'reply') : undefined;
+    return last?.kind === 'reply' ? { pages: citedLocators(last.reply.answer), times: citedTimes(last.reply.answer) } : { pages: [], times: [] };
   }, [items, readingId]);
 
   const masteryState = useMemo(() => {
@@ -448,8 +468,24 @@ export default function DeepTutorChat() {
         <PathBar topic={topic.data} mode={path.mode ?? 'study'} onMode={running ? undefined : (mode) => void switchMode(mode)} onOpenPath={() => openPath()} />
       ) : null}
       {page ? <BookBar bookId={page.bookId} pageId={page.pageId} /> : null}
-      {reading ? <ReadingBar collectionId={reading.collectionId} materialId={reading.materialId} cited={cited} /> : null}
-      <KeyboardAvoidingView behavior="padding" style={styles.body}>
+      {reading ? <ReadingBar collectionId={reading.collectionId} materialId={reading.materialId} cited={cited.pages} times={cited.times} /> : null}
+      {legacy ? (
+        <View style={styles.moving}>
+          {migration.isError ? (
+            <>
+              <Text style={[styles.webNoteText, { color: palette.textMuted }]}>{`Couldn't move this video chat into Reading: ${describeError(migration.error)}`}</Text>
+              <Button label="Try Again" onPress={() => void migration.refetch()} />
+              <Button label="Open in DeepTutor Web App" variant="secondary" onPress={openOnWeb} />
+            </>
+          ) : (
+            <>
+              <ActivityIndicator color={palette.textMuted} />
+              <Text style={[styles.webNoteText, { color: palette.textMuted }]}>Moving this video chat into Reading…</Text>
+            </>
+          )}
+        </View>
+      ) : null}
+      <KeyboardAvoidingView behavior="padding" style={[styles.body, legacy && styles.hidden]}>
         {detail.isLoading && !turn ? (
           <ActivityIndicator style={styles.loading} color={palette.textMuted} />
         ) : detail.isError && !turn ? (
@@ -524,4 +560,6 @@ const styles = StyleSheet.create({
   empty: { flex: 1, fontFamily: fonts.regular, fontSize: 14, textAlign: 'center', marginTop: 32, paddingHorizontal: 24 },
   webNote: { margin: 12, marginBottom: 24, padding: 14, gap: 10, borderRadius: radius.lg },
   webNoteText: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20 },
+  moving: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 },
+  hidden: { display: 'none' },
 });

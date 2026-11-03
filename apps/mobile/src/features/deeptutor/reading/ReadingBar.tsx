@@ -1,3 +1,4 @@
+import { clock } from '@maviechat/deeptutor-protocol';
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
@@ -8,9 +9,9 @@ import { readingPlaces, useReadingPlace } from './readingContext';
 
 /**
  * Above a reading chat: the collection and the file you're reading (tap to read on), the pages
- * the tutor's last answer cites, and the passage you're about to ask about (× to drop it).
+ * and moments the tutor's last answer cites, and the passage you're about to ask about (× to drop it).
  */
-export function ReadingBar({ collectionId, materialId, cited }: { collectionId: string; materialId: string; cited: number[] }) {
+export function ReadingBar({ collectionId, materialId, cited, times = [] }: { collectionId: string; materialId: string; cited: number[]; times?: number[] }) {
   const palette = usePalette();
   const place = useReadingPlace(collectionId);
   const collection = useDtCollection(collectionId);
@@ -18,28 +19,51 @@ export function ReadingBar({ collectionId, materialId, cited }: { collectionId: 
   const detail = useDtMaterial(current);
   const missing = collection.isError;
   const unit = unitName(detail.data?.unit ?? 'page');
-  const read = (locator?: number) =>
-    current ? router.push({ pathname: '/learn/reading/read', params: { collection: collectionId, material: current, ...(locator ? { locator: String(locator) } : {}) } }) : undefined;
+  const media = detail.data?.renderMode === 'video' || detail.data?.renderMode === 'audio';
+  const here = place?.materialId === current ? place : undefined;
+  const where = here ? (media && here.timeSeconds !== undefined ? clock(here.timeSeconds) : here.locator ? `${unit} ${here.locator}` : '') : '';
+  const read = (at: { locator?: number; seconds?: number } = {}) =>
+    current
+      ? router.push({
+          pathname: '/learn/reading/read',
+          params: {
+            collection: collectionId,
+            material: current,
+            ...(at.locator ? { locator: String(at.locator) } : {}),
+            ...(at.seconds !== undefined ? { t: String(Math.floor(at.seconds)) } : {}),
+          },
+        })
+      : undefined;
 
   return (
     <View style={[styles.wrap, { borderBottomColor: palette.border }]}>
-      <Pressable accessibilityRole="button" accessibilityHint="Opens the reader" disabled={missing || !current} onPress={() => read(place?.locator)} style={styles.top} hitSlop={4}>
+      <Pressable accessibilityRole="button" accessibilityHint="Opens the reader" disabled={missing || !current} onPress={() => read({ locator: here?.locator, seconds: media ? here?.timeSeconds : undefined })} style={styles.top} hitSlop={4}>
         <Icon name="book-open" size={16} color={palette.textMuted} />
         <View style={styles.text}>
           <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
             {missing ? 'A collection that is no longer here' : detail.data?.title || 'Reading'}
           </Text>
           <Text style={[styles.sub, { color: palette.textMuted }]} numberOfLines={1}>
-            {[collection.data?.collection.title, place?.materialId === current && place.locator ? `${unit} ${place.locator}` : ''].filter(Boolean).join(' · ')}
+            {[collection.data?.collection.title, where].filter(Boolean).join(' · ')}
           </Text>
         </View>
         {missing ? null : <Icon name="chevron-right" size={14} color={palette.textFaint} />}
       </Pressable>
-      {cited.length && current ? (
+      {(cited.length || times.length) && current ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           <Text style={[styles.sub, { color: palette.textMuted }]}>Cited:</Text>
+          {times.slice(0, 12).map((seconds) => (
+            <Pressable
+              key={`t${seconds}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Play from ${clock(seconds)}`}
+              onPress={() => read({ seconds })}
+              style={[styles.chip, { borderColor: palette.border }]}>
+              <Text style={[styles.chipText, { color: palette.link }]}>{clock(seconds)}</Text>
+            </Pressable>
+          ))}
           {cited.slice(0, 12).map((locator) => (
-            <Pressable key={locator} accessibilityRole="button" accessibilityLabel={`Read ${unit} ${locator}`} onPress={() => read(locator)} style={[styles.chip, { borderColor: palette.border }]}>
+            <Pressable key={locator} accessibilityRole="button" accessibilityLabel={`Read ${unit} ${locator}`} onPress={() => read({ locator })} style={[styles.chip, { borderColor: palette.border }]}>
               <Text style={[styles.chipText, { color: palette.link }]}>{`${unit === 'Page' ? 'p.' : `${unit} `}${locator}`}</Text>
             </Pressable>
           ))}

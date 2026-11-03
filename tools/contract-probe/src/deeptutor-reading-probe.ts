@@ -1,5 +1,6 @@
 import {
   addBookmark,
+  clock,
   addToCollection,
   applyTurnEvent,
   createCollection,
@@ -13,6 +14,7 @@ import {
   getPosition,
   getSession,
   getSupportedFormats,
+  getTranscript,
   getUnit,
   importLinks,
   listAnnotations,
@@ -182,5 +184,59 @@ export async function probeReading(baseUrl: string, token: string, client: DtCli
     connection.close();
     if (collectionId) await deleteCollection(client, collectionId).catch(() => undefined);
     for (const id of materials) await deleteMaterial(client, id).catch(() => undefined);
+  }
+}
+
+/**
+ * B5.4 against a live DeepTutor, in the test account, with no model calls: a short YouTube video
+ * imported into an "APP PROBE:" collection (DeepTutor fetches its captions, or files it without
+ * them), its transcript read with each segment's start time, the place saved at a time
+ * (`#t=`) and read back, a note at a time kept and deleted; then the collection and the video
+ * deleted.
+ */
+export async function probeVideo(client: DtClient): Promise<{ note: string; fixture: Record<string, unknown> }> {
+  const notes: string[] = [];
+  const fixture: Record<string, unknown> = {};
+  let collectionId: string | null = null;
+  let materialId: string | null = null;
+  try {
+    const collection = await createCollection(client, { title: 'APP PROBE: video', color: 'rose' });
+    collectionId = collection.id;
+    const imported = await importLinks(client, ['https://www.youtube.com/watch?v=jNQXAC9IVRw'], { collectionId: collection.id });
+    const video = imported.materials[0];
+    if (!video) throw new Error('the import gave no material');
+    materialId = video.id;
+    if (video.kind !== 'youtube') throw new Error(`the link was filed as ${video.kind}`);
+    let status = video.status;
+    for (let tries = 0; tries < 45 && (status === 'queued' || status === 'processing'); tries += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      status = (await getCollection(client, collection.id)).collection.materials.find((item) => item.id === video.id)?.status ?? 'missing';
+    }
+    if (status !== 'ready') throw new Error(`the video came out ${status}`);
+    const detail = await getMaterial(client, video.id);
+    const transcript = await getTranscript(client, video.id);
+    fixture.video = { renderMode: detail.renderMode, unit: detail.unit, units: detail.unitCount, segments: transcript.segments.length, timed: transcript.segments.every((segment) => segment.start >= 0), refs: shapeOf(detail.unitRefs.slice(0, 1)) };
+    notes.push(`a YouTube video imported (${detail.renderMode}, ${transcript.segments.length} transcript segments${transcript.segments.length ? `, the last at ${clock(transcript.segments[transcript.segments.length - 1]!.start)}` : ', no captions'})`);
+
+    await savePosition(client, video.id, { locator: 1, anchor: '#t=7', percentage: 0.35 });
+    const place = await getPosition(client, video.id);
+    if (place?.anchor !== '#t=7') throw new Error(`the place came back as ${place?.anchor ?? 'nothing'}`);
+    const quote = transcript.segments[0]?.text ?? 'Probe note';
+    const note = await saveAnnotation(client, video.id, { locator: 1, kind: 'note', quote: quote.slice(0, 2000), note: 'probe note', anchor: '#t=5' });
+    if (note.kind !== 'note' || note.anchor !== '#t=5') throw new Error('the note at a time came back different');
+    await deleteAnnotation(client, video.id, note.id);
+    notes.push('place kept at #t=7; a note at #t=5 kept and deleted');
+
+    await deleteCollection(client, collection.id);
+    collectionId = null;
+    await deleteMaterial(client, video.id);
+    materialId = null;
+    notes.push('collection and video deleted');
+    return { note: notes.join('; '), fixture };
+  } catch (error) {
+    throw new Error(`${notes.join('; ')}${notes.length ? '; then ' : ''}${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    if (collectionId) await deleteCollection(client, collectionId).catch(() => undefined);
+    if (materialId) await deleteMaterial(client, materialId).catch(() => undefined);
   }
 }

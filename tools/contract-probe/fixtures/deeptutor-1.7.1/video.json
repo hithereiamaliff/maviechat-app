@@ -1,0 +1,16 @@
+{
+  "video": {
+    "renderMode": "video",
+    "unit": "segment",
+    "units": 1,
+    "segments": 0,
+    "timed": true,
+    "refs": [
+      {
+        "href": "string",
+        "locator": "number",
+        "title": "string"
+      }
+    ]
+  }
+}

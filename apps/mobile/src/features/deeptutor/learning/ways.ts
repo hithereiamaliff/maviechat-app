@@ -1,7 +1,6 @@
-import { bookOfPreferences, masteryOfPreferences, pageAvailable, readingOfPreferences, type DtAuthStatus, type DtLearningActivity, type DtLearningKind, type DtModule, type DtSessionSummary } from '@maviechat/deeptutor-protocol';
+import { bookOfPreferences, isLegacyWatching, masteryOfPreferences, pageAvailable, readingOfPreferences, type DtAuthStatus, type DtLearningActivity, type DtLearningKind, type DtModule, type DtSessionSummary } from '@maviechat/deeptutor-protocol';
 import { router } from 'expo-router';
 import type { IconName } from '@/components/Icon';
-import { openDtPage } from '@/features/deeptutor/settings/DtGeneralSettings';
 
 /** A way to learn in DeepTutor, in our own words: what it is, and three things it does. */
 export interface LearningWay {
@@ -71,9 +70,8 @@ export function waysFor(modules: DtModule[] | undefined, status: DtAuthStatus | 
   );
 }
 
-/** Opens an activity: natively where the app has it, else DeepTutor's own page. */
+/** Opens an activity in its own screen. */
 export function openActivity(activity: DtLearningActivity): void {
-  const id = encodeURIComponent(activity.id);
   switch (activity.kind) {
     case 'mastery':
       router.push({ pathname: '/learn/mastery/[id]', params: { id: activity.id } });
@@ -89,7 +87,8 @@ export function openActivity(activity: DtLearningActivity): void {
       router.push({ pathname: '/learn/reading/[id]', params: { id: activity.id } });
       return;
     case 'watching':
-      openDtPage(`/learning/watching/${id}`, activity.title || 'Video');
+      // A video chat from before Videos joined Reading: its chat moves it there when opened.
+      router.push({ pathname: '/learn/[id]', params: { id: activity.id } });
   }
 }
 
@@ -101,8 +100,11 @@ export function startWay(way: LearningWay): void {
   else router.push({ pathname: '/learn/reading', params: { new: '1' } });
 }
 
-/** Whether the app has a learning chat's own screen: a mastery path's, a book page's and a reading collection's are native; others open DeepTutor's page. */
+/**
+ * Whether the app has a learning chat's own screen: a mastery path's, a book page's and a reading
+ * collection's are native (an old video chat too: it moves into Reading); others open DeepTutor's page.
+ */
 export function opensNatively(session: DtSessionSummary): boolean {
   const preferences = session.preferences as Record<string, unknown> | undefined;
-  return masteryOfPreferences(preferences) !== null || bookOfPreferences(preferences) !== null || readingOfPreferences(preferences) !== null;
+  return masteryOfPreferences(preferences) !== null || bookOfPreferences(preferences) !== null || readingOfPreferences(preferences) !== null || isLegacyWatching(session);
 }
