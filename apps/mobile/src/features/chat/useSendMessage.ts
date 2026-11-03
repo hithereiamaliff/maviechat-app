@@ -2,6 +2,7 @@ import {
   availableToggles,
   branchPath,
   buildCompletionRequest,
+  buildContinueTurn,
   buildRegenerateTurn,
   buildTurn,
   chatFeatures,
@@ -59,6 +60,13 @@ export interface RegenerateInput extends Extras {
   prompt?: string;
 }
 
+export interface ContinueInput extends Extras {
+  chatId: string;
+  /** The reply that carries on where it stopped. */
+  messageId: string;
+  model: ModelItem;
+}
+
 export interface Sent {
   chatId: string;
   replyId: string;
@@ -92,7 +100,16 @@ export function useSendMessage() {
 
   const dispatch = useCallback(
     async (
-      job: Extras & { chatId: string | null; temporary: boolean; turn: Turn; model: ModelItem; regenerationPrompt?: string; folderId?: string },
+      job: Extras & {
+        chatId: string | null;
+        temporary: boolean;
+        turn: Turn;
+        model: ModelItem;
+        regenerationPrompt?: string;
+        folderId?: string;
+        /** "Continue Response": the reply that carries on. */
+        continueMessageId?: string;
+      },
     ): Promise<Sent | null> => {
       const { turn, model } = job;
       let sessionId: string;
@@ -145,8 +162,10 @@ export function useSendMessage() {
         toolIds: job.toolIds,
         files: requestFiles(parentId ? branchPath(turn.history, parentId) : [], turn.userMessage),
         regenerationPrompt: job.regenerationPrompt,
+        continueMessageId: job.continueMessageId,
         folderId: job.chatId === null && !job.temporary ? job.folderId : undefined,
-        temporaryMessages: job.temporary ? temporaryChatMessages(branchPath(turn.history, turn.userMessage.id), system) : undefined,
+        // A temporary chat sends everything; when continuing, the reply so far too.
+        temporaryMessages: job.temporary ? temporaryChatMessages(branchPath(turn.history, job.continueMessageId ?? turn.userMessage.id), system) : undefined,
       });
 
       try {
@@ -206,6 +225,17 @@ export function useSendMessage() {
     [dispatch, historyOf],
   );
 
+  /** "Continue Response": the last reply carries on where it stopped, in place. */
+  const continueReply = useCallback(
+    async ({ chatId, messageId, model, toggles, toolIds }: ContinueInput): Promise<Sent | null> => {
+      const history = historyOf(chatId);
+      if (!history.messages[messageId]) return null;
+      const turn = buildContinueTurn({ history, messageId });
+      return dispatch({ chatId, temporary: isTemporaryChatId(chatId), turn, model, toggles, toolIds, continueMessageId: messageId });
+    },
+    [dispatch, historyOf],
+  );
+
   const stop = useCallback(
     async (chatId: string) => {
       // A temporary chat's replies run under the current connection's name.
@@ -229,5 +259,5 @@ export function useSendMessage() {
     [client, live, queryClient, toast],
   );
 
-  return { send, regenerate, stop };
+  return { send, regenerate, continueReply, stop };
 }

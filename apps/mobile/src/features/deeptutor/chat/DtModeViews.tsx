@@ -11,7 +11,7 @@ import { Markdown } from '@/markdown/Markdown';
 import { WebFrame } from '@/markdown/WebFrame';
 import { fonts, radius, usePalette } from '@/theme';
 import { choicesFor, isCorrect, NO_ANSWER, type QuizAnswer } from './quiz';
-import { useStoredState } from './storedState';
+import { useStoredState } from '@/lib/storedState';
 import { visualHtml } from './visualHtml';
 
 /** Our names for the stages DeepTutor's modes go through. */

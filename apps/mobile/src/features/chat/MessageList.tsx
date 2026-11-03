@@ -1,10 +1,11 @@
-import { modelName, type HistoryMessage, type ModelItem } from '@maviechat/owui-protocol';
+import { modelName, type HistoryMessage, type ModelAction, type ModelItem, type ReplyAnnotation } from '@maviechat/owui-protocol';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { usePalette } from '@/theme';
 import { AssistantMessage } from './AssistantMessage';
+import { ReplyEditor } from './ReplyEditor';
 import { UserMessage } from './UserMessage';
 
 /** What you can do to a message; undefined actions are hidden. */
@@ -12,6 +13,14 @@ export interface MessageActions {
   saveEdit?: (message: HistoryMessage, content: string) => Promise<boolean>;
   sendEdit?: (message: HistoryMessage, content: string) => Promise<boolean>;
   regenerate?: (reply: HistoryMessage, prompt?: string) => void;
+  /** Edits a reply in place, or as a new version (`asCopy`). */
+  editReply?: (reply: HistoryMessage, texts: string[], asCopy: boolean) => Promise<boolean>;
+  rate?: (reply: HistoryMessage, change: { rating?: 1 | -1; details?: Partial<ReplyAnnotation> }) => Promise<boolean>;
+  /** "Continue Response" on the last reply. */
+  continueReply?: (reply: HistoryMessage) => void;
+  /** The action buttons of the reply's model, and running one. */
+  actionsFor?: (reply: HistoryMessage) => ModelAction[];
+  runAction?: (reply: HistoryMessage, action: ModelAction) => void;
   remove?: (message: HistoryMessage) => void;
   canDeleteMessage: boolean;
   canDeleteReply: boolean;
@@ -38,6 +47,7 @@ export function MessageList({ messages, actions, models, position, onStep, onFol
   const list = useRef<FlashListRef<HistoryMessage>>(null);
   const following = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
+  const [editing, setEditing] = useState<HistoryMessage | null>(null);
   const lastId = messages[messages.length - 1]?.id;
 
   useEffect(() => {
@@ -70,7 +80,7 @@ export function MessageList({ messages, actions, models, position, onStep, onFol
         }}
         renderItem={({ item }) => {
           const branch = position(item.id);
-          const { saveEdit, sendEdit, regenerate, remove } = actions;
+          const { saveEdit, sendEdit, regenerate, remove, editReply, rate, continueReply, actionsFor, runAction } = actions;
           return item.role === 'user' ? (
             <UserMessage
               message={item}
@@ -96,9 +106,19 @@ export function MessageList({ messages, actions, models, position, onStep, onFol
               onRegenerate={regenerate ? (prompt) => regenerate(item, prompt) : undefined}
               // A reply can be deleted only while another version of it remains, as on the web.
               onDelete={remove && actions.canDeleteReply && branch.count > 1 ? () => remove(item) : undefined}
+              onEdit={editReply ? () => setEditing(item) : undefined}
+              onRate={rate ? (change) => rate(item, change) : undefined}
+              onContinue={continueReply ? () => continueReply(item) : undefined}
+              actions={actionsFor?.(item)}
+              onAction={runAction ? (action) => runAction(item, action) : undefined}
             />
           );
         }}
+      />
+      <ReplyEditor
+        message={editing}
+        onClose={() => setEditing(null)}
+        onSave={(texts, asCopy) => (editing && actions.editReply ? actions.editReply(editing, texts, asCopy) : Promise.resolve(false))}
       />
       {!atBottom ? (
         <Pressable

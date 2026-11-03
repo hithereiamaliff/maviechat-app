@@ -9,18 +9,22 @@ import {
   plainText,
   type FileItem,
   type HistoryMessage,
+  type ModelAction,
+  type ReplyAnnotation,
 } from '@maviechat/owui-protocol';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { memo, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { MenuButton, type MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { useStoredState } from '@/lib/storedState';
 import { Markdown } from '@/markdown/Markdown';
 import { fonts, radius, usePalette } from '@/theme';
 import { BranchNav } from './BranchNav';
+import { RatePanel } from './RatePanel';
 import { Sources } from './Sources';
 import { StepGroup, StepView } from './Steps';
 
@@ -50,6 +54,11 @@ export const AssistantMessage = memo(function AssistantMessage({
   onFollowUp,
   onRegenerate,
   onDelete,
+  onEdit,
+  onRate,
+  onContinue,
+  actions = [],
+  onAction,
 }: {
   message: HistoryMessage;
   modelLabel: string;
@@ -63,10 +72,22 @@ export const AssistantMessage = memo(function AssistantMessage({
   /** Asks for another version of this reply, optionally steered ("More Concise", your own words). */
   onRegenerate?: (prompt?: string) => void;
   onDelete?: () => void;
+  /** Opens the reply in the editor (Save, or Save As Copy). */
+  onEdit?: () => void;
+  /** 👍/👎, or the rating panel's details; resolves true once saved. */
+  onRate?: (change: { rating?: 1 | -1; details?: Partial<ReplyAnnotation> }) => Promise<boolean>;
+  /** "Continue Response" (the last reply only). */
+  onContinue?: () => void;
+  /** The model's action buttons. */
+  actions?: ModelAction[];
+  onAction?: (action: ModelAction) => void;
 }) {
   const palette = usePalette();
   const toast = useToast();
   const [revealed, setRevealed] = useState(false);
+  // Kept by message (the list reuses rows as you scroll).
+  const [rating, setRating] = useStoredState<boolean>(`rate-panel:${message.id}`, false);
+  const annotation = (message.annotation as ReplyAnnotation | undefined) ?? {};
   const blocks = useMemo(() => messageBlocks(message), [message]);
   const items = useMemo(() => groupSteps(blocks), [blocks]);
   const sources = useMemo(() => normalizeSources(message.sources), [message.sources]);
@@ -181,8 +202,10 @@ export const AssistantMessage = memo(function AssistantMessage({
       ) : null}
 
       {showActions && !streaming ? (
-        <View style={styles.actions}>
+        // The web's order; on a narrow phone the row scrolls sideways.
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.actionsScroll} contentContainerStyle={styles.actions}>
           <BranchNav index={branch.index} count={branch.count} onStep={onStep} />
+          {onEdit ? <IconButton icon="pencil" label="Edit" size={18} color={palette.textMuted} onPress={onEdit} /> : null}
           <IconButton
             icon="clipboard-document"
             label="Copy response"
@@ -201,9 +224,60 @@ export const AssistantMessage = memo(function AssistantMessage({
               onPress={() => Alert.alert('Usage', usage)}
             />
           ) : null}
+          {onRate ? (
+            <>
+              <IconButton
+                icon="hand-thumb-up"
+                label={annotation.rating === 1 ? 'Good response (rated)' : 'Good response'}
+                size={18}
+                color={annotation.rating === 1 ? palette.text : palette.textMuted}
+                onPress={() => {
+                  setRating(true);
+                  void onRate({ rating: 1 });
+                }}
+              />
+              <IconButton
+                icon="hand-thumb-down"
+                label={annotation.rating === -1 ? 'Bad response (rated)' : 'Bad response'}
+                size={18}
+                color={annotation.rating === -1 ? palette.text : palette.textMuted}
+                onPress={() => {
+                  setRating(true);
+                  void onRate({ rating: -1 });
+                }}
+              />
+            </>
+          ) : null}
+          {isLast && onContinue ? <IconButton icon="play" label="Continue response" size={18} color={palette.textMuted} onPress={onContinue} /> : null}
           {regenerateItems.length > 0 ? <MenuButton items={regenerateItems} label="Regenerate" icon="arrow-path" size={18} color={palette.textMuted} /> : null}
+          {onAction
+            ? actions.map((action) => (
+                <Pressable
+                  key={action.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.name ?? action.id}
+                  hitSlop={4}
+                  onPress={() => onAction(action)}
+                  style={styles.actionButton}>
+                  {action.icon ? (
+                    <Image
+                      source={{ uri: action.icon }}
+                      style={styles.actionIcon}
+                      tintColor={action.icon.includes('image/svg') ? palette.textMuted : undefined}
+                      contentFit="contain"
+                    />
+                  ) : (
+                    <Icon name="sparkles" size={18} color={palette.textMuted} />
+                  )}
+                </Pressable>
+              ))
+            : null}
           {onDelete ? <IconButton icon="trash" label="Delete" size={18} color={palette.textMuted} onPress={onDelete} /> : null}
-        </View>
+        </ScrollView>
+      ) : null}
+
+      {onRate && rating && annotation.rating && !streaming ? (
+        <RatePanel annotation={annotation} onSave={(details) => onRate({ details })} onClose={() => setRating(false)} />
       ) : null}
     </Pressable>
   );
@@ -227,7 +301,10 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   errorText: { flex: 1, fontFamily: fonts.regular, fontSize: 14, lineHeight: 20 },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4, marginLeft: -8 },
+  actionsScroll: { marginTop: 4, marginLeft: -8, marginRight: -16 },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingRight: 16 },
+  actionButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  actionIcon: { width: 18, height: 18 },
   followUps: { marginTop: 10, gap: 6 },
   followUpTitle: { fontFamily: fonts.medium, fontSize: 13 },
   followUp: {

@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useToast } from '@/components/Toast';
 import { isPhoto, photo, PHOTO_OPTIONS, readAsDataUrl, type Picked } from '@/lib/pickedFiles';
 import { NO_EXTRAS, type DtExtras } from './extrasModel';
-import { setStoredState, useStoredState } from './storedState';
+import { setStoredState, useStoredState } from '@/lib/storedState';
 
 export * from './extrasModel';
 

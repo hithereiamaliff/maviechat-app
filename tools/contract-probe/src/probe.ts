@@ -1,13 +1,14 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
  * then signs out again (revoking the token). It sends no other writes unless --write
  * is given: then it also runs the chat actions on a throwaway "APP PROBE:" chat in the
- * test account and deletes it afterwards (src/write-probe.ts).
+ * test account and deletes it afterwards (src/write-probe.ts). `--a2` runs only milestone 2's
+ * reply checks (edit, save as copy, continue, rating, actions; src/a2-probe.ts).
  *
  * It never prints or stores tokens, passwords, emails or message text: fixtures
  * hold response shapes, counts and feature flags only (fixtures/<server version>/).
@@ -36,6 +37,7 @@ import { summarizeTree } from './tree-summary';
 import { probeSend } from './send-probe';
 import { probeSlice3 } from './slice3-probe';
 import { probeSlice4 } from './slice4-probe';
+import { probeA2 } from './a2-probe';
 import { probeChatActions } from './write-probe';
 
 const { values: args } = parseArgs({
@@ -44,6 +46,7 @@ const { values: args } = parseArgs({
     env: { type: 'string' },
     'no-fixtures': { type: 'boolean' },
     write: { type: 'boolean' },
+    a2: { type: 'boolean' },
   },
 });
 
@@ -212,6 +215,21 @@ async function main() {
           socket.close();
         }
       });
+
+      if (args.a2 && capabilities) {
+        const a2 = await probeA2({
+          client,
+          baseUrl,
+          token: session.token,
+          userId: session.id,
+          userName: session.name,
+          capabilities,
+          canDelete: capabilities.can('chat.delete'),
+          modelId: env.OWUI_PROBE_MODEL,
+        });
+        for (const result of a2.steps) results.push({ ...result, name: `A2: ${result.name}` });
+        fixtures['write.a2'] = a2.fixture;
+      }
 
       if (args.write) {
         const canDelete = capabilities?.can('chat.delete') ?? false;

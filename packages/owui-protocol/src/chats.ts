@@ -124,7 +124,12 @@ export function deleteMessage(client: OwuiClient, chatId: string, messageId: str
  * this (complete) message is sent; `currentId` keeps the shown branch.
  */
 export function saveMessage(client: OwuiClient, chatId: string, message: HistoryMessage, currentId: string | null): Promise<ChatRecord> {
-  return client.post<ChatRecord>(chatPath(chatId), { chat: { history: { messages: { [message.id]: message }, currentId } } });
+  return saveMessages(client, chatId, [message], currentId);
+}
+
+/** Saves several complete messages at once (a new reply version and its parent's children, say). */
+export function saveMessages(client: OwuiClient, chatId: string, messages: HistoryMessage[], currentId: string | null): Promise<ChatRecord> {
+  return client.post<ChatRecord>(chatPath(chatId), { chat: { history: { messages: Object.fromEntries(messages.map((message) => [message.id, message])), currentId } } });
 }
 
 /** Creates a saved chat from a whole history (used to keep a temporary chat). The server picks the id. */

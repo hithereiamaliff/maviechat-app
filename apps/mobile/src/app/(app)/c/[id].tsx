@@ -1,4 +1,4 @@
-import { combineQueued, isTemporaryChatId, OwuiHttpError, uuidv4, type FileItem, type HistoryMessage } from '@maviechat/owui-protocol';
+import { combineQueued, isTemporaryChatId, modelActions, OwuiHttpError, uuidv4, type FileItem, type HistoryMessage } from '@maviechat/owui-protocol';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -40,7 +40,7 @@ export default function ChatScreen() {
   const messageActions = useMessageActions(chatId);
   const { query, messages, position, step, select } = useChatView(chatId);
   const choice = useModelChoice(query.data);
-  const { send, regenerate, stop } = useSendMessage();
+  const { send, regenerate, continueReply, stop } = useSendMessage();
   const queue = useQueue(chatId);
   const [pickerOpen, setPickerOpen] = useState(false);
   const busy = useRef(false);
@@ -197,11 +197,23 @@ export default function ChatScreen() {
               });
             }
           : undefined,
+      editReply: messageActions.canEdit && !streaming ? messageActions.editReply : undefined,
+      rate: messageActions.canRate ? messageActions.rate : undefined,
+      continueReply:
+        messageActions.canContinue && !streaming
+          ? (reply) => {
+              const replyModel = modelOf(reply);
+              if (!replyModel) return;
+              void continueReply({ chatId, messageId: reply.id, model: replyModel, ...extras() });
+            }
+          : undefined,
+      actionsFor: (reply) => modelActions(models.data?.find((item) => item.id === reply.model)),
+      runAction: (reply, action) => void messageActions.runAction(reply, action),
       remove: messageActions.remove,
       canDeleteMessage: messageActions.canDeleteMessage,
       canDeleteReply: messageActions.canDeleteReply,
     };
-  }, [chatId, models.data, model, messageActions, send, regenerate, select, streaming, messages]);
+  }, [chatId, models.data, model, messageActions, send, regenerate, continueReply, select, streaming, messages]);
 
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>

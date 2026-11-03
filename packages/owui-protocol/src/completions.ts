@@ -121,6 +121,24 @@ export function buildRegenerateTurn({
   };
 }
 
+/**
+ * "Continue Response": the reply carries on where it stopped, in place (the server keeps what it
+ * had and appends). The turn is the reply's own, now not done.
+ */
+export function buildContinueTurn({ history, messageId }: { history: ChatHistory; messageId: string }): Turn {
+  const reply = history.messages[messageId];
+  if (!reply || reply.role !== 'assistant' || !reply.parentId) throw new Error('Only a reply can be continued');
+  const userMessage = history.messages[reply.parentId];
+  if (!userMessage) throw new Error('The message the reply answers is missing');
+  const continued: HistoryMessage = { ...reply, done: false };
+  return {
+    history: { messages: { ...history.messages, [reply.id]: continued }, currentId: reply.id },
+    userMessage,
+    replies: [continued],
+    messageIds: [{ model_id: reply.model ?? '', message_id: reply.id, modelIdx: reply.modelIdx ?? 0 }],
+  };
+}
+
 /** Temporary chats are identified by the socket that started them; the server stores nothing. */
 export function temporaryChatId(sessionId: string): string {
   return `temporary:${sessionId}`;
@@ -203,6 +221,8 @@ export interface CompletionRequestInput {
   regenerationPrompt?: string;
   /** Temporary chat: the full conversation (see `temporaryChatMessages`); nothing is saved. */
   temporaryMessages?: Record<string, unknown>[];
+  /** "Continue Response": the reply that carries on where it stopped (see `buildContinueTurn`). */
+  continueMessageId?: string;
 }
 
 /** The `POST /api/chat/completions` body for a saved chat, matching Open WebUI 0.11.3. */
@@ -229,7 +249,8 @@ export function buildCompletionRequest(input: CompletionRequestInput): Record<st
     ...(input.chatId ? { chat_id: input.chatId } : {}),
     ...(input.folderId ? { folder_id: input.folderId } : {}),
     id: firstReply?.id,
-    message_ids: turn.messageIds,
+    // A continued reply is named once, as the one to carry on; the server then leaves it as it is.
+    ...(input.continueMessageId ? { assistant_message_id: input.continueMessageId } : { message_ids: turn.messageIds }),
     parent_id: turn.userMessage.parentId ?? null,
     user_message: turn.userMessage,
     ...(input.regenerationPrompt ? { regeneration_prompt: input.regenerationPrompt } : {}),
