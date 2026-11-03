@@ -73,6 +73,8 @@ interface ComposerProps {
   placeholder?: string;
   /** The new-chat screen's temporary chat switch, for the `/temporary` command. */
   onTemporary?: () => void;
+  /** A saved chat's `/fork` command. */
+  onFork?: () => void;
 }
 
 const NO_TOGGLES: Record<ToggleKey, boolean> = { webSearch: false, imageGeneration: false, codeInterpreter: false };
@@ -99,6 +101,7 @@ export function Composer({
   autoFocus = false,
   placeholder = 'Send a Message',
   onTemporary,
+  onFork,
 }: ComposerProps) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
@@ -154,6 +157,7 @@ export function Composer({
     },
     onPickModel,
     onTemporary,
+    onFork,
   });
 
 

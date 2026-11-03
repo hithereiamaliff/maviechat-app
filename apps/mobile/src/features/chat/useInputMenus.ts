@@ -36,6 +36,8 @@ interface Options {
   onPickModel: () => void;
   /** The new-chat screen's temporary chat switch. */
   onTemporary?: () => void;
+  /** A saved chat's `/fork`: carry on in a copy of the conversation so far. */
+  onFork?: () => void;
 }
 
 /**
@@ -43,7 +45,7 @@ interface Options {
  * filled in, your own asked for in a form); `@` for a model to talk to, knowledge, folders and
  * web pages; `#` for knowledge and web pages.
  */
-export function useInputMenus({ draftKey, text, cursor, focused, setText, onPickModel, onTemporary }: Options) {
+export function useInputMenus({ draftKey, text, cursor, focused, setText, onPickModel, onTemporary, onFork }: Options) {
   const { client } = useAuthed();
   const toast = useToast();
   const capabilities = useCapabilities();
@@ -102,12 +104,13 @@ export function useInputMenus({ draftKey, text, cursor, focused, setText, onPick
       { id: 'model', title: 'Model', subtitle: 'Choose the model', run: onPickModel },
       { id: 'settings', title: 'Settings', subtitle: 'Open your settings', run: () => router.push('/settings') },
       ...(onTemporary ? [{ id: 'temporary', title: 'Temporary', subtitle: 'Turn temporary chat on or off', run: onTemporary }] : []),
+      ...(onFork ? [{ id: 'fork', title: 'Fork', subtitle: 'Carry on in a copy of this chat', run: onFork }] : []),
     ].filter((command) => command.id.startsWith(query.toLowerCase()));
     for (const command of commands) {
       entries.push({
         key: `c-${command.id}`,
         section: 'Commands',
-        icon: command.id === 'model' ? 'cpu-chip' : command.id === 'settings' ? 'cog-6-tooth' : 'eye-slash',
+        icon: command.id === 'model' ? 'cpu-chip' : command.id === 'settings' ? 'cog-6-tooth' : command.id === 'fork' ? 'rectangle-stack' : 'eye-slash',
         title: `/${command.id}`,
         subtitle: command.subtitle,
         onPick: () => {

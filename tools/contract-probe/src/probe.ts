@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -13,7 +13,8 @@
  * src/a3-probe.ts). `--a4` sends one message to two models and merges the answers
  * (src/a4-probe.ts; `OWUI_PROBE_MODEL_2`, in the env file or the environment, picks the second
  * model, else the first answers twice). `--a5` has the model ask a question with its `ask_user`
- * tool and answers it as the app does (src/a5-probe.ts).
+ * tool and answers it as the app does (src/a5-probe.ts). `--a6` tags, shares, clones and forks a
+ * probe chat made without a model, and builds the downloads (src/a6-probe.ts).
  *
  * It never prints or stores tokens, passwords, emails or message text: fixtures
  * hold response shapes, counts and feature flags only (fixtures/<server version>/).
@@ -46,6 +47,7 @@ import { probeA2 } from './a2-probe';
 import { probeA3 } from './a3-probe';
 import { probeA4 } from './a4-probe';
 import { probeA5 } from './a5-probe';
+import { probeA6 } from './a6-probe';
 import { probeChatActions } from './write-probe';
 
 const { values: args } = parseArgs({
@@ -58,6 +60,7 @@ const { values: args } = parseArgs({
     a3: { type: 'boolean' },
     a4: { type: 'boolean' },
     a5: { type: 'boolean' },
+    a6: { type: 'boolean' },
   },
 });
 
@@ -286,6 +289,12 @@ async function main() {
         });
         for (const result of a5.steps) results.push({ ...result, name: `A5: ${result.name}` });
         fixtures['write.a5'] = a5.fixture;
+      }
+
+      if (args.a6 && capabilities) {
+        const a6 = await probeA6({ client, baseUrl, userId: session.id, capabilities, canDelete: capabilities.can('chat.delete') });
+        for (const result of a6.steps) results.push({ ...result, name: `A6: ${result.name}` });
+        fixtures['write.a6'] = a6.fixture;
       }
 
       if (args.write) {

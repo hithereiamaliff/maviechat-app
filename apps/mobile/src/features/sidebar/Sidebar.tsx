@@ -21,6 +21,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Icon, type IconName } from '@/components/Icon';
 import type { MenuItem } from '@/components/Menu';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
+import { useShareSheet } from '@/features/chats/ShareSheet';
+import { useTagsSheet } from '@/features/chats/TagsSheet';
 import { useChatActions } from '@/features/chats/useChatActions';
 import { switchToDeepTutor } from '@/features/deeptutor/switch';
 import { leaveRelay } from '@/features/notifications/push';
@@ -30,6 +32,7 @@ import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
 import { fonts, radius, usePalette } from '@/theme';
 import { SidebarAction, SidebarChatRow, SidebarHeading, SidebarNote, SidebarPanel, SidebarSearch, SidebarUser, sidebarStyles } from './parts';
+import { SearchFilters } from './SearchFilters';
 import { buildSidebarRows, isUnread, type SidebarRow } from './rows';
 import { useSidebar } from './SidebarContext';
 
@@ -54,6 +57,8 @@ export function Sidebar() {
   const settings = useUserSettings();
   const actions = useChatActions();
   const picker = useFolderPicker();
+  const shareSheet = useShareSheet();
+  const tagsSheet = useTagsSheet();
   const pathname = usePathname();
   const currentChatId = pathname.startsWith('/c/') ? decodeURIComponent(pathname.slice(3)) : null;
   const currentFolderId = pathname.startsWith('/folders/') ? decodeURIComponent(pathname.slice('/folders/'.length)) : null;
@@ -238,6 +243,19 @@ export function Sidebar() {
                 icon: item.pinned ? 'bookmark-slash' : 'bookmark',
                 onPress: () => actions.togglePin(item.chat, item.pinned),
               },
+              { key: 'tags', label: 'Tags', icon: 'tag', onPress: () => tagsSheet.open(item.chat) },
+              ...(actions.canShare ? [{ key: 'share', label: 'Share', icon: 'link' as const, onPress: () => shareSheet.open(item.chat) }] : []),
+              ...(actions.canExport ? [{ key: 'download', label: 'Download', icon: 'arrow-down' as const, onPress: () => actions.download(item.chat) }] : []),
+              ...(actions.canClone
+                ? [
+                    {
+                      key: 'clone',
+                      label: 'Clone',
+                      icon: 'rectangle-stack' as const,
+                      onPress: () => void actions.clone(item.chat).then((copy) => (copy ? openChat(copy) : undefined)),
+                    },
+                  ]
+                : []),
               ...(actions.canMove ? [{ key: 'move', label: 'Move', icon: 'folder' as const, onPress: () => picker.open(item.chat) }] : []),
               { key: 'archive', label: 'Archive', icon: 'archive-box', onPress: () => void actions.archive(item.chat, leaveIfCurrent(item.chat.id)) },
               ...(actions.canDelete
@@ -261,6 +279,7 @@ export function Sidebar() {
     <SidebarPanel name={config.data?.name ?? 'Open WebUI'} onNewChat={newChat}>
       <SidebarAction icon="pencil-square" label="New Chat" onPress={newChat} />
       <SidebarSearch value={search} onChange={setSearch} placeholder="Search chats" />
+      {search !== null ? <SearchFilters value={search} onChange={setSearch} /> : null}
       {search === null
         ? shortcuts.map((id) => (
             <SidebarAction
@@ -293,6 +312,8 @@ export function Sidebar() {
 
       <SidebarUser name={session.user.name} menu={userMenu} />
       {picker.element}
+      {shareSheet.element}
+      {tagsSheet.element}
     </SidebarPanel>
   );
 }

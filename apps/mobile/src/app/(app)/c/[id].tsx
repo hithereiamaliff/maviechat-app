@@ -1,6 +1,7 @@
 import {
   awaitingYou,
   combineQueued,
+  forkChat,
   isTemporaryChatId,
   mergeInput,
   mergeResponses,
@@ -32,6 +33,8 @@ import { useToast } from '@/components/Toast';
 import { AskUserCard } from '@/features/chat/AskUserCard';
 import { ChatHeader } from '@/features/chat/ChatHeader';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
+import { useShareSheet } from '@/features/chats/ShareSheet';
+import { useTagsSheet } from '@/features/chats/TagsSheet';
 import { Composer, type OutgoingMessage } from '@/features/chat/Composer';
 import { ControlsSheet, type ControlChanges } from '@/features/chat/controls/ControlsSheet';
 import { getDraft, updateDraft, useQueue } from '@/features/chat/drafts';
@@ -60,6 +63,8 @@ export default function ChatScreen() {
   const settings = useUserSettings();
   const actions = useChatActions();
   const picker = useFolderPicker();
+  const shareSheet = useShareSheet();
+  const tagsSheet = useTagsSheet();
   const live = useLive();
   const toast = useToast();
   const deepTutor = useDeepTutor();
@@ -91,11 +96,20 @@ export default function ChatScreen() {
       toast(`Couldn't send to DeepTutor: ${describeError(error)}`, 'error');
     }
   };
+  const clone = async () => {
+    const copy = await actions.clone(ref);
+    if (copy) router.replace(`/c/${copy}`);
+  };
   const menu: MenuItem[] =
     chat && !temporary
       ? [
           { key: 'rename', label: 'Rename', icon: 'pencil', onPress: () => actions.rename(ref) },
           { key: 'pin', label: pinned ? 'Unpin' : 'Pin', icon: pinned ? 'bookmark-slash' : 'bookmark', onPress: () => actions.togglePin(ref, pinned) },
+          { key: 'tags', label: 'Tags', icon: 'tag', onPress: () => tagsSheet.open(ref) },
+          ...(actions.canShare ? [{ key: 'share', label: 'Share', icon: 'link' as const, onPress: () => shareSheet.open(ref) }] : []),
+          ...(actions.canExport ? [{ key: 'download', label: 'Download', icon: 'arrow-down' as const, onPress: () => actions.download(ref) }] : []),
+          { key: 'copy', label: 'Copy', icon: 'clipboard-document', onPress: () => void actions.copy(ref) },
+          ...(actions.canClone ? [{ key: 'clone', label: 'Clone', icon: 'rectangle-stack' as const, onPress: () => void clone() }] : []),
           ...(actions.canMove ? [{ key: 'move', label: 'Move', icon: 'folder' as const, onPress: () => picker.open(ref) }] : []),
           ...(deepTutor.client
             ? [{ key: 'deeptutor', label: 'Send to DeepTutor', icon: 'academic-cap' as const, onPress: () => void sendToDeepTutor() }]
@@ -167,6 +181,23 @@ export default function ChatScreen() {
     const result = await send({ chatId, parentId, content: text, files, model: target.model, models: target.models, toggles, toolIds });
     if (result) select(result.replyId);
     return Boolean(result);
+  };
+
+  // `/fork`: carry on in a new chat holding the conversation up to the shown message, as the web does.
+  const fork = async () => {
+    if (streaming) {
+      toast('Wait for the reply to finish before forking.');
+      return;
+    }
+    try {
+      const copy = await forkChat(client, chatId, lastId);
+      void queryClient.invalidateQueries({ queryKey: ['chats'] });
+      void queryClient.invalidateQueries({ queryKey: ['folder-chats'] });
+      toast('Chat forked');
+      router.replace(`/c/${copy.id}`);
+    } catch (error) {
+      toast(`Couldn't fork the chat: ${describeError(error)}`, 'error');
+    }
   };
 
   const onSend = async (message: OutgoingMessage) => {
@@ -414,10 +445,13 @@ export default function ChatScreen() {
             onSendQueued={(id) => void sendQueuedNow(id)}
             streaming={streaming}
             temporary={temporary}
+            onFork={chat && !temporary && actions.canClone ? () => void fork() : undefined}
           />
         )}
       </KeyboardAvoidingView>
       {picker.element}
+      {shareSheet.element}
+      {tagsSheet.element}
       <ControlsSheet
         visible={controlsOpen}
         onClose={() => setControlsOpen(false)}

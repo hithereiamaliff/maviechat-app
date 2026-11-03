@@ -27,7 +27,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Item | Source | Mn |
 |---|---|---|---|
-| [~] | Routes: `/` new chat, `/c/{id}` chat, `/folders/{id}` folder landing, `/s/{id}` shared chat (read-only, Clone). Slice 4: `/folders/{id}` | `src/routes/(app)/…` | M1 (`/s` M2) |
+| [~] | Routes: `/` new chat, `/c/{id}` chat, `/folders/{id}` folder landing, `/s/{id}` shared chat (read-only, Clone). Slice 4: `/folders/{id}`. A shared link opens the server's page in the browser (the app has no link handling yet) | `src/routes/(app)/…` | M1 (`/s` M2) |
 | [ ] | Deep-link parameters: `q`, `models`, `web-search`, `image-generation`, `code-interpreter`, `tools`, `temporary-chat`, `message` | `chat/Chat.svelte` | M2 |
 | [x] | Toasts: "Connection lost / Reconnected" (after 2 s, only while the app is open; slice 4), "Session expired" (shown on the sign-in screen; slice 1) | `src/routes/+layout.svelte` | M1 |
 | [x] | Swipe-anywhere sidebar overlay; swipe-left controls panel; sideways-scrolling content wins the gesture | `common/MobileSwipePanel.svelte`, `chat/ChatControls.svelte` | M1 / M2 |
@@ -45,9 +45,9 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [ ] | Folder settings: name, description, background, default models, system prompt, knowledge, sharing (`Folders/FolderModal.svelte`) | M2 |
 | [x] | Chats: "Pinned" group, then Today / Yesterday / Previous 7 days / Previous 30 days / month / year (from `updated_at`), infinite scroll | M1 |
 | [x] | Chat row: generating spinner, unread dot; the "…" button is always visible on phones (no long-press in Open WebUI) | M1 |
-| [~] | Chat menu: Share, Download (JSON/TXT/PDF), Rename (+ Generate), Mark unread, Pin, Clone, Move to folder, Archive, Delete (`ChatMenu.svelte`). Slice 1: Rename, Pin, Archive, Delete (only with the `chat.delete` permission); slice 4: Rename + Generate, Mark as unread, Move (needs the folders feature) | M1 (rename/pin/archive/delete/move); M2 (rest) |
+| [~] | Chat menu: Share, Download (JSON/TXT/PDF), Rename (+ Generate), Mark unread, Pin, Clone, Move to folder, Archive, Delete (`ChatMenu.svelte`). Slice 1: Rename, Pin, Archive, Delete (only with the `chat.delete` permission); slice 4: Rename + Generate, Mark as unread, Move (needs the folders feature); A6: Tags, Share, Download (JSON, text), Clone. PDF waits for a store build | M1 (rename/pin/archive/delete/move); M2 (rest) |
 | [~] | User menu: avatar and name (→ Account), status emoji/message, Workspace, Admin Panel, Settings, Sign Out (`UserMenu.svelte`). Slice 4: Workspace and Admin Panel (open on the web until M3/M4), Settings, Connection, Sign Out; status and Account → M2 | M1 |
-| [~] | Search modal with type/view/location filters, `tag:`, `folder:`, `pinned:`, `shared:`, `archived:`; empty query shows "Pinned & recent" (`layout/SearchModal.svelte`). Slice 1: search field in the sidebar (server search) | M1 basic, M2 filters |
+| [~] | Search modal with type/view/location filters, `tag:`, `folder:`, `pinned:`, `shared:`, `archived:`; empty query shows "Pinned & recent" (`layout/SearchModal.svelte`). Slice 1: search field in the sidebar (server search); A6: filter chips under it (Pinned, Shared, Archived, and your tags; typing `tag:` narrows them) | M1 basic, M2 filters |
 | web | Channels section and channel pages | — |
 | web | Notes section and pages | — |
 
@@ -56,7 +56,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | | Item | Mn |
 |---|---|---|
 | [x] | Sidebar button, chat title | M1 |
-| [~] | "…" menu: Scroll to top, Artifacts, Share, Download JSON/TXT/PDF, Rename, Copy chat, Move to folder, Archive, Delete, Tags editor. Slice 1: Rename, Pin, Archive, Delete; slice 4: Move, and Unarchive on an archived chat | M1 core, M2 rest |
+| [~] | "…" menu: Scroll to top, Artifacts, Share, Download JSON/TXT/PDF, Rename, Copy chat, Move to folder, Archive, Delete, Tags editor. Slice 1: Rename, Pin, Archive, Delete; slice 4: Move, and Unarchive on an archived chat; A6: Tags, Share, Download (JSON, text), Copy, Clone | M1 core, M2 rest |
 | [~] | Temporary Chat toggle (new chat only) / Save Chat (temporary chat with messages). Slice 3: the toggle, with the `chat.temporary` / `temporary_enforced` rules | M1 toggle, M2 Save Chat |
 | [x] | New Chat button (phone only), Controls (knobs) button | M1 |
 | [ ] | Admin banners on the new-chat screen | M2 |
@@ -145,11 +145,11 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | | Item | Mn |
 |---|---|---|
 | [ ] | Artifacts viewer (combined HTML/CSS/JS, versions, Copy, Download, Full screen) | M2 |
-| [ ] | Share (private link; read access to users/groups; mode Clone only / Allow replies; Update and Copy link; delete link) | M2 |
-| [ ] | Download JSON / TXT / PDF (plain-text PDF first); Copy whole chat | M2 |
+| [x] | Share (private link; read access to users/groups; Update and Copy link; delete link). A6: Create Link (copied), Copy, Share Link through the share sheet, Update Link, Delete Link; who may open it (only people you add, everyone on the server, anyone with the link, as your permissions allow); people found by name or email, and groups. 0.11.3 has no Clone-only / Allow-replies modes | M2 |
+| [~] | Download JSON / TXT / PDF (plain-text PDF first); Copy whole chat. A6: JSON and text as files through the share sheet (Save to Files, Mail, AirDrop…), and Copy; PDF needs a print module (a store build) | M2 |
 | [x] | Title: live from the server; Rename + Generate. Slice 2: live title and Rename; slice 4: Generate | M1 |
-| [ ] | Tags: editor; `tag:` search | M2 |
-| [ ] | Clone (sidebar), Fork from a message, `/fork` | M2 |
+| [x] | Tags: editor; `tag:` search. A6: a Tags sheet (remove, add, your other tags to pick), tag chips under the sidebar search | M2 |
+| [x] | Clone (sidebar), Fork from a message, `/fork`. A6: Clone in both menus (opens the copy); `/fork` in the input's `/` menu (from the shown message, as the web; the web has no per-message fork) | M2 |
 | [x] | Archive / Unarchive, Pin, Move to folder, Delete, Mark unread; reading a chat clears its dot here and on the web (slice 4) | M1 |
 | [~] | Temporary chat (not saved; Save Chat later). Slice 3: temporary chats (photos inline, text files read on the phone; other documents need a saved chat) | M1; Save Chat M2 |
 | [~] | Background completions: toast "reply finished" for a chat you're not viewing (tap to open). Slice 2: toast while the app is open; 2026-11-01: also for a reply you left mid-way; push notifications for every account through `services/push-relay` (Open WebUI's server-wide event webhook → Expo push) from store build 4, with tap to open the chat; working end to end on 2026-11-01. While the app is open, banners for every chat but the one on screen (the toast stays for temporary chats and phones without push); Settings says whether a test reached the phone | M1 (while foregrounded); push from build 4 |

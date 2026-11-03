@@ -1,6 +1,10 @@
 import {
   branchPath,
+  chatJson,
+  chatPlainText,
+  cloneChat,
   deleteChat,
+  exportFileName,
   generateTitle,
   getChat,
   initialLeaf,
@@ -16,7 +20,9 @@ import {
   type ChatRecord,
 } from '@maviechat/owui-protocol';
 import { useQueryClient } from '@tanstack/react-query';
-import { Alert, Platform } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
+import { File, Paths } from 'expo-file-system';
+import { ActionSheetIOS, Alert, Platform, Share } from 'react-native';
 import { useToast } from '@/components/Toast';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { useSession } from '@/session/SessionProvider';
@@ -26,7 +32,7 @@ export interface ChatRef {
   title: string;
 }
 
-/** The chat menu's actions (rename and generate, unread, pin, move, archive, delete); shared by the sidebar rows and the chat screen. */
+/** The chat menu's actions (rename and generate, unread, pin, move, clone, download, copy, archive, delete); shared by the sidebar rows and the chat screen. */
 export function useChatActions() {
   const { client } = useAuthed();
   const { verifySession } = useSession();
@@ -74,9 +80,62 @@ export function useChatActions() {
     }
   };
 
+  /** The chat as a file, handed to the share sheet (Save to Files, Mail, AirDrop…). */
+  const downloadAs = async (chat: ChatRef, kind: 'json' | 'txt') => {
+    try {
+      const record = await getChat(client, chat.id);
+      const file = new File(Paths.cache, exportFileName(record.title || chat.title, kind));
+      file.create({ overwrite: true });
+      await file.write(kind === 'json' ? chatJson(record) : chatPlainText(record));
+      await Share.share({ url: file.uri, title: record.title || chat.title });
+    } catch (error) {
+      toast(`Couldn't download the chat: ${error instanceof OwuiHttpError ? (error.detail ?? `HTTP ${error.status}`) : error instanceof Error ? error.message : 'unknown error'}`, 'error');
+      if (error instanceof OwuiHttpError && error.isUnauthorized) verifySession();
+    }
+  };
+
   return {
     /** The web app hides Delete unless the account holds the `chat.delete` permission. */
     canDelete: capabilities?.can('chat.delete') ?? false,
+    /** Share, Download and Clone follow the same permissions as on the web (allowed unless the server says no). */
+    canShare: capabilities?.can('chat.share', true) ?? false,
+    canExport: capabilities?.can('chat.export', true) ?? false,
+    canClone: capabilities?.can('chat.import', true) ?? false,
+
+    /** A copy of the whole chat ("Clone of …"); answers with its id. */
+    async clone(chat: ChatRef): Promise<string | null> {
+      try {
+        const copy = await cloneChat(client, chat.id);
+        refresh(copy.id);
+        toast('Chat cloned');
+        return copy.id;
+      } catch (error) {
+        toast(`Couldn't clone the chat${error instanceof OwuiHttpError && error.detail ? `: ${error.detail}` : ''}`, 'error');
+        if (error instanceof OwuiHttpError && error.isUnauthorized) verifySession();
+        return null;
+      }
+    },
+
+    /** As the web's Download: the chat export (.json) or plain text (.txt). */
+    download(chat: ChatRef) {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { title: 'Download', options: ['Chat Export (.json)', 'Plain Text (.txt)', 'Cancel'], cancelButtonIndex: 2 },
+        (index) => {
+          if (index === 0) void downloadAs(chat, 'json');
+          else if (index === 1) void downloadAs(chat, 'txt');
+        },
+      );
+    },
+
+    /** The shown branch as plain text, on the clipboard. */
+    async copy(chat: ChatRef) {
+      try {
+        await Clipboard.setStringAsync(chatPlainText(await getChat(client, chat.id)));
+        toast('Copied to clipboard');
+      } catch (error) {
+        toast(`Couldn't copy the chat${error instanceof OwuiHttpError && error.detail ? `: ${error.detail}` : ''}`, 'error');
+      }
+    },
 
     rename(chat: ChatRef) {
       if (Platform.OS !== 'ios') return;
