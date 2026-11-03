@@ -190,6 +190,16 @@ export interface DtTurnRequest {
   language?: string;
   /** Lets the server treat a command sent again after a reconnect as the same submission. */
   clientSubmissionId?: string;
+  /** A learning workspace the chat belongs to: `mastery_path` for a mastery path's chats (sent on every turn). */
+  workspaceMode?: string;
+  /** The mastery path the chat works on. */
+  masteryPathId?: string;
+  /** Outline, study or review; null keeps the chat's own mode. */
+  masterySessionMode?: string | null;
+  /** Your answer to the tutor's question card: the option's letter or your words (`answers` for a group of questions). */
+  masteryAnswer?: { question_id: string; text: string; answers?: Record<string, string> };
+  /** The tutor's question you'd rather skip. */
+  masterySkip?: { question_id: string };
 }
 
 export type DtCommand = Record<string, unknown> & { protocol_version: string; type: string };
@@ -214,6 +224,11 @@ export function startTurnCommand(request: DtTurnRequest): DtCommand {
   if (request.config && Object.keys(request.config).length) command.config = request.config;
   if (request.persistUserMessage === false) command.persist_user_message = false;
   if (request.clientSubmissionId) command.client_submission_id = request.clientSubmissionId;
+  if (request.workspaceMode) command.workspace_mode = request.workspaceMode;
+  if (request.masteryPathId) command.mastery_path_id = request.masteryPathId;
+  if (request.masterySessionMode) command.mastery_session_mode = request.masterySessionMode;
+  if (request.masteryAnswer) command.mastery_answer = request.masteryAnswer;
+  if (request.masterySkip) command.mastery_skip = request.masterySkip;
   return command;
 }
 

@@ -38,6 +38,10 @@ export default function DeepTutorLayout() {
           <Stack.Screen name="learn/connection" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="learn/notebook/[id]" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="learn/knowledge/[name]" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+          <Stack.Screen name="learn/mastery/index" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+          <Stack.Screen name="learn/mastery/[id]" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+          <Stack.Screen name="learn/mastery/new" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+          <Stack.Screen name="learn/mastery/chat" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="learn/settings" options={{ presentation: 'modal', animation: 'slide_from_bottom', gestureEnabled: true }} />
         </Stack>
       </SpaceDrawer>

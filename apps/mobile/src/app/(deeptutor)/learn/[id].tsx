@@ -2,12 +2,20 @@ import {
   activeTurnOf,
   getSession,
   isPinned,
+  masteryOfPreferences,
+  masteryTurnFields,
   messageAttachments,
   messageReferences,
+  newlyMastered,
   saveQuizResults,
+  setMasteryMode,
   savedReply,
   sessionTitle,
   shownMessages,
+  type DtMasteryGrade,
+  type DtMasteryMode,
+  type DtMasteryQuestion,
+  type DtMasteryTopic,
   type DtMessage,
   type DtOutline,
   type DtQuizQuestion,
@@ -28,11 +36,13 @@ import { DtFindSheet } from '@/features/deeptutor/chat/DtFind';
 import { DtMessageList, type DtListItem, type DtMessageListHandle } from '@/features/deeptutor/chat/DtMessageList';
 import { extrasRequest, promptExtras, type DtExtras } from '@/features/deeptutor/chat/extras';
 import type { PromptExtras } from '@/features/deeptutor/chat/liveTurns';
+import type { MasteryCardAnswer } from '@/features/deeptutor/chat/DtMasteryCard';
 import type { DtReplyActions } from '@/features/deeptutor/chat/DtReplyView';
 import type { QuizAnswer } from '@/features/deeptutor/chat/quiz';
 import { useDtChoice } from '@/features/deeptutor/chat/useDtChoice';
 import { deepTutorAttachment } from '@/features/deeptutor/crossReference';
-import { useDtNotebooks, useDtSession, useDtSessions } from '@/features/deeptutor/queries';
+import { PathBar } from '@/features/deeptutor/learning/PathBar';
+import { useDtMasteryTopic, useDtNotebooks, useDtSession, useDtSessions } from '@/features/deeptutor/queries';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { switchToOpenWebUI } from '@/features/deeptutor/switch';
 import { TaskLinkSheet } from '@/features/deeptutor/tasks/TaskLinkSheet';
@@ -66,8 +76,36 @@ export default function DeepTutorChat() {
   // Names for what earlier messages referred to (saved as ids).
   const notebooks = useDtNotebooks();
   const chats = useDtSessions('');
-  const native = isNativeCapability(capability);
+  // A mastery path's chat: the path it works on, and its mode.
+  const path = masteryOfPreferences(detail.data?.preferences);
+  const topic = useDtMasteryTopic(path?.pathId ?? '');
+  const native = isNativeCapability(capability) || Boolean(path);
   const running = turn?.reply.status === 'running' || turn?.reply.status === 'waiting';
+
+  // After each reply in a path chat, the path is read again; a point newly mastered gets a note
+  // (from the screen in front only: the path's page may be open underneath).
+  const lastTopic = useRef<DtMasteryTopic | undefined>(undefined);
+  const focused = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      focused.current = true;
+      return () => {
+        focused.current = false;
+      };
+    }, []),
+  );
+  useEffect(() => {
+    const now = topic.data;
+    if (!now) return;
+    const gained = newlyMastered(lastTopic.current, now);
+    lastTopic.current = now;
+    if (gained.length && focused.current) toast(`Mastered: ${gained.map((point) => point.name).join(', ')}`, 'success');
+  }, [topic.data, toast]);
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (wasRunning.current && !running && path) void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'mastery'] });
+    wasRunning.current = running;
+  }, [running, path, queryClient, session.baseUrl]);
 
   // A notification about the chat on screen needs no banner.
   useFocusEffect(
@@ -143,7 +181,12 @@ export default function DeepTutorChat() {
     live.turns.begin(id, text, promptExtras(extras, choice.selectedKnowledgeBases));
     setPinKey(`send-${Date.now()}`);
     try {
-      await live.send({ content: text, sessionId: id, ...choice.request, ...extrasRequest(extras) });
+      await live.send(
+        path
+          ? // A path chat keeps its path and mode on every turn; the tutor brings its own tools.
+            { content: text, sessionId: id, ...masteryTurnFields(path.pathId, null), llmSelection: choice.model, knowledgeBases: choice.selectedKnowledgeBases, ...extrasRequest(extras) }
+          : { content: text, sessionId: id, ...choice.request, ...extrasRequest(extras) },
+      );
       return true;
     } catch (error) {
       live.turns.remove(id);
@@ -177,6 +220,58 @@ export default function DeepTutorChat() {
       toast(`Couldn't start the research: ${describeError(error)}`, 'error');
     }
   };
+
+  // A question card from a path's tutor: your answer (or a skip) is your next message.
+  const answerCard = async (question: DtMasteryQuestion, reply: MasteryCardAnswer, skip = false) => {
+    if (!path) return false;
+    const content = skip ? "Let's skip this question." : reply.text;
+    live.turns.begin(id, content);
+    setPinKey(`card-${Date.now()}`);
+    try {
+      await live.send({
+        content,
+        sessionId: id,
+        ...masteryTurnFields(path.pathId, null),
+        llmSelection: choice.model,
+        ...(skip
+          ? { masterySkip: { question_id: question.id } }
+          : { masteryAnswer: { question_id: question.id, text: reply.text, ...(question.type === 'group' && reply.answers ? { answers: reply.answers } : {}) } }),
+      });
+      return true;
+    } catch (error) {
+      live.turns.remove(id);
+      toast(`Couldn't send: ${describeError(error)}`, 'error');
+      return false;
+    }
+  };
+
+  const switchMode = async (mode: DtMasteryMode) => {
+    if (!path) return;
+    try {
+      await setMasteryMode(client, path.pathId, id, mode);
+      void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'session', id] });
+    } catch (error) {
+      toast(`Couldn't switch: ${describeError(error)}`, 'error');
+    }
+  };
+
+  // Rulings on the tutor's questions arrive with later replies, so they're gathered across the chat.
+  const masteryState = useMemo(() => {
+    const grades: Record<string, DtMasteryGrade> = {};
+    const skipped: string[] = [];
+    const rejected = new Set<string>();
+    for (const item of items) {
+      if (item.kind !== 'reply') continue;
+      for (const grade of item.reply.mastery.grades) {
+        grades[grade.questionId] = grade;
+        for (const part of grade.parts) grades[part.questionId] = part;
+        rejected.delete(grade.questionId);
+      }
+      skipped.push(...item.reply.mastery.skipped);
+      for (const questionId of item.reply.mastery.rejected) rejected.add(questionId);
+    }
+    return { grades, skipped, rejected: [...rejected] };
+  }, [items]);
 
   const answer = async (answers: { questionId: string; text: string }[]) => {
     const accepted = await live.answer(id, answers);
@@ -241,21 +336,33 @@ export default function DeepTutorChat() {
 
   const openOnWeb = () => router.push({ pathname: '/learn/web', params: { path: `/chat/${encodeURIComponent(id)}` } });
   // Replies get handlers that stay the same between frames (the latest version runs when tapped).
-  const handlers = useRef({ regenerate, startResearch, answer, saveQuiz, openOnWeb });
+  const handlers = useRef({ regenerate, startResearch, answer, saveQuiz, openOnWeb, answerCard });
   useEffect(() => {
-    handlers.current = { regenerate, startResearch, answer, saveQuiz, openOnWeb };
+    handlers.current = { regenerate, startResearch, answer, saveQuiz, openOnWeb, answerCard };
   });
+  const inPath = Boolean(path);
   const actions = useMemo<DtReplyActions>(
     () => ({
-      onRegenerate: native && !running ? () => handlers.current.regenerate() : undefined,
+      // A path's tutor keeps score of each answer, so its replies aren't regenerated.
+      onRegenerate: native && !inPath && !running ? () => handlers.current.regenerate() : undefined,
       onStartResearch: running ? undefined : (outline) => handlers.current.startResearch(outline),
       onAnswer: (answers) => handlers.current.answer(answers),
       onSaveQuiz: (turnId, questions, answers) => handlers.current.saveQuiz(turnId, questions, answers),
       onOpenWeb: () => handlers.current.openOnWeb(),
+      mastery: inPath
+        ? {
+            ...masteryState,
+            onAnswer: running ? undefined : (question, reply) => handlers.current.answerCard(question, reply),
+            onSkip: running ? undefined : (question) => handlers.current.answerCard(question, { text: '' }, true),
+          }
+        : undefined,
     }),
-    [native, running],
+    [native, inPath, running, masteryState],
   );
+  const openPath = () => (path ? router.push({ pathname: '/learn/mastery/[id]', params: { id: path.pathId } }) : undefined);
+  const waypoint = topic.data?.next?.pointName || topic.data?.modules.flatMap((module) => module.points).find((point) => point.status !== 'mastered')?.name;
   const menu: MenuItem[] = [
+    ...(path ? [{ key: 'path', label: 'Open the Path', icon: 'map' as const, onPress: openPath }] : []),
     ...(owui.state.status === 'signed-in' && items.length > 0
       ? [{ key: 'ask', label: attaching ? 'Attaching…' : 'Ask About It in Open WebUI', icon: 'chat-bubble-left' as const, onPress: () => void askInOpenWebUI() }]
       : []),
@@ -280,6 +387,9 @@ export default function DeepTutorChat() {
   return (
     <View style={styles.screen}>
       <DtHeader title={title} menu={menu} />
+      {path ? (
+        <PathBar topic={topic.data} mode={path.mode ?? 'study'} onMode={running ? undefined : (mode) => void switchMode(mode)} onOpenPath={() => openPath()} />
+      ) : null}
       <KeyboardAvoidingView behavior="padding" style={styles.body}>
         {detail.isLoading && !turn ? (
           <ActivityIndicator style={styles.loading} color={palette.textMuted} />
@@ -300,9 +410,11 @@ export default function DeepTutorChat() {
             models={choice.models}
             model={choice.model}
             onModelChange={choice.setModel}
-            modes={choice.modes}
-            mode={choice.mode}
+            // A path chat's mode is the path's own (above); DeepTutor's other modes aren't offered here.
+            modes={path ? [] : choice.modes}
+            mode={path ? 'mastery_path' : choice.mode}
             onModeChange={choice.setMode}
+            placeholder={path ? (waypoint ? `Ask your tutor about "${waypoint}"` : 'Ask your tutor') : undefined}
             config={choice.config}
             onSettingChange={choice.setSetting}
             knowledgeBases={choice.knowledgeBases}

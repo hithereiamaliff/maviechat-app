@@ -1,6 +1,6 @@
 /**
  * DeepTutor contract probe (milestone M1.5):
- *   npm run probe:deeptutor -- [--url http://127.0.0.1:3782] [--env ~/.config/maviechat/deeptutor-test.env] [--no-fixtures] [--turn]
+ *   npm run probe:deeptutor -- [--url http://127.0.0.1:3782] [--env ~/.config/maviechat/deeptutor-test.env] [--no-fixtures] [--turn] [--learning]
  *
  * `--turn` also runs one short "APP PROBE:" chat turn over `/ws` (it uses the account's model),
  * drops the socket mid-reply on purpose, checks the resumed reply equals the saved one, and
@@ -29,6 +29,9 @@
  * weeks with one date deleted and undone and the rest renamed from the second date; search and
  * the layers read. Events and the chat are deleted; the tasks are archived (DeepTutor has no
  * delete for tasks).
+ * `--learning` checks the learning hub and mastery paths (src/deeptutor-learning-probe.ts): a
+ * path made from a goal, a study chat whose question card is answered and graded, mode switch,
+ * a point marked known and back, rename, review settings, a map edit, reset, then deletion.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -129,6 +132,7 @@ import {
   tokenExpiry,
   TOKEN_COOKIE,
 } from '@maviechat/deeptutor-protocol';
+import { probeLearning } from './deeptutor-learning-probe';
 import { loadEnvFile } from './env';
 import { shapeOf } from './shape';
 
@@ -148,6 +152,7 @@ const { values: args } = parseArgs({
     library: { type: 'boolean' },
     knowledge: { type: 'boolean' },
     calendar: { type: 'boolean' },
+    learning: { type: 'boolean' },
   },
 });
 
@@ -338,6 +343,14 @@ async function main() {
     await step('calendar: tasks, a chat link, events, a repeating event, undo, search, layers', async () => {
       const outcome = await probeCalendar(baseUrl, session.token as string, client);
       fixtures.calendar = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.learning) {
+    await step('learning: hub index, a mastery path, a study chat with a graded question, settings, map edit, reset, delete', async () => {
+      const outcome = await probeLearning(baseUrl, session.token as string, client);
+      fixtures.learning = outcome.fixture;
       return { value: true, note: outcome.note };
     });
   }

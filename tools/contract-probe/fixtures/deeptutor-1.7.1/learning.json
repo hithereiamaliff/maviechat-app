@@ -1,0 +1,32 @@
+{
+  "learningPages": [
+    "/learning/books",
+    "/learning/mastery",
+    "/learning/practice",
+    "/learning/reading"
+  ],
+  "topicKeys": {
+    "next": "probe",
+    "sources": 0,
+    "recallTarget": 0.9,
+    "strategy": null
+  },
+  "card": {
+    "type": "choice",
+    "options": 4,
+    "freeText": true,
+    "hasPoint": true,
+    "attempt": 1
+  },
+  "grade": {
+    "result": "incorrect",
+    "correctKnown": true,
+    "hasCorrectLabel": true,
+    "final": true
+  },
+  "settleSeconds": 0,
+  "strategies": {
+    "presets": 4,
+    "custom": 0
+  }
+}

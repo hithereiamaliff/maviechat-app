@@ -10,9 +10,13 @@ import {
   type DateKey,
   DEFAULT_ATTACHMENT_LIMITS,
   getAttachmentLimits,
+  getAuthStatus,
   getKbProgress,
   getKnowledgeBase,
+  getLearningIndex,
   getLearningJournal,
+  getMasteryTopic,
+  getPointReport,
   getLlmOptions,
   getNotebook,
   getPracticeSummary,
@@ -27,7 +31,12 @@ import {
   listKnowledgeBases,
   listKnowledgeCenter,
   listRagProviders,
+  listKnowledgeMaterials,
+  listMasterySessions,
+  listMasteryTopics,
   listModes,
+  listModules,
+  listReviewStrategies,
   listNotebooks,
   listQuestionCategories,
   listSessions,
@@ -247,3 +256,59 @@ export function useDtCalendarRange(from: DateKey, to: DateKey) {
 /** The six weeks a month view shows: from its first row's Monday, 42 days. */
 export const monthRange = (firstShown: DateKey) => ({ from: firstShown, to: addDaysKey(firstShown, 42) });
 
+
+/** Every learning activity (books, paths, collections, videos, practice), as DeepTutor's hub shows them; refreshed every 30 s while shown, as there. */
+export function useDtLearningIndex() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'learning-index'], queryFn: () => getLearningIndex(client), refetchInterval: 30_000, staleTime: 10_000 });
+}
+
+/** DeepTutor's modules, to know which learning pages this server has switched on. */
+export function useDtModules() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'modules'], queryFn: () => listModules(client), staleTime: 5 * 60_000 });
+}
+
+/** Sign-in status, which carries a learner account's limits (`learning_policy`). */
+export function useDtAuthStatus() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'auth-status'], queryFn: () => getAuthStatus(client), staleTime: 5 * 60_000 });
+}
+
+/** Your mastery paths. */
+export function useDtMasteryTopics() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'mastery', 'topics'], queryFn: () => listMasteryTopics(client), staleTime: 15_000 });
+}
+
+/** One path; read again every 15 s while shown (the tutor changes it as you study). */
+export function useDtMasteryTopic(pathId: string) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'mastery', 'topic', pathId], queryFn: () => getMasteryTopic(client, pathId), enabled: Boolean(pathId), refetchInterval: 15_000, staleTime: 5_000 });
+}
+
+export function useDtMasterySessions(pathId: string) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'mastery', 'sessions', pathId], queryFn: () => listMasterySessions(client, pathId), enabled: Boolean(pathId), refetchInterval: 15_000, staleTime: 5_000 });
+}
+
+export function useDtReviewStrategies(enabled = true) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'mastery', 'strategies'], queryFn: () => listReviewStrategies(client), enabled, staleTime: 5 * 60_000 });
+}
+
+/** What a knowledge point's mastery rests on: attempts, the bar to pass, its review. */
+export function useDtPointReport(pathId: string, pointId: string | null) {
+  const { client, session } = useDtAuthed();
+  return useQuery({
+    queryKey: [DT_QUERY_ROOT, session.baseUrl, 'mastery', 'point', pathId, pointId],
+    queryFn: () => getPointReport(client, pathId, pointId as string),
+    enabled: Boolean(pathId && pointId),
+  });
+}
+
+/** Knowledge bases a new path can be built from. */
+export function useDtKnowledgeMaterials(enabled: boolean) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'mastery', 'kb-materials'], queryFn: () => listKnowledgeMaterials(client), enabled, staleTime: 60_000 });
+}

@@ -1,4 +1,4 @@
-import { isArchived, learningPath, listSessions, searchSessions, searchSnippet, sessionTitle, type DtSessionSummary } from '@maviechat/deeptutor-protocol';
+import { isArchived, learningPath, listSessions, masteryOfPreferences, searchSessions, searchSnippet, sessionTitle, type DtSessionSummary } from '@maviechat/deeptutor-protocol';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -63,7 +63,7 @@ export default function ChatHistory() {
   const failure = query ? found.error : all.error;
 
   const open = (item: DtSessionSummary) => {
-    const path = learningPath(item);
+    const path = masteryOfPreferences(item.preferences as Record<string, unknown> | undefined) ? null : learningPath(item);
     if (path) router.replace({ pathname: '/learn/web', params: { path, title: sessionTitle(item) } });
     else router.replace({ pathname: '/learn/[id]', params: { id: item.id } });
   };

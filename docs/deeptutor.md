@@ -344,6 +344,37 @@ Both are native, on the Home shelf.
   - `DELETE /automations/{job_id}` stops one; `GET /task-blocks` → `{task_id: count}`; `GET /export.ics`; `GET /stream` is a change feed (Server-Sent Events) the app doesn't use.
 - Learner accounts may use both (DeepTutor files them under chat).
 
+## All Learning and Mastery Path (B5.1, 2026-11-03)
+
+Learning activities come in four slices: **B5.1** the hub and mastery paths, **B5.2** books, **B5.3** reading, **B5.4** videos. Until a kind's slice lands, it opens DeepTutor's own page.
+
+- **All Learning** (Learning shelf) is DeepTutor's hub:
+  - **Needs your attention:** paths with reviews due, books paused (with DeepTutor's reason) or still being written.
+  - **Your learning:** every activity, newest first, with progress (pages read, points mastered). Filters All, Books, Mastery Path, Practice, Reading (Reading takes videos too), a search box, 24 at a time.
+  - It reads again every 30 s while shown, as DeepTutor's page does.
+  - A path opens natively, a practice item on its own question (`/learn/practice?entry=`); books, collections and videos open DeepTutor's pages.
+- **New Learning Activity** offers the ways this account may start: the server has the page on (`/api/modules`), and a learner's policy allows the surface (`allowed_surfaces`; for Mastery Path also the `mastery_path` mode, since a learner's tutor turns are refused without it). Each card has a line and three points in our own words.
+- **Mastery Path:**
+  - **The list:** a banner when reviews are due ("Start Review" opens a review chat naming them), then a card per path: emblem, name, goal, progress, modules, chats, date.
+  - **New path:** your goal (up to 2,000 characters) and one of DeepTutor's eight emblems, then optional materials: knowledge bases, Favorites notebooks (their first 16 records go along) and earlier chats (their last message). DeepTutor names the path; the app then starts the **outline chat** with the tutor straight away, as DeepTutor does. (Books, question sets, Co-Writer drafts and partners as materials: later.)
+  - **The path page:** emblem and goal, what it was built from, points mastered; **Next up** (design the outline, with the tutor or by hand, when there's none; else the next point, with Continue, Answer Your Tutor, Begin or Review); the outline (tap a point: the bar to pass, your answers, next review, "I already know this" or back); reviews (due first by risk; ▶ reviews one; Start Review) with the review plan and recall target; what the tutor knows about you; the path's chats and New Chat. Menu: Rename, Edit Modules, Reset Progress, More on the Web, Delete Path.
+  - **Edit Modules:** names, kinds (concept, memory, procedure, design), order, add and remove, checked against DeepTutor's rules before saving. Unlike DeepTutor's own editor, the app keeps each module's one-line objective.
+  - **Path chats** run in the ordinary DeepTutor chat screen, with a bar on top: the path (tap for its page), points mastered, and Outline / Study / Review (Study waits for an outline). The tutor's question cards are native: lettered options or your own words, groups of parts answered together, Skip, then the ruling (right, partly, not quite, or not graded) with the answer and why. A newly mastered point gets a note. New chats start with three starters per mode.
+  - Your own review plans (making, editing, copying) stay on the web; the app picks among them.
+  - Not yet: the board view, the composer's hint line (an extra model call per turn), the page images the tutor shows from your documents, the hand-off cards in ordinary chats.
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --learning`)
+
+- **Hub:** `GET /api/dashboard/learning-index` → `{sources: {books, mastery, reading, watching, practice}, failed[]}`, each already filtered by what the account may open. `GET /api/modules` → `{modules[{id, enabled, ready, navigation[], capabilities[]}]}`; a learner's limits come with `GET /api/auth/status` (`learning_policy.allowed_surfaces`, `allowed_capabilities`).
+- **Paths** are `/api/mastery-paths`:
+  - `GET /topics` (active ones, newest first), `GET /topics/{id}`, `POST /topics {goal, emoji, sources[], modules[]}` (DeepTutor names it; with modules given, study can start at once), `PUT /topics/{id}/map {modules}` (ids kept keep their evidence), `GET /topics/{id}/sessions`, `PUT /topics/{id}/sessions/{sid}/mode {mode}`, `POST /topics/{id}/objectives/{kp}/override {mastered, note}`, `PUT /topics/{id}/review-strategy {template_id}`, `PUT /topics/{id}/review-settings {desired_retention}` (0.7–0.99), `GET /review-strategies` (four presets on our server).
+  - The older `/progress/{id}` routes take the same id: `GET …/objectives/{kp}` (attempts, the bar, the review), `PATCH {name}`, `POST …/redo` (reset), `DELETE`.
+- **A path chat** sends on every turn `capability: mastery_path`, `workspace_mode: mastery_path`, `mastery_path_id`, and `mastery_session_mode` (null keeps the chat's). Answering a card is a new turn whose text is the option's letter (or your words) with `mastery_answer {question_id, text, answers?}`; skipping sends `mastery_skip {question_id}`. Cards arrive as `tool_result` metadata `mastery_question`; rulings as `mastery_grade.result`, graded at the start of the answering turn; also `mastery_skip_question`, `mastery_answer_rejected`, `mastery_mode`, `mastery_build`.
+- **Posing a question ends the turn** (the next message answers it), and the tutor usually poses the next one after a ruling.
+- **Just after a turn ends, the path stays locked for a moment:** a change to it (map, override, settings, rename, reset, delete) answers 409 "Active learning turn could not be stopped". The app retries such changes three times over about ten seconds (`whenPathFree`).
+- **The tutor's cards are kept in the Question Bank** as practice questions (`source: mastery_path`, with `mastery_path_id`). They outlive the path, so the probe deletes its own.
+- Deleting a path leaves its chats as ordinary chats.
+
 ## M1.5 checklist
 
 | | Item |

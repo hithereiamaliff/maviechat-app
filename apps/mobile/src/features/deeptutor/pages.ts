@@ -7,7 +7,17 @@ export interface DtPage {
   icon: IconName;
   path: string;
   /** The app's own screen for it. */
-  route?: '/learn/practice' | '/learn/questions' | '/learn/favorites' | '/learn/journal' | '/learn/history' | '/learn/knowledge' | '/learn/calendar' | '/learn/tasks';
+  route?:
+    | '/learn/practice'
+    | '/learn/questions'
+    | '/learn/favorites'
+    | '/learn/journal'
+    | '/learn/history'
+    | '/learn/knowledge'
+    | '/learn/calendar'
+    | '/learn/tasks'
+    | '/learn/learning'
+    | '/learn/learning/new';
   /** Hidden from learner accounts, which DeepTutor limits to chat and some learning. */
   notForLearners?: boolean;
 }
@@ -47,8 +57,8 @@ export const DT_SHELVES: DtShelf[] = [
     groups: [
       {
         pages: [
-          { key: 'learning-new', label: 'New Learning Activity', icon: 'plus', path: '/learning/new' },
-          { key: 'learning', label: 'All Learning', icon: 'squares-2x2', path: '/learning' },
+          { key: 'learning-new', label: 'New Learning Activity', icon: 'plus', path: '/learning/new', route: '/learn/learning/new' },
+          { key: 'learning', label: 'All Learning', icon: 'squares-2x2', path: '/learning', route: '/learn/learning' },
           { key: 'practice', label: 'Practice', icon: 'arrow-path', path: '/learning/practice', route: '/learn/practice' },
         ],
       },

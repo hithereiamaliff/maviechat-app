@@ -84,6 +84,51 @@ export interface DtOutline {
   config: Record<string, unknown>;
 }
 
+/** A question a mastery path's tutor posed (`mastery_question`); a reply can pose several. */
+export interface DtMasteryQuestion {
+  id: string;
+  prompt: string;
+  /** "choice" (lettered options), "short" (your words), or "group" (2–4 parts answered together). */
+  type: string;
+  /** The knowledge point it checks. */
+  pointName: string;
+  difficulty: string;
+  attempt: number;
+  options: { label: string; body: string }[];
+  freeText: boolean;
+  parts: DtMasteryQuestion[];
+}
+
+/** The tutor's ruling on an answer (`mastery_grade`); it usually arrives with the next turn. */
+export interface DtMasteryGrade {
+  questionId: string;
+  correct: boolean | null;
+  /** "correct", "partial", "incorrect" or "ungraded". */
+  result: string;
+  learnerAnswer: string;
+  correctLabel: string;
+  correctBody: string;
+  explanation: string;
+  feedback: string;
+  /** False while the tutor still wants more (a clarification, the rest of a group). */
+  final: boolean;
+  parts: DtMasteryGrade[];
+}
+
+/** What a mastery path's tutor did in a reply, besides writing. */
+export interface DtMasteryInfo {
+  questions: DtMasteryQuestion[];
+  grades: DtMasteryGrade[];
+  /** Questions dropped at your request (no grade will come). */
+  skipped: string[];
+  /** Answers the server couldn't take; their cards open again. */
+  rejected: string[];
+  /** The mode the tutor switched the chat to. */
+  mode: string | null;
+  /** The outline the tutor drew: how many modules and knowledge points it added. */
+  built: { modules: number; points: number } | null;
+}
+
 /** A reply as DeepTutor's events build it, live or from a saved message. */
 export interface DtReply {
   sessionId: string | null;
@@ -113,6 +158,7 @@ export interface DtReply {
   askAnswers: Record<string, string> | null;
   visual: DtVisual | null;
   outline: DtOutline | null;
+  mastery: DtMasteryInfo;
 }
 
 export function emptyReply(sessionId: string | null = null, turnId: string | null = null): DtReply {
@@ -137,6 +183,7 @@ export function emptyReply(sessionId: string | null = null, turnId: string | nul
     askAnswers: null,
     visual: null,
     outline: null,
+    mastery: { questions: [], grades: [], skipped: [], rejected: [], mode: null, built: null },
   };
 }
 
@@ -286,6 +333,86 @@ function mergeSources(current: DtSource[], incoming: unknown): DtSource[] {
 }
 
 /** Applies one event. Repeats (a `seq` already applied) leave the reply as it is. */
+/** A mastery tool's payload in a `tool_result`: under `tool_metadata`, or at the top of the metadata. */
+function toolPayload(meta: Record<string, unknown>, key: string): Record<string, unknown> | null {
+  const nested = record(meta.tool_metadata)[key];
+  const value = nested === undefined ? meta[key] : nested;
+  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+export function masteryQuestion(raw: unknown, nested = false): DtMasteryQuestion | null {
+  const item = record(raw);
+  const id = text(item.question_id).trim();
+  if (!id) return null;
+  const type = text(item.question_type) || 'short';
+  let parts: DtMasteryQuestion[] = [];
+  if (type === 'group') {
+    if (nested) return null;
+    const list = Array.isArray(item.questions) ? item.questions.map((part) => masteryQuestion(part, true)) : [];
+    // A group is two to four parts with their own ids; anything else isn't shown as a group.
+    if (list.length < 2 || list.length > 4 || list.some((part) => !part)) return null;
+    parts = list as DtMasteryQuestion[];
+    if (new Set([id, ...parts.map((part) => part.id)]).size !== parts.length + 1) return null;
+  }
+  const attempt = count(item.attempt);
+  return {
+    id,
+    prompt: text(item.prompt),
+    type,
+    pointName: text(record(item.objective).name).trim(),
+    difficulty: text(item.difficulty).trim(),
+    attempt: attempt && attempt > 0 ? Math.floor(attempt) : 1,
+    options: (Array.isArray(item.options) ? item.options : []).map(record).map((option) => ({ label: text(option.label), body: text(option.body) })).filter((option) => option.label),
+    freeText: item.allow_free_text !== false,
+    parts,
+  };
+}
+
+export function masteryGrade(raw: unknown): DtMasteryGrade | null {
+  const item = record(raw);
+  const questionId = text(item.question_id).trim();
+  if (!questionId) return null;
+  const parts = item.question_type === 'group' && Array.isArray(item.results) ? item.results.flatMap((part) => masteryGrade(part) ?? []) : [];
+  return {
+    questionId,
+    correct: item.is_correct === null || item.is_correct === undefined ? null : item.is_correct === true,
+    result: text(item.result),
+    learnerAnswer: text(item.learner_answer),
+    correctLabel: text(item.correct_label),
+    correctBody: text(item.correct_body),
+    explanation: text(item.explanation),
+    feedback: text(item.feedback),
+    final: item.final !== false && item.complete !== false,
+    parts,
+  };
+}
+
+function applyMasteryResult(mastery: DtMasteryInfo, meta: Record<string, unknown>): DtMasteryInfo {
+  let next = mastery;
+  const posed = masteryQuestion(toolPayload(meta, 'mastery_question'));
+  // Cards in older history came inside an `ask_user` envelope.
+  const legacy = toolPayload(meta, 'ask_user');
+  const card = posed ?? (legacy?.kind === 'mastery_question' ? masteryQuestion(legacy.mastery_question) : null);
+  if (card) next = { ...next, questions: [...next.questions.filter((question) => question.id !== card.id), card] };
+  const grade = masteryGrade(toolPayload(meta, 'mastery_grade')?.result);
+  if (grade) {
+    next = {
+      ...next,
+      grades: [...next.grades.filter((item) => item.questionId !== grade.questionId), grade],
+      rejected: next.rejected.filter((id) => id !== grade.questionId),
+    };
+  }
+  const skip = toolPayload(meta, 'mastery_skip_question');
+  if (skip?.skipped === true && text(skip.question_id)) next = { ...next, skipped: [...next.skipped, text(skip.question_id)] };
+  const rejected = text(toolPayload(meta, 'mastery_answer_rejected')?.question_id);
+  if (rejected) next = { ...next, rejected: [...next.rejected.filter((id) => id !== rejected), rejected] };
+  const mode = toolPayload(meta, 'mastery_mode');
+  if (mode?.status === 'switched' && text(mode.mode)) next = { ...next, mode: text(mode.mode) };
+  const built = toolPayload(meta, 'mastery_build');
+  if (built?.status === 'built') next = { ...next, built: { modules: count(built.modules_added) ?? 0, points: count(built.knowledge_points_added) ?? 0 } };
+  return next;
+}
+
 export function applyTurnEvent(reply: DtReply, event: DtStreamEvent): DtReply {
   if (event.seq > 0 && event.seq <= reply.seq) return reply;
   const next: DtReply = { ...reply, seq: Math.max(reply.seq, event.seq) };
@@ -332,7 +459,9 @@ export function applyTurnEvent(reply: DtReply, event: DtStreamEvent): DtReply {
     }
     case 'tool_result': {
       const id = text(meta.call_id);
-      const asked = askOf(record(meta.tool_metadata).ask_user);
+      next.mastery = applyMasteryResult(next.mastery, meta);
+      const askPayload = record(record(meta.tool_metadata).ask_user);
+      const asked = askPayload.kind === 'mastery_question' ? null : askOf(askPayload);
       if (asked) {
         // The turn now waits for your answers (sent with `submit_user_reply`).
         next.ask = asked;

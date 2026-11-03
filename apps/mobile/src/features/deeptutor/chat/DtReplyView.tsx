@@ -1,4 +1,14 @@
-import { replySegments, toolSummary, type DtOutline, type DtQuizQuestion, type DtReply, type DtSource, type DtToolStep } from '@maviechat/deeptutor-protocol';
+import {
+  replySegments,
+  toolSummary,
+  type DtMasteryGrade,
+  type DtMasteryQuestion,
+  type DtOutline,
+  type DtQuizQuestion,
+  type DtReply,
+  type DtSource,
+  type DtToolStep,
+} from '@maviechat/deeptutor-protocol';
 import * as Clipboard from 'expo-clipboard';
 import { memo, useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -11,6 +21,7 @@ import { Markdown } from '@/markdown/Markdown';
 import { fonts, radius, usePalette } from '@/theme';
 import { toolIcon, toolLabel } from './DtComposer';
 import { DtSentExtras, type SentAttachment } from './DtExtrasViews';
+import { DtMasteryCard, type MasteryCardAnswer } from './DtMasteryCard';
 import { DtAskView, DtOutlineView, DtQuizView, DtStages, DtVisualView } from './DtModeViews';
 import type { QuizAnswer } from './quiz';
 
@@ -32,10 +43,21 @@ const STEP_NAMES: Record<string, string> = {
   rag: 'Searched your knowledge base',
   exec: 'Ran code',
   web_fetch: 'Read a web page',
+  mastery_status: 'Checked your progress',
+  mastery_build: 'Drew the outline',
+  mastery_revise: 'Revised the outline',
+  mastery_profile: 'Noted what you told it',
+  mastery_mode: 'Switched mode',
+  mastery_assess: 'Assessed your explanation',
+  mastery_explained: 'Noted your explanation',
+  mastery_defer: 'Set a point aside for now',
+  mastery_paths: 'Looked at your paths',
 };
 
 /** Steps the reply shows in their own way (the question card, the drawing). */
-const SHOWN_ELSEWHERE = new Set(['ask_user', 'submit_visualization']);
+const SHOWN_ELSEWHERE = new Set(['ask_user', 'submit_visualization', 'mastery_quiz', 'mastery_grade', 'mastery_skip_question']);
+
+const MODE_NAMES: Record<string, string> = { outline: 'Outline', study: 'Study', review: 'Review' };
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 
@@ -112,6 +134,17 @@ export interface DtReplyActions {
   /** Saves a finished Quiz to DeepTutor. */
   onSaveQuiz?: (turnId: string, questions: DtQuizQuestion[], answers: Record<string, QuizAnswer>) => Promise<void>;
   onOpenWeb?: () => void;
+  /** A mastery path's chat: its question cards and their rulings across the conversation. */
+  mastery?: DtMasteryContext;
+}
+
+export interface DtMasteryContext {
+  grades: Record<string, DtMasteryGrade>;
+  skipped: string[];
+  rejected: string[];
+  /** Absent while a reply is running. */
+  onAnswer?: (question: DtMasteryQuestion, answer: MasteryCardAnswer) => Promise<boolean>;
+  onSkip?: (question: DtMasteryQuestion) => Promise<boolean>;
 }
 
 interface DtReplyViewProps extends DtReplyActions {
@@ -123,7 +156,7 @@ interface DtReplyViewProps extends DtReplyActions {
 }
 
 /** A DeepTutor reply: its stages and reasoning, the answer with each step in its place, the mode's own result, sources and actions. */
-export const DtReplyView = memo(function DtReplyView({ reply, baseUrl, stateKey, last, onRegenerate, onStartResearch, onAnswer, onSaveQuiz, onOpenWeb }: DtReplyViewProps) {
+export const DtReplyView = memo(function DtReplyView({ reply, baseUrl, stateKey, last, onRegenerate, onStartResearch, onAnswer, onSaveQuiz, onOpenWeb, mastery }: DtReplyViewProps) {
   const palette = usePalette();
   const toast = useToast();
   const segments = useMemo(() => replySegments({ answer: reply.answer, tools: reply.tools.filter((tool) => !SHOWN_ELSEWHERE.has(tool.name)) }), [reply]);
@@ -158,6 +191,28 @@ export const DtReplyView = memo(function DtReplyView({ reply, baseUrl, stateKey,
           ),
         )
       )}
+      {reply.mastery.built ? (
+        <Text style={[styles.faint, { color: palette.textMuted }]}>
+          {`Drew the outline: ${reply.mastery.built.modules} ${reply.mastery.built.modules === 1 ? 'module' : 'modules'}, ${reply.mastery.built.points} knowledge ${reply.mastery.built.points === 1 ? 'point' : 'points'}.`}
+        </Text>
+      ) : null}
+      {reply.mastery.mode ? <Text style={[styles.faint, { color: palette.textMuted }]}>{`Switched this chat to ${MODE_NAMES[reply.mastery.mode] ?? reply.mastery.mode}.`}</Text> : null}
+      {reply.mastery.questions.map((question) => {
+        const grade = mastery?.grades[question.id];
+        const open = !(grade?.final ?? false) && !mastery?.skipped.includes(question.id);
+        return (
+          <DtMasteryCard
+            key={question.id}
+            question={question}
+            grade={grade}
+            skipped={mastery?.skipped.includes(question.id) ?? false}
+            rejected={mastery?.rejected.includes(question.id) ?? false}
+            onAnswer={open && mastery?.onAnswer ? (answer) => mastery.onAnswer!(question, answer) : undefined}
+            onSkip={open && mastery?.onSkip ? () => mastery.onSkip!(question) : undefined}
+            stateKey={stateKey}
+          />
+        );
+      })}
       {reply.ask ? <DtAskView ask={reply.ask} answers={reply.askAnswers} waiting={waiting} stateKey={stateKey} onSubmit={onAnswer} /> : null}
       {reply.quiz.length > 0 ? (
         <DtQuizView

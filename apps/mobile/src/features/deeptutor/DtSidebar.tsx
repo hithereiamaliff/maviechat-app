@@ -1,4 +1,4 @@
-import { listSessions, searchSessions, sessionStatusColor, sessionTitle } from '@maviechat/deeptutor-protocol';
+import { listSessions, masteryOfPreferences, searchSessions, sessionStatusColor, sessionTitle } from '@maviechat/deeptutor-protocol';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useGlobalSearchParams, usePathname } from 'expo-router';
@@ -20,7 +20,7 @@ import { useDtChatActions } from './useDtChatActions';
 import { useDtSignOut } from './useDtSignOut';
 
 const PAGE_SIZE = 100;
-const NOT_CHATS = new Set(['web', 'settings', 'connection', 'practice', 'questions', 'favorites', 'journal', 'history', 'knowledge', 'calendar', 'tasks']);
+const NOT_CHATS = new Set(['web', 'settings', 'connection', 'practice', 'questions', 'favorites', 'journal', 'history', 'knowledge', 'calendar', 'tasks', 'learning', 'mastery']);
 
 /**
  * DeepTutor's sidebar, laid out like Open WebUI's (new chat, search, you at the bottom) and
@@ -150,12 +150,14 @@ export function DtSidebar() {
         );
       case 'learning-chat': {
         const title = sessionTitle(item.session);
+        // A mastery path's chats are native; the other learning chats open in DeepTutor's own pages.
+        const native = masteryOfPreferences(item.session.preferences as Record<string, unknown> | undefined) !== null;
         return (
           <SidebarChatRow
             title={title}
-            current={item.path === currentPagePath}
+            current={native ? item.session.id === currentChatId : item.path === currentPagePath}
             busy={item.session.status === 'running'}
-            onOpen={() => openPage(item.path, title)}
+            onOpen={() => (native ? openChat(item.session.id) : openPage(item.path, title))}
             menu={[
               { key: 'rename', label: 'Rename', icon: 'pencil', onPress: () => actions.rename(item.session.id, title) },
               { key: 'archive', label: 'Archive', icon: 'archive-box', onPress: () => actions.setArchived(item.session.id, true) },
