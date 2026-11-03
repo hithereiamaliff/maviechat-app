@@ -128,8 +128,8 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [x] | Header: model name (avatar hidden on narrow screens), "context compacted" label | M1 |
 | [x] | Status history (latest, expandable; "Searched N sites", "Retrieved N sources") (`ResponseMessage/StatusHistory*`) | M1 |
 | [~] | Markdown: GFM, tables (+ Copy / Export CSV), task lists, callouts NOTE/TIP/IMPORTANT/WARNING/CAUTION, footnotes, `[1]` citation chips, mentions, `:::` fences, inline code copy. Slice 1: GFM, tables, task lists, citation chips, math as text; slice 5: footnote references (raised), mentions (`@M:` names the model), tap inline code to copy | M1 core, M2 tables export/callouts/fences |
-| [ ] | Math (KaTeX-equivalent, inline and block) | M2 |
-| [~] | Code blocks: language label, collapse/expand, Copy, Run (server Jupyter), Preview (HTML/SVG → artifacts), diff blocks; Mermaid and Vega diagrams. Slice 1: label, highlighting, collapse, Copy | M1 copy/collapse; M2 run/preview/diagrams |
+| [x] | Math (KaTeX-equivalent, inline and block). A1 (2026-11-03): MathJax 3.2.2 converts TeX to SVG inside the app (loaded with the first formula) and react-native-svg draws it; inline maths sits on the text baseline, display maths is centred and scrolls sideways when wide, a display formula inside a paragraph gets its own line, broken TeX shows as written, unknown commands in red. Same renderer in DeepTutor | M2 |
+| [~] | Code blocks: language label, collapse/expand, Copy, Run (server Jupyter), Preview (HTML/SVG → artifacts), diff blocks; Mermaid and Vega diagrams. Slice 1: label, highlighting, collapse, Copy. A1: Mermaid and Vega/Vega-Lite blocks draw as diagrams once the block is complete (Code/Diagram toggle); HTML and SVG blocks have Preview (sandboxed web view). Left: Run, diff blocks | M1 copy/collapse; M2 run/preview/diagrams |
 | [x] | Collapsibles: Reasoning ("Thinking…", "Thought for N seconds"), code interpreter ("Analyzing…/Analyzed"), tool calls ("Executing X…", "View Result from X", input/output, Allow/Deny), grouped "Explored…" | M1 |
 | [x] | Sources: "N Sources" pill with favicons, expandable list, detail sheet (excerpts, relevance, page, open) | M1 |
 | [~] | Generated images and files; tool HTML embeds (sandboxed). Slice 3: generated images | M1 images, M2 embeds |
@@ -208,7 +208,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 |---|---|
 | Pyodide (`execute:python`, Run in the browser), `execute` JavaScript | Answer "unsupported" immediately; Run uses the server's Jupyter |
 | Artifacts, tool embeds and HTML previews in iframes | Sandboxed WebViews (at most ~3 live) |
-| Mermaid, Vega, KaTeX | One hidden render WebView (cached images); math as native SVG if the spike passes |
+| Mermaid, Vega, KaTeX | Maths: native SVG from MathJax in the app (no web view). Mermaid and Vega: a sandboxed web view per diagram, sized to fit, renderers pinned on jsDelivr |
 | TipTap rich-text input | Plain native text input with markdown (Open WebUI's phone behaviour is plain anyway) |
 | Browser STT/TTS, Kokoro | iOS on-device speech, or the server engines |
 | Realtime voice, screen capture, Drive/OneDrive pickers, folder upload | Out of scope (web) |

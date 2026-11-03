@@ -2,23 +2,37 @@ import { highlightCode } from '@maviechat/owui-markdown';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { memo, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { fonts, radius, usePalette, useSyntaxColors } from '@/theme';
+import { codeView, mermaidPage, previewPage, vegaPage } from './webPages';
+import { WebFrame } from './WebFrame';
 
 interface CodeBlockProps {
   code: string;
   lang?: string;
   /** Shown instead of the language in the header (e.g. "Input", "Output"). */
   title?: string;
+  /** False while the block is still streaming: diagrams and previews wait for all of it. */
+  complete?: boolean;
 }
 
-export const CodeBlock = memo(function CodeBlock({ code, lang, title }: CodeBlockProps) {
+/**
+ * A code block, highlighted, with Copy and Collapse. Mermaid and Vega blocks draw as diagrams
+ * (with the code a tap away), and HTML and SVG blocks offer a preview, as on the web.
+ */
+export const CodeBlock = memo(function CodeBlock({ code, lang, title, complete = true }: CodeBlockProps) {
   const palette = usePalette();
   const syntax = useSyntaxColors();
+  const dark = useColorScheme() === 'dark';
   const lines = useMemo(() => highlightCode(code.replace(/\n$/, ''), lang), [code, lang]);
   const [collapsed, setCollapsed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showCode, setShowCode] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const view = complete ? codeView(lang, code) : null;
+  const diagram = useMemo(() => (view === 'mermaid' ? mermaidPage(code, dark) : view === 'vega' ? vegaPage(code, dark) : null), [view, code, dark]);
+  const drawing = diagram !== null && !showCode;
   const shown = collapsed ? lines.slice(0, 1) : lines;
 
   const copy = async () => {
@@ -35,7 +49,24 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, title }: CodeBloc
           {title ?? (lang?.split(/\s+/)[0] || 'code')}
         </Text>
         <View style={styles.actions}>
-          {lines.length > 1 ? (
+          {diagram ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={drawing ? 'Show the code' : 'Show the diagram'}
+              hitSlop={8}
+              onPress={() => setShowCode((value) => !value)}
+              style={styles.action}>
+              <Icon name={drawing ? 'code-bracket' : 'chart-bar'} size={14} color={palette.textMuted} strokeWidth={2} />
+              <Text style={[styles.actionText, { color: palette.textMuted }]}>{drawing ? 'Code' : 'Diagram'}</Text>
+            </Pressable>
+          ) : null}
+          {view === 'preview' ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Preview" hitSlop={8} onPress={() => setPreviewing(true)} style={styles.action}>
+              <Icon name="arrows-pointing-out" size={14} color={palette.textMuted} strokeWidth={2} />
+              <Text style={[styles.actionText, { color: palette.textMuted }]}>Preview</Text>
+            </Pressable>
+          ) : null}
+          {lines.length > 1 && !drawing ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={collapsed ? 'Expand code' : 'Collapse code'}
@@ -54,20 +85,41 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, title }: CodeBloc
           </Pressable>
         </View>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        <Text selectable style={[styles.code, { color: palette.text }]}>
-          {shown.map((line, index) => (
-            <Text key={index}>
-              {line.map((span, spanIndex) => (
-                <Text key={spanIndex} style={span.scope ? { color: syntax[span.scope] ?? syntax[span.scope.split('.')[0] ?? ''] } : undefined}>
-                  {span.text}
-                </Text>
-              ))}
-              {index < shown.length - 1 ? '\n' : ''}
-            </Text>
-          ))}
-        </Text>
-      </ScrollView>
+      {drawing && diagram ? (
+        <View style={styles.diagram}>
+          <WebFrame html={diagram} initialHeight={200} />
+        </View>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+          <Text selectable style={[styles.code, { color: palette.text }]}>
+            {shown.map((line, index) => (
+              <Text key={index}>
+                {line.map((span, spanIndex) => (
+                  <Text key={spanIndex} style={span.scope ? { color: syntax[span.scope] ?? syntax[span.scope.split('.')[0] ?? ''] } : undefined}>
+                    {span.text}
+                  </Text>
+                ))}
+                {index < shown.length - 1 ? '\n' : ''}
+              </Text>
+            ))}
+          </Text>
+        </ScrollView>
+      )}
+      {view === 'preview' ? (
+        <Modal visible={previewing} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPreviewing(false)}>
+          <View style={[styles.sheet, { backgroundColor: palette.background }]}>
+            <View style={styles.sheetHeader}>
+              <Text style={[styles.sheetTitle, { color: palette.text }]} accessibilityRole="header">
+                Preview
+              </Text>
+              <Pressable accessibilityRole="button" onPress={() => setPreviewing(false)} hitSlop={8}>
+                <Text style={[styles.done, { color: palette.link }]}>Done</Text>
+              </Pressable>
+            </View>
+            {previewing ? <WebFrame html={previewPage(code, dark)} fill /> : null}
+          </View>
+        </Modal>
+      ) : null}
     </View>
   );
 });
@@ -115,4 +167,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
   },
+  diagram: {
+    padding: 8,
+  },
+  sheet: { flex: 1 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10 },
+  sheetTitle: { fontFamily: fonts.semibold, fontSize: 17 },
+  done: { fontFamily: fonts.semibold, fontSize: 16 },
 });

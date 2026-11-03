@@ -1,5 +1,5 @@
 import type { ModelItem, SourceRef } from '@maviechat/owui-protocol';
-import { lexMarkdown, type MentionToken, type Token, type Tokens } from '@maviechat/owui-markdown';
+import { isClosedCodeBlock, lexMarkdown, type MentionToken, type Token, type Tokens } from '@maviechat/owui-markdown';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
@@ -10,6 +10,7 @@ import { useToast } from '@/components/Toast';
 import { openLink } from '@/lib/links';
 import { fonts, radius, usePalette, type Palette } from '@/theme';
 import { CodeBlock } from './CodeBlock';
+import { BlockMath, InlineMath } from './MathView';
 
 interface MarkdownProps {
   text: string;
@@ -61,6 +62,28 @@ function renderBlock(token: Token, key: string, context: Context): ReactNode {
       const paragraph = token as Tokens.Paragraph;
       const only = paragraph.tokens.length === 1 ? paragraph.tokens[0] : undefined;
       if (only?.type === 'image') return <MarkdownImage key={key} token={only as Tokens.Image} context={context} />;
+      // A display formula ($$…$$, \[…\]) inside a paragraph gets a line of its own, as on the web.
+      if (paragraph.tokens.some(isDisplayMath)) {
+        const parts: ReactNode[] = [];
+        let run: Token[] = [];
+        const flush = (index: number) => {
+          if (run.some((child) => child.type !== 'text' || (child as Tokens.Text).text.trim())) {
+            parts.push(
+              <Text key={`${key}.t${index}`} style={[styles.paragraph, { color }]}>
+                {renderInline(run, `${key}.t${index}`, context)}
+              </Text>,
+            );
+          }
+          run = [];
+        };
+        paragraph.tokens.forEach((child, index) => {
+          if (!isDisplayMath(child)) return void run.push(child);
+          flush(index);
+          parts.push(<BlockMath key={`${key}.m${index}`} tex={(child as unknown as { text: string }).text} color={color} />);
+        });
+        flush(paragraph.tokens.length);
+        return <View key={key}>{parts}</View>;
+      }
       return (
         <Text key={key} style={[styles.paragraph, { color }]}>
           {renderInline(paragraph.tokens, key, context)}
@@ -77,7 +100,7 @@ function renderBlock(token: Token, key: string, context: Context): ReactNode {
     }
     case 'code': {
       const code = token as Tokens.Code;
-      return <CodeBlock key={key} code={code.text} lang={code.lang ?? undefined} />;
+      return <CodeBlock key={key} code={code.text} lang={code.lang ?? undefined} complete={isClosedCodeBlock(code.raw)} />;
     }
     case 'blockquote': {
       const quote = token as Tokens.Blockquote;
@@ -110,11 +133,7 @@ function renderBlock(token: Token, key: string, context: Context): ReactNode {
       );
     }
     case 'blockMath':
-      return (
-        <View key={key} style={[styles.math, { backgroundColor: palette.surface }]}>
-          <Text style={[styles.mathText, { color }]}>{(token as unknown as { text: string }).text}</Text>
-        </View>
-      );
+      return <BlockMath key={key} tex={(token as unknown as { text: string }).text} color={color} />;
     default:
       return 'raw' in token && token.raw.trim() ? (
         <Text key={key} style={[styles.paragraph, { color }]}>
@@ -264,12 +283,11 @@ function renderInline(tokens: Token[] | undefined, key: string, context: Context
           </Text>
         );
       }
-      case 'inlineMath':
-        return (
-          <Text key={k} style={styles.mathInline}>
-            {(token as unknown as { text: string }).text}
-          </Text>
-        );
+      case 'inlineMath': {
+        const math = token as unknown as { text: string; display?: boolean };
+        // Display maths inside a heading, list item or table cell stays in its line, at display size.
+        return <InlineMath key={k} tex={math.text} display={math.display} color={context.color} />;
+      }
       case 'html':
         return (token as Tokens.HTML).text.replace(/<[^>]+>/g, '');
       default:
@@ -289,6 +307,10 @@ function MarkdownImage({ token, context }: { token: Tokens.Image; context: Conte
       contentFit="contain"
     />
   );
+}
+
+function isDisplayMath(token: Token): boolean {
+  return token.type === 'inlineMath' && (token as unknown as { display?: boolean }).display === true;
 }
 
 function headingSize(depth: number): TextStyle {
@@ -347,8 +369,5 @@ const styles = StyleSheet.create({
   tableRow: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth },
   cell: { minWidth: 96, maxWidth: 260, paddingHorizontal: 10, paddingVertical: 8, fontFamily: fonts.regular, fontSize: 14, lineHeight: 20 },
   headerCell: { fontFamily: fonts.semibold },
-  math: { borderRadius: radius.md, padding: 12, marginVertical: 8 },
-  mathText: { fontFamily: fonts.mono, fontSize: 14, textAlign: 'center' },
-  mathInline: { fontFamily: fonts.mono, fontSize: 14 },
   image: { width: '100%', aspectRatio: 4 / 3, borderRadius: radius.md, marginVertical: 8 },
 });

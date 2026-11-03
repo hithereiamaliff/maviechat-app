@@ -1,8 +1,6 @@
 import type { DtAsk, DtOutline, DtQuizQuestion, DtStage, DtVisual } from '@maviechat/deeptutor-protocol';
-import * as WebBrowser from 'expo-web-browser';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, useColorScheme, View } from 'react-native';
-import { WebView } from 'react-native-webview';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
@@ -10,6 +8,7 @@ import { Disclosure } from '@/features/chat/Steps';
 import { describeError } from '@/lib/errors';
 import { CodeBlock } from '@/markdown/CodeBlock';
 import { Markdown } from '@/markdown/Markdown';
+import { WebFrame } from '@/markdown/WebFrame';
 import { fonts, radius, usePalette } from '@/theme';
 import { choicesFor, isCorrect, NO_ANSWER, type QuizAnswer } from './quiz';
 import { useStoredState } from './storedState';
@@ -321,35 +320,12 @@ export function DtVisualView({ visual, onOpenWeb }: { visual: DtVisual; onOpenWe
   const palette = usePalette();
   const dark = useColorScheme() === 'dark';
   const html = useMemo(() => visualHtml(visual, dark), [visual, dark]);
-  const [height, setHeight] = useState(visual.renderType === 'chartjs' ? 320 : 240);
 
   return (
     <View style={styles.block}>
       {visual.title ? <Text style={[styles.visualTitle, { color: palette.text }]}>{visual.title}</Text> : null}
       {html ? (
-        <View style={[styles.visualFrame, { height, borderColor: palette.border }]}>
-          <WebView<object>
-            source={{ html }}
-            originWhitelist={['*']}
-            incognito
-            scrollEnabled={false}
-            javaScriptEnabled
-            onMessage={(event) => {
-              try {
-                const next = Number((JSON.parse(event.nativeEvent.data) as { height?: unknown }).height);
-                if (Number.isFinite(next)) setHeight(Math.min(900, Math.max(120, next)));
-              } catch {
-                // not a size message
-              }
-            }}
-            onShouldStartLoadWithRequest={(request) => {
-              if (request.url === 'about:blank' || !request.isTopFrame) return true;
-              if (/^https?:/i.test(request.url)) void WebBrowser.openBrowserAsync(request.url);
-              return false;
-            }}
-            style={{ backgroundColor: palette.background }}
-          />
-        </View>
+        <WebFrame html={html} initialHeight={visual.renderType === 'chartjs' ? 320 : 240} />
       ) : (
         <View style={[styles.summary, { backgroundColor: palette.surface }]}>
           <Text style={[styles.note, { color: palette.textMuted }]}>{`This kind of visual (${visual.renderType}) shows in the DeepTutor web app.`}</Text>
@@ -395,5 +371,4 @@ const styles = StyleSheet.create({
   outlineTitle: { fontFamily: fonts.semibold, fontSize: 15 },
   outlineOverview: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18 },
   visualTitle: { fontFamily: fonts.semibold, fontSize: 15 },
-  visualFrame: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, overflow: 'hidden' },
 });

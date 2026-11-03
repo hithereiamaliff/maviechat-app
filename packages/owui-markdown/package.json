@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "lowlight": "^3.3.0",
-    "marked": "^18.1.2"
+    "marked": "^18.1.2",
+    "mathjax-full": "3.2.2"
   }
 }
