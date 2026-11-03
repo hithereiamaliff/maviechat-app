@@ -2,6 +2,7 @@ import {
   activeTurnOf,
   bookOfPreferences,
   bookTurnFields,
+  citedLocators,
   getSession,
   isPinned,
   masteryOfPreferences,
@@ -9,6 +10,8 @@ import {
   messageAttachments,
   messageReferences,
   newlyMastered,
+  readingOfPreferences,
+  readingTurnFields,
   saveQuizResults,
   setMasteryMode,
   savedReply,
@@ -45,6 +48,8 @@ import { useDtChoice } from '@/features/deeptutor/chat/useDtChoice';
 import { BookBar } from '@/features/deeptutor/books/BookBar';
 import { deepTutorAttachment } from '@/features/deeptutor/crossReference';
 import { PathBar } from '@/features/deeptutor/learning/PathBar';
+import { ReadingBar } from '@/features/deeptutor/reading/ReadingBar';
+import { readingPlaces } from '@/features/deeptutor/reading/readingContext';
 import { useDtBook, useDtMasteryTopic, useDtNotebooks, useDtSession, useDtSessions } from '@/features/deeptutor/queries';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { switchToOpenWebUI } from '@/features/deeptutor/switch';
@@ -85,7 +90,10 @@ export default function DeepTutorChat() {
   // A chat about a book's page: the tutor reads the page with every message.
   const page = path ? null : bookOfPreferences(detail.data?.preferences);
   const pageBook = useDtBook(page?.bookId ?? '');
-  const native = isNativeCapability(capability) || Boolean(path) || Boolean(page);
+  // A chat about a reading collection: the tutor reads the file and the page you're on.
+  const reading = path || page ? null : readingOfPreferences(detail.data?.preferences);
+  const readingId = reading?.collectionId ?? '';
+  const native = isNativeCapability(capability) || Boolean(path) || Boolean(page) || Boolean(reading);
   const running = turn?.reply.status === 'running' || turn?.reply.status === 'waiting';
 
   // After each reply in a path chat, the path is read again; a point newly mastered gets a note
@@ -112,6 +120,13 @@ export default function DeepTutorChat() {
     if (wasRunning.current && !running && path) void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'mastery'] });
     wasRunning.current = running;
   }, [running, path, queryClient, session.baseUrl]);
+
+  // Passage actions in the reader carry on in the reading chat you're in.
+  useFocusEffect(
+    useCallback(() => {
+      if (readingId) readingPlaces.update(readingId, { chatId: id });
+    }, [readingId, id]),
+  );
 
   // A notification about the chat on screen needs no banner.
   useFocusEffect(
@@ -183,6 +198,21 @@ export default function DeepTutorChat() {
     return list;
   }, [saved, savedItems, turn]);
 
+  // DeepTutor doesn't remember the reading place between messages: the reader's (and a passage you chose) go each time.
+  const readingRequest = (text: string, extras: DtExtras, target: { collectionId: string; materialId: string }) => {
+    const place = readingPlaces.get(target.collectionId);
+    const selection = readingPlaces.takeSelection(target.collectionId);
+    const materialId = place?.materialId || target.materialId || null;
+    const here = place && place.materialId === materialId ? place : undefined;
+    return {
+      content: text,
+      sessionId: id,
+      llmSelection: choice.model,
+      ...extrasRequest(extras),
+      ...readingTurnFields({ collectionId: target.collectionId, materialId, revision: here?.revision, viewport: { locator: here?.locator, selection, timeSeconds: here?.timeSeconds } }),
+    };
+  };
+
   const send = async (text: string, extras: DtExtras) => {
     live.turns.begin(id, text, promptExtras(extras, choice.selectedKnowledgeBases));
     setPinKey(`send-${Date.now()}`);
@@ -191,7 +221,9 @@ export default function DeepTutorChat() {
         path
           ? // A path chat keeps its path and mode on every turn; the tutor brings its own tools.
             { content: text, sessionId: id, ...masteryTurnFields(path.pathId, null), llmSelection: choice.model, knowledgeBases: choice.selectedKnowledgeBases, ...extrasRequest(extras) }
-          : page
+          : reading
+            ? readingRequest(text, extras, reading)
+            : page
             ? // A page's chat sends the page each time, with the book's knowledge bases (the chat keeps its own until the book is read).
               {
                 content: text,
@@ -271,6 +303,13 @@ export default function DeepTutorChat() {
   };
 
   // Rulings on the tutor's questions arrive with later replies, so they're gathered across the chat.
+  // The pages the tutor's latest answer cites, a tap away in the reader.
+  const cited = useMemo(() => {
+    if (!readingId) return [];
+    const last = [...items].reverse().find((item) => item.kind === 'reply');
+    return last?.kind === 'reply' ? citedLocators(last.reply.answer) : [];
+  }, [items, readingId]);
+
   const masteryState = useMemo(() => {
     const grades: Record<string, DtMasteryGrade> = {};
     const skipped: string[] = [];
@@ -380,6 +419,7 @@ export default function DeepTutorChat() {
   const menu: MenuItem[] = [
     ...(path ? [{ key: 'path', label: 'Open the Path', icon: 'map' as const, onPress: openPath }] : []),
     ...(page?.pageId && !pageBook.isError ? [{ key: 'page', label: 'Open the Page', icon: 'book-open' as const, onPress: openPage }] : []),
+    ...(reading ? [{ key: 'collection', label: 'Open the Collection', icon: 'folder' as const, onPress: () => router.push({ pathname: '/learn/reading/[id]', params: { id: reading.collectionId } }) }] : []),
     ...(owui.state.status === 'signed-in' && items.length > 0
       ? [{ key: 'ask', label: attaching ? 'Attaching…' : 'Ask About It in Open WebUI', icon: 'chat-bubble-left' as const, onPress: () => void askInOpenWebUI() }]
       : []),
@@ -408,6 +448,7 @@ export default function DeepTutorChat() {
         <PathBar topic={topic.data} mode={path.mode ?? 'study'} onMode={running ? undefined : (mode) => void switchMode(mode)} onOpenPath={() => openPath()} />
       ) : null}
       {page ? <BookBar bookId={page.bookId} pageId={page.pageId} /> : null}
+      {reading ? <ReadingBar collectionId={reading.collectionId} materialId={reading.materialId} cited={cited} /> : null}
       <KeyboardAvoidingView behavior="padding" style={styles.body}>
         {detail.isLoading && !turn ? (
           <ActivityIndicator style={styles.loading} color={palette.textMuted} />
@@ -423,23 +464,23 @@ export default function DeepTutorChat() {
             onSend={send}
             onStop={stop}
             // A page's chat uses your own tool settings and the book's knowledge bases, as on DeepTutor.
-            tools={page ? [] : choice.tools}
-            selectedTools={page ? [] : choice.selectedTools}
+            tools={page || reading ? [] : choice.tools}
+            selectedTools={page || reading ? [] : choice.selectedTools}
             onToolsChange={choice.setSelectedTools}
             models={choice.models}
             model={choice.model}
             onModelChange={choice.setModel}
             // A path chat's mode is the path's own (above); DeepTutor's other modes aren't offered here.
-            modes={path || page ? [] : choice.modes}
-            mode={path ? 'mastery_path' : page ? 'chat' : choice.mode}
+            modes={path || page || reading ? [] : choice.modes}
+            mode={path ? 'mastery_path' : page || reading ? 'chat' : choice.mode}
             onModeChange={choice.setMode}
-            placeholder={path ? (waypoint ? `Ask your tutor about "${waypoint}"` : 'Ask your tutor') : page ? 'Ask about this page' : undefined}
+            placeholder={path ? (waypoint ? `Ask your tutor about "${waypoint}"` : 'Ask your tutor') : page ? 'Ask about this page' : reading ? "Ask about what you're reading" : undefined}
             config={choice.config}
             onSettingChange={choice.setSetting}
             knowledgeBases={choice.knowledgeBases}
-            selectedKnowledgeBases={page ? [] : choice.selectedKnowledgeBases}
+            selectedKnowledgeBases={page || reading ? [] : choice.selectedKnowledgeBases}
             onKnowledgeBasesChange={choice.setSelectedKnowledgeBases}
-            knowledgeFixed={Boolean(page)}
+            knowledgeFixed={Boolean(page || reading)}
             sessionId={id}
           />
         ) : (

@@ -1,4 +1,4 @@
-import { bookOfPreferences, masteryOfPreferences, pageAvailable, type DtAuthStatus, type DtLearningActivity, type DtLearningKind, type DtModule, type DtSessionSummary } from '@maviechat/deeptutor-protocol';
+import { bookOfPreferences, masteryOfPreferences, pageAvailable, readingOfPreferences, type DtAuthStatus, type DtLearningActivity, type DtLearningKind, type DtModule, type DtSessionSummary } from '@maviechat/deeptutor-protocol';
 import { router } from 'expo-router';
 import type { IconName } from '@/components/Icon';
 import { openDtPage } from '@/features/deeptutor/settings/DtGeneralSettings';
@@ -86,7 +86,7 @@ export function openActivity(activity: DtLearningActivity): void {
       router.push({ pathname: '/learn/books/[id]', params: { id: activity.id } });
       return;
     case 'reading':
-      openDtPage(`/learning/reading/${id}`, activity.title || 'Reading');
+      router.push({ pathname: '/learn/reading/[id]', params: { id: activity.id } });
       return;
     case 'watching':
       openDtPage(`/learning/watching/${id}`, activity.title || 'Video');
@@ -98,11 +98,11 @@ export function startWay(way: LearningWay): void {
   if (way.kind === 'mastery') router.push('/learn/mastery/new');
   else if (way.kind === 'practice') router.push('/learn/practice');
   else if (way.kind === 'books') router.push('/learn/books/new');
-  else openDtPage(`${way.path}?create=1`, `New ${way.label}`);
+  else router.push({ pathname: '/learn/reading', params: { new: '1' } });
 }
 
-/** Whether the app has a learning chat's own screen: a mastery path's chats and a book page's are native; others open DeepTutor's page. */
+/** Whether the app has a learning chat's own screen: a mastery path's, a book page's and a reading collection's are native; others open DeepTutor's page. */
 export function opensNatively(session: DtSessionSummary): boolean {
   const preferences = session.preferences as Record<string, unknown> | undefined;
-  return masteryOfPreferences(preferences) !== null || bookOfPreferences(preferences) !== null;
+  return masteryOfPreferences(preferences) !== null || bookOfPreferences(preferences) !== null || readingOfPreferences(preferences) !== null;
 }

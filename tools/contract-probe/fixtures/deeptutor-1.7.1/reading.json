@@ -1,0 +1,92 @@
+{
+  "formats": {
+    "extensions": 120,
+    "maxBytes": 209715200,
+    "txt": true,
+    "pdf": true
+  },
+  "material": {
+    "annotationCount": "number",
+    "contentFormat": "string",
+    "filename": "string",
+    "hasRawView": "boolean",
+    "id": "string",
+    "mime": "string",
+    "outline": [
+      {
+        "level": "number",
+        "locator": "number",
+        "title": "string"
+      }
+    ],
+    "renderMode": "string",
+    "revision": "number",
+    "sourceType": "string",
+    "sourceUrl": "string",
+    "title": "string",
+    "unit": "string",
+    "unitCount": "number",
+    "unitRefs": []
+  },
+  "link": {
+    "status": "ready"
+  },
+  "annotation": {
+    "anchor": "string",
+    "author": "string",
+    "color": "string",
+    "createdAt": "number",
+    "id": "string",
+    "kind": "string",
+    "locator": "number",
+    "note": "string",
+    "quote": "string",
+    "rects": [],
+    "selectors": [
+      {
+        "end": "number",
+        "exact": "string",
+        "prefix": "string",
+        "start": "number",
+        "suffix": "string",
+        "type": "string"
+      }
+    ],
+    "updatedAt": "number"
+  },
+  "chat": {
+    "preferences": {
+      "answer_by": "string",
+      "book_references": [],
+      "capability": "string",
+      "history_references": [],
+      "knowledge_bases": [],
+      "language": "string",
+      "llm_selection": {
+        "model_id": "string",
+        "profile_id": "string"
+      },
+      "notebook_references": [],
+      "partner_group_references": [],
+      "question_notebook_references": [],
+      "reading_material_id": "string",
+      "reading_references": [],
+      "reading_workspace_id": "string",
+      "session_kind": "string",
+      "tools": [
+        "string"
+      ],
+      "workspace_dependencies": {
+        "book_references": [],
+        "history_references": [],
+        "knowledge_bases": [],
+        "notebook_references": [],
+        "question_notebook_references": [],
+        "reading_references": []
+      },
+      "workspace_id": "string",
+      "workspace_mode": "string"
+    },
+    "answerMentionsStroma": true
+  }
+}

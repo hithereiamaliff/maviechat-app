@@ -5,7 +5,12 @@ import {
   getCalendarLayers,
   getTaskBlocks,
   getTaskBoard,
+  listAnnotations,
   listBlockTypes,
+  listBookmarks,
+  listCollectionChats,
+  listCollections,
+  listLibrary,
   listBooks,
   listCalendars,
   listOccurrences,
@@ -14,6 +19,11 @@ import {
   getAttachmentLimits,
   getAuthStatus,
   getBook,
+  getCollection,
+  getMaterial,
+  getSupportedFormats,
+  getTranscript,
+  getUnit,
   getBookPage,
   getEstimateBasis,
   getKbProgress,
@@ -47,6 +57,7 @@ import {
   listSessions,
   searchSessions,
   type DtSessionSummary,
+  isPreparing,
 } from '@maviechat/deeptutor-protocol';
 import { useQuery } from '@tanstack/react-query';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
@@ -349,4 +360,73 @@ export function useDtBlockTypes(enabled: boolean) {
 export function useDtEstimateBasis(depth: string, enabled: boolean) {
   const { client, session } = useDtAuthed();
   return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'books', 'estimate', depth], queryFn: () => getEstimateBasis(client, depth), enabled, staleTime: 10 * 60_000 });
+}
+
+/** Your reading collections; read again every 4 s while a material in one is being prepared. */
+export function useDtCollections() {
+  const { client, session } = useDtAuthed();
+  return useQuery({
+    queryKey: [DT_QUERY_ROOT, session.baseUrl, 'reading', 'collections'],
+    queryFn: () => listCollections(client),
+    refetchInterval: (query) => (query.state.data?.collections.some((collection) => collection.materials.some(isPreparing)) ? 4000 : 30_000),
+    staleTime: 3000,
+  });
+}
+
+/** A collection and its chats; read again every 4 s while a material is being prepared, as DeepTutor's page does. */
+export function useDtCollection(id: string) {
+  const { client, session } = useDtAuthed();
+  return useQuery({
+    queryKey: [DT_QUERY_ROOT, session.baseUrl, 'reading', 'collection', id],
+    queryFn: () => getCollection(client, id),
+    enabled: Boolean(id),
+    refetchInterval: (query) => (query.state.data?.collection.materials.some(isPreparing) ? 4000 : false),
+    staleTime: 3000,
+  });
+}
+
+export function useDtCollectionChats(id: string) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'reading', 'chats', id], queryFn: () => listCollectionChats(client, id), enabled: Boolean(id), staleTime: 5000 });
+}
+
+export function useDtLibrary(enabled: boolean) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'reading', 'library'], queryFn: () => listLibrary(client), enabled, staleTime: 10_000 });
+}
+
+export function useDtSupportedFormats() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'reading', 'formats'], queryFn: () => getSupportedFormats(client), staleTime: 30 * 60_000 });
+}
+
+export function useDtMaterial(id: string) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'reading', 'material', id], queryFn: () => getMaterial(client, id), enabled: Boolean(id), staleTime: 60_000 });
+}
+
+/** One unit's text (kept a while: units don't change unless the material is fetched again). */
+export function useDtUnit(id: string, locator: number) {
+  const { client, session } = useDtAuthed();
+  return useQuery({
+    queryKey: [DT_QUERY_ROOT, session.baseUrl, 'reading', 'material', id, 'unit', locator],
+    queryFn: () => getUnit(client, id, locator),
+    enabled: Boolean(id) && locator >= 1,
+    staleTime: 10 * 60_000,
+  });
+}
+
+export function useDtAnnotations(id: string) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'reading', 'material', id, 'annotations'], queryFn: () => listAnnotations(client, id), enabled: Boolean(id) });
+}
+
+export function useDtBookmarks(id: string) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'reading', 'material', id, 'bookmarks'], queryFn: () => listBookmarks(client, id), enabled: Boolean(id) });
+}
+
+export function useDtTranscript(id: string, enabled: boolean) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'reading', 'material', id, 'transcript'], queryFn: () => getTranscript(client, id), enabled: Boolean(id) && enabled, staleTime: 10 * 60_000 });
 }

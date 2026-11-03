@@ -21,7 +21,8 @@ const FILTERS: { key: DtLearningKind | 'all'; label: string }[] = [
 /**
  * All Learning, as DeepTutor's hub: what needs your attention (reviews due, books paused or still
  * being written), then every learning activity, newest first, to filter by kind or search.
- * Mastery paths, books and practice open here; reading and videos open DeepTutor's own pages.
+ * Mastery paths, books, reading collections and practice open here; videos saved before
+ * DeepTutor moved them into Reading open its own page, which moves them.
  */
 export default function AllLearning() {
   const palette = usePalette();
@@ -102,9 +103,13 @@ export default function AllLearning() {
           />
         </View>
 
-        {filter === 'mastery' || filter === 'books' ? (
-          <Pressable accessibilityRole="button" onPress={() => router.push(filter === 'books' ? '/learn/books' : '/learn/mastery')} style={styles.open} hitSlop={4}>
-            <Text style={[styles.link, { color: palette.link }]}>{filter === 'books' ? 'Open Books' : 'Open Mastery Path'}</Text>
+        {filter === 'mastery' || filter === 'books' || filter === 'reading' ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push(filter === 'books' ? '/learn/books' : filter === 'reading' ? '/learn/reading' : '/learn/mastery')}
+            style={styles.open}
+            hitSlop={4}>
+            <Text style={[styles.link, { color: palette.link }]}>{filter === 'books' ? 'Open Books' : filter === 'reading' ? 'Open Reading' : 'Open Mastery Path'}</Text>
             <Icon name="chevron-right" size={14} color={palette.link} />
           </Pressable>
         ) : null}

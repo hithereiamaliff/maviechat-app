@@ -1,6 +1,6 @@
 /**
  * DeepTutor contract probe (milestone M1.5):
- *   npm run probe:deeptutor -- [--url http://127.0.0.1:3782] [--env ~/.config/maviechat/deeptutor-test.env] [--no-fixtures] [--turn] [--learning] [--books]
+ *   npm run probe:deeptutor -- [--url http://127.0.0.1:3782] [--env ~/.config/maviechat/deeptutor-test.env] [--no-fixtures] [--turn] [--learning] [--books] [--reading]
  *
  * `--turn` also runs one short "APP PROBE:" chat turn over `/ws` (it uses the account's model),
  * drops the socket mid-reply on purpose, checks the resumed reply equals the saved one, and
@@ -35,6 +35,9 @@
  * `--books` checks Books (src/deeptutor-books-probe.ts): a small "APP PROBE:" book through
  * proposal, outline and one chapter written over `/ws/books` (a second socket following its
  * events), reading progress, export, a chat about the page, pause, then deletion.
+ * `--reading` checks Reading (src/deeptutor-reading-probe.ts): an "APP PROBE:" collection with
+ * an uploaded text file and an imported link, a highlight, bookmark and reading place, one tutor
+ * message about a passage, then the collection, its chat and the materials deleted.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -137,6 +140,7 @@ import {
 } from '@maviechat/deeptutor-protocol';
 import { probeBooks } from './deeptutor-books-probe';
 import { probeLearning } from './deeptutor-learning-probe';
+import { probeReading } from './deeptutor-reading-probe';
 import { loadEnvFile } from './env';
 import { shapeOf } from './shape';
 
@@ -158,6 +162,7 @@ const { values: args } = parseArgs({
     calendar: { type: 'boolean' },
     learning: { type: 'boolean' },
     books: { type: 'boolean' },
+    reading: { type: 'boolean' },
   },
 });
 
@@ -364,6 +369,14 @@ async function main() {
     await step('books: proposal, outline, one chapter over /ws/books, progress, export, page chat, pause, delete', async () => {
       const outcome = await probeBooks(baseUrl, session.token as string, client);
       fixtures.books = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.reading) {
+    await step('reading: collection, upload, link, highlight, bookmark, place, a tutor message, delete', async () => {
+      const outcome = await probeReading(baseUrl, session.token as string, client);
+      fixtures.reading = outcome.fixture;
       return { value: true, note: outcome.note };
     });
   }

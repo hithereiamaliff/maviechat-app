@@ -13,6 +13,7 @@ export * from './markdown';
 export * from './notebooks';
 export * from './organize';
 export * from './practice';
+export * from './reading';
 export * from './sessions';
 export * from './tasks';
 export * from './turnConnection';

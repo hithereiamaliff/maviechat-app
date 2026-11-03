@@ -202,6 +202,11 @@ export interface DtTurnRequest {
   masterySkip?: { question_id: string };
   /** Book pages the tutor reads along with the message (a page's chat). */
   bookReferences?: { book_id: string; page_ids: string[] }[];
+  /** A reading chat's collection, material and revision, and where you are in it (sent on every turn). */
+  readingWorkspaceId?: string;
+  readingMaterialId?: string;
+  readingMaterialRevision?: number;
+  readingViewport?: Record<string, unknown>;
 }
 
 export type DtCommand = Record<string, unknown> & { protocol_version: string; type: string };
@@ -232,6 +237,10 @@ export function startTurnCommand(request: DtTurnRequest): DtCommand {
   if (request.masteryAnswer) command.mastery_answer = request.masteryAnswer;
   if (request.masterySkip) command.mastery_skip = request.masterySkip;
   if (request.bookReferences?.length) command.book_references = request.bookReferences;
+  if (request.readingWorkspaceId) command.reading_workspace_id = request.readingWorkspaceId;
+  if (request.readingMaterialId) command.reading_material_id = request.readingMaterialId;
+  if (request.readingMaterialRevision) command.reading_material_revision = request.readingMaterialRevision;
+  if (request.readingViewport && Object.keys(request.readingViewport).length) command.reading_viewport = request.readingViewport;
   return command;
 }
 
