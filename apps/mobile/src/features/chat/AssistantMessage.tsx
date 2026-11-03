@@ -7,6 +7,7 @@ import {
   latestStatus,
   messageBlocks,
   normalizeSources,
+  outputText,
   pendingApprovals,
   plainText,
   type FileItem,
@@ -21,7 +22,9 @@ import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, 
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { MenuButton, type MenuItem } from '@/components/Menu';
+import { ReadAloudButton } from '@/components/ReadAloudButton';
 import { useToast } from '@/components/Toast';
+import { useCapabilities, useUserSettings } from '@/lib/server';
 import { useStoredState } from '@/lib/storedState';
 import { Markdown } from '@/markdown/Markdown';
 import { fonts, radius, usePalette } from '@/theme';
@@ -90,6 +93,11 @@ export const AssistantMessage = memo(function AssistantMessage({
 }) {
   const palette = usePalette();
   const toast = useToast();
+  const capabilities = useCapabilities();
+  const settings = useUserSettings();
+  // Read Aloud follows the `chat.tts` permission (allowed unless denied) and your speed setting.
+  const canSpeak = capabilities?.can('chat.tts', true) ?? false;
+  const ttsRate = (settings.data?.ui as { audio?: { tts?: { playbackRate?: unknown } } } | undefined)?.audio?.tts?.playbackRate;
   const [revealed, setRevealed] = useState(false);
   // Kept by message (the list reuses rows as you scroll).
   const [rating, setRating] = useStoredState<boolean>(`rate-panel:${message.id}`, false);
@@ -227,6 +235,7 @@ export const AssistantMessage = memo(function AssistantMessage({
               void Clipboard.setStringAsync(plainText(blocks)).then(() => toast('Copied to clipboard'));
             }}
           />
+          {canSpeak ? <ReadAloudButton id={message.id} markdown={outputText(message.output) || message.content || ''} rate={typeof ttsRate === 'number' ? ttsRate : undefined} /> : null}
           {usage ? (
             <IconButton
               icon="information-circle"

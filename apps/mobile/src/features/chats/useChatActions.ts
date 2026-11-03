@@ -22,10 +22,12 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { File, Paths } from 'expo-file-system';
+import * as Print from 'expo-print';
 import { ActionSheetIOS, Alert, Platform, Share } from 'react-native';
 import { useToast } from '@/components/Toast';
-import { useAuthed, useCapabilities } from '@/lib/server';
+import { useAuthed, useCapabilities, useModels } from '@/lib/server';
 import { useSession } from '@/session/SessionProvider';
+import { chatPdfHtml } from './chatPdf';
 
 export interface ChatRef {
   id: string;
@@ -39,6 +41,7 @@ export function useChatActions() {
   const capabilities = useCapabilities();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const models = useModels();
 
   const refresh = (id: string) => {
     void queryClient.invalidateQueries({ queryKey: ['chats'] });
@@ -81,12 +84,19 @@ export function useChatActions() {
   };
 
   /** The chat as a file, handed to the share sheet (Save to Files, Mail, AirDrop…). */
-  const downloadAs = async (chat: ChatRef, kind: 'json' | 'txt') => {
+  const downloadAs = async (chat: ChatRef, kind: 'json' | 'txt' | 'pdf') => {
     try {
       const record = await getChat(client, chat.id);
       const file = new File(Paths.cache, exportFileName(record.title || chat.title, kind));
-      file.create({ overwrite: true });
-      await file.write(kind === 'json' ? chatJson(record) : chatPlainText(record));
+      if (kind === 'pdf') {
+        // Printed on A4 from the chat's formatted text (iOS draws it), then named after the chat.
+        const modelName = (id: string | undefined) => models.data?.find((model) => model.id === id)?.name || id || 'Assistant';
+        const printed = await Print.printToFileAsync({ html: chatPdfHtml(record, modelName), width: 595, height: 842, margins: { left: 40, right: 40, top: 40, bottom: 40 } });
+        await new File(printed.uri).move(file, { overwrite: true });
+      } else {
+        file.create({ overwrite: true });
+        await file.write(kind === 'json' ? chatJson(record) : chatPlainText(record));
+      }
       await Share.share({ url: file.uri, title: record.title || chat.title });
     } catch (error) {
       toast(`Couldn't download the chat: ${error instanceof OwuiHttpError ? (error.detail ?? `HTTP ${error.status}`) : error instanceof Error ? error.message : 'unknown error'}`, 'error');
@@ -116,13 +126,14 @@ export function useChatActions() {
       }
     },
 
-    /** As the web's Download: the chat export (.json) or plain text (.txt). */
+    /** As the web's Download: the chat export (.json), plain text (.txt) or a PDF document. */
     download(chat: ChatRef) {
       ActionSheetIOS.showActionSheetWithOptions(
-        { title: 'Download', options: ['Chat Export (.json)', 'Plain Text (.txt)', 'Cancel'], cancelButtonIndex: 2 },
+        { title: 'Download', options: ['Chat Export (.json)', 'Plain Text (.txt)', 'PDF Document (.pdf)', 'Cancel'], cancelButtonIndex: 3 },
         (index) => {
           if (index === 0) void downloadAs(chat, 'json');
           else if (index === 1) void downloadAs(chat, 'txt');
+          else if (index === 2) void downloadAs(chat, 'pdf');
         },
       );
     },

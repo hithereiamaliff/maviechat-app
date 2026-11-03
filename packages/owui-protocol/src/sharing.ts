@@ -232,7 +232,7 @@ export function chatJson(chat: ChatRecord): string {
 }
 
 /** A file name from a chat's title that any file system takes. */
-export function exportFileName(title: string, extension: 'txt' | 'json'): string {
+export function exportFileName(title: string, extension: 'txt' | 'json' | 'pdf'): string {
   const name = title
     .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ')
     .replace(/\s+/g, ' ')

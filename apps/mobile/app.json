@@ -55,7 +55,8 @@
         {
           "enableRemoteNotifications": true
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": false,

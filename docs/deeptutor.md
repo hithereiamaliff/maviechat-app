@@ -400,6 +400,10 @@ DeepTutor writes a book from what you want to learn: a proposal to review, an ou
 - Errors may come as `{detail: {code, message}}`; the app reads both.
 - The probe's book: brief, cut to two chapters with prose and a quick check, first chapter only; one chapter written (three prose blocks and a five-question check, about three minutes), its quiz answer recorded without a verdict (so no learning record), a page chat answered and filed under the page, paused, then the chat and the book deleted.
 
+## Read Aloud (A7, 2026-11-03)
+
+DeepTutor replies get the same Read Aloud button as Open WebUI's, in the phone's own voice (the reply's words: no code, maths or links' addresses; a passage in Chinese, Japanese, Korean, Arabic, Russian, Thai, Tamil or Hindi gets a voice for its script). DeepTutor has its own voice endpoints, `POST /api/voice/tts {text, voice?, format?}` → audio and `POST /api/voice/stt` (multipart `file`, `language?`) → `{text}`, run by the providers its admin sets in Settings › Voice. On our server neither is set ("No active TTS model is configured"), so the app doesn't use them; dictation is left out (the keyboard's microphone covers it).
+
 ## Reading (B5.3, 2026-11-03)
 
 A reading collection is a folder of things to read with the tutor beside you: PDFs, e-books, Office files, text, web pages, YouTube and Bilibili videos, and audio or video files. In 1.7.1 DeepTutor folded its separate Videos page into Reading, so videos are collection files too.

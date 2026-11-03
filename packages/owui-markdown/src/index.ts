@@ -3,3 +3,5 @@ export * from './extensions';
 export * from './highlight';
 export * from './lexer';
 export { isClosedCodeBlock } from './fences';
+export * from './html';
+export * from './speech';

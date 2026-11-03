@@ -80,6 +80,7 @@ const ICONS = [
   'shield-check',
   'signal',
   'sparkles',
+  'speaker-wave',
   'squares-2x2',
   'stop-circle',
   'tag',

@@ -14,6 +14,7 @@ import { memo, useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
+import { ReadAloudButton } from '@/components/ReadAloudButton';
 import { useToast } from '@/components/Toast';
 import { Disclosure } from '@/features/chat/Steps';
 import { openLink } from '@/lib/links';
@@ -252,6 +253,7 @@ export const DtReplyView = memo(function DtReplyView({ reply, baseUrl, stateKey,
               onPress={() => void Clipboard.setStringAsync(reply.answer).then(() => toast('Copied to clipboard'))}
             />
           ) : null}
+          {reply.answer.trim() ? <ReadAloudButton id={`dt-${reply.assistantMessageId ?? reply.turnId ?? ''}`} markdown={reply.answer} /> : null}
           {last && onRegenerate ? <IconButton icon="arrow-path" label="Regenerate" size={18} color={palette.textMuted} onPress={onRegenerate} /> : null}
         </View>
       ) : null}

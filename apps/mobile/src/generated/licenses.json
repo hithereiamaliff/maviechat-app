@@ -390,6 +390,11 @@
     "license": "MIT"
   },
   {
+    "name": "expo-file-system",
+    "version": "58.0.13",
+    "license": "MIT"
+  },
+  {
     "name": "expo-font",
     "version": "58.0.11",
     "license": "MIT"
@@ -440,6 +445,11 @@
     "license": "MIT"
   },
   {
+    "name": "expo-print",
+    "version": "58.0.8",
+    "license": "MIT"
+  },
+  {
     "name": "expo-router",
     "version": "58.0.29",
     "license": "MIT"
@@ -452,6 +462,11 @@
   {
     "name": "expo-server",
     "version": "58.0.6",
+    "license": "MIT"
+  },
+  {
+    "name": "expo-speech",
+    "version": "58.0.3",
     "license": "MIT"
   },
   {
@@ -472,6 +487,11 @@
   {
     "name": "expo-updates-interface",
     "version": "58.0.1",
+    "license": "MIT"
+  },
+  {
+    "name": "expo-video",
+    "version": "58.0.13",
     "license": "MIT"
   },
   {
