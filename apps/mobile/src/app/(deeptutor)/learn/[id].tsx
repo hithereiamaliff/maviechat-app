@@ -1,5 +1,6 @@
 import {
   activeTurnOf,
+  getSession,
   isPinned,
   messageAttachments,
   messageReferences,
@@ -202,8 +203,18 @@ export default function DeepTutorChat() {
   };
 
   const stop = () => {
-    void live.stop(id).then((accepted) => {
-      if (!accepted) toast("DeepTutor didn't stop the reply. It may have finished already.", 'error');
+    void live.stop(id).then(async (accepted) => {
+      if (accepted) return;
+      // Nothing to stop: if DeepTutor says no reply is running, let go of the one showing, so you can send again.
+      const fresh = await queryClient
+        .fetchQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'session', id], queryFn: () => getSession(client, id), staleTime: 0 })
+        .catch(() => null);
+      if (fresh && !activeTurnOf(fresh)) {
+        live.turns.remove(id);
+        toast('That reply had already finished.');
+      } else {
+        toast("DeepTutor didn't stop the reply. Try again in a moment.", 'error');
+      }
     });
   };
 

@@ -68,13 +68,19 @@ export class LiveTurns {
     this.notify();
   }
 
-  /** Applies a turn event; a new turn in the session (a regenerate) takes the old one's place. */
+  /**
+   * Applies a turn event; a new turn in the session (a regenerate) takes the old one's place.
+   * A turn's end (`done`) or the chat's new title (`session_meta`) never starts one: either
+   * arriving for a reply that isn't showing would leave an empty "Working…" behind.
+   */
   apply(event: DtStreamEvent): LiveTurn | undefined {
     const sessionId = event.session_id;
     if (!sessionId || !event.turn_id) return undefined;
     const current = this.turns.get(sessionId);
+    const known = current && (current.turnId === event.turn_id || current.turnId === '');
+    if (!known && (event.type === 'done' || event.type === 'session_meta')) return undefined;
     let turn: LiveTurn;
-    if (current && (current.turnId === event.turn_id || current.turnId === '')) {
+    if (current && known) {
       turn = { ...current, turnId: event.turn_id, reply: applyTurnEvent(current.turnId ? current.reply : { ...current.reply, turnId: event.turn_id }, event) };
     } else {
       turn = { sessionId, turnId: event.turn_id, prompt: null, replacesLast: false, reply: applyTurnEvent(emptyReply(sessionId, event.turn_id), event) };

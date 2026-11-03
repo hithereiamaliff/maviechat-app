@@ -13,6 +13,7 @@ function setup() {
   const timers: { run: () => void; ms: number; id: number }[] = [];
   let nextTimer = 0;
   const events: DtStreamEvent[] = [];
+  const late: DtStreamEvent[] = [];
   const states: DtConnectionState[] = [];
   const connection = new DtTurnConnection({
     url: 'wss://learn.example.com/ws',
@@ -22,6 +23,7 @@ function setup() {
       return { send: (data) => socket.sent.push(JSON.parse(data) as Record<string, unknown>), close: () => (socket.closed = true) };
     },
     onEvent: (event) => events.push(event),
+    onLateEvent: (event) => late.push(event),
     onState: (state) => states.push(state),
     timers: {
       set: (run, ms) => {
@@ -47,7 +49,7 @@ function setup() {
     timers.splice(timers.indexOf(timer), 1);
     timer.run();
   };
-  return { connection, sockets, timers, events, states, latest, frame, turnEvent, fire };
+  return { connection, sockets, timers, events, late, states, latest, frame, turnEvent, fire };
 }
 
 describe('turn connection', () => {
@@ -79,6 +81,23 @@ describe('turn connection', () => {
     turnEvent('content', 2, { content: 'A' });
     turnEvent('content', 3, { content: 'B' });
     expect(events.map((event) => event.seq)).toEqual([1, 2, 3]);
+  });
+
+  it("keeps what comes after a turn's done (the new title) from starting a reply", () => {
+    const { connection, latest, turnEvent, events, late } = setup();
+    void connection.startTurn({ content: 'Hello', sessionId: 'unified_1' });
+    latest().handlers.onOpen();
+    turnEvent('session', 1);
+    turnEvent('content', 2, { content: 'A' });
+    turnEvent('done', 3);
+    turnEvent('session_meta', 4, { metadata: { title: 'Greeting' } });
+    expect(events.map((event) => event.type)).toEqual(['session', 'content', 'done']);
+    expect(late.map((event) => event.type)).toEqual(['session_meta']);
+    // Following it again on purpose replays it as usual.
+    connection.follow('turn_1', 0);
+    turnEvent('session_meta', 5);
+    turnEvent('done', 6);
+    expect(events.map((event) => event.seq)).toEqual([1, 2, 3, 5, 6]);
   });
 
   it('asks for a replay when an event goes missing', () => {

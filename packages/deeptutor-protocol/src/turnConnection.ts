@@ -47,6 +47,11 @@ export interface DtTurnConnectionOptions {
   connect: DtSocketFactory;
   /** Every event of the turns this connection follows, in order and once each. */
   onEvent(event: DtStreamEvent): void;
+  /**
+   * An event after its turn's `done`: DeepTutor still sends the chat's new title (`session_meta`)
+   * once the reply has ended. It never starts a reply of its own.
+   */
+  onLateEvent?(event: DtStreamEvent): void;
   /** Refused commands and broken subscriptions. A refused start also rejects its `startTurn`. */
   onError?(error: DtProtocolError): void;
   onState?(state: DtConnectionState): void;
@@ -122,6 +127,8 @@ export class DtTurnConnection {
   /** The last event applied of every turn seen; unfinished turns are also in `active`. */
   private readonly cursors = new Map<string, number>();
   private readonly active = new Set<string>();
+  /** Turns whose `done` arrived: what still comes for them is late (`onLateEvent`). */
+  private readonly finished = new Set<string>();
   private readonly gapAsked = new Map<string, number>();
   /** Turns whose `session` event arrived, or that were followed rather than started here. */
   private readonly named = new Set<string>();
@@ -166,6 +173,7 @@ export class DtTurnConnection {
   /** Follows a turn already running (or replays a finished one) from after `afterSeq`. */
   follow(turnId: string, afterSeq = 0): void {
     if (!turnId) return;
+    this.finished.delete(turnId);
     this.cursors.set(turnId, Math.max(this.cursors.get(turnId) ?? 0, afterSeq));
     this.active.add(turnId);
     this.named.add(turnId);
@@ -306,6 +314,10 @@ export class DtTurnConnection {
       }
       this.cursors.set(turnId, event.seq);
     }
+    if (this.finished.has(turnId)) {
+      this.options.onLateEvent?.(event);
+      return;
+    }
     if (event.type === 'session' && !this.named.has(turnId)) {
       this.named.add(turnId);
       this.settleStart(event.session_id, turnId);
@@ -315,7 +327,10 @@ export class DtTurnConnection {
         this.regenerates.delete(event.session_id);
       }
     }
-    if (event.type === 'done') this.active.delete(turnId);
+    if (event.type === 'done') {
+      this.active.delete(turnId);
+      this.finished.add(turnId);
+    }
     this.options.onEvent(event);
   }
 

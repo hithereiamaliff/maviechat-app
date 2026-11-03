@@ -114,6 +114,10 @@ Chats in modes the app doesn't run natively open read-only with **Open in DeepTu
 - **A running session:** `status: "running"`, `active_turn_id`, and `active_turns` (`[{id, status, last_seq}]`). The reply is saved only at `done`.
 - **After `done`, the session refuses new turns for about 8 seconds:** "Session already has an active or recovering turn" (`start_turn_rejected`, `regenerate_rejected`) while DeepTutor holds the turn's lease. Nothing is created before a turn is accepted, so the app sends the same command again every 2 s, for up to 30 s, and shows "Waiting for DeepTutor to finish the last reply…". DeepTutor's own web app shows an error instead.
 - **Regenerate replaces the last reply** (deletes it and writes a new one); no branches.
+- **After `done`, DeepTutor sends one more event, `session_meta`** (the chat's new title), sometimes a moment later. Resuming a finished turn replays its events, `done` and `session_meta`; resuming from its last seq sends `session_meta` and a closing `done`.
+  - A late `session_meta` must never start a reply. Before 2026-11-03 it did when it arrived after the app had let go of the finished reply: an empty "Working…" that never ended, a stop button with nothing to stop, and a message box that couldn't send.
+  - Now the connection hands events after a turn's `done` to `onLateEvent`, which refreshes the title, and the live store never starts a reply from `done` or `session_meta`.
+  - A refused stop checks the session and, if nothing is running, clears the reply showing.
 - **Titles:** sessions stay "New conversation" in Chat mode, so the app shows the first message instead.
 - **Choices:** `GET /api/settings/llm-options` lists the models an admin granted to the account (`active` is the default). `GET /api/tools` lists tools; a chat can switch on those marked `toggleable` and not tied to another mode.
 

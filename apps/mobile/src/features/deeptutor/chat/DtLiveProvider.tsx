@@ -99,7 +99,16 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
           void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, baseUrl, 'sessions'] });
           watchForPush(event.session_id, event.turn_id);
         }
-        if (event.type === 'done' && live) settle(live);
+        if (event.type === 'done') {
+          if (live) settle(live);
+          // The end of a reply that isn't showing: the saved chat is still worth reading again.
+          else void queryClient.invalidateQueries({ queryKey: sessionKey(event.session_id) });
+        }
+      },
+      // After a reply ends, DeepTutor sends the chat's new title: fetch it, but start nothing.
+      onLateEvent: (event) => {
+        void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, baseUrl, 'sessions'] });
+        void queryClient.invalidateQueries({ queryKey: sessionKey(event.session_id) });
       },
       onError: (error) => {
         if (!error.session_id || error.error_code === 'subscription_failed') return;

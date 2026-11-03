@@ -53,6 +53,18 @@ describe('live DeepTutor turns', () => {
     expect(turns.get('s1')).toBeUndefined();
   });
 
+  it("never starts a reply from a turn's end or the chat's new title", () => {
+    const { turns } = setup();
+    // The reply already finished and was let go; DeepTutor's late title event, or a repeated end, comes in.
+    expect(turns.apply(event('session_meta', 't1', 22))).toBeUndefined();
+    expect(turns.apply(event('done', 't1', 23))).toBeUndefined();
+    expect(turns.get('s1')).toBeUndefined();
+    // For the reply that is showing, both still apply.
+    turns.begin('s1', 'Hello');
+    turns.apply(event('session', 't2', 1));
+    expect(turns.apply(event('done', 't2', 2))?.reply.status).toBe('completed');
+  });
+
   it('tells screens at most once a frame', () => {
     const { turns, flush, notified } = setup();
     turns.begin('s1', 'Hello');
