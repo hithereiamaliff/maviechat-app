@@ -17,6 +17,7 @@ import { Icon } from '@/components/Icon';
 import { useAnchoredMenu, type MenuItem } from '@/components/Menu';
 import { DeepTutorPicker } from '@/features/deeptutor/DeepTutorPicker';
 import { useAuthed, useCapabilities, useTools, useUserSettings } from '@/lib/server';
+import { useGrowingInput } from '@/lib/useGrowingInput';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
 import { AttachmentStrip } from './AttachmentStrip';
@@ -109,6 +110,7 @@ export function Composer({
   const showIntegrations = available.webSearch || available.imageGeneration || available.codeInterpreter || usable.length > 0;
   const canExpand = draft.text.split('\n').length > 2;
   const setText = (text: string) => updateDraft(draftKey, (current) => ({ ...current, text }));
+  const field = useGrowingInput(draft.text, setText);
 
   // Like the web, a model brings its own default toggles and tools when you start with it.
   const settingsReady = !settings.isPending;
@@ -150,10 +152,19 @@ export function Composer({
 
   const submit = async () => {
     if (!canSend) return;
+    const message = { text: draft.text, files: draft.files, toggles, toolIds };
+    const previews = draft.previews;
     setSending(true);
-    const sent = await onSend({ text: draft.text, files: draft.files, toggles, toolIds });
+    // As on the web, the input empties as the message goes; one that didn't go out comes back,
+    // unless something new was written meanwhile.
+    updateDraft(draftKey, (current) => ({ ...current, text: '', files: [], previews: {} }));
+    const sent = await onSend(message);
     setSending(false);
-    if (sent) updateDraft(draftKey, (current) => ({ ...current, text: '', files: [], previews: {} }));
+    if (!sent) {
+      updateDraft(draftKey, (current) =>
+        current.text || current.files.length ? current : { ...current, text: message.text, files: message.files, previews },
+      );
+    }
   };
 
   const editQueued = (id: string) =>
@@ -175,13 +186,13 @@ export function Composer({
         <View>
           <TextInput
             ref={input}
-            value={draft.text}
-            onChangeText={setText}
+            value={field.value}
+            onChangeText={field.onChangeText}
             placeholder={placeholder}
             placeholderTextColor={palette.textFaint}
             multiline
             autoFocus={autoFocus}
-            style={[styles.input, canExpand && styles.inputBesideExpand, { color: palette.text }]}
+            style={[styles.input, canExpand && styles.inputBesideExpand, { color: palette.text }, field.style]}
             accessibilityLabel="Message"
           />
           {canExpand ? (

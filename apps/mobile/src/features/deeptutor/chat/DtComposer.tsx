@@ -6,6 +6,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { useAnchoredMenu, type MenuItem } from '@/components/Menu';
 import { updateDraft, useDraftText } from '@/features/chat/drafts';
 import { useDtAttachmentLimits, useDtNotebooks, useDtSessions } from '@/features/deeptutor/queries';
+import { useGrowingInput } from '@/lib/useGrowingInput';
 import { fonts, radius, usePalette } from '@/theme';
 import { capabilityName, modeInfo } from './capabilities';
 import { DtExtrasStrip, DtPickSheet, type ExtraChip, type PickItem } from './DtExtrasViews';
@@ -112,6 +113,7 @@ export function DtComposer({
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }), []);
   const text = useDraftText(draftKey);
+  const field = useGrowingInput(text, (value) => updateDraft(draftKey, (draft) => ({ ...draft, text: value })));
   const [sending, setSending] = useState(false);
   const [sheet, setSheet] = useState<'mode' | 'tools' | 'model' | 'notebook' | 'chat' | 'knowledge' | null>(null);
   const info = modeInfo(mode);
@@ -185,13 +187,13 @@ export function DtComposer({
         <DtExtrasStrip chips={chips} />
         <TextInput
           ref={input}
-          value={text}
-          onChangeText={(value) => updateDraft(draftKey, (draft) => ({ ...draft, text: value }))}
+          value={field.value}
+          onChangeText={field.onChangeText}
           placeholder={placeholder ?? PLACEHOLDERS[mode] ?? 'Ask DeepTutor anything'}
           placeholderTextColor={palette.textFaint}
           multiline
           autoFocus={autoFocus}
-          style={[styles.input, { color: palette.text }]}
+          style={[styles.input, { color: palette.text }, field.style]}
           accessibilityLabel="Message"
         />
         <View style={styles.row}>
