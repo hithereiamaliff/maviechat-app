@@ -27,6 +27,7 @@ import { sessionDate, useDtCollection, useDtCollectionChats, useDtLibrary, useDt
 import { CollectionSheet } from '@/features/deeptutor/reading/CollectionSheet';
 import { failureText, materialIcon } from '@/features/deeptutor/reading/labels';
 import { describeError } from '@/lib/errors';
+import { PHONE_UPLOAD_MAX_BYTES, uploadPart } from '@/lib/uploadPart';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
 
@@ -78,13 +79,14 @@ export default function ReadingCollection() {
         toast(`${asset.name}: DeepTutor can't read .${extension} files.`, 'error');
         continue;
       }
-      if (formats.data?.maxBytes && asset.size && asset.size > formats.data.maxBytes) {
-        toast(`${asset.name} is over ${Math.round(formats.data.maxBytes / 1048576)} MB.`, 'error');
+      const limit = Math.min(formats.data?.maxBytes || PHONE_UPLOAD_MAX_BYTES, PHONE_UPLOAD_MAX_BYTES);
+      if (asset.size && asset.size > limit) {
+        toast(`${asset.name} is over ${Math.round(limit / 1048576)} MB, too big to send from the phone. Add it from DeepTutor’s web app.`, 'error');
         continue;
       }
       setUploading((list) => [...list, asset.name]);
       try {
-        const material = await uploadMaterial(client, { uri: asset.uri, name: asset.name, type: asset.mimeType ?? 'application/octet-stream' }, asset.name);
+        const material = await uploadMaterial(client, uploadPart({ uri: asset.uri, name: asset.name, type: asset.mimeType ?? 'application/octet-stream' }), asset.name);
         await addToCollection(client, id, material.id, true);
       } catch (error) {
         fail(`add ${asset.name}`)(error);

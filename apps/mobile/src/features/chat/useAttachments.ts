@@ -21,6 +21,7 @@ import { useAuthed, useCapabilities, useServerConfig } from '@/lib/server';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
 import { isPhoto, photo, PHOTO_OPTIONS, readAsDataUrl, type Picked } from '@/lib/pickedFiles';
+import { uploadPart } from '@/lib/uploadPart';
 import { getDraft, patchFile, removeFile, updateDraft } from './drafts';
 
 /**
@@ -58,7 +59,7 @@ export function useAttachments({ draftKey, model, temporary }: { draftKey: strin
     try {
       const form = new FormData();
       // React Native uploads a local file given as {uri, name, type}.
-      form.append('file', { uri: file.uri, name: file.name, type: file.mimeType ?? 'application/octet-stream' } as unknown as Blob);
+      form.append('file', uploadPart({ uri: file.uri, name: file.name, type: file.mimeType ?? 'application/octet-stream' }));
       const uploaded = await uploadFile(client, form, { process: !image });
       if (typeof uploaded.error === 'string' && uploaded.error) toast(uploaded.error);
       if (!image && (await waitForProcessing(client, uploaded.id)) === 'failed') throw new Error("the server couldn't read it");

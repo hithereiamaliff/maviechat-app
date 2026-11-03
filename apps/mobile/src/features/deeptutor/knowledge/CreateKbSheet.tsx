@@ -13,6 +13,7 @@ import { describeError } from '@/lib/errors';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 import { fonts, radius, usePalette } from '@/theme';
 import { fileSize } from './status';
+import { PHONE_UPLOAD_MAX_BYTES, uploadPart } from '@/lib/uploadPart';
 
 /** A document picked on the phone, sent as React Native's file part. */
 export interface PickedDocument {
@@ -29,11 +30,13 @@ export async function pickDocuments(provider: string, toast: (message: string, t
   const picked = result.assets.map((asset) => ({ uri: asset.uri, name: asset.name, type: asset.mimeType ?? 'application/octet-stream', size: asset.size ?? null }));
   const kept = picked.filter((file) => providerAccepts(provider, file.name));
   if (kept.length < picked.length) toast(provider === 'pageindex-oss' ? 'PageIndex OSS takes PDF files only; the others were left out.' : 'Some files are not a type this engine takes; they were left out.', 'error');
-  return kept;
+  const small = kept.filter((file) => (file.size ?? 0) <= PHONE_UPLOAD_MAX_BYTES);
+  if (small.length < kept.length) toast('Files over 100 MB were left out: add them from DeepTutor’s web app.', 'error');
+  return small;
 }
 
-/** React Native's FormData takes `{ uri, name, type }` for a file. */
-export const filePart = (file: PickedDocument) => ({ uri: file.uri, name: file.name, type: file.type });
+/** A picked document as an upload part the app's fetch can send. */
+export const filePart = (file: PickedDocument) => uploadPart({ uri: file.uri, name: file.name, type: file.type });
 
 interface CreateKbSheetProps {
   visible: boolean;
