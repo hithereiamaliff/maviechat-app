@@ -1,11 +1,13 @@
 import {
   attachmentUrl,
+  awaitingYou,
   errorText,
   groupSteps,
   isImageItem,
   latestStatus,
   messageBlocks,
   normalizeSources,
+  pendingApprovals,
   plainText,
   type FileItem,
   type HistoryMessage,
@@ -23,6 +25,7 @@ import { useToast } from '@/components/Toast';
 import { useStoredState } from '@/lib/storedState';
 import { Markdown } from '@/markdown/Markdown';
 import { fonts, radius, usePalette } from '@/theme';
+import { ApprovalCard } from './ApprovalCard';
 import { BranchNav } from './BranchNav';
 import { RatePanel } from './RatePanel';
 import { Sources } from './Sources';
@@ -59,6 +62,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   onContinue,
   actions = [],
   onAction,
+  onApprove,
 }: {
   message: HistoryMessage;
   modelLabel: string;
@@ -81,6 +85,8 @@ export const AssistantMessage = memo(function AssistantMessage({
   /** The model's action buttons. */
   actions?: ModelAction[];
   onAction?: (action: ModelAction) => void;
+  /** Allow or deny a tool call waiting for your OK; absent where it can't be answered (temporary chats). */
+  onApprove?: (callId: string, approve: boolean) => Promise<void>;
 }) {
   const palette = usePalette();
   const toast = useToast();
@@ -93,7 +99,9 @@ export const AssistantMessage = memo(function AssistantMessage({
   const sources = useMemo(() => normalizeSources(message.sources), [message.sources]);
   const status = latestStatus(message.statusHistory);
   const error = errorText(message.error);
-  const streaming = message.done === false;
+  const approvals = useMemo(() => pendingApprovals(message), [message]);
+  // Stopped for your approval or answer: not being written any more.
+  const streaming = message.done === false && !awaitingYou(message);
   const usage = usageSummary(message.usage);
   const showActions = isLast || revealed;
   const images = useMemo(
@@ -173,6 +181,10 @@ export const AssistantMessage = memo(function AssistantMessage({
           <StepView key={item.id} step={item} />
         ),
       )}
+
+      {approvals.map((call) => (
+        <ApprovalCard key={call.callId} call={call} onDecide={onApprove ? (approve) => onApprove(call.callId, approve) : undefined} />
+      ))}
 
       {streaming && items.length === 0 && !status ? <ActivityIndicator style={styles.pending} color={palette.textMuted} /> : null}
 

@@ -9,6 +9,9 @@ import {
   type Capabilities,
   type OwuiClient,
   type SupportStatus,
+  listPrompts,
+  searchKnowledgeBases,
+  searchKnowledgeFiles,
 } from '@maviechat/owui-protocol';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
@@ -79,4 +82,25 @@ export function supportLabel(status: SupportStatus | undefined): string {
     default:
       return 'checking…';
   }
+}
+
+/** Your saved prompts, for the input's `/` menu. */
+export function usePrompts(enabled: boolean) {
+  const { client } = useAuthed();
+  return useQuery({ queryKey: ['prompts'], queryFn: () => listPrompts(client), enabled, staleTime: 60_000 });
+}
+
+/** Knowledge bases and their files matching what you typed after `@` or `#`. */
+export function useKnowledgeSearch(query: string, enabled: boolean) {
+  const { client } = useAuthed();
+  return useQuery({
+    queryKey: ['knowledge-search', query],
+    queryFn: async () => {
+      const [bases, files] = await Promise.all([searchKnowledgeBases(client, query).catch(() => []), searchKnowledgeFiles(client, query).catch(() => [])]);
+      return [...bases, ...files];
+    },
+    enabled,
+    staleTime: 30_000,
+    placeholderData: (previous) => previous,
+  });
 }

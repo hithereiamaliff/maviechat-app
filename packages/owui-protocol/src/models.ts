@@ -59,6 +59,17 @@ export async function saveDefaultModels(client: OwuiClient, modelIds: string[]):
 }
 
 /**
+ * Tool permissions (when the server allows them): "full" runs tools without asking; "ask" stops
+ * the reply before each tool call until you allow or deny it. Kept with your settings' parameters.
+ */
+export async function saveToolApprovalMode(client: OwuiClient, mode: 'full' | 'ask'): Promise<UserSettings> {
+  const current = await getUserSettings(client);
+  const ui = (current.ui ?? {}) as Record<string, unknown>;
+  const params = (typeof ui.params === 'object' && ui.params !== null ? ui.params : {}) as Record<string, unknown>;
+  return updateUserSettings(client, { ...current, ui: { ...ui, params: { ...params, tool_approval_mode: mode } } });
+}
+
+/**
  * The models a new chat starts with, as on the web: your defaults (several when you saved a
  * comparison), else the server's, else the first visible model. Models you can't see are left out.
  */

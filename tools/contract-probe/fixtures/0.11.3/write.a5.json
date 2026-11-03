@@ -1,0 +1,30 @@
+{
+  "prompts": {
+    "count": 0,
+    "withVariables": 0
+  },
+  "knowledge": {
+    "bases": 0,
+    "files": 0
+  },
+  "path": "saved",
+  "questions": [
+    {
+      "options": 2,
+      "allowOther": true,
+      "header": true
+    }
+  ],
+  "resolveKeys": [
+    "chat_id",
+    "message_id",
+    "status",
+    "task_ids"
+  ],
+  "finalOutput": [
+    "reasoning:in_progress",
+    "function_call:completed",
+    "function_call_output:completed",
+    "message:completed"
+  ]
+}

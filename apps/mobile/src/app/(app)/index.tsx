@@ -56,12 +56,14 @@ export default function NewChat() {
   const suggestions = useMemo(() => promptSuggestions(infoModel, config.data), [infoModel, config.data]);
   const insertSuggestion = (settings.data?.ui as { insertSuggestionPrompt?: boolean } | null | undefined)?.insertSuggestionPrompt ?? false;
 
-  const start = async ({ text, files, toggles, toolIds }: OutgoingMessage) => {
+  const start = async ({ text, files, toggles, toolIds, atModelId }: OutgoingMessage) => {
+    // A model picked with `@` answers alone (as on the web).
+    const at = atModelId ? choice.models.find((item) => item.id === atModelId) : undefined;
     if (!model) {
       toast(choice.loading ? 'Loading models…' : 'No model is available to this account.', 'error');
       return false;
     }
-    const result = await send({ chatId: null, parentId: null, content: text, files, model, models: choice.selected, toggles, toolIds, temporary, params: chatParams });
+    const result = await send({ chatId: null, parentId: null, content: text, files, model: at ?? model, models: at ? [at] : choice.selected, toggles, toolIds, temporary, params: chatParams });
     if (!result) return false;
     carryOver(NEW_CHAT, result.chatId);
     router.replace({ pathname: '/c/[id]', params: { id: result.chatId } });
@@ -181,6 +183,7 @@ export default function NewChat() {
             onStop={() => {}}
             streaming={false}
             temporary={temporary}
+            onTemporary={allowed && !enforced ? () => setTemporaryOn((value) => !value) : undefined}
           />
 
           <Suggestions suggestions={suggestions} input={typed} inserts={insertSuggestion} onSelect={suggest} />

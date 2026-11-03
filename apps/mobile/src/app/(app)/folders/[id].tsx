@@ -41,12 +41,13 @@ export default function FolderScreen() {
   const draftKey = `folder:${folderId}`;
   const model = choice.model;
 
-  const start = async ({ text, files, toggles, toolIds }: OutgoingMessage) => {
+  const start = async ({ text, files, toggles, toolIds, atModelId }: OutgoingMessage) => {
+    const at = atModelId ? choice.models.find((item) => item.id === atModelId) : undefined;
     if (!model) {
       toast(choice.loading ? 'Loading models…' : 'No model is available to this account.', 'error');
       return false;
     }
-    const result = await send({ chatId: null, parentId: null, content: text, files, model, models: choice.selected, toggles, toolIds, folderId });
+    const result = await send({ chatId: null, parentId: null, content: text, files, model: at ?? model, models: at ? [at] : choice.selected, toggles, toolIds, folderId });
     if (!result) return false;
     carryOver(draftKey, result.chatId);
     router.replace({ pathname: '/c/[id]', params: { id: result.chatId } });

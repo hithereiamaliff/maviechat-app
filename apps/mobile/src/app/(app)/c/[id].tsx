@@ -1,4 +1,5 @@
 import {
+  awaitingYou,
   combineQueued,
   isTemporaryChatId,
   mergeInput,
@@ -6,6 +7,8 @@ import {
   modelActions,
   newestLeaf,
   OwuiHttpError,
+  pendingAskUser,
+  resolveToolCall,
   saveMessage,
   selectBranch,
   updateChatControls,
@@ -13,6 +16,7 @@ import {
   type ChatRecord,
   type FileItem,
   type HistoryMessage,
+  type AskUserAnswer,
   type MergedResponse,
   type ReplyGroup,
 } from '@maviechat/owui-protocol';
@@ -25,6 +29,7 @@ import { Button } from '@/components/Button';
 import { IconButton } from '@/components/IconButton';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { AskUserCard } from '@/features/chat/AskUserCard';
 import { ChatHeader } from '@/features/chat/ChatHeader';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
 import { Composer, type OutgoingMessage } from '@/features/chat/Composer';
@@ -126,9 +131,11 @@ export default function ChatScreen() {
   const history = chat?.chat?.history;
   // With Compare, the other models' answers to the last message aren't on the shown branch, but count too.
   const lastAsked = [...messages].reverse().find((message) => message.role === 'user');
-  const streaming =
-    messages.some((message) => message.role === 'assistant' && message.done === false) ||
-    (lastAsked?.childrenIds ?? []).some((id) => history?.messages[id]?.done === false);
+  // A reply stopped for your approval or answer isn't being written; it waits for you.
+  const writing = (message: HistoryMessage | undefined) => message?.role === 'assistant' && message.done === false && !awaitingYou(message);
+  const streaming = messages.some(writing) || (lastAsked?.childrenIds ?? []).some((id) => writing(history?.messages[id]));
+  const lastReply = messages[messages.length - 1];
+  const asking = !temporary && lastReply?.role === 'assistant' ? pendingAskUser(lastReply) : null;
   const lastId = messages[messages.length - 1]?.id ?? null;
   const queueEnabled = (settings.data?.ui as { enableMessageQueue?: boolean } | null | undefined)?.enableMessageQueue ?? true;
   const model = choice.model;
@@ -149,9 +156,15 @@ export default function ChatScreen() {
     wasStreaming.current = streaming;
   }, [streaming, chatId, markRead]);
 
-  const deliver = async ({ text, files, toggles, toolIds }: OutgoingMessage, parentId: string | null) => {
-    if (!model) return false;
-    const result = await send({ chatId, parentId, content: text, files, model, models: selected, toggles, toolIds });
+  // A model picked with `@` answers alone, until it's taken off (as on the web).
+  const targets = (atModelId?: string | null) => {
+    const at = atModelId ? models.data?.find((item) => item.id === atModelId) : undefined;
+    return at ? { model: at, models: [at] } : { model, models: selected };
+  };
+  const deliver = async ({ text, files, toggles, toolIds, atModelId }: OutgoingMessage, parentId: string | null) => {
+    const target = targets(atModelId);
+    if (!target.model) return false;
+    const result = await send({ chatId, parentId, content: text, files, model: target.model, models: target.models, toggles, toolIds });
     if (result) select(result.replyId);
     return Boolean(result);
   };
@@ -181,8 +194,11 @@ export default function ChatScreen() {
     const ids = new Set(items.map((item) => item.id));
     updateDraft(chatId, (draft) => ({ ...draft, queue: draft.queue.filter((item) => !ids.has(item.id)) }));
     const { prompt, files } = combineQueued(items);
-    const { toggles, toolIds } = getDraft(chatId);
-    void send({ chatId, parentId: lastId, content: prompt, files, model, models: selected, toggles, toolIds })
+    const { toggles, toolIds, atModel } = getDraft(chatId);
+    const at = atModel ? models.data?.find((item) => item.id === atModel) : undefined;
+    const target = at ? { model: at, models: [at] } : { model, models: selected };
+    if (!target.model) return;
+    void send({ chatId, parentId: lastId, content: prompt, files, model: target.model, models: target.models, toggles, toolIds })
       .then((result) => {
         if (result) {
           select(result.replyId);
@@ -194,7 +210,7 @@ export default function ChatScreen() {
       .finally(() => {
         busy.current = false;
       });
-  }, [streaming, queue, model, selected, chat, chatId, lastId, send, select]);
+  }, [streaming, queue, model, selected, models.data, chat, chatId, lastId, send, select]);
 
   const sendQueuedNow = async (id: string) => {
     const item = getDraft(chatId).queue.find((entry) => entry.id === id);
@@ -204,8 +220,8 @@ export default function ChatScreen() {
     stalled.current = false;
     try {
       if (streaming) await stop(chatId);
-      const { toggles, toolIds } = getDraft(chatId);
-      const sent = await deliver({ text: item.prompt, files: item.files, toggles, toolIds }, lastId);
+      const { toggles, toolIds, atModel } = getDraft(chatId);
+      const sent = await deliver({ text: item.prompt, files: item.files, toggles, toolIds, atModelId: atModel ?? undefined }, lastId);
       if (!sent) {
         stalled.current = true;
         updateDraft(chatId, (draft) => ({ ...draft, queue: [item, ...draft.queue] }));
@@ -214,6 +230,26 @@ export default function ChatScreen() {
       busy.current = false;
     }
   };
+
+  // A reply stopped for you: approving or denying a tool call, or answering the model's questions.
+  // The server saves it and carries on with the reply; its events reach this chat as usual.
+  const [resolving, setResolving] = useState(false);
+  const resolve = async (messageId: string, callId: string, action: 'approve' | 'reject' | 'answer', answers?: Record<string, AskUserAnswer>) => {
+    setResolving(true);
+    try {
+      await resolveToolCall(client, chatId, messageId, callId, action, answers ? { answers } : {});
+    } catch (error) {
+      toast(`Couldn't send that: ${describeError(error)}`, 'error');
+      void query.refetch();
+    } finally {
+      setResolving(false);
+    }
+  };
+  // The reply list keeps one set of actions; this keeps its approval handler current.
+  const resolveRef = useRef(resolve);
+  useEffect(() => {
+    resolveRef.current = resolve;
+  });
 
   const listActions = useMemo<MessageActions>(() => {
     const extras = () => {
@@ -256,10 +292,11 @@ export default function ChatScreen() {
       actionsFor: (reply) => modelActions(models.data?.find((item) => item.id === reply.model)),
       runAction: (reply, action) => void messageActions.runAction(reply, action),
       remove: messageActions.remove,
+      resolveApproval: temporary ? undefined : (reply, callId, approve) => resolveRef.current(reply.id, callId, approve ? 'approve' : 'reject'),
       canDeleteMessage: messageActions.canDeleteMessage,
       canDeleteReply: messageActions.canDeleteReply,
     };
-  }, [chatId, models.data, model, selected, messageActions, send, regenerate, continueReply, select, streaming, messages]);
+  }, [chatId, models.data, model, selected, messageActions, send, regenerate, continueReply, select, streaming, messages, temporary]);
 
   // "Merge Responses": a model combines the shown answers; the result streams in and is kept on the shown reply.
   const [mergingId, setMergingId] = useState<string | null>(null);
@@ -354,6 +391,17 @@ export default function ChatScreen() {
             mergingId={mergingId}
           />
         )}
+        {asking && lastReply ? (
+          <View style={styles.asking}>
+            <AskUserCard
+              key={asking.callId}
+              questions={asking.questions}
+              busy={resolving}
+              onSubmit={(answers) => void resolve(lastReply.id, asking.callId, 'answer', answers)}
+              onSkip={() => void resolve(lastReply.id, asking.callId, 'reject')}
+            />
+          </View>
+        ) : null}
         {query.isError || notFound ? null : (
           <Composer
             draftKey={chatId}
@@ -396,4 +444,5 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 16 },
   message: { fontFamily: fonts.regular, fontSize: 15, textAlign: 'center' },
   retry: { alignSelf: 'stretch' },
+  asking: { paddingHorizontal: 12, paddingTop: 6 },
 });

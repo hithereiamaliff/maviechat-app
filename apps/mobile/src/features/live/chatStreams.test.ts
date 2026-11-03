@@ -127,6 +127,22 @@ describe('ChatStreams', () => {
     expect(answers.some((value) => typeof value === 'object' && value !== null && 'error' in value)).toBe(true);
   });
 
+  it("asks the model's live questions and sends your answers, or a cancel when you skip", async () => {
+    const { streams, event, hooks } = setup();
+    const picked = { colour: { type: 'option' as const, option_index: 0, label: 'Teal', description: '' } };
+    hooks.ask = vi.fn(async () => picked);
+    const answers: unknown[] = [];
+    const questions = [{ id: 'colour', question: 'Which?', options: [{ label: 'Teal' }, { label: 'Orange' }] }];
+    streams.handle(event('c1', 'a1', 'request:user_input', { questions, timeout_ms: 60000 }), (value) => answers.push(value));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(hooks.ask).toHaveBeenCalledWith([{ id: 'colour', header: 'Question 1', question: 'Which?', options: [{ label: 'Teal', description: '' }, { label: 'Orange', description: '' }], allowOther: true }], expect.any(Number));
+    expect(answers).toEqual([{ status: 'answered', answers: picked }]);
+    hooks.ask = vi.fn(async () => null);
+    streams.handle(event('c1', 'a1', 'request:user_input', { questions }), (value) => answers.push(value));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(answers[1]).toEqual({ status: 'cancelled', answers: {} });
+  });
+
   it('announces a reply you left mid-way, but not the one on screen', () => {
     const left = setup('c2');
     left.seed('c1');

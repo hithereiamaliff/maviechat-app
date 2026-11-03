@@ -16,13 +16,14 @@ export interface UploadedFile {
  * `{type: 'image', url: <data URL>}` and documents travel as `{type: 'text', content}`.
  */
 export interface FileItem {
-  type: 'file' | 'image' | 'text';
+  /** A whole knowledge base (`collection`) or folder can ride along too, picked from the `@` or `#` menu. */
+  type: 'file' | 'image' | 'text' | 'collection' | 'folder';
   file?: UploadedFile | '';
   id: string | null;
   url: string;
   name: string;
   collection_name?: string;
-  status?: 'uploading' | 'uploaded' | 'error';
+  status?: 'uploading' | 'uploaded' | 'processed' | 'error';
   size?: number;
   error?: string;
   itemId?: string;

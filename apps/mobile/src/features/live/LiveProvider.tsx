@@ -1,12 +1,14 @@
-import { isTemporaryChatId, openSocketSession, type SocketSession, type SocketStatus } from '@maviechat/owui-protocol';
+import { isTemporaryChatId, openSocketSession, type AskUserAnswer, type AskUserQuestion, type SocketSession, type SocketStatus } from '@maviechat/owui-protocol';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Alert, AppState, Platform } from 'react-native';
+import { Alert, AppState, Modal, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useToast } from '@/components/Toast';
+import { AskUserCard } from '@/features/chat/AskUserCard';
 import { patchChatRow } from '@/features/chats/cache';
 import { setViewingChat } from '@/features/notifications/presence';
 import { pushAnnouncesReplies } from '@/features/notifications/push';
 import { useAuthed, useCapabilities } from '@/lib/server';
+import { fonts, usePalette } from '@/theme';
 import { ChatStreams } from './chatStreams';
 
 interface LiveContextValue {
@@ -74,11 +76,14 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
   }, [currentChatId]);
   useEffect(() => () => setViewingChat(null), []);
 
+  // The model's questions asked live, one set at a time, answered in a sheet.
+  const [asking, setAsking] = useState<{ questions: AskUserQuestion[]; deadline: number | null; done: (answers: Record<string, AskUserAnswer> | null) => void } | null>(null);
   const [streams] = useState(
     () =>
       new ChatStreams(queryClient, {
         confirm,
         prompt,
+        ask: (questions, deadline) => new Promise((resolve) => setAsking({ questions, deadline, done: resolve })),
         notify: (message, tone) => toast(message, tone),
         isViewing: (chatId) => viewing.current === chatId,
         // Open WebUI reports saved chats' replies only, so temporary chats keep the app's own notice.
@@ -164,8 +169,42 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
     [status, streams, markRead],
   );
 
-  return <LiveContext.Provider value={value}>{children}</LiveContext.Provider>;
+  const finish = (answers: Record<string, AskUserAnswer> | null) => {
+    asking?.done(answers);
+    setAsking(null);
+  };
+  return (
+    <LiveContext.Provider value={value}>
+      {children}
+      <Modal visible={asking !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => finish(null)}>
+        {asking ? <LiveQuestions questions={asking.questions} deadline={asking.deadline} onDone={finish} /> : null}
+      </Modal>
+    </LiveContext.Provider>
+  );
 }
+
+function LiveQuestions({ questions, deadline, onDone }: { questions: AskUserQuestion[]; deadline: number | null; onDone: (answers: Record<string, AskUserAnswer> | null) => void }) {
+  const palette = usePalette();
+  const skip = useCallback(() => onDone(null), [onDone]);
+  return (
+    <View style={[styles.sheet, { backgroundColor: palette.background }]}>
+      <Text style={[styles.title, { color: palette.text }]} accessibilityRole="header">
+        The model has a question
+      </Text>
+      <Text style={[styles.note, { color: palette.textMuted }]}>Its reply waits for your answer.</Text>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <AskUserCard questions={questions} deadline={deadline} onSubmit={(answers) => onDone(answers)} onSkip={skip} />
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  sheet: { flex: 1, paddingTop: 20 },
+  title: { fontFamily: fonts.semibold, fontSize: 18, paddingHorizontal: 20 },
+  note: { fontFamily: fonts.regular, fontSize: 14, paddingHorizontal: 20, marginTop: 4 },
+  content: { padding: 16 },
+});
 
 export function useLive(): LiveContextValue {
   const value = useContext(LiveContext);

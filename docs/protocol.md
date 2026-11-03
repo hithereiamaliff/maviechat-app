@@ -261,6 +261,21 @@ The server merges these writes: it keeps its own copy of in-progress assistant m
 - `execute:tool` (call a user tool server from the client): later, with plain fetch.
 - Prefer the saved path for approvals and questions: a `function_call` item with `status: "pending"` is answered with `POST /api/v1/chats/{id}/messages/{mid}/resolve {call_id, action: "approve"|"reject"|"answer", answers?}`. It survives the app being suspended.
 
+**Replies that wait for you (0.11.3 ✓, `npm run probe -- --a5`)**
+- **Tool approvals:** with tool permissions on (`config.features.enable_tool_permissions`, an admin setting) and the request's `params.tool_approval_mode: "ask"` (the web keeps it in user settings and chat params; default `full`), the server stops before each tool call. The call shows in `output[]` as a `function_call` with `status: "pending"` (later ones `queued`), the message saved with `done: false`. Without tool permissions the server runs every tool (`full`).
+- **The model's questions:** the built-in `ask_user` tool (on by default) puts 1–3 questions, each with 2–3 options `{label, description}` and an optional free answer (`allow_other`). On our server it **waits in the reply**: a pending `function_call` named `ask_user` whose `arguments` hold `{questions[{id, header, question, options, allow_other}], allow_other, timeout_ms}`. The web shows the first option as "Recommended".
+- **Answering either:** `POST /api/v1/chats/{id}/messages/{mid}/resolve {call_id, action: "approve"|"reject"|"answer", answers?, timed_out?}`. Answers are keyed by question id: `{type: "option", option_index, label, description}` or `{type: "other", text}`. The server saves it, emits `chat:completion {output}`, and carries on with the reply as a new task (`{status, chat_id, message_id, task_ids}`); its events go to every connection of yours. A call already resolved answers 409.
+- **Live questions:** the same questions can come over the socket as `request:user_input {questions, allow_other, timeout_ms}` (60–240 s), acked with `{status: "answered", answers}` or `{status: "cancelled", answers: {}}`.
+- A reply that waits isn't being written: the app shows its question or approval and doesn't count it as streaming.
+- A finished reply can keep a `reasoning` item marked `in_progress` after such a pause; treat a finished reply's steps as finished.
+
+**Input menus and prompt variables (0.11.3)**
+- **`/`:** commands (model, settings, temporary; the web also has compact, fork and status) and saved prompts, `GET /api/v1/prompts/` → `[{command, name, content, …}]`, matched on the command.
+- **A prompt goes in** with its built-in variables filled in on the device: `USER_NAME`, `USER_EMAIL`, `USER_BIO`, `USER_GENDER`, `USER_BIRTH_DATE`, `USER_AGE`, `USER_LANGUAGE`, `USER_LOCATION` (or `LOCATION_UNKNOWN`), `CLIPBOARD`, `CURRENT_DATE` (YYYY-MM-DD), `CURRENT_TIME` (HH:MM:SS), `CURRENT_DATETIME`, `CURRENT_TIMEZONE`, `CURRENT_WEEKDAY`; unset profile ones stay as written. Its own variables, `{{name}}` or `{{name | type:prop=value:flag}}` (e.g. `{{tone | select:options=["Formal","Casual"]:required}}`), are asked for in a form, then replaced.
+- **`@`:** a model to answer instead of the selected ones (kept until removed), knowledge bases (`GET /api/v1/knowledge/search?query=` → `{items, total}`, attached as `{…item, type: "collection", status: "processed"}`), knowledge files (`GET /api/v1/knowledge/search/files?query=`, type `file`), folders (type `folder`), and a web address.
+- **`#`:** knowledge and web addresses.
+- **A web address** is fetched by the server: `POST /api/v1/retrieval/process/url {url, collection_name: null}` → `{type: "text"|"file"|"image", name, content, url, file?, collection_name}`. A page is attached as `{type: "text", file: {data: {content}, meta: {name, source}}, context: "full"}`. Needs the `chat.web_upload` permission.
+
 ## 7. Tasks and extras
 
 - **Title, tags, follow-ups:** the server runs them when `background_tasks` asks and the admin flags allow. Results arrive as `chat:title`, `chat:tags` and `chat:message:follow_ups`.

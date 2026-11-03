@@ -13,6 +13,8 @@ export function stepLabel(step: StepBlock): string {
       if (!step.done) return 'Thinking…';
       return step.durationSec !== null ? `Thought for ${formatDuration(step.durationSec)}` : 'Thought';
     case 'tool':
+      if (step.waiting) return step.name === 'ask_user' ? 'Input needed' : `Waiting for your OK: ${step.name}`;
+      if (step.rejected) return `Denied ${step.name}`;
       return step.done ? `View result from ${step.name}` : `Executing ${step.name}…`;
     case 'code':
       return step.done ? 'Analyzed' : 'Analyzing…';

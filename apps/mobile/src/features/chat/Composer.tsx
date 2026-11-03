@@ -1,5 +1,6 @@
 import {
   availableToggles,
+  saveToolApprovalMode,
   defaultToggles,
   defaultToolIds,
   effectiveToggles,
@@ -10,13 +11,16 @@ import {
   type ModelItem,
   type ToggleKey,
 } from '@maviechat/owui-protocol';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useImperativeHandle, useRef, useState, type ComponentRef, type Ref } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { useAnchoredMenu, type MenuItem } from '@/components/Menu';
+import { useToast } from '@/components/Toast';
 import { DeepTutorPicker } from '@/features/deeptutor/DeepTutorPicker';
-import { useAuthed, useCapabilities, useTools, useUserSettings } from '@/lib/server';
+import { describeError } from '@/lib/errors';
+import { useAuthed, useCapabilities, useModels, useServerConfig, useTools, useUserSettings } from '@/lib/server';
 import { useGrowingInput } from '@/lib/useGrowingInput';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
@@ -24,14 +28,19 @@ import { AttachmentStrip } from './AttachmentStrip';
 import { getDraft, updateDraft, useDraft } from './drafts';
 import { FullScreenInput } from './FullScreenInput';
 import { IntegrationsSheet, TOGGLE_INFO } from './IntegrationsSheet';
+import { MentionMenu } from './MentionMenu';
+import { PromptVariablesSheet } from './PromptVariablesSheet';
 import { QueuedMessages } from './QueuedMessages';
 import { useAttachments } from './useAttachments';
+import { useInputMenus } from './useInputMenus';
 
 export interface OutgoingMessage {
   text: string;
   files: FileItem[];
   toggles: FeatureToggles;
   toolIds: string[];
+  /** Picked with `@`: this model alone answers, instead of the chat's models. */
+  atModelId?: string;
 }
 
 /** Lets a screen put the cursor in the input (e.g. after inserting a suggestion). */
@@ -62,6 +71,8 @@ interface ComposerProps {
   autoFocus?: boolean;
   /** The web asks "How can I help you today?" on the new-chat screen and "Send a Message" in a chat. */
   placeholder?: string;
+  /** The new-chat screen's temporary chat switch, for the `/temporary` command. */
+  onTemporary?: () => void;
 }
 
 const NO_TOGGLES: Record<ToggleKey, boolean> = { webSearch: false, imageGeneration: false, codeInterpreter: false };
@@ -87,12 +98,23 @@ export function Composer({
   floating = false,
   autoFocus = false,
   placeholder = 'Send a Message',
+  onTemporary,
 }: ComposerProps) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
-  const { session } = useAuthed();
+  const { session, client } = useAuthed();
   const capabilities = useCapabilities();
   const settings = useUserSettings();
+  const config = useServerConfig();
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  // Tool permissions, when the server has them on: your choice is kept with your settings' parameters.
+  const approvalsOn = (config.data?.features as { enable_tool_permissions?: boolean } | undefined)?.enable_tool_permissions === true;
+  const approvalMode = ((settings.data?.ui as { params?: { tool_approval_mode?: string } } | null | undefined)?.params?.tool_approval_mode === 'ask' ? 'ask' : 'full') as 'full' | 'ask';
+  const setApprovalMode = (mode: 'full' | 'ask') =>
+    void saveToolApprovalMode(client, mode)
+      .then(() => queryClient.invalidateQueries({ queryKey: ['user-settings'] }))
+      .catch((error: unknown) => toast(`Couldn't change tool permissions: ${describeError(error)}`, 'error'));
   const tools = useTools();
   const draft = useDraft(draftKey);
   const attach = useAttachments({ draftKey, model, temporary });
@@ -103,18 +125,37 @@ export function Composer({
   const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }), []);
+  const allModels = useModels();
+  const atModel = draft.atModel ? allModels.data?.find((item) => item.id === draft.atModel) : undefined;
 
-  const available = capabilities ? availableToggles(capabilities, models?.length ? models : model) : NO_TOGGLES;
+  const available = capabilities ? availableToggles(capabilities, atModel ?? (models?.length ? models : model)) : NO_TOGGLES;
   const toggles = effectiveToggles(draft.toggles, available);
   const usable = usableTools(tools.data ?? []);
   const toolIds = draft.toolIds.filter((id) => usable.some((tool) => tool.id === id));
   const hasContent = draft.text.trim().length > 0 || draft.files.length > 0;
   const uploading = filesPending(draft.files);
   const canSend = hasContent && !sending && !uploading;
-  const showIntegrations = available.webSearch || available.imageGeneration || available.codeInterpreter || usable.length > 0;
+  const showIntegrations = available.webSearch || available.imageGeneration || available.codeInterpreter || usable.length > 0 || approvalsOn;
   const canExpand = draft.text.split('\n').length > 2;
   const setText = (text: string) => updateDraft(draftKey, (current) => ({ ...current, text }));
   const field = useGrowingInput(draft.text, setText);
+  const [cursor, setCursor] = useState(0);
+  const [focused, setFocused] = useState(false);
+  const menus = useInputMenus({
+    draftKey,
+    text: draft.text,
+    cursor,
+    focused,
+    setText: (text, at) => {
+      setText(text);
+      setCursor(at);
+      // After the new text is in, the cursor goes where the picked item ends.
+      setTimeout(() => input.current?.setSelection(at, at), 50);
+    },
+    onPickModel,
+    onTemporary,
+  });
+
 
   // Like the web, a model brings its own default toggles and tools when you start with it.
   const settingsReady = !settings.isPending;
@@ -156,7 +197,7 @@ export function Composer({
 
   const submit = async () => {
     if (!canSend) return;
-    const message = { text: draft.text, files: draft.files, toggles, toolIds };
+    const message = { text: draft.text, files: draft.files, toggles, toolIds, ...(atModel ? { atModelId: atModel.id } : {}) };
     const previews = draft.previews;
     setSending(true);
     // As on the web, the input empties as the message goes; one that didn't go out comes back,
@@ -185,13 +226,33 @@ export function Composer({
   return (
     <View style={[styles.wrap, !floating && { paddingBottom: Math.max(insets.bottom, 8) }]}>
       <QueuedMessages queue={draft.queue} onSendNow={onSendQueued} onEdit={editQueued} onDelete={deleteQueued} />
+      {menus.trigger && (menus.entries.length > 0 || menus.loading || menus.trigger.query.length > 0) ? (
+        <MentionMenu entries={menus.entries} loading={menus.loading} empty={menus.empty} />
+      ) : null}
       <View style={[styles.box, { borderColor: palette.border, backgroundColor: palette.background }]}>
+        {atModel ? (
+          <View style={styles.atRow}>
+            <Text style={[styles.atText, { color: palette.textMuted }]} numberOfLines={1}>
+              {`Talking to @${atModel.name ?? atModel.id}`}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Stop talking to this model"
+              hitSlop={8}
+              onPress={() => updateDraft(draftKey, (current) => ({ ...current, atModel: null }))}>
+              <Icon name="x-mark" size={14} color={palette.textMuted} />
+            </Pressable>
+          </View>
+        ) : null}
         <AttachmentStrip files={draft.files} previews={draft.previews} baseUrl={session.baseUrl} token={session.token} onRemove={removeAttachment} />
         <View>
           <TextInput
             ref={input}
             value={field.value}
             onChangeText={field.onChangeText}
+            onSelectionChange={(event) => setCursor(event.nativeEvent.selection.end)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             placeholder={placeholder}
             placeholderTextColor={palette.textFaint}
             multiline
@@ -301,6 +362,7 @@ export function Composer({
         onClose={() => setExpanded(false)}
         onDismiss={() => input.current?.focus()}
       />
+      <PromptVariablesSheet variables={menus.form} onCancel={menus.cancelForm} onInsert={menus.insertForm} />
       <IntegrationsSheet
         visible={sheetOpen}
         onClose={() => setSheetOpen(false)}
@@ -310,6 +372,7 @@ export function Composer({
         tools={usable}
         toolIds={toolIds}
         onToggleTool={setTool}
+        approval={approvalsOn ? { mode: approvalMode, onChange: setApprovalMode } : undefined}
       />
     </View>
   );
@@ -320,6 +383,8 @@ const styles = StyleSheet.create({
   box: { borderWidth: 1, borderRadius: 26, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 8, gap: 6 },
   input: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 22, maxHeight: 160, paddingTop: 2, paddingBottom: 2 },
   inputBesideExpand: { paddingRight: 30 },
+  atRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  atText: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 13 },
   expand: { position: 'absolute', top: -2, right: -6, width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   round: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

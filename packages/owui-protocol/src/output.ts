@@ -32,7 +32,18 @@ export interface OutputItem {
 export type DisplayBlock =
   | { kind: 'text'; id: string; text: string }
   | { kind: 'reasoning'; id: string; text: string; durationSec: number | null; done: boolean }
-  | { kind: 'tool'; id: string; name: string; argumentsText: string; resultText: string | null; done: boolean }
+  | {
+      kind: 'tool';
+      id: string;
+      name: string;
+      argumentsText: string;
+      resultText: string | null;
+      done: boolean;
+      /** Stopped until you approve it, or answer the model's questions (`ask_user`). */
+      waiting?: boolean;
+      /** You denied it. */
+      rejected?: boolean;
+    }
   | { kind: 'code'; id: string; lang: string; code: string; resultText: string | null; done: boolean }
   | { kind: 'search'; id: string; label: string; queries: string[]; done: boolean }
   | { kind: 'other'; id: string; label: string; done: boolean };
@@ -59,7 +70,8 @@ export function outputToBlocks(output: OutputItem[], messageDone = true): Displa
   const blocks: DisplayBlock[] = [];
   output.forEach((item, index) => {
     const id = item.id ?? `${item.type ?? 'item'}-${index}`;
-    const done = item.status ? item.status === 'completed' || item.status === 'incomplete' : messageDone;
+    // A finished reply's steps are finished, whatever they say (a reasoning step can stay "in_progress" after a pause).
+    const done = item.status === 'completed' || item.status === 'incomplete' || (messageDone && item.status !== 'pending' && item.status !== 'requires_approval');
     switch (item.type) {
       case 'message': {
         const text = partsText(item.content);
@@ -73,13 +85,18 @@ export function outputToBlocks(output: OutputItem[], messageDone = true): Displa
       }
       case 'function_call': {
         const result = item.call_id ? results.get(item.call_id) : undefined;
+        const waiting = result === undefined && (item.status === 'pending' || item.status === 'requires_approval');
+        const rejected = item.status === 'rejected';
         blocks.push({
           kind: 'tool',
           id,
           name: item.name ?? 'tool',
           argumentsText: prettyJson(item.arguments),
           resultText: result ?? null,
-          done: result !== undefined || done,
+          // Waiting for you or denied isn't running.
+          done: result !== undefined || done || waiting || rejected,
+          ...(waiting ? { waiting: true } : {}),
+          ...(rejected ? { rejected: true } : {}),
         });
         break;
       }

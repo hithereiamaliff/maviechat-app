@@ -12,6 +12,11 @@ export const TOGGLE_INFO: Record<ToggleKey, { label: string; hint: string; icon:
 
 const ORDER: ToggleKey[] = ['webSearch', 'imageGeneration', 'codeInterpreter'];
 
+const APPROVAL_MODES: { value: 'full' | 'ask'; label: string; hint: string; icon: IconName }[] = [
+  { value: 'full', label: 'Full access', hint: 'Tools run without asking.', icon: 'bolt' },
+  { value: 'ask', label: 'Ask for approval', hint: 'The reply stops before each tool until you allow or deny it.', icon: 'shield-check' },
+];
+
 /** The web app's integrations menu as a bottom sheet: web search, image, code interpreter and tools. */
 export function IntegrationsSheet({
   visible,
@@ -22,6 +27,7 @@ export function IntegrationsSheet({
   tools,
   toolIds,
   onToggleTool,
+  approval,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -31,6 +37,8 @@ export function IntegrationsSheet({
   tools: ToolItem[];
   toolIds: string[];
   onToggleTool: (id: string, on: boolean) => void;
+  /** Tool permissions, when the server allows them. */
+  approval?: { mode: 'full' | 'ask'; onChange: (mode: 'full' | 'ask') => void };
 }) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
@@ -75,6 +83,24 @@ export function IntegrationsSheet({
                   onToggleTool(tool.id, on),
                 ),
               )}
+            </>
+          ) : null}
+          {approval ? (
+            <>
+              <Text style={[styles.section, { color: palette.textFaint }]}>Tool permissions</Text>
+              {APPROVAL_MODES.map((mode) => {
+                const on = approval.mode === mode.value;
+                return (
+                  <Pressable key={mode.value} accessibilityRole="radio" accessibilityState={{ checked: on }} onPress={() => approval.onChange(mode.value)} style={styles.row}>
+                    <Icon name={mode.icon} size={20} color={palette.textMuted} />
+                    <View style={styles.rowText}>
+                      <Text style={[styles.label, { color: palette.text }]}>{mode.label}</Text>
+                      <Text style={[styles.hint, { color: palette.textMuted }]}>{mode.hint}</Text>
+                    </View>
+                    {on ? <Icon name="check" size={18} color={palette.text} strokeWidth={2} /> : null}
+                  </Pressable>
+                );
+              })}
             </>
           ) : null}
         </ScrollView>

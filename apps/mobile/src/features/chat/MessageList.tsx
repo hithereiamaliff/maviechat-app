@@ -37,6 +37,8 @@ export interface MessageActions {
   actionsFor?: (reply: HistoryMessage) => ModelAction[];
   runAction?: (reply: HistoryMessage, action: ModelAction) => void;
   remove?: (message: HistoryMessage) => void;
+  /** Allow or deny a tool call a reply is waiting on. */
+  resolveApproval?: (reply: HistoryMessage, callId: string, approve: boolean) => Promise<void>;
   canDeleteMessage: boolean;
   canDeleteReply: boolean;
 }
@@ -165,6 +167,7 @@ export function MessageList({
               onContinue={continueReply ? () => continueReply(message) : undefined}
               actions={actionsFor?.(message)}
               onAction={runAction ? (action) => runAction(message, action) : undefined}
+              onApprove={actions.resolveApproval ? (callId, approve) => actions.resolveApproval!(message, callId, approve) : undefined}
             />
           );
           const groups = item.role === 'assistant' && history ? replyGroups(history, item.id) : null;

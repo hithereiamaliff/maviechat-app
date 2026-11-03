@@ -1,4 +1,4 @@
-import { applyMessageEvent, type ChatEventEnvelope, type ChatRecord, type HistoryMessage } from '@maviechat/owui-protocol';
+import { applyMessageEvent, askUserQuestions, type AskUserAnswer, type AskUserQuestion, type ChatEventEnvelope, type ChatRecord, type HistoryMessage } from '@maviechat/owui-protocol';
 import type { QueryClient } from '@tanstack/react-query';
 
 type Reply = (response: unknown) => void;
@@ -8,6 +8,8 @@ export interface StreamHooks {
   confirm(title: string, message: string): Promise<boolean>;
   prompt(title: string, message: string, placeholder?: string, value?: string): Promise<string | false>;
   notify(message: string, tone?: 'info' | 'error' | 'success'): void;
+  /** The model's questions asked live (`request:user_input`); resolves with your answers, or null for none. */
+  ask?(questions: AskUserQuestion[], deadline: number | null): Promise<Record<string, AskUserAnswer> | null>;
   /** True when the user is looking at this chat right now. */
   isViewing(chatId: string): boolean;
   /** True when a push notification announces this chat's finished reply, so the app needn't. */
@@ -211,10 +213,13 @@ export class ChatStreams {
       case 'input':
         reply?.(await this.hooks.prompt(text(payload.title) || 'Input', text(payload.message), text(payload.placeholder), text(payload.value)));
         return;
-      case 'request:user_input':
-        reply?.({ status: 'cancelled', answers: {} });
-        this.hooks.notify('A tool asked you a question. Answering tool questions arrives in a later update.');
+      case 'request:user_input': {
+        const questions = askUserQuestions(payload.questions, payload.allow_other !== false);
+        const timeout = typeof payload.timeout_ms === 'number' && payload.timeout_ms > 0 ? payload.timeout_ms : null;
+        const answers = questions.length && this.hooks.ask ? await this.hooks.ask(questions, timeout ? Date.now() + timeout : null) : null;
+        reply?.(answers ? { status: 'answered', answers } : { status: 'cancelled', answers: {} });
         return;
+      }
       case 'request:elicitation':
         reply?.({ action: 'cancel' });
         return;

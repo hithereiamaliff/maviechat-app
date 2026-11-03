@@ -16,6 +16,8 @@ export interface Draft {
   /** The model whose defaults the toggles and tools came from; picking another model applies its own. */
   defaultsFor: string | null;
   queue: QueuedMessage[];
+  /** Picked with `@`: every message goes to this one model until you take it off, as on the web. */
+  atModel?: string | null;
 }
 
 /** The new-chat screen's draft. */
@@ -45,11 +47,11 @@ export function removeFile(key: string, itemId: string): void {
   });
 }
 
-/** The first message created the chat: it keeps the toggles and tools, and the new-chat input starts over. */
+/** The first message created the chat: it keeps the toggles, tools and `@` model, and the new-chat input starts over. */
 export function carryOver(from: string, to: string): void {
-  const { toggles, toolIds, defaultsFor } = getDraft(from);
+  const { toggles, toolIds, defaultsFor, atModel } = getDraft(from);
   drafts.delete(from);
-  updateDraft(to, (draft) => ({ ...draft, toggles, toolIds, defaultsFor }));
+  updateDraft(to, (draft) => ({ ...draft, toggles, toolIds, defaultsFor, atModel }));
 }
 
 function subscribe(listener: () => void): () => void {
