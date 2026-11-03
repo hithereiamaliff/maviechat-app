@@ -13,12 +13,24 @@ function updateLabel(): string {
   return `${when} (${Updates.updateId.slice(0, 8)})`;
 }
 
-/** About: app and server versions, and the open-source packages the app ships. */
+/** About in Open WebUI's Settings: the app, this server and its version. */
 export function AboutSettings() {
-  const palette = usePalette();
   const config = useServerConfig();
   const version = useServerVersion();
   const capabilities = useCapabilities();
+  return (
+    <AppAbout
+      serverRows={[
+        ['Server', config.data?.name ?? 'Open WebUI'],
+        ['Open WebUI', version.data ? `${version.data.version} (${supportLabel(capabilities?.support)})` : version.isError ? 'unavailable' : 'checking…'],
+      ]}
+    />
+  );
+}
+
+/** About, in either space's Settings: the app's version and update, the space's server, and the open-source packages the app ships. */
+export function AppAbout({ serverRows }: { serverRows: [string, string][] }) {
+  const palette = usePalette();
   const [showLicenses, setShowLicenses] = useState(false);
   const { isUpdatePending, isChecking, isDownloading } = Updates.useUpdates();
   const [updateNote, setUpdateNote] = useState<string | null>(null);
@@ -36,12 +48,7 @@ export function AboutSettings() {
     }
   };
 
-  const rows: [string, string][] = [
-    ['MavieChat', Constants.expoConfig?.version ?? 'unknown'],
-    ['Update', updateLabel()],
-    ['Server', config.data?.name ?? 'Open WebUI'],
-    ['Open WebUI', version.data ? `${version.data.version} (${supportLabel(capabilities?.support)})` : version.isError ? 'unavailable' : 'checking…'],
-  ];
+  const rows: [string, string][] = [['MavieChat', Constants.expoConfig?.version ?? 'unknown'], ['Update', updateLabel()], ...serverRows];
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
@@ -69,7 +76,7 @@ export function AboutSettings() {
       ) : null}
       {updateNote ? <Text style={[styles.note, { color: palette.textMuted }]}>{updateNote}</Text> : null}
       <Text style={[styles.note, { color: palette.textFaint }]}>
-        MavieChat is an independent app for Open WebUI servers. It is not affiliated with Open WebUI.
+        MavieChat is an independent app for Open WebUI and DeepTutor servers. It is not affiliated with Open WebUI or DeepTutor.
       </Text>
 
       <Pressable

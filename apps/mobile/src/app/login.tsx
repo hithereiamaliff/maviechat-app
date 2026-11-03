@@ -1,9 +1,11 @@
 import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { TextField } from '@/components/TextField';
+import { switchToDeepTutor } from '@/features/deeptutor/switch';
+import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { describeSignInError } from '@/session/errors';
 import { useSession } from '@/session/SessionProvider';
 import { fonts, usePalette } from '@/theme';
@@ -14,6 +16,7 @@ export default function Login() {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
   const { state, signIn } = useSession();
+  const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
   const [serverUrl, setServerUrl] = useState(() => (state.status === 'signed-out' ? (state.lastServerUrl ?? '') : ''));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -106,10 +109,18 @@ export default function Login() {
           ) : null}
 
           <Button label="Sign in" onPress={() => void submit()} loading={busy} />
+          {/* Either space works on its own: DeepTutor alone needs no Open WebUI account. */}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => (deepTutorSignedIn ? switchToDeepTutor(true) : router.replace('/deeptutor-login'))}
+            hitSlop={8}
+            style={styles.other}>
+            <Text style={[styles.otherText, { color: palette.link }]}>{deepTutorSignedIn ? 'Back to DeepTutor' : 'Sign in to DeepTutor instead'}</Text>
+          </Pressable>
         </View>
 
         <Text style={[styles.footer, { color: palette.textMuted }]}>
-          MavieChat is an independent app for Open WebUI servers and is not affiliated with Open WebUI.
+          MavieChat is an independent app for Open WebUI and DeepTutor servers and is not affiliated with either.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -124,5 +135,7 @@ const styles = StyleSheet.create({
   subtitle: { fontFamily: fonts.regular, fontSize: 16 },
   form: { gap: 16 },
   message: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20 },
+  other: { alignSelf: 'center', paddingVertical: 4 },
+  otherText: { fontFamily: fonts.medium, fontSize: 15 },
   footer: { marginTop: 'auto', fontFamily: fonts.regular, fontSize: 12, lineHeight: 17, textAlign: 'center' },
 });

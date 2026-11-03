@@ -87,13 +87,13 @@ DeepTutor is a **spec only**, like Open WebUI and Conduit (see `AGENTS.md`). Rea
 
 ## Native chat (slice 1, 2026-11-01)
 
-The DeepTutor space opens on a native list of your DeepTutor chats. **New chat** and each chat are native screens in DeepTutor's **Chat** mode:
+Each DeepTutor chat is a native screen (since 2026-11-03 the space opens on a new chat, with your chats in the sidebar; see "The DeepTutor space"). In DeepTutor's **Chat** mode:
 - streaming replies with their reasoning (folded), each tool call where it happened (with its result), and sources;
 - stop, regenerate, copy;
 - the model (from the account's granted models) and the switchable tools, per chat;
 - a reply resumes after a dropped connection or a trip to the background, and a reply started on another device shows as it streams.
 
-Chats in other modes (Solve, Quiz, Research, Visualize…) open read-only with **Open in DeepTutor Web App**. The web app is also in the home menu.
+Chats in modes the app doesn't run natively open read-only with **Open in DeepTutor Web App** (slice 2 made Solve, Quiz, Research, Visualize and Ask Questions native). DeepTutor's other pages are in the sidebar.
 
 **Code:** `packages/deeptutor-protocol` (`turns.ts`, `turnConnection.ts`, `turnReply.ts`, `chatOptions.ts`); the app's `features/deeptutor/chat/` and `app/(deeptutor)/learn/`.
 
@@ -150,6 +150,45 @@ The composer's mode chip picks DeepTutor's mode for a turn, with its settings: Q
 - **Find in Chat** searches the shown messages on the phone and scrolls to the one you tap.
 - `npm run probe:deeptutor -- --refs` checks all of it against the server (passes on 1.7.1).
 
+## The DeepTutor space (2026-11-03)
+
+The owner asked for DeepTutor to be treated equally with Open WebUI: a home page, its settings and the rest of DeepTutor, not just a chat list. The space now has the same structure as Open WebUI's, organised the way DeepTutor's own web app is (its "Modern" layout, 1.7.1, read as a spec).
+
+- **The same frame in both spaces.** One top bar (sidebar button, the switch to the other space, title, new chat, menu), one sidebar frame (swipe open from anywhere; name at the top; New Chat, Search; you at the bottom), one Settings modal with tabs, and one Connection page. Each space fills them with its own content (`features/sidebar/SpaceBar`, `SpaceDrawer`, `parts`; `features/settings/SettingsFrame`, `DetailScreen`).
+- **Home** (`/learn`) is a new chat, like Open WebUI's: a greeting for the time of day, the input in the middle, then DeepTutor's **Ideas for you** and the modes to **Start with**. An idea fills the input; the refresh button asks for a new set.
+- **The sidebar** has DeepTutor's five shelves as tabs:
+  - **Home:** Calendar, Task Board, Co-Writer, then your chats (Pinned, Today, Within a week, Earlier).
+  - **Learning:** New Learning Activity, All Learning, and the chats held in learning activities (each opens in its activity).
+  - **Resources:** All Resources, Chat History, Favorites, Learning Journal, Question Bank, Knowledge Center.
+  - **Partners:** All Partners, New Partner, New Group.
+  - **Personalization:** All Personalization, My Agents, Personas, Skills, MCP Services, CLI Apps, Memory.
+  - Learner accounts get Home (without Co-Writer) and Learning only, as in DeepTutor.
+  - Pages the app doesn't have natively open DeepTutor's own page in the app, signed in, under the same bar.
+  - Each chat's menu: Rename, Pin or Unpin, Archive, Delete. The chat screen's menu has Pin and Archive too.
+- **The account menu:** Admin (admins: DeepTutor's user management), Settings, Switch to or Connect Open WebUI, Connection, Sign Out.
+- **Settings:**
+  - **General:** the app's theme and notifications, then DeepTutor's reply language and More DeepTutor Settings (its own page).
+  - **Account:** who you are, Change Password, your picture (DeepTutor's profile page), Sign Out.
+  - **Archived Chats:** search, open, restore or delete, Restore All.
+  - **About.**
+- **Either space works alone.** Each sign-in screen offers the other ("Sign in to DeepTutor instead", "Sign in to Open WebUI instead"). Notifications switch on without an Open WebUI account (DeepTutor's replies only need the phone's push token); the test notification still goes through Open WebUI's account. Signing out of Open WebUI only takes the phone off the relay for that account, so DeepTutor's notifications carry on.
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --space`)
+
+- **Filing.** `GET /api/sessions` without `workspace_id` returns every chat with its `preferences`.
+  - DeepTutor's sidebar leaves out archived chats (`archived`), side chats (`parent_session_id`) and note chats (`note_document_id`).
+  - It files learning chats under Learning:
+    - a mastery path (`workspace_mode: mastery_path` + `mastery_path_id`) opens at `/learning/mastery/<path>/sessions/<id>`;
+    - a reading collection (`immersive_reading` + `reading_workspace_id`) opens at `/learning/reading/<collection>/sessions/<id>`;
+    - a book page (`book_id`, `book_page_id`) opens at `/learning/books/<book>/pages/<page>?chat=<id>`;
+    - a video (`immersive_watching`) opens at `/learning/watching/<id>`.
+  - The app applies the same rules (`listedUnder`, `learningPath`).
+- **Pin and archive:** `PATCH /api/sessions/{id}/organization` with `{pinned}` or `{archived}`; archiving takes the chat's side chats along. There is no archived-only list, so Archived Chats filters the full list.
+- **Profile:** `GET /api/auth/profile` (`preset` is `standard`, `custom` or `learner`; `can_change_password`, `must_change_password`).
+- **Password:** `PUT /api/auth/profile/password {current_password, new_password}`. The new one needs at least 8 characters and must differ; a wrong current one answers 400 and changes nothing. Tokens stay valid.
+- **Languages:** `GET /api/settings/ui` → `theme`, `language` (DeepTutor's interface), `response_language` (17 reply languages, Malay included); `PUT` merges only the fields sent.
+- **Ideas:** `GET /api/dashboard/suggestions` → `{suggestions: [{label, prompt}], stale}`; it answers at once and writes a fresh set behind the answer when stale (the app asks again every 3.5 s, up to 10 times). `POST /api/dashboard/suggestions/refresh` writes a new set now (uses DeepTutor's model). An empty list means DeepTutor has nothing about you to go on yet.
+
 ## M1.5 checklist
 
 | | Item |
@@ -158,8 +197,8 @@ The composer's mode chip picks DeepTutor's mode for a turn, with its settings: Q
 | [~] | Saved servers and a switcher (Keychain per server; caches kept apart). Done: an Open WebUI and a DeepTutor sign-in side by side, each in the Keychain, with DeepTutor's data cached under its own keys. The switch button sits at the top left in both spaces (beside the sidebar button in Open WebUI, beside Back on DeepTutor's inner screens), and Connect DeepTutor is in the account menu. Each space records itself while it shows, and a launch opens straight into the last one (read before the first frame, so Open WebUI doesn't flash first; a launch from a notification goes to its chat). A longer list (several Open WebUI servers) comes with M4's scratch instance |
 | [x] | `packages/deeptutor-protocol`, a DeepTutor contract probe (`npm run probe:deeptutor`), and fixtures per version (`tools/contract-probe/fixtures/deeptutor-1.7.1/`). |
 | [x] | `.ref/deeptutor` pinned at the deployed tag (`packages/deeptutor-protocol/src/support.json`), and the copy check extended to cover it. |
-| [~] | The DeepTutor space: web view plus a native bar (store build 3, `react-native-webview`). Built with react-native-webview 14.0.1: DeepTutor's `/chat` under a slim bar (Switch to Open WebUI; menu: Chats for Open WebUI, Reload, Open in Browser, Sign out). The sign-in comes from iOS's shared cookie store (native requests use `credentials: 'include'`); if the web view still lands on `/login`, it sets the cookie from the stored token once per visit. Links to other sites open in the browser, swipe goes back, and the app now declares the microphone for DeepTutor's voice features. Not yet tried on a phone |
+| [x] | The DeepTutor space. First a web view under a native bar (store build 3); since 2026-11-03 a native space equal to Open WebUI's: home, sidebar with DeepTutor's five shelves, Settings, Connection (see "The DeepTutor space"). DeepTutor's pages the app doesn't have natively open in the web view, signed in, under the same bar.
 | [x] | "Reference DeepTutor Chat" in the Open WebUI + menu (a `text` attachment, see above). |
 | [x] | "Send to DeepTutor" in the Open WebUI chat menu (saved chats only): the shown branch as Markdown, filed as a `chat` record in the "From MavieChat" notebook, with our own summary. |
 | [ ] | Phone checks: switch both ways without signing in again; both cross-reference directions; an expired DeepTutor sign-in; offline. |
-| [~] | Native DeepTutor chat over the `/ws` turn protocol 2.0 (see "Native chat" and "Modes"). Slice 1 (Chat) and slice 2 (Solve, Quiz, Research, Visualize, Ask Questions) are done. Mastery path, Reading, Audio overview and the animation modes open in the web app. |
+| [~] | Native DeepTutor chat over the `/ws` turn protocol 2.0 (see "Native chat", "Modes" and "Attachments and references"). Slices 1–3 are done: Chat; Solve, Quiz, Research, Visualize, Ask Questions; attachments, knowledge bases, notebook and earlier-chat references, rename, find. Learning activities (mastery paths, reading, books, videos) and the animation modes open in DeepTutor's own pages. |

@@ -1,11 +1,15 @@
+import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { fonts, radius, usePalette } from '@/theme';
 import { setThemePreference, THEME_CHOICES, useThemePreference } from '@/theme/preference';
 import { NotificationSettings } from './NotificationSettings';
 
-/** General: the theme, as in the web's General settings, and this iPhone's notifications. Other settings come in M2. */
-export function GeneralSettings() {
+/**
+ * General, in either space's Settings: the theme (for the whole app) and this iPhone's
+ * notifications, then the space's own settings (`children`). `note` says what else is to come.
+ */
+export function GeneralSettings({ note, children }: { note: string; children?: ReactNode }) {
   const palette = usePalette();
   const preference = useThemePreference();
 
@@ -33,9 +37,10 @@ export function GeneralSettings() {
         })}
       </View>
       <Text style={[styles.note, { color: palette.textFaint }]}>
-        Saved on this iPhone, as the web app saves it per browser. Language, system prompt and the other settings come in a later update.
+        {`Saved on this iPhone for both Open WebUI and DeepTutor, as the web apps save it per browser. ${note}`}
       </Text>
       <NotificationSettings />
+      {children}
     </ScrollView>
   );
 }

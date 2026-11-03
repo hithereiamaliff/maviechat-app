@@ -101,14 +101,15 @@ export default function DeepTutorLogin() {
           ) : null}
 
           <Button label="Sign in" onPress={() => void submit()} loading={busy} />
-          {owui.state.status === 'signed-in' ? (
-            <Pressable accessibilityRole="button" onPress={() => router.replace('/')} hitSlop={8} style={styles.back}>
-              <Text style={[styles.backText, { color: palette.link }]}>Back to Open WebUI</Text>
-            </Pressable>
-          ) : null}
+          {/* Either space works on its own: Open WebUI alone needs no DeepTutor account. */}
+          <Pressable accessibilityRole="button" onPress={() => router.replace(owui.state.status === 'signed-in' ? '/' : '/login')} hitSlop={8} style={styles.back}>
+            <Text style={[styles.backText, { color: palette.link }]}>{owui.state.status === 'signed-in' ? 'Back to Open WebUI' : 'Sign in to Open WebUI instead'}</Text>
+          </Pressable>
         </View>
 
-        <Text style={[styles.footer, { color: palette.textMuted }]}>MavieChat is an independent app and is not affiliated with DeepTutor.</Text>
+        <Text style={[styles.footer, { color: palette.textMuted }]}>
+          MavieChat is an independent app for Open WebUI and DeepTutor servers and is not affiliated with either.
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

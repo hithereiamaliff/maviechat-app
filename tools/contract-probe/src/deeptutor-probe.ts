@@ -8,7 +8,11 @@
  * Quiz, Visualize, Research's outline, Ask Questions answered), checks the app reads each mode's
  * result, live and saved, and deletes the sessions (about two minutes of model use). `--refs`
  * sends a photo, a text file, a notebook and an earlier chat with one turn, checks the saved
- * message reads back (and its photo loads signed in), and deletes everything it made.
+ * message reads back (and its photo loads signed in), and deletes everything it made. `--space`
+ * checks what the app's DeepTutor space reads and writes: the profile, the reply language (saved
+ * back unchanged), the home screen's ideas, a wrong current password refused (so nothing
+ * changes), and one short "APP PROBE:" chat pinned, archived, restored and unpinned, read back
+ * from the list after each step, then deleted.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -20,6 +24,18 @@ import { parseArgs } from 'node:util';
 import {
   addChatRecord,
   applyTurnEvent,
+  changePassword,
+  DtHttpError,
+  getProfile,
+  getSuggestions,
+  getUiSettings,
+  isArchived,
+  isPinned,
+  listedUnder,
+  organizeSession,
+  randomId,
+  REPLY_LANGUAGES,
+  updateUiSettings,
   createNotebook,
   deleteNotebook,
   deleteSession,
@@ -61,6 +77,7 @@ const { values: args } = parseArgs({
     turn: { type: 'boolean' },
     modes: { type: 'boolean' },
     refs: { type: 'boolean' },
+    space: { type: 'boolean' },
   },
 });
 
@@ -212,6 +229,14 @@ async function main() {
     await step('attachments and references: photo, text file, notebook, earlier chat', async () => {
       const outcome = await probeRefs(baseUrl, session.token as string, client);
       return { value: true, note: outcome };
+    });
+  }
+
+  if (args.space) {
+    await step('space: profile, reply language, ideas, password check, pin and archive', async () => {
+      const outcome = await probeSpace(baseUrl, session.token as string, client);
+      fixtures.space = outcome.fixture;
+      return { value: true, note: outcome.note };
     });
   }
 
@@ -453,6 +478,72 @@ async function probeRefs(baseUrl: string, token: string, client: DtClient): Prom
     await Promise.all(sessions.map((id) => deleteSession(client, id).catch(() => undefined)));
     await deleteNotebook(client, notebook.id).catch(() => undefined);
   }
+}
+
+/** What the DeepTutor space reads and writes, on the test account; the one chat it makes is deleted. */
+async function probeSpace(baseUrl: string, token: string, client: DtClient): Promise<{ note: string; fixture: Record<string, unknown> }> {
+  const profile = await getProfile(client);
+  if (!profile.username || typeof profile.can_change_password !== 'boolean') throw new Error('the profile lacks a username or can_change_password');
+  const ui = await getUiSettings(client);
+  if (!REPLY_LANGUAGES.some((language) => language.code === ui.response_language)) throw new Error(`unknown reply language "${ui.response_language}"`);
+  const saved = await updateUiSettings(client, { response_language: ui.response_language });
+  if (saved.response_language !== ui.response_language) throw new Error('the reply language did not save back unchanged');
+  const ideas = await getSuggestions(client);
+
+  // A current password that can't be right: DeepTutor refuses before changing anything.
+  const refused = await changePassword(client, `wrong ${randomId()}`, `probe-${randomId()}`).then(
+    () => null,
+    (error: unknown) => error,
+  );
+  if (refused === null) throw new Error('a wrong current password was accepted');
+  if (!(refused instanceof DtHttpError) || refused.status !== 400) throw new Error(`a wrong current password answered ${String(refused)}`);
+
+  let id: string | null = null;
+  let finished: () => void = () => undefined;
+  const done = new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('no done event within 3 minutes')), 180_000);
+    finished = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+  });
+  const connection = new DtTurnConnection({
+    url: turnSocketUrl(baseUrl),
+    connect: (url, handlers) => {
+      const socket = new NodeWebSocket(url, { headers: { Cookie: socketCookieHeader(token) } });
+      socket.onopen = () => handlers.onOpen();
+      socket.onmessage = (event) => handlers.onMessage(event.data);
+      socket.onclose = (event) => handlers.onClose(event.code);
+      return { send: (data) => socket.send(data), close: () => socket.close() };
+    },
+    onEvent: (event) => {
+      if (event.type === 'done') finished();
+    },
+  });
+  try {
+    id = (await connection.startTurn({ content: `${PROBE_PREFIX} Just say OK.`, tools: [] })).sessionId;
+    await done;
+    const row = async () => {
+      const found = (await listSessions(client, { limit: 50 })).find((item) => item.id === id);
+      if (!found) throw new Error('the chat is missing from the list');
+      return found;
+    };
+    const expect = async (change: { pinned?: boolean; archived?: boolean }, check: (session: Awaited<ReturnType<typeof row>>) => boolean, what: string) => {
+      await organizeSession(client, id as string, change);
+      if (!check(await row())) throw new Error(`after ${JSON.stringify(change)} the list doesn't show it ${what}`);
+    };
+    await expect({ pinned: true }, (session) => isPinned(session) && listedUnder(session) === 'conversations', 'pinned');
+    await expect({ archived: true }, (session) => isArchived(session) && listedUnder(session) === null, 'archived');
+    await expect({ archived: false }, (session) => !isArchived(session) && listedUnder(session) === 'conversations', 'restored');
+    await expect({ pinned: false }, (session) => !isPinned(session), 'unpinned');
+  } finally {
+    connection.close();
+    if (id) await deleteSession(client, id).catch(() => undefined);
+  }
+  return {
+    note: `profile ok (${profile.preset ?? 'no preset'}); reply language ${ui.response_language} saved back; ${ideas.suggestions.length} ideas${ideas.stale ? ' (being written)' : ''}; wrong password refused; pin, archive, restore, unpin read back; chat deleted`,
+    fixture: { profile: shapeOf(profile), ui: shapeOf(ui), suggestions: shapeOf(ideas) },
+  };
 }
 
 function report(version: string) {

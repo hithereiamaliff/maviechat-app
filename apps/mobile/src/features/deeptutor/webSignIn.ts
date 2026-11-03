@@ -35,3 +35,15 @@ export function signInScript(token: string, expiresAt: number | null, loginUrl: 
 
 /** Script that signs the web view out (the server clears its cookie), for "Sign out of DeepTutor". */
 export const SIGN_OUT_SCRIPT = "fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(function () {}); true;";
+
+let openWebView: { signOut: () => void } | null = null;
+
+/** The web page on screen registers itself, so signing out from the sidebar signs it out too. */
+export function registerWebView(view: { signOut: () => void } | null): void {
+  openWebView = view;
+}
+
+/** Signs out the DeepTutor web page on screen, if there is one (its cookie store is its own). */
+export function signOutWebView(): void {
+  openWebView?.signOut();
+}

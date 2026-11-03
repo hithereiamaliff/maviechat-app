@@ -89,12 +89,19 @@ async function expoPushToken(): Promise<string> {
   return (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : {})).data;
 }
 
+/** A signed-in Open WebUI account, for the parts of notifications that go through it. */
+export interface OwuiAccount {
+  client: OwuiClient;
+  session: StoredSession;
+}
+
 /**
- * Switches notifications on for this phone: iOS permission (asked once), the Expo push token,
- * and a place in MavieChat's relay under your Open WebUI account. Open WebUI's server-wide
- * webhook then reports every finished or failed reply, so any account works. Safe to repeat.
+ * Switches notifications on for this phone: iOS permission (asked once) and the Expo push token.
+ * With an Open WebUI account, the phone also takes a place in MavieChat's relay under it, and
+ * Open WebUI's server-wide webhook then reports every finished or failed reply. DeepTutor needs
+ * nothing more: each of its replies is handed to the relay as it starts, with this token. Safe to repeat.
  */
-export async function enablePush(client: OwuiClient, session: StoredSession, { ask }: { ask: boolean }): Promise<PushStatus> {
+export async function enablePush(owui: OwuiAccount | null, { ask }: { ask: boolean }): Promise<PushStatus> {
   const current = await loadState();
   let permission = await Notifications.getPermissionsAsync();
   if (!permission.granted && ask && permission.canAskAgain) permission = await Notifications.requestPermissionsAsync();
@@ -103,20 +110,39 @@ export async function enablePush(client: OwuiClient, session: StoredSession, { a
     return 'blocked';
   }
   const pushToken = await expoPushToken();
-  const answer: RelayAnswer = await registerWithRelay(relayFetch, session.token, pushToken);
+  if (!owui) {
+    await saveState({ ...current, enabled: true, asked: true, pushToken });
+    return 'on';
+  }
+  const answer: RelayAnswer = await registerWithRelay(relayFetch, owui.session.token, pushToken);
   if (!current.legacyCleaned) {
     // The per-user webhook of earlier versions would now notify twice.
-    await deleteNotificationTarget(client, legacyTargetId(current.deviceId)).catch(() => undefined);
+    await deleteNotificationTarget(owui.client, legacyTargetId(current.deviceId)).catch(() => undefined);
   }
-  await saveState({ ...current, enabled: true, asked: true, userId: session.user.id, pushToken, lastEventAt: answer.lastEventAt, legacyCleaned: true });
+  await saveState({
+    ...current,
+    enabled: true,
+    asked: true,
+    userId: owui.session.user.id,
+    pushToken,
+    lastEventAt: answer.lastEventAt,
+    legacyCleaned: true,
+  });
   return 'on';
 }
 
-/** Takes this phone off the relay for this account. Also called before signing out. */
-export async function disablePush(session: StoredSession): Promise<void> {
+/** Switches notifications off on this phone, taking it off the relay for the Open WebUI account first. */
+export async function disablePush(owuiSession: StoredSession | null): Promise<void> {
   const current = await loadState();
-  if (current.enabled && current.pushToken) await unregisterFromRelay(relayFetch, session.token, current.pushToken);
+  if (owuiSession && current.enabled && current.pushToken) await unregisterFromRelay(relayFetch, owuiSession.token, current.pushToken);
   await saveState({ ...current, enabled: false, userId: null });
+}
+
+/** Before signing out of Open WebUI: that account's replies stop reaching this phone, while DeepTutor's carry on. */
+export async function leaveRelay(owuiSession: StoredSession): Promise<void> {
+  const current = await loadState();
+  if (current.enabled && current.pushToken) await unregisterFromRelay(relayFetch, owuiSession.token, current.pushToken);
+  await saveState({ ...current, userId: null });
 }
 
 /** A test notification straight from the relay. */
@@ -127,9 +153,9 @@ export async function sendTestPush(session: StoredSession): Promise<RelayAnswer>
   return answer;
 }
 
-/** First launch with an account: ask once and switch on. Later launches refresh the registration quietly. */
-export async function setUpPushOnLaunch(client: OwuiClient, session: StoredSession): Promise<void> {
+/** First launch in either space: ask once and switch on. Later launches refresh the token and registration quietly. */
+export async function setUpPushOnLaunch(owui: OwuiAccount | null): Promise<void> {
   const current = await loadState();
-  if (!current.asked) await enablePush(client, session, { ask: true });
-  else if (current.enabled) await enablePush(client, session, { ask: false });
+  if (!current.asked) await enablePush(owui, { ask: true });
+  else if (current.enabled) await enablePush(owui, { ask: false });
 }

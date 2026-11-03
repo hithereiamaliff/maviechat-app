@@ -1,65 +1,221 @@
+import { refreshSuggestions } from '@maviechat/deeptutor-protocol';
+import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Alert, StyleSheet, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
-import { MenuButton } from '@/components/Menu';
-import { hostOf } from '@/features/deeptutor/crossReference';
-import { SessionList } from '@/features/deeptutor/SessionList';
-import { SpaceHeader } from '@/features/deeptutor/SpaceHeader';
-import { SwitchToOpenWebUIButton } from '@/features/deeptutor/SpaceSwitch';
-import { switchToOpenWebUI } from '@/features/deeptutor/switch';
-import { useDeepTutor, useDtAuthed } from '@/session/DeepTutorProvider';
-import { useSession } from '@/session/SessionProvider';
-import { saveSpace } from '@/session/storage';
+import { useToast } from '@/components/Toast';
+import { updateDraft } from '@/features/chat/drafts';
+import { modeInfo } from '@/features/deeptutor/chat/capabilities';
+import { DtComposer, type DtComposerHandle } from '@/features/deeptutor/chat/DtComposer';
+import { useDtLive } from '@/features/deeptutor/chat/DtLiveProvider';
+import { DtUserBubble } from '@/features/deeptutor/chat/DtReplyView';
+import { extrasRequest, promptExtras, type DtExtras } from '@/features/deeptutor/chat/extras';
+import type { PromptExtras } from '@/features/deeptutor/chat/liveTurns';
+import { useDtChoice } from '@/features/deeptutor/chat/useDtChoice';
+import { DtHeader } from '@/features/deeptutor/DtHeader';
+import { useDtSuggestions } from '@/features/deeptutor/queries';
+import { describeError } from '@/lib/errors';
+import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
+import { fonts, radius, usePalette } from '@/theme';
 
-/** The DeepTutor space's home: your DeepTutor chats, newest first, and a new chat. */
+const DT_NEW_CHAT = 'dt:new';
+
+/** Our own greeting for the time of day. */
+function greetingFor(name: string, now: Date): string {
+  const hour = now.getHours();
+  const part = hour >= 5 && hour < 12 ? 'morning' : hour >= 12 && hour < 18 ? 'afternoon' : 'evening';
+  return `Good ${part}, ${name}`;
+}
+
+/**
+ * DeepTutor's home, laid out like Open WebUI's new-chat screen: a greeting, the input in the
+ * middle, then DeepTutor's ideas for you and the modes to start with. The first message
+ * creates the chat, which then takes over.
+ */
 export default function DeepTutorHome() {
-  const { session } = useDtAuthed();
-  const { signOut } = useDeepTutor();
-  const owuiSignedIn = useSession().state.status === 'signed-in';
+  const palette = usePalette();
+  const toast = useToast();
+  const { client, session } = useDtAuthed();
+  const queryClient = useQueryClient();
+  const live = useDtLive();
+  const choice = useDtChoice(null);
+  const ideas = useDtSuggestions();
+  const composer = useRef<DtComposerHandle>(null);
+  const [pending, setPending] = useState<{ text: string; extras?: PromptExtras } | null>(null);
+  const [greeting] = useState(() => greetingFor(session.account.username, new Date()));
+  const [rerolling, setRerolling] = useState(false);
 
-  const confirmSignOut = () =>
-    Alert.alert('Sign out of DeepTutor?', 'Your Open WebUI sign-in stays as it is.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign Out',
-        style: 'destructive',
-        onPress: () =>
-          void signOut().then(() => {
-            void saveSpace('owui');
-            router.replace(owuiSignedIn ? '/' : '/deeptutor-login');
-          }),
-      },
-    ]);
+  const send = async (text: string, extras: DtExtras) => {
+    const shown = promptExtras(extras, choice.selectedKnowledgeBases);
+    setPending({ text, extras: shown });
+    try {
+      const sessionId = await live.send({ content: text, ...choice.request, ...extrasRequest(extras) });
+      live.turns.setPrompt(sessionId, text, shown);
+      router.replace({ pathname: '/learn/[id]', params: { id: sessionId } });
+      return true;
+    } catch (error) {
+      setPending(null);
+      toast(`Couldn't send: ${describeError(error)}`, 'error');
+      return false;
+    }
+  };
+
+  const startWith = (mode: string) => {
+    choice.setMode(mode);
+    composer.current?.focus();
+  };
+
+  // As on DeepTutor's home, an idea fills the input; you send it.
+  const takeIdea = (prompt: string) => {
+    updateDraft(DT_NEW_CHAT, (draft) => ({ ...draft, text: prompt }));
+    composer.current?.focus();
+  };
+
+  const reroll = async () => {
+    setRerolling(true);
+    try {
+      queryClient.setQueryData([DT_QUERY_ROOT, session.baseUrl, 'suggestions'], await refreshSuggestions(client));
+    } catch (error) {
+      toast(`Couldn't get new ideas: ${describeError(error)}`, 'error');
+    } finally {
+      setRerolling(false);
+    }
+  };
+  const suggestions = ideas.data?.suggestions ?? [];
+
+  const input = (
+    <DtComposer
+      ref={composer}
+      draftKey={DT_NEW_CHAT}
+      floating={!pending}
+      running={pending !== null}
+      onSend={send}
+      onStop={() => undefined}
+      tools={choice.tools}
+      selectedTools={choice.selectedTools}
+      onToolsChange={choice.setSelectedTools}
+      models={choice.models}
+      model={choice.model}
+      onModelChange={choice.setModel}
+      modes={choice.modes}
+      mode={choice.mode}
+      onModeChange={choice.setMode}
+      config={choice.config}
+      onSettingChange={choice.setSetting}
+      knowledgeBases={choice.knowledgeBases}
+      selectedKnowledgeBases={choice.selectedKnowledgeBases}
+      onKnowledgeBasesChange={choice.setSelectedKnowledgeBases}
+    />
+  );
 
   return (
-    <View style={styles.screen}>
-      <SpaceHeader
-        leading={<SwitchToOpenWebUIButton />}
-        title="DeepTutor"
-        subtitle={`${session.account.username} · ${hostOf(session.baseUrl)}`}
-        trailing={
+    <View style={[styles.screen, { backgroundColor: palette.background }]}>
+      <DtHeader />
+      <KeyboardAvoidingView behavior="padding" style={styles.screen}>
+        {pending ? (
           <>
-            <IconButton icon="pencil-square" label="New chat" onPress={() => router.push('/learn/new')} />
-            <MenuButton
-              label="DeepTutor options"
-              items={[
-                { key: 'web', label: 'DeepTutor Web App', icon: 'globe-alt', onPress: () => router.push('/learn/web') },
-                ...(owuiSignedIn ? [{ key: 'switch', label: 'Switch to Open WebUI', icon: 'arrows-right-left' as const, onPress: switchToOpenWebUI }] : []),
-                { key: 'signout', label: 'Sign out of DeepTutor', icon: 'arrow-right-start-on-rectangle', destructive: true, onPress: confirmSignOut },
-              ]}
-            />
+            <ScrollView contentContainerStyle={styles.pending}>
+              <DtUserBubble
+                text={pending.text}
+                attachments={pending.extras?.attachments}
+                references={pending.extras?.references.map((reference) => ({
+                  key: reference.key,
+                  icon: reference.kind === 'notebook' ? 'book-open' : reference.kind === 'chat' ? 'chat-bubble-left' : 'archive-box',
+                  label: reference.label,
+                }))}
+              />
+              <ActivityIndicator style={styles.spinner} color={palette.textMuted} />
+            </ScrollView>
+            {input}
           </>
-        }
-      />
-      <SessionList
-        rowHint="Opens the chat"
-        empty="No DeepTutor chats yet. Start one with the New Chat button at the top."
-        onOpen={(item) => router.push({ pathname: '/learn/[id]', params: { id: item.id } })}
-      />
+        ) : (
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            <View style={styles.greeting}>
+              <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
+                {greeting}
+              </Text>
+              <Text style={[styles.description, { color: palette.textMuted }]}>What shall we learn today?</Text>
+            </View>
+            {input}
+            {suggestions.length > 0 ? (
+              <View style={styles.starters}>
+                <View style={styles.startersHeader}>
+                  <Icon name="sparkles" size={14} color={palette.textFaint} />
+                  <Text style={[styles.startersLabel, styles.grow, { color: palette.textFaint }]}>Ideas for you</Text>
+                  {rerolling ? (
+                    <ActivityIndicator size="small" color={palette.textFaint} />
+                  ) : (
+                    <IconButton icon="arrow-path" label="Suggest something else" size={15} color={palette.textFaint} onPress={() => void reroll()} />
+                  )}
+                </View>
+                {suggestions.map((idea) => (
+                  <Pressable
+                    key={idea.label}
+                    accessibilityRole="button"
+                    accessibilityHint="Puts this idea in the message box"
+                    onPress={() => takeIdea(idea.prompt)}
+                    style={({ pressed }) => [styles.starter, pressed && { backgroundColor: palette.surface }]}>
+                    <Text style={[styles.starterTitle, styles.grow, { color: palette.text }]} numberOfLines={2}>
+                      {idea.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            <View style={styles.starters}>
+              <View style={styles.startersHeader}>
+                <Icon name="bolt" size={14} color={palette.textFaint} />
+                <Text style={[styles.startersLabel, { color: palette.textFaint }]}>Start with</Text>
+              </View>
+              {choice.modes
+                .filter((mode) => mode !== 'chat')
+                .map((mode) => {
+                  const info = modeInfo(mode);
+                  const selected = mode === choice.mode;
+                  return (
+                    <Pressable
+                      key={mode}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityHint="Picks this mode for your message"
+                      onPress={() => startWith(selected ? 'chat' : mode)}
+                      style={({ pressed }) => [styles.starter, (pressed || selected) && { backgroundColor: palette.surface }]}>
+                      <Icon name={info.icon} size={18} color={palette.textMuted} />
+                      <View style={styles.starterText}>
+                        <Text style={[styles.starterTitle, { color: palette.text }]}>{info.name}</Text>
+                        <Text style={[styles.starterHint, { color: palette.textMuted }]} numberOfLines={1}>
+                          {info.hint}
+                        </Text>
+                      </View>
+                      {selected ? <Icon name="check" size={16} color={palette.text} strokeWidth={2} /> : null}
+                    </Pressable>
+                  );
+                })}
+            </View>
+          </ScrollView>
+        )}
+      </KeyboardAvoidingView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  content: { flexGrow: 1, justifyContent: 'center', paddingBottom: 48, gap: 20 },
+  greeting: { paddingHorizontal: 24, gap: 8, alignItems: 'center' },
+  title: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 24 },
+  description: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  starters: { paddingHorizontal: 18 },
+  startersHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 20, paddingHorizontal: 2, marginBottom: 2 },
+  startersLabel: { fontFamily: fonts.regular, fontSize: 13 },
+  starter: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 10, paddingVertical: 8, borderRadius: radius.md },
+  starterText: { flex: 1 },
+  grow: { flex: 1 },
+  starterTitle: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 20 },
+  starterHint: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18 },
+  pending: { paddingHorizontal: 16, paddingBottom: 24 },
+  spinner: { alignSelf: 'flex-start', marginTop: 24 },
 });

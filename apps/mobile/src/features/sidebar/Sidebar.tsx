@@ -9,7 +9,6 @@ import {
   searchChats,
   setFolderExpanded,
   sidebarShortcuts,
-  type ChatListItem,
   type FolderNode,
   type ShortcutId,
 } from '@maviechat/owui-protocol';
@@ -18,20 +17,19 @@ import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstac
 import { router, usePathname } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
-import { IconButton } from '@/components/IconButton';
-import { MenuButton, MenuTrigger, type MenuItem } from '@/components/Menu';
+import type { MenuItem } from '@/components/Menu';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
 import { useChatActions } from '@/features/chats/useChatActions';
 import { switchToDeepTutor } from '@/features/deeptutor/switch';
-import { disablePush } from '@/features/notifications/push';
+import { leaveRelay } from '@/features/notifications/push';
 import { useAuthed, useCapabilities, useServerConfig, useUserSettings } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
 import { fonts, radius, usePalette } from '@/theme';
+import { SidebarAction, SidebarChatRow, SidebarHeading, SidebarNote, SidebarPanel, SidebarSearch, SidebarUser, sidebarStyles } from './parts';
 import { buildSidebarRows, isUnread, type SidebarRow } from './rows';
 import { useSidebar } from './SidebarContext';
 
@@ -46,7 +44,6 @@ const SHORTCUTS: Record<ShortcutId, { label: string; icon: IconName; path: strin
 
 export function Sidebar() {
   const palette = usePalette();
-  const insets = useSafeAreaInsets();
   const sidebar = useSidebar();
   const { client, session } = useAuthed();
   const { signOut } = useSession();
@@ -181,17 +178,17 @@ export function Sidebar() {
       key: 'signout',
       label: 'Sign Out',
       icon: 'arrow-right-start-on-rectangle',
-      // Notifications for this account stop on this phone: it leaves the relay first.
-      onPress: () => void disablePush(session).catch(() => undefined).finally(() => void signOut()),
+      // Notifications for this account stop on this phone: it leaves the relay first (DeepTutor's carry on).
+      onPress: () => void leaveRelay(session).catch(() => undefined).finally(() => void signOut()),
     },
   ];
 
   const renderRow = ({ item }: { item: SidebarRow }) => {
     switch (item.type) {
       case 'header':
-        return <Text style={[styles.header, { color: palette.textFaint }]}>{item.label}</Text>;
+        return <SidebarHeading label={item.label} />;
       case 'note':
-        return <Text style={[styles.note, { color: palette.textFaint, paddingLeft: 12 + item.depth * 14 }]}>{item.label}</Text>;
+        return <SidebarNote label={item.label} depth={item.depth} />;
       case 'folder':
         // As on the web: the row opens the folder's page, the chevron opens or closes it here.
         return (
@@ -224,9 +221,11 @@ export function Sidebar() {
         );
       case 'chat':
         return (
-          <ChatRow
-            chat={item.chat}
+          <SidebarChatRow
+            title={item.chat.title || 'New Chat'}
             depth={item.depth}
+            busy={Boolean(item.chat.active)}
+            unread={isUnread(item.chat)}
             pinned={item.pinned}
             current={item.chat.id === currentChatId}
             onOpen={() => openChat(item.chat.id)}
@@ -259,35 +258,9 @@ export function Sidebar() {
   };
 
   return (
-    <View style={[styles.panel, { backgroundColor: palette.sidebar, paddingTop: insets.top + 6 }]}>
-      <View style={styles.brand}>
-        <Pressable onPress={newChat} style={styles.brandName} accessibilityRole="button" accessibilityLabel="New chat">
-          <Text style={[styles.brandText, { color: palette.text }]} numberOfLines={1}>
-            {config.data?.name ?? 'Open WebUI'}
-          </Text>
-        </Pressable>
-        <IconButton icon="bars-3" label="Close sidebar" onPress={sidebar.close} />
-      </View>
-
+    <SidebarPanel name={config.data?.name ?? 'Open WebUI'} onNewChat={newChat}>
       <SidebarAction icon="pencil-square" label="New Chat" onPress={newChat} />
-      {search === null ? (
-        <SidebarAction icon="magnifying-glass" label="Search" onPress={() => setSearch('')} />
-      ) : (
-        <View style={[styles.search, { backgroundColor: palette.background, borderColor: palette.border }]}>
-          <Icon name="magnifying-glass" size={16} color={palette.textMuted} />
-          <TextInput
-            autoFocus
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search chats"
-            placeholderTextColor={palette.textFaint}
-            returnKeyType="search"
-            autoCorrect={false}
-            style={[styles.searchInput, { color: palette.text }]}
-          />
-          <IconButton icon="x-mark" label="Close search" size={16} color={palette.textMuted} onPress={() => setSearch(null)} />
-        </View>
-      )}
+      <SidebarSearch value={search} onChange={setSearch} placeholder="Search chats" />
       {search === null
         ? shortcuts.map((id) => (
             <SidebarAction
@@ -300,7 +273,7 @@ export function Sidebar() {
           ))
         : null}
 
-      <View style={styles.list}>
+      <View style={sidebarStyles.list}>
         <FlashList
           data={rows}
           keyExtractor={(row) => row.key}
@@ -313,117 +286,20 @@ export function Sidebar() {
           }}
           refreshing={false}
           onRefresh={() => void queryClient.invalidateQueries({ queryKey: ['chats'] })}
-          ListFooterComponent={chats.isFetchingNextPage ? <ActivityIndicator style={styles.more} color={palette.textMuted} /> : null}
-          contentContainerStyle={styles.listContent}
+          ListFooterComponent={chats.isFetchingNextPage ? <ActivityIndicator style={sidebarStyles.more} color={palette.textMuted} /> : null}
+          contentContainerStyle={sidebarStyles.listContent}
         />
       </View>
 
-      <View style={[styles.footer, { borderTopColor: palette.border, paddingBottom: insets.bottom + 6 }]}>
-        <MenuTrigger label="Account" items={userMenu}>
-          <View style={styles.user}>
-            <View style={[styles.avatar, { backgroundColor: palette.surfaceStrong }]}>
-              <Text style={[styles.avatarText, { color: palette.text }]}>{initials(session.user.name)}</Text>
-            </View>
-            <Text style={[styles.userName, { color: palette.text }]} numberOfLines={1}>
-              {session.user.name}
-            </Text>
-          </View>
-        </MenuTrigger>
-      </View>
+      <SidebarUser name={session.user.name} menu={userMenu} />
       {picker.element}
-    </View>
+    </SidebarPanel>
   );
-}
-
-function ChatRow({
-  chat,
-  depth,
-  pinned,
-  current,
-  onOpen,
-  menu,
-}: {
-  chat: ChatListItem;
-  depth: number;
-  pinned: boolean;
-  current: boolean;
-  onOpen: () => void;
-  menu: Parameters<typeof MenuButton>[0]['items'];
-}) {
-  const palette = usePalette();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onOpen}
-      style={({ pressed }) => [
-        styles.row,
-        { paddingLeft: 12 + depth * 14 },
-        (current || pressed) && { backgroundColor: palette.sidebarActive },
-      ]}>
-      <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
-        {chat.title || 'New Chat'}
-      </Text>
-      {chat.active ? (
-        <ActivityIndicator size="small" color={palette.textMuted} />
-      ) : !current && isUnread(chat) ? (
-        <View style={[styles.dot, { backgroundColor: palette.unread }]} accessibilityLabel="Unread" />
-      ) : null}
-      {pinned ? <Icon name="bookmark" size={14} color={palette.textFaint} /> : null}
-      <MenuButton items={menu} label={`Options for ${chat.title}`} size={18} color={palette.textMuted} />
-    </Pressable>
-  );
-}
-
-function SidebarAction({ icon, label, hint, onPress }: { icon: IconName; label: string; hint?: string; onPress: () => void }) {
-  const palette = usePalette();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityHint={hint}
-      onPress={onPress}
-      style={({ pressed }) => [styles.action, pressed && { backgroundColor: palette.sidebarActive }]}>
-      <Icon name={icon} size={19} color={palette.text} />
-      <Text style={[styles.actionText, { color: palette.text }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '')).toUpperCase() || '?';
 }
 
 const styles = StyleSheet.create({
-  panel: { flex: 1, paddingHorizontal: 8 },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 6, marginBottom: 4 },
-  brandName: { flex: 1 },
-  brandText: { fontFamily: fonts.semibold, fontSize: 15 },
-  action: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 40, paddingHorizontal: 10, borderRadius: radius.md },
-  actionText: { fontFamily: fonts.medium, fontSize: 15 },
-  search: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    height: 40,
-    marginVertical: 2,
-    paddingLeft: 10,
-    borderRadius: radius.md,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  searchInput: { flex: 1, fontFamily: fonts.regular, fontSize: 15, paddingVertical: 0 },
-  list: { flex: 1, marginTop: 6 },
-  listContent: { paddingBottom: 12 },
-  header: { fontFamily: fonts.medium, fontSize: 12, paddingHorizontal: 12, paddingTop: 14, paddingBottom: 4 },
-  note: { fontFamily: fonts.regular, fontSize: 13, paddingVertical: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, paddingRight: 0, borderRadius: radius.md },
   title: { flex: 1, fontFamily: fonts.regular, fontSize: 14 },
-  dot: { width: 7, height: 7, borderRadius: 4 },
   chevron: { width: 22, height: 30, alignItems: 'center', justifyContent: 'center' },
   badge: { overflow: 'hidden', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, fontFamily: fonts.medium, fontSize: 11, marginRight: 8 },
-  more: { marginVertical: 12 },
-  footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 6 },
-  user: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8 },
-  avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontFamily: fonts.semibold, fontSize: 12 },
-  userName: { flex: 1, fontFamily: fonts.medium, fontSize: 15 },
 });

@@ -1,0 +1,27 @@
+{
+  "profile": {
+    "avatar": "string",
+    "can_change_password": "boolean",
+    "created_at": "string",
+    "disabled": "boolean",
+    "id": "string",
+    "must_change_password": "boolean",
+    "preset": "string",
+    "role": "string",
+    "username": "string"
+  },
+  "ui": {
+    "language": "string",
+    "response_language": "string",
+    "theme": "string"
+  },
+  "suggestions": {
+    "stale": "boolean",
+    "suggestions": [
+      {
+        "label": "string",
+        "prompt": "string"
+      }
+    ]
+  }
+}

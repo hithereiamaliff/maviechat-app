@@ -1,0 +1,121 @@
+import type { IconName } from '@/components/Icon';
+
+/** A DeepTutor page the app doesn't have natively yet: it opens DeepTutor's own page, signed in. */
+export interface DtPage {
+  key: string;
+  label: string;
+  icon: IconName;
+  path: string;
+  /** Hidden from learner accounts, which DeepTutor limits to chat and some learning. */
+  notForLearners?: boolean;
+}
+
+export type DtShelfKey = 'home' | 'learning' | 'resources' | 'partners' | 'personalization';
+
+/** One of DeepTutor's sidebar shelves (1.7.1): a tab, then its pages in groups. */
+export interface DtShelf {
+  key: DtShelfKey;
+  label: string;
+  icon: IconName;
+  groups: { heading?: string; pages: DtPage[] }[];
+  notForLearners?: boolean;
+}
+
+/** DeepTutor's sidebar, shelf by shelf, in its own order. Home also lists your chats, and Learning the chats held in learning activities. */
+export const DT_SHELVES: DtShelf[] = [
+  {
+    key: 'home',
+    label: 'Home',
+    icon: 'home',
+    groups: [
+      {
+        heading: 'Workspace',
+        pages: [
+          { key: 'calendar', label: 'Calendar', icon: 'calendar', path: '/calendar' },
+          { key: 'kanban', label: 'Task Board', icon: 'view-columns', path: '/kanban' },
+          { key: 'co-writer', label: 'Co-Writer', icon: 'pencil', path: '/co-writer', notForLearners: true },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'learning',
+    label: 'Learning',
+    icon: 'academic-cap',
+    groups: [
+      {
+        pages: [
+          { key: 'learning-new', label: 'New Learning Activity', icon: 'plus', path: '/learning/new' },
+          { key: 'learning', label: 'All Learning', icon: 'squares-2x2', path: '/learning' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'resources',
+    label: 'Resources',
+    icon: 'folder',
+    notForLearners: true,
+    groups: [
+      { pages: [{ key: 'space', label: 'All Resources', icon: 'squares-2x2', path: '/space' }] },
+      {
+        heading: 'Conversations & Materials',
+        pages: [
+          { key: 'chat-history', label: 'Chat History', icon: 'clock', path: '/space/chat-history' },
+          { key: 'notebooks', label: 'Favorites', icon: 'bookmark', path: '/notebooks' },
+          { key: 'journal', label: 'Learning Journal', icon: 'book-open', path: '/space/journal' },
+          { key: 'questions', label: 'Question Bank', icon: 'question-mark-circle', path: '/space/questions' },
+          { key: 'knowledge', label: 'Knowledge Center', icon: 'circle-stack', path: '/knowledge-bases' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'partners',
+    label: 'Partners',
+    icon: 'user-group',
+    notForLearners: true,
+    groups: [
+      {
+        pages: [
+          { key: 'partners', label: 'All Partners', icon: 'user-group', path: '/partners' },
+          { key: 'partner-new', label: 'New Partner', icon: 'plus', path: '/partners/new' },
+          { key: 'group-new', label: 'New Group', icon: 'users', path: '/partners/groups/new' },
+        ],
+      },
+    ],
+  },
+  {
+    key: 'personalization',
+    label: 'Personalization',
+    icon: 'user-circle',
+    notForLearners: true,
+    groups: [
+      {
+        pages: [
+          { key: 'personalization', label: 'All Personalization', icon: 'squares-2x2', path: '/personalization' },
+          { key: 'agents', label: 'My Agents', icon: 'cpu-chip', path: '/agents' },
+          { key: 'personas', label: 'Personas', icon: 'identification', path: '/space/personas' },
+          { key: 'skills', label: 'Skills', icon: 'sparkles', path: '/space/skills' },
+          { key: 'mcp', label: 'MCP Services', icon: 'puzzle-piece', path: '/space/mcp' },
+          { key: 'cli-apps', label: 'CLI Apps', icon: 'command-line', path: '/space/cli-apps' },
+          { key: 'memory', label: 'Memory', icon: 'light-bulb', path: '/memory' },
+        ],
+      },
+    ],
+  },
+];
+
+/** The shelves this account sees: learners get Home and Learning only (and no Co-Writer). */
+export function shelvesFor(learner: boolean): DtShelf[] {
+  if (!learner) return DT_SHELVES;
+  return DT_SHELVES.filter((shelf) => !shelf.notForLearners).map((shelf) => ({
+    ...shelf,
+    groups: shelf.groups.map((group) => ({ ...group, pages: group.pages.filter((page) => !page.notForLearners) })),
+  }));
+}
+
+/** DeepTutor's admin pages (account menu, admins only). */
+export const DT_ADMIN_PAGE: DtPage = { key: 'admin', label: 'Admin', icon: 'shield-check', path: '/admin/users' };
+/** DeepTutor's full settings, for what the app's Settings doesn't cover. */
+export const DT_SETTINGS_PAGE: DtPage = { key: 'settings', label: 'DeepTutor Settings', icon: 'cog-6-tooth', path: '/settings' };

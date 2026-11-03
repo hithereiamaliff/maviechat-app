@@ -1,9 +1,8 @@
 import {
   activeTurnOf,
-  deleteSession,
+  isPinned,
   messageAttachments,
   messageReferences,
-  renameSession,
   saveQuizResults,
   savedReply,
   sessionTitle,
@@ -15,11 +14,10 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
-import { IconButton } from '@/components/IconButton';
-import { MenuButton, type MenuItem } from '@/components/Menu';
+import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
 import { NEW_CHAT, updateDraft } from '@/features/chat/drafts';
 import { capabilityName, isNativeCapability } from '@/features/deeptutor/chat/capabilities';
@@ -33,10 +31,10 @@ import type { DtReplyActions } from '@/features/deeptutor/chat/DtReplyView';
 import type { QuizAnswer } from '@/features/deeptutor/chat/quiz';
 import { useDtChoice } from '@/features/deeptutor/chat/useDtChoice';
 import { deepTutorAttachment } from '@/features/deeptutor/crossReference';
-import { sessionDate, useDtNotebooks, useDtSession, useDtSessions } from '@/features/deeptutor/queries';
-import { SpaceHeader } from '@/features/deeptutor/SpaceHeader';
-import { SwitchToOpenWebUIButton } from '@/features/deeptutor/SpaceSwitch';
+import { useDtNotebooks, useDtSession, useDtSessions } from '@/features/deeptutor/queries';
+import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { switchToOpenWebUI } from '@/features/deeptutor/switch';
+import { useDtChatActions } from '@/features/deeptutor/useDtChatActions';
 import { setViewingChat } from '@/features/notifications/presence';
 import { describeError } from '@/lib/errors';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
@@ -53,6 +51,7 @@ export default function DeepTutorChat() {
   const { client, session } = useDtAuthed();
   const owui = useSession();
   const live = useDtLive();
+  const chatActions = useDtChatActions();
   const turn = useLiveTurn(id);
   const detail = useDtSession(id);
   const capability = typeof detail.data?.capability === 'string' ? detail.data.capability : undefined;
@@ -223,47 +222,9 @@ export default function DeepTutorChat() {
     }
   };
 
-  const rename = () =>
-    Alert.prompt(
-      'Rename chat',
-      undefined,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Rename',
-          onPress: (value?: string) => {
-            const title = value?.trim();
-            if (!title) return;
-            void renameSession(client, id, title)
-              .then(() => {
-                void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'session', id] });
-                void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'sessions'] });
-              })
-              .catch((error: unknown) => toast(`Couldn't rename: ${describeError(error)}`, 'error'));
-          },
-        },
-      ],
-      'plain-text',
-      detail.data ? sessionTitle(detail.data) : '',
-    );
-
-  const confirmDelete = () =>
-    Alert.alert('Delete this chat?', 'It moves to the recycle bin in DeepTutor.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () =>
-          void deleteSession(client, id)
-            .then(() => {
-              void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'sessions'] });
-              live.turns.remove(id);
-              if (router.canGoBack()) router.back();
-              else router.replace('/learn');
-            })
-            .catch((error: unknown) => toast(`Couldn't delete: ${describeError(error)}`, 'error')),
-      },
-    ]);
+  const title = detail.data ? sessionTitle(detail.data) : turn?.prompt ? sessionTitle({ title: '', last_message: turn.prompt }) : 'DeepTutor chat';
+  const leave = () => router.replace('/learn');
+  const pinned = detail.data ? isPinned(detail.data) : false;
 
   const openOnWeb = () => router.push({ pathname: '/learn/web', params: { path: `/chat/${encodeURIComponent(id)}` } });
   // Replies get handlers that stay the same between frames (the latest version runs when tapped).
@@ -286,29 +247,25 @@ export default function DeepTutorChat() {
       ? [{ key: 'ask', label: attaching ? 'Attaching…' : 'Ask About It in Open WebUI', icon: 'chat-bubble-left' as const, onPress: () => void askInOpenWebUI() }]
       : []),
     { key: 'find', label: 'Find in Chat', icon: 'magnifying-glass', onPress: () => setFinding(true) },
-    { key: 'rename', label: 'Rename Chat', icon: 'pencil', onPress: rename },
+    { key: 'rename', label: 'Rename Chat', icon: 'pencil', onPress: () => chatActions.rename(id, detail.data ? sessionTitle(detail.data) : '') },
+    ...(detail.data
+      ? [
+          {
+            key: 'pin',
+            label: pinned ? 'Unpin Chat' : 'Pin Chat',
+            icon: pinned ? ('bookmark-slash' as const) : ('bookmark' as const),
+            onPress: () => chatActions.setPinned(id, !pinned),
+          },
+          { key: 'archive', label: 'Archive Chat', icon: 'archive-box' as const, onPress: () => chatActions.setArchived(id, true, leave) },
+        ]
+      : []),
     { key: 'web', label: 'Open in DeepTutor Web App', icon: 'arrow-top-right-on-square', onPress: openOnWeb },
-    { key: 'delete', label: 'Delete Chat', icon: 'trash', destructive: true, onPress: confirmDelete },
+    { key: 'delete', label: 'Delete Chat', icon: 'trash', destructive: true, onPress: () => chatActions.remove(id, leave) },
   ];
 
   return (
     <View style={styles.screen}>
-      <SpaceHeader
-        leading={
-          <>
-            <IconButton icon="chevron-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/learn'))} />
-            <SwitchToOpenWebUIButton />
-          </>
-        }
-        title={detail.data ? sessionTitle(detail.data) : turn?.prompt ? sessionTitle({ title: '', last_message: turn.prompt }) : 'DeepTutor chat'}
-        subtitle={[sessionDate(detail.data?.updated_at ?? detail.data?.created_at), native ? null : capabilityName(capability)].filter(Boolean).join(' · ')}
-        trailing={
-          <>
-            <IconButton icon="pencil-square" label="New chat" onPress={() => router.push('/learn/new')} />
-            <MenuButton label="Chat options" items={menu} />
-          </>
-        }
-      />
+      <DtHeader title={title} menu={menu} />
       <KeyboardAvoidingView behavior="padding" style={styles.body}>
         {detail.isLoading && !turn ? (
           <ActivityIndicator style={styles.loading} color={palette.textMuted} />

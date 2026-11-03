@@ -1,5 +1,5 @@
 import { sameSelection, sessionTitle, type DtChatTool, type DtKnowledgeBase, type DtLlmOption, type DtLlmSelection } from '@maviechat/deeptutor-protocol';
-import { useState, type ReactNode } from 'react';
+import { useImperativeHandle, useRef, useState, type ComponentRef, type ReactNode, type Ref } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
@@ -34,7 +34,12 @@ export function toolIcon(name: string): IconName {
   return TOOL_INFO[name]?.icon ?? 'wrench-screwdriver';
 }
 
+export interface DtComposerHandle {
+  focus: () => void;
+}
+
 interface DtComposerProps {
+  ref?: Ref<DtComposerHandle>;
   /** Which chat's draft this is (`dt:new` on the new-chat screen). */
   draftKey: string;
   running: boolean;
@@ -61,6 +66,8 @@ interface DtComposerProps {
   sessionId?: string;
   placeholder?: string;
   autoFocus?: boolean;
+  /** In the middle of the home screen rather than at the bottom (no room kept for the home indicator). */
+  floating?: boolean;
 }
 
 const PLACEHOLDERS: Record<string, string> = {
@@ -76,6 +83,7 @@ const PLACEHOLDERS: Record<string, string> = {
  * and model, and send or stop. The text is kept per chat while the app runs.
  */
 export function DtComposer({
+  ref,
   draftKey,
   running,
   onSend,
@@ -97,9 +105,12 @@ export function DtComposer({
   sessionId,
   placeholder,
   autoFocus = false,
+  floating = false,
 }: DtComposerProps) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
+  const input = useRef<ComponentRef<typeof TextInput>>(null);
+  useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }), []);
   const text = useDraftText(draftKey);
   const [sending, setSending] = useState(false);
   const [sheet, setSheet] = useState<'mode' | 'tools' | 'model' | 'notebook' | 'chat' | 'knowledge' | null>(null);
@@ -169,10 +180,11 @@ export function DtComposer({
   };
 
   return (
-    <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+    <View style={[styles.wrap, !floating && { paddingBottom: Math.max(insets.bottom, 8) }]}>
       <View style={[styles.box, { borderColor: palette.border, backgroundColor: palette.background }]}>
         <DtExtrasStrip chips={chips} />
         <TextInput
+          ref={input}
           value={text}
           onChangeText={(value) => updateDraft(draftKey, (draft) => ({ ...draft, text: value }))}
           placeholder={placeholder ?? PLACEHOLDERS[mode] ?? 'Ask DeepTutor anything'}

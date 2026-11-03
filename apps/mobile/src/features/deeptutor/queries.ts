@@ -2,6 +2,10 @@ import {
   DEFAULT_ATTACHMENT_LIMITS,
   getAttachmentLimits,
   getLlmOptions,
+  getProfile,
+  getSuggestions,
+  getUiSettings,
+  getServerVersion,
   getSession,
   listChatTools,
   listKnowledgeBases,
@@ -73,6 +77,38 @@ export function useDtAttachmentLimits() {
     staleTime: 10 * 60_000,
     placeholderData: DEFAULT_ATTACHMENT_LIMITS,
   });
+}
+
+/** Who you are on DeepTutor (role, learner or not, whether you can change your password). */
+export function useDtProfile() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'profile'], queryFn: () => getProfile(client), staleTime: 5 * 60_000 });
+}
+
+/** The account's DeepTutor languages (its own interface, and replies). */
+export function useDtUiSettings() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'ui-settings'], queryFn: () => getUiSettings(client), staleTime: 60_000 });
+}
+
+/**
+ * DeepTutor's ideas for the home screen. While it writes a fresh set ("stale"), it's asked
+ * again every few seconds, a few times, as its web app does.
+ */
+export function useDtSuggestions() {
+  const { client, session } = useDtAuthed();
+  return useQuery({
+    queryKey: [DT_QUERY_ROOT, session.baseUrl, 'suggestions'],
+    queryFn: () => getSuggestions(client),
+    staleTime: 5 * 60_000,
+    refetchInterval: (query) => (query.state.data?.stale && query.state.dataUpdateCount < 10 ? 3500 : false),
+  });
+}
+
+/** The DeepTutor version the server runs (null when it doesn't say). */
+export function useDtServerVersion() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'version'], queryFn: () => getServerVersion(client), staleTime: 5 * 60_000 });
 }
 
 /** A session time (Unix seconds or milliseconds, or ISO text) as a short date. */

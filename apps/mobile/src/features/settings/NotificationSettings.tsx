@@ -5,15 +5,17 @@ import { deliveryProblem } from '@/features/notifications/iosDelivery';
 import { disablePush, enablePush, sendTestPush, usePushState } from '@/features/notifications/push';
 import { describePushError } from '@/features/notifications/relay';
 import { watchForTest, type TestWatch } from '@/features/notifications/testWatch';
-import { useAuthed } from '@/lib/server';
+import { useSession } from '@/session/SessionProvider';
 import { fonts, radius, usePalette } from '@/theme';
 
 type TestState = { step: 'waiting' } | { step: 'arrived'; at: Date } | { step: 'missing' } | { step: 'failed'; message: string };
 
-/** Notifications for finished replies (this iPhone only). */
+/** Notifications for finished replies (this iPhone only), in either space's Settings. Open WebUI may not be signed in. */
 export function NotificationSettings() {
   const palette = usePalette();
-  const { client, session } = useAuthed();
+  const owui = useSession();
+  const session = owui.state.status === 'signed-in' ? owui.state.session : null;
+  const account = session && owui.client ? { client: owui.client, session } : null;
   const push = usePushState();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export function NotificationSettings() {
     setProblem(null);
     setTestState(null);
     try {
-      if (on) setBlocked((await enablePush(client, session, { ask: true })) === 'blocked');
+      if (on) setBlocked((await enablePush(account, { ask: true })) === 'blocked');
       else await disablePush(session);
     } catch (error) {
       setProblem(describePushError(error));
@@ -56,6 +58,7 @@ export function NotificationSettings() {
 
   // Settings covers the app's toasts, so the result shows here.
   const test = async () => {
+    if (!session) return;
     watch.current?.stop();
     const current = watchForTest();
     watch.current = current;
@@ -73,8 +76,8 @@ export function NotificationSettings() {
   };
 
   const enabled = push?.enabled ?? false;
-  // The relay hears about replies only once an admin adds its webhook in Open WebUI.
-  const waitingForServer = enabled && push?.lastEventAt === null;
+  // The relay hears about Open WebUI's replies only once an admin adds its webhook there.
+  const waitingForServer = enabled && session !== null && push?.lastEventAt === null;
   const testNote = testState ? describeTest(testState) : null;
   const testColor =
     testState?.step === 'arrived' ? palette.success : testState?.step === 'missing' || testState?.step === 'failed' ? palette.danger : palette.textMuted;
@@ -91,7 +94,8 @@ export function NotificationSettings() {
             <Switch accessibilityLabel="Notify me when a reply finishes" value={enabled} onValueChange={(on) => void turn(on)} />
           )}
         </View>
-        {enabled ? (
+        {/* The test goes through the relay, which knows this phone by its Open WebUI account. */}
+        {enabled && session ? (
           <Pressable
             accessibilityRole="button"
             onPress={() => void test()}
@@ -123,7 +127,7 @@ export function NotificationSettings() {
         </Text>
       ) : null}
       <Text style={[styles.note, { color: palette.textFaint }]}>
-        {"When a reply finishes or fails, Open WebUI tells MavieChat's notification service, which notifies this iPhone with the chat title and the start of the reply. While MavieChat is open, every chat gets a banner except the one on screen."}
+        {"When a reply finishes or fails, MavieChat's notification service notifies this iPhone with the chat title and the start of the reply. Open WebUI tells it about every reply; DeepTutor's replies are handed to it as they start. While MavieChat is open, every chat gets a banner except the one on screen."}
       </Text>
     </View>
   );
