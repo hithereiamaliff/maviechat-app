@@ -18,6 +18,10 @@ export interface DtNotebook {
   description?: string;
   created_at?: number;
   updated_at?: number;
+  /** In the list (which leaves the records out). */
+  record_count?: number;
+  /** A notebook whose file DeepTutor can't read is listed with this set, not dropped. */
+  unreadable?: boolean;
   records?: DtRecord[];
   [key: string]: unknown;
 }
@@ -74,4 +78,24 @@ export async function addChatRecord(client: DtClient, input: ChatRecordInput): P
     metadata: input.metadata ?? {},
   });
   return response.record;
+}
+
+/** Renames a notebook or changes its description. */
+export async function updateNotebook(client: DtClient, id: string, change: { name?: string; description?: string }): Promise<void> {
+  await client.send('PUT', `/api/notebooks/${encodeURIComponent(id)}`, { body: change });
+}
+
+/** Changes a record's title or summary (DeepTutor keeps the fields not sent). */
+export async function updateRecord(client: DtClient, notebookId: string, recordId: string, change: { title?: string; summary?: string }): Promise<void> {
+  await client.send('PUT', `/api/notebooks/${encodeURIComponent(notebookId)}/records/${encodeURIComponent(recordId)}`, { body: change });
+}
+
+export async function deleteRecord(client: DtClient, notebookId: string, recordId: string): Promise<void> {
+  await client.delete(`/api/notebooks/${encodeURIComponent(notebookId)}/records/${encodeURIComponent(recordId)}`);
+}
+
+/** The whole notebook as Markdown, as DeepTutor exports it. */
+export async function exportNotebook(client: DtClient, id: string): Promise<string> {
+  const text = await client.get<unknown>(`/api/notebooks/${encodeURIComponent(id)}/export`);
+  return typeof text === 'string' ? text : '';
 }

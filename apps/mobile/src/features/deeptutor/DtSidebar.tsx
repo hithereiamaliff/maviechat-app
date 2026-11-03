@@ -20,7 +20,7 @@ import { useDtChatActions } from './useDtChatActions';
 import { useDtSignOut } from './useDtSignOut';
 
 const PAGE_SIZE = 100;
-const NOT_CHATS = new Set(['web', 'settings', 'connection', 'practice', 'questions']);
+const NOT_CHATS = new Set(['web', 'settings', 'connection', 'practice', 'questions', 'favorites', 'journal', 'history']);
 
 /**
  * DeepTutor's sidebar, laid out like Open WebUI's (new chat, search, you at the bottom) and

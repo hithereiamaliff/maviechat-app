@@ -12,7 +12,7 @@ import { isNativeCapability, modeInfo } from '@/features/deeptutor/chat/capabili
 import { DtComposer, type DtComposerHandle } from '@/features/deeptutor/chat/DtComposer';
 import { useDtLive } from '@/features/deeptutor/chat/DtLiveProvider';
 import { DtUserBubble } from '@/features/deeptutor/chat/DtReplyView';
-import { extrasRequest, promptExtras, type DtExtras } from '@/features/deeptutor/chat/extras';
+import { DT_NEW_CHAT, extrasRequest, promptExtras, type DtExtras } from '@/features/deeptutor/chat/extras';
 import type { PromptExtras } from '@/features/deeptutor/chat/liveTurns';
 import { useDtChoice } from '@/features/deeptutor/chat/useDtChoice';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
@@ -20,8 +20,6 @@ import { useDtSuggestions } from '@/features/deeptutor/queries';
 import { describeError } from '@/lib/errors';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 import { fonts, radius, usePalette } from '@/theme';
-
-const DT_NEW_CHAT = 'dt:new';
 
 /** Our own greeting for the time of day. */
 function greetingFor(name: string, now: Date): string {

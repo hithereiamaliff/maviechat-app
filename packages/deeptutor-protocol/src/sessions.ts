@@ -184,3 +184,19 @@ export function messageReferences(message: DtMessage): DtMessageReferences {
   });
   return { notebooks, chats: texts(snapshot.historyReferences), knowledgeBases: texts(snapshot.knowledgeBases) };
 }
+
+/**
+ * The text around the first match, for a search result: `match_excerpt` (DeepTutor's window of
+ * the best matching message, from `GET /api/sessions/search`), cut to about `radius` characters
+ * each side of the words searched for.
+ */
+export function searchSnippet(session: DtSessionSummary, query: string, radius = 80): string {
+  const raw = typeof session.match_excerpt === 'string' ? session.match_excerpt : typeof session.match_content === 'string' ? session.match_content : '';
+  const content = raw.replace(/\s+/g, ' ').trim();
+  if (!content) return '';
+  const at = query.trim() ? content.toLowerCase().indexOf(query.trim().toLowerCase()) : -1;
+  if (at < 0) return content.length > radius * 2 ? `${content.slice(0, radius * 2)}…` : content;
+  const start = Math.max(0, at - radius);
+  const end = Math.min(content.length, at + query.trim().length + radius);
+  return `${start > 0 ? '…' : ''}${content.slice(start, end)}${end < content.length ? '…' : ''}`;
+}

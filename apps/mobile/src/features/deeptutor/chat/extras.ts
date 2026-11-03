@@ -19,6 +19,17 @@ export function clearExtras(draftKey: string): void {
   setStoredState(key(draftKey), NO_EXTRAS);
 }
 
+/** The new-chat screen's draft (DeepTutor's home). */
+export const DT_NEW_CHAT = 'dt:new';
+
+/** Starts a new chat that refers to a notebook or an earlier chat: home, with it already on the message. */
+export function startChatWith(reference: { notebook: { id: string; name: string } } | { chat: { id: string; title: string } }): void {
+  setStoredState(key(DT_NEW_CHAT), {
+    ...NO_EXTRAS,
+    ...('notebook' in reference ? { notebooks: [reference.notebook] } : { chats: [reference.chat] }),
+  });
+}
+
 const megabytes = (bytes: number) => `${Math.round(bytes / (1024 * 1024))} MB`;
 
 /** Photos, the camera and files for a chat's next message, within DeepTutor's size limits. */

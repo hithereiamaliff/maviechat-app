@@ -225,6 +225,36 @@ The owner asked for DeepTutor's quizzes to be native beyond the chat's Quiz mode
   - An old `version` gets 409.
   - A wrong objective answer rated anything but `again` gets 422.
 
+## Favorites, Learning Journal and Chat History (B2, 2026-11-03)
+
+Three more of DeepTutor's pages are native, all on the Resources shelf.
+
+- **Favorites** (DeepTutor's notebooks):
+  - The list: name, description, item count, date. **+** makes a notebook. Each one's menu: Chat About It, Rename, Delete.
+  - A notebook shows what's saved in it; each item opens in full (question and answer, as Markdown) with Copy, Rename and Remove.
+  - The notebook menu: Chat About It, Share as Markdown, Rename, Delete Notebook.
+  - **Chat About It** opens the home page with the notebook already referenced on the message.
+- **Learning Journal**, read-only: your goal (topic, why, level), where the last session left off and what's next, and what you have learned. DeepTutor writes it itself through its `learning_update` tool.
+- **Chat History:**
+  - Every chat, learning and side chats included.
+  - Search runs on the server, over titles and message text, and each result shows the words that matched.
+  - Filters as on DeepTutor's page: Active, Archived, or both; All, Main Chats or Tutor Threads.
+  - Each chat's menu: Use in a New Chat (an earlier-chat reference), Archive or Restore, Delete.
+  - Learning chats open in their activity.
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --library`)
+
+- **Notebooks:**
+  - `GET /api/notebooks` → `{notebooks, total}`, each with `record_count` (and `unreadable` for a damaged file);
+  - `GET /api/notebooks/{id}` → with `records` (`id, type, title, summary, user_query, output, metadata, created_at`);
+  - `PUT /api/notebooks/{id}` (`name`, `description`, `color`, `icon`);
+  - `PUT /api/notebooks/{id}/records/{rid}` sends only the fields given;
+  - `DELETE` both;
+  - `GET /api/notebooks/{id}/export` → Markdown text.
+- **Journal:** `GET /api/learning-journal` → `mission {topic, why, level}`, `last_session {summary, next_focus}`, `records [{id, title, insight, created_at}]` (newest first), plus the slice DeepTutor feeds into each turn (`injected_context`).
+- **Search:** `GET /api/sessions/search` answers with `match_excerpt` (a window around the first match in the best message), `match_role`, `match_message_id`, `last_message`, `capability`, `message_count` and `preferences`. It drops `match_content`.
+- **Side chats** ("tutor threads") have `preferences.session_kind: "selection_tutor"` and a `parent_session_id`.
+
 ## M1.5 checklist
 
 | | Item |

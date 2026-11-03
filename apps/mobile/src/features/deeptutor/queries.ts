@@ -1,7 +1,9 @@
 import {
   DEFAULT_ATTACHMENT_LIMITS,
   getAttachmentLimits,
+  getLearningJournal,
   getLlmOptions,
+  getNotebook,
   getPracticeSummary,
   getProfile,
   getQuestionBankStats,
@@ -69,6 +71,18 @@ export function useDtKnowledgeBases() {
 export function useDtNotebooks(enabled = true) {
   const { client, session } = useDtAuthed();
   return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'notebooks'], queryFn: () => listNotebooks(client), enabled, staleTime: 60_000 });
+}
+
+/** One notebook with its records. */
+export function useDtNotebook(id: string) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'notebooks', id], queryFn: () => getNotebook(client, id), enabled: Boolean(id) });
+}
+
+/** What DeepTutor keeps about your learning between chats. */
+export function useDtLearningJournal() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'learning-journal'], queryFn: () => getLearningJournal(client) });
 }
 
 /** How large attachments may be (DeepTutor's defaults until the server answers). */

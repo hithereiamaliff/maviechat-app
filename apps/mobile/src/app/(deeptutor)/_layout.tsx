@@ -36,6 +36,7 @@ export default function DeepTutorLayout() {
             contentStyle: { backgroundColor: palette.background },
           }}>
           <Stack.Screen name="learn/connection" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+          <Stack.Screen name="learn/notebook/[id]" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="learn/settings" options={{ presentation: 'modal', animation: 'slide_from_bottom', gestureEnabled: true }} />
         </Stack>
       </SpaceDrawer>

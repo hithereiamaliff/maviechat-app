@@ -16,6 +16,9 @@
  * saves the answer as wrong, and walks DeepTutor's practice loop with it: question bank, summary
  * (a wrong answer is due the next day), checking, reviewing (a wrong answer must be "again", a retried review is answered the
  * same, an old version is refused), bookmarking; then deletes the question and the chat.
+ * `--library` checks Favorites, the Learning Journal and Chat History: a throwaway notebook and
+ * record (rename, edit, export, remove), the journal's shape, and a one-line chat found by a
+ * made-up word with that word in its snippet, archived and restored; everything is deleted.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -29,6 +32,12 @@ import {
   applyTurnEvent,
   changePassword,
   checkPracticeAnswer,
+  deleteRecord,
+  exportNotebook,
+  getLearningJournal,
+  searchSnippet,
+  updateNotebook,
+  updateRecord,
   deleteSavedQuestion,
   DtHttpError,
   getPracticeQuestion,
@@ -92,6 +101,7 @@ const { values: args } = parseArgs({
     refs: { type: 'boolean' },
     space: { type: 'boolean' },
     practice: { type: 'boolean' },
+    library: { type: 'boolean' },
   },
 });
 
@@ -258,6 +268,14 @@ async function main() {
     await step('practice: quiz result saved, bank, summary, queue, check, review, bookmark', async () => {
       const outcome = await probePractice(baseUrl, session.token as string, client);
       fixtures.practice = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.library) {
+    await step('library: Favorites notebook and record, Learning Journal, Chat History search', async () => {
+      const outcome = await probeLibrary(baseUrl, session.token as string, client);
+      fixtures.library = outcome.fixture;
       return { value: true, note: outcome.note };
     });
   }
@@ -673,6 +691,77 @@ async function probePractice(baseUrl: string, token: string, client: DtClient): 
     connection.close();
     if (entryId !== null) await deleteSavedQuestion(client, entryId).catch(() => undefined);
     if (sessionId) await deleteSession(client, sessionId).catch(() => undefined);
+  }
+}
+
+/** Favorites, the Learning Journal and Chat History on the test account; what it makes is deleted. */
+async function probeLibrary(baseUrl: string, token: string, client: DtClient): Promise<{ note: string; fixture: Record<string, unknown> }> {
+  const notebook = await createNotebook(client, `${PROBE_PREFIX} favorites`, 'Written and deleted by the MavieChat probe');
+  let sessionId: string | null = null;
+  const connection = new DtTurnConnection({
+    url: turnSocketUrl(baseUrl),
+    connect: (url, handlers) => {
+      const socket = new NodeWebSocket(url, { headers: { Cookie: socketCookieHeader(token) } });
+      socket.onopen = () => handlers.onOpen();
+      socket.onmessage = (event) => handlers.onMessage(event.data);
+      socket.onclose = (event) => handlers.onClose(event.code);
+      return { send: (data) => socket.send(data), close: () => socket.close() };
+    },
+    onEvent: (event) => {
+      if (event.type === 'done') finished();
+    },
+  });
+  let finished: () => void = () => undefined;
+  try {
+    const record = await addChatRecord(client, {
+      notebookIds: [notebook.id],
+      title: `${PROBE_PREFIX} record`,
+      summary: 'A clip for the probe.',
+      userQuery: 'What is the capital of Atlantis?',
+      output: 'The capital of Atlantis is **Coralia**.',
+      metadata: { source: 'maviechat-probe' },
+    });
+    await updateRecord(client, notebook.id, record.id, { title: `${PROBE_PREFIX} renamed` });
+    await updateNotebook(client, notebook.id, { name: `${PROBE_PREFIX} favorites (renamed)` });
+    const read = await getNotebook(client, notebook.id);
+    if (read.name !== `${PROBE_PREFIX} favorites (renamed)`) throw new Error('the notebook rename did not stick');
+    const saved = read.records?.find((item) => item.id === record.id);
+    if (saved?.title !== `${PROBE_PREFIX} renamed` || !saved.output.includes('Coralia')) throw new Error('the record edit did not read back');
+    const listed = (await listNotebooks(client)).find((item) => item.id === notebook.id);
+    if (listed?.record_count !== 1) throw new Error(`the notebook list counts ${String(listed?.record_count)} records`);
+    const markdown = await exportNotebook(client, notebook.id);
+    if (!markdown.includes('renamed')) throw new Error('the export lacks the record');
+    await deleteRecord(client, notebook.id, record.id);
+    if ((await getNotebook(client, notebook.id)).records?.length) throw new Error('the record was not removed');
+
+    const journal = await getLearningJournal(client);
+
+    const word = `zq${randomId().slice(0, 8)}`;
+    const done = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('no done event within 3 minutes')), 180_000);
+      finished = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+    });
+    sessionId = (await connection.startTurn({ content: `${PROBE_PREFIX} The code word is ${word}. Just say OK.`, tools: [] })).sessionId;
+    await done;
+    const hit = (await searchSessions(client, word, { limit: 20 })).sessions.find((item) => item.id === sessionId);
+    if (!hit) throw new Error('search did not find the chat by its word');
+    if (!searchSnippet(hit, word).includes(word)) throw new Error('the search snippet lacks the word');
+    await organizeSession(client, sessionId, { archived: true });
+    const archived = (await listSessions(client, { limit: 50 })).find((item) => item.id === sessionId);
+    if (!archived || !isArchived(archived)) throw new Error('the archived chat is not marked archived in the full list');
+    await organizeSession(client, sessionId, { archived: false });
+
+    return {
+      note: `notebook renamed, record edited, exported (${markdown.length} chars) and removed; journal read (${journal.records.length} records); chat found by its word with a snippet, archived and restored; all deleted`,
+      fixture: { notebook: shapeOf(read), journal: shapeOf(journal), search: shapeOf(hit) },
+    };
+  } finally {
+    connection.close();
+    if (sessionId) await deleteSession(client, sessionId).catch(() => undefined);
+    await deleteNotebook(client, notebook.id).catch(() => undefined);
   }
 }
 

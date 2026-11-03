@@ -1,0 +1,86 @@
+{
+  "notebook": {
+    "color": "string",
+    "created_at": "number",
+    "description": "string",
+    "icon": "string",
+    "id": "string",
+    "name": "string",
+    "records": [
+      {
+        "created_at": "number",
+        "id": "string",
+        "kb_name": "null",
+        "metadata": {
+          "source": "string"
+        },
+        "output": "string",
+        "summary": "string",
+        "title": "string",
+        "type": "string",
+        "user_query": "string"
+      }
+    ],
+    "updated_at": "number"
+  },
+  "journal": {
+    "last_session": {
+      "next_focus": "string",
+      "summary": "string",
+      "updated_at": "string"
+    },
+    "mission": {
+      "level": "string",
+      "topic": "string",
+      "updated_at": "string",
+      "why": "string"
+    },
+    "records": [],
+    "updated_at": "string"
+  },
+  "search": {
+    "active_turn_id": "string",
+    "capability": "string",
+    "compressed_summary": "string",
+    "content_workspace_id": "string",
+    "created_at": "number",
+    "id": "string",
+    "last_message": "string",
+    "match_created_at": "number",
+    "match_excerpt": "string",
+    "match_message_id": "number",
+    "match_role": "string",
+    "message_count": "number",
+    "preferences": {
+      "answer_by": "string",
+      "book_references": [],
+      "capability": "string",
+      "history_references": [],
+      "knowledge_bases": [],
+      "language": "string",
+      "llm_selection": {
+        "model_id": "string",
+        "profile_id": "string"
+      },
+      "notebook_references": [],
+      "partner_group_references": [],
+      "question_notebook_references": [],
+      "reading_references": [],
+      "tools": [],
+      "workspace_dependencies": {
+        "book_references": [],
+        "history_references": [],
+        "knowledge_bases": [],
+        "notebook_references": [],
+        "question_notebook_references": [],
+        "reading_references": []
+      },
+      "workspace_id": "string"
+    },
+    "session_id": "string",
+    "status": "string",
+    "summary_up_to_msg_id": "number",
+    "title": "string",
+    "updated_at": "number"
+  }
+}
