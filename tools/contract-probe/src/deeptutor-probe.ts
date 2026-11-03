@@ -19,6 +19,10 @@
  * `--library` checks Favorites, the Learning Journal and Chat History: a throwaway notebook and
  * record (rename, edit, export, remove), the journal's shape, and a one-line chat found by a
  * made-up word with that word in its snippet, archived and restored; everything is deleted.
+ * `--knowledge` checks the Knowledge Center: a throwaway knowledge base made from a one-page PDF
+ * (PageIndex OSS, Flash), followed to ready; a chat turn that picks it must find the PDF's word;
+ * a second PDF added and removed, a re-index, Make Default (the old default is put back), then
+ * the knowledge base and the chat are deleted. Uses the account's model for a minute or two.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -60,6 +64,19 @@ import {
   updateUiSettings,
   createNotebook,
   deleteNotebook,
+  createKnowledgeBase,
+  deleteKbFile,
+  deleteKnowledgeBase,
+  getKbProgress,
+  getKnowledgeBase,
+  listKbFiles,
+  listKnowledgeCenter,
+  listRagProviders,
+  ragPreflight,
+  reindexKnowledgeBase,
+  setDefaultKnowledgeBase,
+  uploadKbFiles,
+  type DtKnowledgeBaseInfo,
   deleteSession,
   DtClient,
   messageAttachments,
@@ -102,6 +119,7 @@ const { values: args } = parseArgs({
     space: { type: 'boolean' },
     practice: { type: 'boolean' },
     library: { type: 'boolean' },
+    knowledge: { type: 'boolean' },
   },
 });
 
@@ -276,6 +294,14 @@ async function main() {
     await step('library: Favorites notebook and record, Learning Journal, Chat History search', async () => {
       const outcome = await probeLibrary(baseUrl, session.token as string, client);
       fixtures.library = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.knowledge) {
+    await step('knowledge: create from a PDF, index, chat finds it, add and remove a file, re-index, default, delete', async () => {
+      const outcome = await probeKnowledge(baseUrl, session.token as string, client);
+      fixtures.knowledge = outcome.fixture;
       return { value: true, note: outcome.note };
     });
   }
@@ -762,6 +788,132 @@ async function probeLibrary(baseUrl: string, token: string, client: DtClient): P
     connection.close();
     if (sessionId) await deleteSession(client, sessionId).catch(() => undefined);
     await deleteNotebook(client, notebook.id).catch(() => undefined);
+  }
+}
+
+/** A one-page PDF holding one line of text, made here so the probe needs no file. */
+function onePagePdf(line: string): File {
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 144] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+  ];
+  const content = `BT /F1 12 Tf 20 100 Td (${line}) Tj ET`;
+  objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  let pdf = '%PDF-1.4\n';
+  const offsets: number[] = [];
+  objects.forEach((object, index) => {
+    offsets.push(pdf.length);
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = pdf.length;
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('')}`;
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return new File([pdf], 'probe.pdf', { type: 'application/pdf' });
+}
+
+const INDEXING_STAGES = new Set(['initializing', 'processing_documents', 'processing_file']);
+
+/** Polls until DeepTutor has indexed the knowledge base and `until` holds; notes the stages it passed. */
+async function indexed(client: DtClient, name: string, stages: Set<string>, until: (info: DtKnowledgeBaseInfo, sawBusy: boolean) => boolean = () => true) {
+  const deadline = Date.now() + 240_000;
+  let sawBusy = false;
+  for (;;) {
+    const progress = await getKbProgress(client, name);
+    if (progress) stages.add(progress.stage);
+    const info = await getKnowledgeBase(client, name);
+    const busy = info.status !== 'ready' || (progress !== null && INDEXING_STAGES.has(progress.stage));
+    sawBusy ||= busy;
+    if (/^(error|failed)$/.test(info.status) || progress?.stage === 'error') throw new Error(`indexing failed (${progress?.message || info.status})`);
+    if (!busy && until(info, sawBusy)) return info;
+    if (Date.now() > deadline) throw new Error(`still ${info.status} after 4 minutes`);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+}
+
+/** The Knowledge Center on one throwaway knowledge base; it and the chat that used it are deleted. */
+async function probeKnowledge(baseUrl: string, token: string, client: DtClient): Promise<{ note: string; fixture: Record<string, unknown> }> {
+  const providers = await listRagProviders(client);
+  if (!providers.some((provider) => provider.id === 'pageindex-oss' && provider.configured)) throw new Error('PageIndex OSS is not offered on this server');
+  const preflight = await ragPreflight(client, 'pageindex-oss');
+  if (!preflight.ok) throw new Error(`PageIndex OSS is not ready: ${preflight.missing.join('; ')}`);
+  const before = await listKnowledgeCenter(client);
+  const previousDefault = before.find((kb) => kb.isDefault)?.name ?? null;
+  // Colons aren't allowed in names, so not the usual "APP PROBE:" prefix.
+  const name = `app-probe-kb-${randomId().slice(0, 8)}`;
+  const word = 'papaya';
+  const stages = new Set<string>();
+  let sessionId: string | null = null;
+  let reply: DtReply = emptyReply();
+  let finished: () => void = () => undefined;
+  const connection = new DtTurnConnection({
+    url: turnSocketUrl(baseUrl),
+    connect: (url, handlers) => {
+      const socket = new NodeWebSocket(url, { headers: { Cookie: socketCookieHeader(token) } });
+      socket.onopen = () => handlers.onOpen();
+      socket.onmessage = (event) => handlers.onMessage(event.data);
+      socket.onclose = (event) => handlers.onClose(event.code);
+      return { send: (data) => socket.send(data), close: () => socket.close() };
+    },
+    onEvent: (event) => {
+      reply = applyTurnEvent(reply, event);
+      if (event.type === 'done') finished();
+    },
+  });
+  let created = false;
+  try {
+    const started = Date.now();
+    await createKnowledgeBase(client, { name, provider: 'pageindex-oss', pageindexMode: 'flash', files: [onePagePdf(`The secret probe word is ${word}.`)] });
+    created = true;
+    const ready = await indexed(client, name, stages);
+    const seconds = Math.round((Date.now() - started) / 1000);
+    const listed = (await listKnowledgeCenter(client)).find((kb) => kb.name === name);
+    if (!listed || listed.provider !== 'pageindex-oss' || listed.documents !== 1) throw new Error(`the list shows ${JSON.stringify(listed && { provider: listed.provider, documents: listed.documents })}`);
+    const files = await listKbFiles(client, name);
+    if (files.map((file) => file.name).join() !== 'probe.pdf') throw new Error(`the files are ${files.length}, not probe.pdf`);
+
+    const done = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('no done event within 3 minutes')), 180_000);
+      finished = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+    });
+    sessionId = (
+      await connection.startTurn({ content: `${PROBE_PREFIX} What is the secret probe word in my knowledge base? Answer with that one word.`, tools: [], knowledgeBases: [name] })
+    ).sessionId;
+    await done;
+    if (reply.status !== 'completed') throw new Error(`the turn ended ${reply.status}`);
+    if (!reply.answer.toLowerCase().includes(word)) throw new Error("the reply did not find the knowledge base's word");
+
+    const second = new File([await onePagePdf('The second probe word is mango.').arrayBuffer()], 'second.pdf', { type: 'application/pdf' });
+    await uploadKbFiles(client, name, [second]);
+    await indexed(client, name, stages, (info) => info.documents === 2);
+    const both = (await listKbFiles(client, name)).map((file) => file.name).sort();
+    if (both.join() !== 'probe.pdf,second.pdf') throw new Error(`after adding, the files are ${both.length}`);
+    const removal = await deleteKbFile(client, name, 'second.pdf');
+    const left = await listKbFiles(client, name);
+    if (left.length !== 1 || left[0]?.name !== 'probe.pdf') throw new Error('removing a file left the wrong files');
+
+    await reindexKnowledgeBase(client, name);
+    const reindexed = await indexed(client, name, stages, (info, sawBusy) => sawBusy || info.lastIndexedAt !== ready.lastIndexedAt);
+
+    await setDefaultKnowledgeBase(client, name);
+    if (!(await listKnowledgeCenter(client)).find((kb) => kb.name === name)?.isDefault) throw new Error('Make Default did not read back');
+    if (previousDefault) await setDefaultKnowledgeBase(client, previousDefault);
+
+    await deleteKnowledgeBase(client, name);
+    created = false;
+    if ((await listKnowledgeCenter(client)).some((kb) => kb.name === name)) throw new Error('the deleted knowledge base is still listed');
+
+    return {
+      note: `indexed in ${seconds}s (${[...stages].join(' → ')}); the chat found the PDF's word; a second PDF added and removed (still indexed: ${removal.wasIndexed}); re-indexed (${reindexed.documents} document); Make Default read back${previousDefault ? ' and the old default put back' : ''}; all deleted`,
+      fixture: { item: shapeOf(listed), files: shapeOf(files), providers: shapeOf(providers), stages: [...stages] },
+    };
+  } finally {
+    connection.close();
+    if (sessionId) await deleteSession(client, sessionId).catch(() => undefined);
+    if (created) await deleteKnowledgeBase(client, name).catch(() => undefined);
   }
 }
 

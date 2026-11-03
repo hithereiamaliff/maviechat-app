@@ -13,8 +13,11 @@ export interface DtClientOptions {
 
 export interface DtRequestOptions {
   query?: Record<string, QueryValue>;
+  /** JSON, or a `FormData` sent as multipart (uploads). */
   body?: unknown;
   signal?: AbortSignal;
+  /** Longer than the client's default for uploads. */
+  timeoutMs?: number;
 }
 
 /** DeepTutor answered with an error status. `detail` is its message when it sent one. */
@@ -102,8 +105,11 @@ export class DtClient {
   async send<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, options: DtRequestOptions = {}): Promise<{ data: T; headers: Headers }> {
     const headers: Record<string, string> = { Accept: 'application/json' };
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
-    let body: string | undefined;
-    if (options.body !== undefined) {
+    let body: string | FormData | undefined;
+    if (typeof FormData !== 'undefined' && options.body instanceof FormData) {
+      // fetch sets the multipart boundary itself.
+      body = options.body;
+    } else if (options.body !== undefined) {
       headers['Content-Type'] = 'application/json';
       body = JSON.stringify(options.body);
     }
@@ -113,7 +119,7 @@ export class DtClient {
     const timer = setTimeout(() => {
       timedOut = true;
       controller.abort();
-    }, this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+    }, options.timeoutMs ?? this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
     const forwardAbort = () => controller.abort();
     options.signal?.addEventListener('abort', forwardAbort);
 

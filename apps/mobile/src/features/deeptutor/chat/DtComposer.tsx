@@ -279,7 +279,7 @@ export function DtComposer({
         items={(notebooks.data ?? []).map((notebook) => ({ id: notebook.id, label: notebook.name, hint: notebook.description || undefined }))}
         selected={extras.notebooks.map((notebook) => notebook.id)}
         loading={notebooks.isLoading}
-        empty="No notebooks yet. Send an Open WebUI chat to DeepTutor, or make one in the DeepTutor web app."
+        empty="No notebooks yet. Make one in Favorites, or send an Open WebUI chat to DeepTutor."
         onToggle={(item) => setExtras({ ...extras, notebooks: toggle(extras.notebooks, { id: item.id, name: item.label }) })}
         onClose={() => setSheet(null)}
       />
@@ -301,7 +301,7 @@ export function DtComposer({
         items={(knowledgeBases ?? []).map((kb) => ({ id: kb.name, label: kb.name, hint: kb.status || undefined }))}
         selected={selectedKnowledgeBases}
         loading={knowledgeBases === undefined}
-        empty="No knowledge bases yet. Make one in the DeepTutor web app; it needs an embedding model in DeepTutor's settings."
+        empty="No knowledge bases yet. Make one in the Knowledge Center (Resources, in the sidebar)."
         onToggle={(item) =>
           onKnowledgeBasesChange(selectedKnowledgeBases.includes(item.id) ? selectedKnowledgeBases.filter((name) => name !== item.id) : [...selectedKnowledgeBases, item.id])
         }

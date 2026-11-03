@@ -1,6 +1,8 @@
 import {
   DEFAULT_ATTACHMENT_LIMITS,
   getAttachmentLimits,
+  getKbProgress,
+  getKnowledgeBase,
   getLearningJournal,
   getLlmOptions,
   getNotebook,
@@ -12,7 +14,10 @@ import {
   getServerVersion,
   getSession,
   listChatTools,
+  listKbFiles,
   listKnowledgeBases,
+  listKnowledgeCenter,
+  listRagProviders,
   listModes,
   listNotebooks,
   listQuestionCategories,
@@ -22,6 +27,7 @@ import {
 } from '@maviechat/deeptutor-protocol';
 import { useQuery } from '@tanstack/react-query';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
+import { kbBusy } from './knowledge/status';
 
 /** Recent sessions, or those matching `query` (title or message text). */
 export function useDtSessions(query: string) {
@@ -71,6 +77,42 @@ export function useDtKnowledgeBases() {
 export function useDtNotebooks(enabled = true) {
   const { client, session } = useDtAuthed();
   return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'notebooks'], queryFn: () => listNotebooks(client), enabled, staleTime: 60_000 });
+}
+
+/** The Knowledge Center's list; while one is indexing, it's read again every few seconds. */
+export function useDtKnowledgeCenter() {
+  const { client, session } = useDtAuthed();
+  return useQuery({
+    queryKey: [DT_QUERY_ROOT, session.baseUrl, 'knowledge-bases', 'center'],
+    queryFn: () => listKnowledgeCenter(client),
+    refetchInterval: (query) => (query.state.data?.some((kb) => kbBusy(kb.status)) ? 2500 : false),
+  });
+}
+
+/** One knowledge base, its documents and its indexing progress (read again while it indexes). */
+export function useDtKnowledgeBase(name: string) {
+  const { client, session } = useDtAuthed();
+  const info = useQuery({
+    queryKey: [DT_QUERY_ROOT, session.baseUrl, 'knowledge-bases', 'one', name],
+    queryFn: () => getKnowledgeBase(client, name),
+    enabled: Boolean(name),
+    refetchInterval: (query) => (query.state.data && kbBusy(query.state.data.status) ? 2500 : false),
+  });
+  const busy = info.data ? kbBusy(info.data.status) : false;
+  const files = useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'knowledge-bases', 'files', name], queryFn: () => listKbFiles(client, name), enabled: Boolean(name) });
+  const progress = useQuery({
+    queryKey: [DT_QUERY_ROOT, session.baseUrl, 'knowledge-bases', 'progress', name],
+    queryFn: () => getKbProgress(client, name),
+    enabled: Boolean(name) && busy,
+    refetchInterval: busy ? 2000 : false,
+  });
+  return { info, files, progress, busy };
+}
+
+/** The engines DeepTutor offers for a new knowledge base. */
+export function useDtRagProviders(enabled: boolean) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'rag-providers'], queryFn: () => listRagProviders(client), enabled, staleTime: 60_000 });
 }
 
 /** One notebook with its records. */

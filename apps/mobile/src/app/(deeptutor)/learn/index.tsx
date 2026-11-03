@@ -41,12 +41,16 @@ export default function DeepTutorHome() {
   const live = useDtLive();
   const choice = useDtChoice(null);
   const ideas = useDtSuggestions();
-  // `?mode=deep_question` (Practice's "Make a Quiz") opens with that mode picked.
-  const asked = useLocalSearchParams<{ mode?: string }>().mode;
-  const { setMode } = choice;
+  // `?mode=deep_question` (Practice's "Make a Quiz") opens with that mode picked;
+  // `?kb=` (the Knowledge Center's "Use in a New Chat") with that knowledge base picked.
+  const { mode: asked, kb: askedKb } = useLocalSearchParams<{ mode?: string; kb?: string }>();
+  const { setMode, setSelectedKnowledgeBases } = choice;
   useEffect(() => {
     if (typeof asked === 'string' && isNativeCapability(asked)) setMode(asked);
   }, [asked, setMode]);
+  useEffect(() => {
+    if (typeof askedKb === 'string' && askedKb) setSelectedKnowledgeBases([askedKb]);
+  }, [askedKb, setSelectedKnowledgeBases]);
   const composer = useRef<DtComposerHandle>(null);
   const [pending, setPending] = useState<{ text: string; extras?: PromptExtras } | null>(null);
   const [greeting] = useState(() => greetingFor(session.account.username, new Date()));

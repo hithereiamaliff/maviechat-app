@@ -7,7 +7,7 @@ export interface DtPage {
   icon: IconName;
   path: string;
   /** The app's own screen for it. */
-  route?: '/learn/practice' | '/learn/questions' | '/learn/favorites' | '/learn/journal' | '/learn/history';
+  route?: '/learn/practice' | '/learn/questions' | '/learn/favorites' | '/learn/journal' | '/learn/history' | '/learn/knowledge';
   /** Hidden from learner accounts, which DeepTutor limits to chat and some learning. */
   notForLearners?: boolean;
 }
@@ -68,7 +68,7 @@ export const DT_SHELVES: DtShelf[] = [
           { key: 'notebooks', label: 'Favorites', icon: 'bookmark', path: '/notebooks', route: '/learn/favorites' },
           { key: 'journal', label: 'Learning Journal', icon: 'book-open', path: '/space/journal', route: '/learn/journal' },
           { key: 'questions', label: 'Question Bank', icon: 'question-mark-circle', path: '/space/questions', route: '/learn/questions' },
-          { key: 'knowledge', label: 'Knowledge Center', icon: 'circle-stack', path: '/knowledge-bases' },
+          { key: 'knowledge', label: 'Knowledge Center', icon: 'circle-stack', path: '/knowledge-bases', route: '/learn/knowledge' },
         ],
       },
     ],

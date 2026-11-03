@@ -149,7 +149,7 @@ The composer's mode chip picks DeepTutor's mode for a turn, with its settings: Q
   - `history_references` is earlier session ids;
   - `knowledge_bases` is names, kept by the session like its tools.
   - The saved user message's `metadata.request_snapshot` records them (`notebookReferences`, `historyReferences`, `knowledgeBases`), and the app shows them as chips.
-- **Knowledge bases** are listed by `GET /api/knowledge-bases` (`name`, `status`, …). Building one needs an embedding model (not configured on our server yet); until then the list is empty.
+- **Knowledge bases** are listed by `GET /api/knowledge-bases` (`name`, `status`, …). The app's Knowledge Center makes them (see B3).
 - **Rename:** `PATCH /api/sessions/{id} {title}`.
 - **Find in Chat** searches the shown messages on the phone and scrolls to the one you tap.
 - `npm run probe:deeptutor -- --refs` checks all of it against the server (passes on 1.7.1).
@@ -258,6 +258,35 @@ Three more of DeepTutor's pages are native, all on the Resources shelf.
 - **Journal:** `GET /api/learning-journal` → `mission {topic, why, level}`, `last_session {summary, next_focus}`, `records [{id, title, insight, created_at}]` (newest first), plus the slice DeepTutor feeds into each turn (`injected_context`).
 - **Search:** `GET /api/sessions/search` answers with `match_excerpt` (a window around the first match in the best message), `match_role`, `match_message_id`, `last_message`, `capability`, `message_count` and `preferences`. It drops `match_content`.
 - **Side chats** ("tutor threads") have `preferences.session_kind: "selection_tutor"` and a `parent_session_id`.
+
+## Knowledge Center (B3, 2026-11-03)
+
+DeepTutor's knowledge bases are native, on the Resources shelf.
+
+- **The list:** each knowledge base with its status (Ready, Indexing and how far, Indexing failed, Needs re-indexing), documents, engine and a Default badge. It refreshes itself while one indexes. Each one's menu: Use in a New Chat, Make Default, Delete.
+- **+** opens New Knowledge Base:
+  - a name, checked against DeepTutor's rules as you type;
+  - an engine. Only engines the server has installed and that need no outside account are offered. Each is checked with DeepTutor's readiness check, and one that isn't ready shows what it lacks;
+  - for PageIndex, Flash (quicker) or Standard (more thorough);
+  - documents from Files, filtered to what the engine takes (PageIndex OSS: PDFs only).
+- **A knowledge base** shows its status, with a progress bar while it indexes and DeepTutor's message when it failed, then its documents. You can add documents or remove one. Its menu: Use in a New Chat, Add Documents, Re-index (Try Indexing Again after a failure), Make Default, More on the Web, Delete Knowledge Base. One connected to an outside source (a folder, Obsidian…) is read-only.
+- **Use in a New Chat** opens the home page with that knowledge base picked (`/learn?kb=`). The chat keeps it, like DeepTutor's composer.
+- **Our server:** PageIndex OSS works now; it uses the chat model and takes PDFs. LlamaIndex needs an embedding model, which an admin adds in DeepTutor's model settings; until then the app shows it as not ready, with DeepTutor's reason.
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --knowledge`)
+
+- **Create:** `POST /api/knowledge-bases` as multipart: `name`, `rag_provider`, `pageindex_mode` (`flash` or `standard`), `files` (any number, or none) → `{message, name, files, task_id, id}`. Indexing runs in the background.
+- **Names:** at most 120 characters, none of `< > : " / \ | ? * # %`, not `.` or `..`.
+- **State:** the list (and `GET /{kb}`) gives `status` (`initializing`, `processing`, `ready`, `error`, `needs_reindex`, `unavailable`), `statistics` (`raw_documents`, `rag_provider`, `needs_reindex`), `metadata` (`description`, `last_indexed_at`), `is_default`, `read_only`.
+- **Progress:** `GET /{kb}/progress` → `{stage, progress_percent, current, total, file_name, message}`. Stages: `initializing`, `processing_documents`, `processing_file`, `completed`, `error`; `not_started` when there is nothing to report. A one-page PDF indexes in about 2 seconds.
+- **Engines:** `GET /api/knowledge-bases/rag-providers` → `{providers[{id, name, description, configured, setup_required, requires_api_key}]}`. Readiness: `GET /api/knowledge-bases/rag-pipelines/{id}/preflight` → `{ok, checks[{label, detail, ok, optional}]}`.
+- **Documents:** `GET /{kb}/files` → `{files[{name, type, size, modified, mime_type}]}`. `POST /{kb}/upload` (multipart `files`) adds and indexes them; the status flips to `processing` before the call returns.
+- **Removing a document:** `DELETE /{kb}/files/{path}` → `{status, path, was_indexed}`. PageIndex drops it from its index too. Other engines keep finding its text until a re-index, so the app offers one.
+- **Re-index:** `POST /{kb}/reindex` (an empty form is enough); also how a failed one is tried again. Refused (409) while a run is going.
+- **Default:** `PUT /api/knowledge-bases/default/{kb}`. DeepTutor uses the default where a feature needs a knowledge base and none is picked. A default that was deleted is ignored.
+- **Delete:** `DELETE /{kb}`. Connected and legacy knowledge bases refuse file changes (409).
+- **Size:** DeepTutor takes up to 200 MB a file. Its web front end streams uploads to the backend, and our Traefik route sets no limit.
+- **A chat** that picks a PageIndex knowledge base searches it through PageIndex's own tools; other engines go through the `rag` tool.
 
 ## M1.5 checklist
 

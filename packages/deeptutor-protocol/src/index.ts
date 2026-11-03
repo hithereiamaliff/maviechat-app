@@ -3,6 +3,7 @@ export * from './auth';
 export * from './chatOptions';
 export * from './http';
 export * from './journal';
+export * from './knowledge';
 export * from './markdown';
 export * from './notebooks';
 export * from './organize';

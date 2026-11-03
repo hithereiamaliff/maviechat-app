@@ -1,0 +1,35 @@
+{
+  "item": {
+    "description": "string",
+    "documents": "number",
+    "isDefault": "boolean",
+    "lastIndexedAt": "string",
+    "name": "string",
+    "needsReindex": "boolean",
+    "progress": "null",
+    "provider": "string",
+    "readOnly": "boolean",
+    "status": "string"
+  },
+  "files": [
+    {
+      "folder": "boolean",
+      "modified": "number",
+      "name": "string",
+      "size": "number"
+    }
+  ],
+  "providers": [
+    {
+      "configured": "boolean",
+      "description": "string",
+      "id": "string",
+      "name": "string",
+      "needsSetup": "boolean"
+    }
+  ],
+  "stages": [
+    "processing_documents",
+    "completed"
+  ]
+}
