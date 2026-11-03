@@ -5,6 +5,7 @@ import { LiveProvider } from '@/features/live/LiveProvider';
 import { PushSetup } from '@/features/notifications/PushSetup';
 import { Sidebar } from '@/features/sidebar/Sidebar';
 import { SpaceDrawer } from '@/features/sidebar/SpaceDrawer';
+import { signedOutRoute } from '@/features/welcome/entry';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
 import { saveSpace } from '@/session/storage';
@@ -16,7 +17,8 @@ export default function AppLayout() {
   const palette = usePalette();
   const pathname = usePathname();
   const currentChatId = pathname.startsWith('/c/') ? decodeURIComponent(pathname.slice(3)) : null;
-  const launch = useLaunchTarget(useDeepTutor().state.status);
+  const deepTutor = useDeepTutor().state.status;
+  const launch = useLaunchTarget(deepTutor);
   const showing = launch === 'here' && state.status === 'signed-in';
 
   // The app reopens in the space you were in, however you got here.
@@ -27,7 +29,11 @@ export default function AppLayout() {
   if (launch === 'pending') return null;
   if (launch === 'deeptutor') return <Redirect href="/learn" />;
   if (state.status === 'loading') return null;
-  if (state.status !== 'signed-in') return <Redirect href="/login" />;
+  if (state.status !== 'signed-in') {
+    // DeepTutor if it's signed in, else the welcome screen (or this sign-in, when it just expired).
+    const route = signedOutRoute(deepTutor, Boolean(state.notice));
+    return route ? <Redirect href={route} /> : null;
+  }
 
   return (
     <LiveProvider currentChatId={currentChatId}>

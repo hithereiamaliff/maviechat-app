@@ -5,7 +5,7 @@ import { useSession } from '@/session/SessionProvider';
 import { saveSpace } from '@/session/storage';
 import { signOutWebView } from './webSignIn';
 
-/** Signing out of DeepTutor, after asking: Open WebUI stays signed in, and the app goes there (or to DeepTutor's sign-in). */
+/** Signing out of DeepTutor, after asking: Open WebUI stays signed in, and the app goes there (or to the welcome screen). */
 export function useDtSignOut(): () => void {
   const { signOut } = useDeepTutor();
   const owuiSignedIn = useSession().state.status === 'signed-in';
@@ -21,7 +21,7 @@ export function useDtSignOut(): () => void {
           void signOut().then(() => {
             void saveSpace('owui');
             if (router.canDismiss()) router.dismissAll();
-            router.replace(owuiSignedIn ? '/' : '/deeptutor-login');
+            router.replace(owuiSignedIn ? '/' : '/welcome');
           });
         },
       },

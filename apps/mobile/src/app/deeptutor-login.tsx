@@ -1,8 +1,9 @@
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
+import { IconButton } from '@/components/IconButton';
 import { TextField } from '@/components/TextField';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { describeDtSignInError } from '@/session/errors';
@@ -18,6 +19,8 @@ export default function DeepTutorLogin() {
   const insets = useSafeAreaInsets();
   const { state, signIn } = useDeepTutor();
   const owui = useSession();
+  // Opened from the welcome screen: a way back to the choice.
+  const fromWelcome = useLocalSearchParams<{ from?: string }>().from === 'welcome';
   const [serverUrl, setServerUrl] = useState(() => (state.status === 'signed-out' ? (state.lastServerUrl ?? '') : ''));
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -102,7 +105,9 @@ export default function DeepTutorLogin() {
 
           <Button label="Sign in" onPress={() => void submit()} loading={busy} />
           {/* Either space works on its own: Open WebUI alone needs no DeepTutor account. */}
-          <Pressable accessibilityRole="button" onPress={() => router.replace(owui.state.status === 'signed-in' ? '/' : '/login')} hitSlop={8} style={styles.back}>
+          <Pressable accessibilityRole="button" onPress={() =>
+              owui.state.status === 'signed-in' ? router.replace('/') : router.replace({ pathname: '/login', params: fromWelcome ? { from: 'welcome' } : {} })
+            } hitSlop={8} style={styles.back}>
             <Text style={[styles.backText, { color: palette.link }]}>{owui.state.status === 'signed-in' ? 'Back to Open WebUI' : 'Sign in to Open WebUI instead'}</Text>
           </Pressable>
         </View>
@@ -111,6 +116,11 @@ export default function DeepTutorLogin() {
           MavieChat is an independent app for Open WebUI and DeepTutor servers and is not affiliated with either.
         </Text>
       </ScrollView>
+      {fromWelcome ? (
+        <View style={[styles.backButton, { top: insets.top + 4 }]}>
+          <IconButton icon="chevron-left" label="Back to the choice" onPress={() => router.replace('/welcome')} />
+        </View>
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -124,6 +134,7 @@ const styles = StyleSheet.create({
   form: { gap: 16 },
   message: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20 },
   back: { alignSelf: 'center', paddingVertical: 4 },
+  backButton: { position: 'absolute', left: 8 },
   backText: { fontFamily: fonts.medium, fontSize: 15 },
   footer: { marginTop: 'auto', fontFamily: fonts.regular, fontSize: 12, lineHeight: 17, textAlign: 'center' },
 });

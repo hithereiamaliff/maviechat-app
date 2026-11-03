@@ -1,8 +1,9 @@
-import { Redirect, router } from 'expo-router';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
+import { IconButton } from '@/components/IconButton';
 import { TextField } from '@/components/TextField';
 import { switchToDeepTutor } from '@/features/deeptutor/switch';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
@@ -17,6 +18,8 @@ export default function Login() {
   const insets = useSafeAreaInsets();
   const { state, signIn } = useSession();
   const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
+  // Opened from the welcome screen: a way back to the choice.
+  const fromWelcome = useLocalSearchParams<{ from?: string }>().from === 'welcome';
   const [serverUrl, setServerUrl] = useState(() => (state.status === 'signed-out' ? (state.lastServerUrl ?? '') : ''));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -112,7 +115,9 @@ export default function Login() {
           {/* Either space works on its own: DeepTutor alone needs no Open WebUI account. */}
           <Pressable
             accessibilityRole="button"
-            onPress={() => (deepTutorSignedIn ? switchToDeepTutor(true) : router.replace('/deeptutor-login'))}
+            onPress={() =>
+              deepTutorSignedIn ? switchToDeepTutor(true) : router.replace({ pathname: '/deeptutor-login', params: fromWelcome ? { from: 'welcome' } : {} })
+            }
             hitSlop={8}
             style={styles.other}>
             <Text style={[styles.otherText, { color: palette.link }]}>{deepTutorSignedIn ? 'Back to DeepTutor' : 'Sign in to DeepTutor instead'}</Text>
@@ -123,6 +128,11 @@ export default function Login() {
           MavieChat is an independent app for Open WebUI and DeepTutor servers and is not affiliated with either.
         </Text>
       </ScrollView>
+      {fromWelcome ? (
+        <View style={[styles.back, { top: insets.top + 4 }]}>
+          <IconButton icon="chevron-left" label="Back to the choice" onPress={() => router.replace('/welcome')} />
+        </View>
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -136,6 +146,7 @@ const styles = StyleSheet.create({
   form: { gap: 16 },
   message: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20 },
   other: { alignSelf: 'center', paddingVertical: 4 },
+  back: { position: 'absolute', left: 8 },
   otherText: { fontFamily: fonts.medium, fontSize: 15 },
   footer: { marginTop: 'auto', fontFamily: fonts.regular, fontSize: 12, lineHeight: 17, textAlign: 'center' },
 });

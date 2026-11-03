@@ -171,7 +171,7 @@ The owner asked for DeepTutor to be treated equally with Open WebUI: a home page
   - **Account:** who you are, Change Password, your picture (DeepTutor's profile page), Sign Out.
   - **Archived Chats:** search, open, restore or delete, Restore All.
   - **About.**
-- **Either space works alone.** Each sign-in screen offers the other ("Sign in to DeepTutor instead", "Sign in to Open WebUI instead"). Notifications switch on without an Open WebUI account (DeepTutor's replies only need the phone's push token); the test notification still goes through Open WebUI's account. Signing out of Open WebUI only takes the phone off the relay for that account, so DeepTutor's notifications carry on.
+- **Either space works alone.** With neither signed in (a first launch, or after signing out of both), the app opens on a **welcome screen** that offers Open WebUI or DeepTutor as equals. With only one signed in, the app opens there. Each sign-in screen offers the other ("Sign in to DeepTutor instead", "Sign in to Open WebUI instead"), and one opened from the welcome screen has a way back to it. Notifications switch on without an Open WebUI account (DeepTutor's replies only need the phone's push token); the test notification still goes through Open WebUI's account. Signing out of Open WebUI only takes the phone off the relay for that account, so DeepTutor's notifications carry on.
 
 ### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --space`)
 

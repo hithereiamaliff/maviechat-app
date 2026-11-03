@@ -109,7 +109,7 @@ export function DtSidebar() {
       onPress: () => {
         sidebar.close();
         if (owuiSignedIn) switchToOpenWebUI();
-        else router.push('/login');
+        else router.replace('/login');
       },
     },
     {
