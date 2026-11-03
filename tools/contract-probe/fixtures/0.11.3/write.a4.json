@@ -1,0 +1,13 @@
+{
+  "columns": "two models",
+  "newChat": {
+    "chatModels": 2,
+    "current": "first reply"
+  },
+  "savedChat": {
+    "current": "second reply"
+  },
+  "merge": {
+    "streamedPieces": "several"
+  }
+}

@@ -46,6 +46,8 @@ export interface SendInput extends Extras {
   parentId: string | null;
   content: string;
   model: ModelItem;
+  /** With Compare: every model the message goes to, `model` first; each answers in its own column. */
+  models?: ModelItem[];
   files?: FileItem[];
   /** With `chatId: null`: start a temporary chat, which the server doesn't keep. */
   temporary?: boolean;
@@ -74,12 +76,16 @@ export interface ContinueInput extends Extras {
 
 export interface Sent {
   chatId: string;
+  /**
+   * The reply to show. With several models it's the one the server keeps as current: the first
+   * model's in a new chat, the last one's in a saved chat (the server marks each new message current).
+   */
   replyId: string;
 }
 
 const EMPTY_HISTORY: ChatHistory = { messages: {}, currentId: null };
 
-function localRecord(id: string, model: ModelItem, history: ChatHistory, controls: { params?: Record<string, unknown>; files?: unknown[] } = {}): ChatRecord {
+function localRecord(id: string, modelIds: string[], history: ChatHistory, controls: { params?: Record<string, unknown>; files?: unknown[] } = {}): ChatRecord {
   const now = Math.floor(Date.now() / 1000);
   return {
     id,
@@ -87,7 +93,7 @@ function localRecord(id: string, model: ModelItem, history: ChatHistory, control
     updated_at: now,
     created_at: now,
     current_message_id: history.currentId,
-    chat: { id, title: 'New Chat', models: [model.id], history, messages: [], tags: [], timestamp: now * 1000, ...controls },
+    chat: { id, title: 'New Chat', models: modelIds, history, messages: [], tags: [], timestamp: now * 1000, ...controls },
   };
 }
 
@@ -136,7 +142,7 @@ export function useSendMessage() {
         queryClient.setQueryData<ChatRecord>(['chat', routeId], (current) =>
           current && job.chatId
             ? { ...current, current_message_id: turn.history.currentId, chat: { ...current.chat, history: turn.history } }
-            : localRecord(routeId, model, turn.history, { params: job.params }),
+            : localRecord(routeId, turn.userMessage.models ?? [model.id], turn.history, { params: job.params }),
         );
       }
       live.streams.track(replyIds, routeId);
@@ -184,7 +190,7 @@ export function useSendMessage() {
         const started = await startCompletion(client, body);
         const id = routeId ?? started.chat_id;
         if (!routeId) {
-          queryClient.setQueryData<ChatRecord>(['chat', id], localRecord(id, model, turn.history, { params: job.params, files }));
+          queryClient.setQueryData<ChatRecord>(['chat', id], localRecord(id, turn.userMessage.models ?? [model.id], turn.history, { params: job.params, files }));
           live.streams.bind(replyIds, id);
         } else if (!job.temporary && files.length > 0) {
           // The server keeps the request's files as the chat's; so does the cached copy.
@@ -199,15 +205,19 @@ export function useSendMessage() {
           void queryClient.invalidateQueries({ queryKey: ['folder-chats', job.folderId] });
           void queryClient.invalidateQueries({ queryKey: ['folders'] });
         }
-        return { chatId: id, replyId };
+        return { chatId: id, replyId: job.chatId && !job.temporary ? (replyIds[replyIds.length - 1] as string) : replyId };
       } catch (error) {
         live.streams.untrack(replyIds);
         if (routeId) {
+          // Every reply of the turn ends with the error (several with Compare).
           queryClient.setQueryData<ChatRecord>(['chat', routeId], (current) => {
             const history = current?.chat?.history;
-            const reply = history?.messages[replyId];
-            if (!current || !history || !reply) return current;
-            const messages = { ...history.messages, [replyId]: { ...reply, done: true, error: { content: describeError(error) } } };
+            if (!current || !history) return current;
+            const messages = { ...history.messages };
+            for (const id of replyIds) {
+              const reply = messages[id];
+              if (reply) messages[id] = { ...reply, done: true, error: { content: describeError(error) } };
+            }
             return { ...current, chat: { ...current.chat, history: { ...history, messages } } };
           });
         }
@@ -225,10 +235,10 @@ export function useSendMessage() {
   );
 
   const send = useCallback(
-    async ({ chatId, parentId, content, model, files = [], temporary = false, toggles, toolIds, folderId, params }: SendInput): Promise<Sent | null> => {
+    async ({ chatId, parentId, content, model, models, files = [], temporary = false, toggles, toolIds, folderId, params }: SendInput): Promise<Sent | null> => {
       const text = content.trim();
       if (!text && files.length === 0) return null;
-      const turn = buildTurn({ history: historyOf(chatId), content: text, models: [model], files, parentId });
+      const turn = buildTurn({ history: historyOf(chatId), content: text, models: models?.length ? models : [model], files, parentId });
       return dispatch({ chatId, temporary: temporary || isTemporaryChatId(chatId), turn, model, toggles, toolIds, folderId, params: chatId === null ? params : undefined });
     },
     [dispatch, historyOf],

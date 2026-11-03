@@ -68,7 +68,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [x] | Search by name/ID/tag; filters All / Local / External / Direct / tag. Slice 5: fuzzy search as on the web, filter chips All / Local / External / tags, hidden models left out. Direct connections live in the browser, so the server's list never has them | M1 |
 | [x] | Rows: avatar, name, tags, badges, description, checkmark. Slice 5: picture, size label (Ollama, LM Studio, llama.cpp), loaded dot, tag and External icons, description line, default badge, checkmark | M1 |
 | [ ] | Row "…": Keep in Sidebar / Hide from Sidebar, Copy link (Edit/Delete for admins → M3) | M2 |
-| [ ] | **Compare** toggle for multi-model (permission `multiple_models`) | M2 |
+| [x] | **Compare** toggle for multi-model (permission `multiple_models`). A4 (2026-11-03): the Compare switch beside search; with it on, taps add or remove models (numbered in order, the last one stays) and the picker stays open; off keeps the first. The input bar reads "Model +2". "Set as default" saves the list | M2 |
 | [x] | "Set as default" (new chat only) | M1 |
 | [ ] | Model controls (preset knobs next to the selector) (`MessageInput/ModelControls.svelte`) | M2 |
 
@@ -85,7 +85,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Item | Mn |
 |---|---|---|
-| [x] | Centred input; stacked model avatars; model name or "Hello, {name}"; description; "By author". Slice 5: the model's picture and name (or "Hello, {name}"), two lines of description (tap for the rest), "By author" (community authors link to their page), input asking "How can I help you today?". One picture until Compare (M2) | M1 |
+| [x] | Centred input; stacked model avatars; model name or "Hello, {name}"; description; "By author". Slice 5: the model's picture and name (or "Hello, {name}"), two lines of description (tap for the rest), "By author" (community authors link to their page), input asking "How can I help you today?". A4: with Compare the pictures overlap; the last model's details show until you tap another's picture | M1 |
 | [x] | "Suggested" prompts (model's own, else admin defaults), shuffled and filtered as you type; tap sends, or inserts if that setting is on. Slice 5: all of it (a model whose own list is empty shows none; nothing past 500 typed characters). When there are none the web shows its own name and version; the app leaves that line out | M1 |
 | [ ] | Landing mode "chat" (input pinned to the bottom) | M2 |
 | [ ] | Folder landing page: folder header, input, Chats / Knowledge tabs | M2 |
@@ -137,7 +137,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [~] | Action bar (always on the last message; tap to reveal on others): branch arrows, Edit (Save / Save As Copy), Copy, Read Aloud, Info (usage), Fork, 👍/👎, Continue (last only), Regenerate menu (Suggest a change / Try again / Add details / More concise), custom actions, Delete (when siblings exist), timestamp. Slice 1: arrows, Copy, Info; slice 3: Regenerate menu, Delete; A2 (2026-11-03): Edit (Save / Save As Copy; structured replies edit each text part, steps kept), 👍/👎, Continue (last only), the model's action buttons (`/api/chat/actions/{id}`, changed messages merged); the row scrolls sideways when full. Left: Read Aloud (A7), Fork (A6) | M1 (arrows, copy, regenerate, info, delete); M2 (edit, read aloud, fork, rate, continue, actions) |
 | [x] | Follow-ups list under the last reply (tap sends, or inserts per setting) | M1 |
 | [x] | Rating panel: 1–10, reason chips (up/down sets), comment, Save (`Messages/RateComment.svelte`). A2: shown under the reply after 👍/👎; 6–10 after 👍 and 1–5 after 👎; one reason (the web's keys, our own words); filed with `/api/v1/evaluations/feedback` (created once, then updated) and kept on the reply as `annotation` + `feedbackId`. The web's automatic tag generation for ratings is not done | M2 |
-| [ ] | Multi-model: full-width swipeable cards; solid border = the branch continued from; per-model arrows; tabs setting; "Merge Responses" | M2 |
+| [x] | Multi-model: full-width swipeable cards; solid border = the branch continued from; per-model arrows; tabs setting; "Merge Responses". A4 (2026-11-03): all of it. The web selects a card when you click it; in the app the reply already reacts to taps, so other cards carry "Continue with this answer". Dots under the cards show which one you're on. Merge also sends the chat id (see protocol §5) | M2 |
 | [ ] | Text-selection actions Ask / Explain (`ContentRenderer/FloatingButtons.svelte`) → long-press "Select text" sheet | M2 |
 
 ## 9. Chat-level features

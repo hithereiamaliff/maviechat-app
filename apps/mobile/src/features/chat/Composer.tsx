@@ -43,7 +43,10 @@ interface ComposerProps {
   ref?: Ref<ComposerHandle>;
   /** Which chat's draft this is (`NEW_CHAT` on the new-chat screen). */
   draftKey: string;
+  /** The model that leads: its default toggles and tools apply. */
   model: ModelItem | undefined;
+  /** With Compare, every model the message goes to; a toggle shows only when all of them allow it. */
+  models?: ModelItem[];
   modelLabel: string;
   onPickModel: () => void;
   /** Resolves true when the message was sent or queued (the input is then cleared). */
@@ -73,6 +76,7 @@ export function Composer({
   ref,
   draftKey,
   model,
+  models,
   modelLabel,
   onPickModel,
   onSend,
@@ -100,7 +104,7 @@ export function Composer({
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }), []);
 
-  const available = capabilities ? availableToggles(capabilities, model) : NO_TOGGLES;
+  const available = capabilities ? availableToggles(capabilities, models?.length ? models : model) : NO_TOGGLES;
   const toggles = effectiveToggles(draft.toggles, available);
   const usable = usableTools(tools.data ?? []);
   const toolIds = draft.toolIds.filter((id) => usable.some((tool) => tool.id === id));

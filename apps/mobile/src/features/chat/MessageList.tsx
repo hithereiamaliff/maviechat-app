@@ -1,10 +1,25 @@
-import { modelName, type HistoryMessage, type ModelAction, type ModelItem, type ReplyAnnotation } from '@maviechat/owui-protocol';
+import {
+  groupPosition,
+  groupsDone,
+  mergedResponse,
+  modelName,
+  newestLeaf,
+  replyGroups,
+  switchGroupVersion,
+  type ChatHistory,
+  type HistoryMessage,
+  type ModelAction,
+  type ModelItem,
+  type ReplyAnnotation,
+  type ReplyGroup,
+} from '@maviechat/owui-protocol';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { usePalette } from '@/theme';
 import { AssistantMessage } from './AssistantMessage';
+import { MultiReplies } from './MultiReplies';
 import { ReplyEditor } from './ReplyEditor';
 import { UserMessage } from './UserMessage';
 
@@ -43,12 +58,43 @@ interface MessageListProps {
   pinToBottomKey?: string;
   baseUrl: string;
   token: string;
+  /** The whole tree, so a message sent to several models (Compare) shows every model's answer. */
+  history?: ChatHistory;
+  /** Shows a leaf and saves the choice: a column's version arrows, "Continue with this answer". */
+  onShow?: (leafId: string) => void;
+  /** Answers from several models as tabs rather than cards (the web's interface setting). */
+  multiAsTabs?: boolean;
+  /** "Merge Responses" for the turn whose shown reply this is. */
+  onMerge?: (replyId: string, groups: ReplyGroup[]) => void;
+  mergingId?: string | null;
+}
+
+/** A reply to a message sent to several models is drawn with its siblings, under one key per turn. */
+function isMultiReply(history: ChatHistory | undefined, message: HistoryMessage): boolean {
+  const parent = message.role === 'assistant' && message.parentId ? history?.messages[message.parentId] : undefined;
+  return (parent?.models?.length ?? 0) > 1;
 }
 
 const NEAR_BOTTOM = 120;
 
 /** The shown branch of a chat, opened at the newest message; follows a streaming reply while you're at the bottom. */
-export function MessageList({ ref, messages, actions, models, position, onStep, onFollowUp, pinToBottomKey, baseUrl, token }: MessageListProps) {
+export function MessageList({
+  ref,
+  messages,
+  actions,
+  models,
+  position,
+  onStep,
+  onFollowUp,
+  pinToBottomKey,
+  baseUrl,
+  token,
+  history,
+  onShow,
+  multiAsTabs = false,
+  onMerge,
+  mergingId = null,
+}: MessageListProps) {
   const palette = usePalette();
   const list = useRef<FlashListRef<HistoryMessage>>(null);
   const following = useRef(true);
@@ -80,8 +126,9 @@ export function MessageList({ ref, messages, actions, models, position, onStep, 
       <FlashList
         ref={list}
         data={messages}
-        keyExtractor={(message) => message.id}
-        getItemType={(message) => message.role}
+        // A turn's answers keep their row (and the cards their place) as you choose between them.
+        keyExtractor={(message) => (isMultiReply(history, message) ? `turn:${message.parentId}` : message.id)}
+        getItemType={(message) => (isMultiReply(history, message) ? 'multi' : message.role)}
         contentContainerStyle={styles.content}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
@@ -100,6 +147,51 @@ export function MessageList({ ref, messages, actions, models, position, onStep, 
         renderItem={({ item }) => {
           const branch = position(item.id);
           const { saveEdit, sendEdit, regenerate, remove, editReply, rate, continueReply, actionsFor, runAction } = actions;
+          const reply = (message: HistoryMessage, place: { index: number; count: number }, step: (direction: -1 | 1) => void) => (
+            <AssistantMessage
+              message={message}
+              modelLabel={typeof message.modelName === 'string' && message.modelName ? message.modelName : modelName(models, message.model)}
+              branch={place}
+              onStep={step}
+              isLast={item.id === lastId}
+              baseUrl={baseUrl}
+              token={token}
+              onFollowUp={onFollowUp}
+              onRegenerate={regenerate ? (prompt) => regenerate(message, prompt) : undefined}
+              // A reply can be deleted only while another version of it remains, as on the web.
+              onDelete={remove && actions.canDeleteReply && place.count > 1 ? () => remove(message) : undefined}
+              onEdit={editReply ? () => setEditing(message) : undefined}
+              onRate={rate ? (change) => rate(message, change) : undefined}
+              onContinue={continueReply ? () => continueReply(message) : undefined}
+              actions={actionsFor?.(message)}
+              onAction={runAction ? (action) => runAction(message, action) : undefined}
+            />
+          );
+          const groups = item.role === 'assistant' && history ? replyGroups(history, item.id) : null;
+          if (groups && history) {
+            const last = item.id === lastId;
+            return (
+              <MultiReplies
+                groups={groups}
+                replyId={item.id}
+                messages={history.messages}
+                labelOf={(message) => (typeof message.modelName === 'string' && message.modelName ? message.modelName : modelName(models, message.model))}
+                tabs={multiAsTabs}
+                renderReply={(message, group) =>
+                  reply(message, groupPosition(group), (direction) => {
+                    const leaf = switchGroupVersion(history, group, direction);
+                    if (leaf) onShow?.(leaf);
+                  })
+                }
+                onSelect={(group) => onShow?.(newestLeaf(history, group.shownId))}
+                merged={mergedResponse(history.messages[item.id])}
+                onMerge={onMerge && last && groupsDone(history, groups) ? () => onMerge(item.id, groups) : undefined}
+                merging={mergingId === item.id}
+                baseUrl={baseUrl}
+                token={token}
+              />
+            );
+          }
           return item.role === 'user' ? (
             <UserMessage
               message={item}
@@ -113,24 +205,7 @@ export function MessageList({ ref, messages, actions, models, position, onStep, 
               onDelete={remove && actions.canDeleteMessage && (item.parentId !== null || branch.count > 1) ? () => remove(item) : undefined}
             />
           ) : (
-            <AssistantMessage
-              message={item}
-              modelLabel={typeof item.modelName === 'string' && item.modelName ? item.modelName : modelName(models, item.model)}
-              branch={branch}
-              onStep={(step) => onStep(item.id, step)}
-              isLast={item.id === lastId}
-              baseUrl={baseUrl}
-              token={token}
-              onFollowUp={onFollowUp}
-              onRegenerate={regenerate ? (prompt) => regenerate(item, prompt) : undefined}
-              // A reply can be deleted only while another version of it remains, as on the web.
-              onDelete={remove && actions.canDeleteReply && branch.count > 1 ? () => remove(item) : undefined}
-              onEdit={editReply ? () => setEditing(item) : undefined}
-              onRate={rate ? (change) => rate(item, change) : undefined}
-              onContinue={continueReply ? () => continueReply(item) : undefined}
-              actions={actionsFor?.(item)}
-              onAction={runAction ? (action) => runAction(item, action) : undefined}
-            />
+            reply(item, branch, (step) => onStep(item.id, step))
           );
         }}
       />

@@ -46,7 +46,7 @@ export default function FolderScreen() {
       toast(choice.loading ? 'Loading models…' : 'No model is available to this account.', 'error');
       return false;
     }
-    const result = await send({ chatId: null, parentId: null, content: text, files, model, toggles, toolIds, folderId });
+    const result = await send({ chatId: null, parentId: null, content: text, files, model, models: choice.selected, toggles, toolIds, folderId });
     if (!result) return false;
     carryOver(draftKey, result.chatId);
     router.replace({ pathname: '/c/[id]', params: { id: result.chatId } });
@@ -86,7 +86,8 @@ export default function FolderScreen() {
             draftKey={draftKey}
             placeholder="How can I help you today?"
             model={model}
-            modelLabel={model?.name ?? 'Select a model'}
+            models={choice.selected}
+            modelLabel={choice.label}
             onPickModel={() => setPickerOpen(true)}
             onSend={start}
             onStop={() => {}}
@@ -124,9 +125,10 @@ export default function FolderScreen() {
       <ModelPicker
         visible={pickerOpen}
         models={choice.models}
-        selectedId={model?.id ?? null}
-        defaultId={choice.defaultId}
-        onSelect={choice.pick}
+        selectedIds={choice.selected.map((item) => item.id)}
+        defaultIds={choice.defaultIds}
+        onChange={choice.pick}
+        compareAllowed={choice.compareAllowed}
         onClose={() => setPickerOpen(false)}
       />
     </View>

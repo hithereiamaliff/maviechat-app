@@ -47,5 +47,14 @@ export function useChatView(chatId: string) {
   /** Show this leaf (e.g. a reply just sent) without saving the choice; the server already did. */
   const select = useCallback((leafId: string) => setSelection({ chatId, leaf: leafId }), [chatId]);
 
-  return { query, messages, position, step, select };
+  /** Show this leaf and save the choice, as switching branches does (one model's answer among several). */
+  const show = useCallback(
+    (leafId: string) => {
+      setSelection({ chatId, leaf: leafId });
+      if (!temporary) selectBranch(client, chatId, leafId).catch(() => toast("Couldn't save which version is shown", 'error'));
+    },
+    [client, chatId, toast, temporary],
+  );
+
+  return { query, messages, position, step, select, show };
 }

@@ -35,6 +35,12 @@ describe('model capabilities', () => {
     });
   });
 
+  it('offers a toggle to several models only when each of them allows it', () => {
+    const all = { feature: () => true };
+    expect(availableToggles(all, [model({ web_search: false }), model()])).toEqual({ webSearch: false, imageGeneration: true, codeInterpreter: true });
+    expect(availableToggles(all, [model(), model()])).toEqual({ webSearch: true, imageGeneration: true, codeInterpreter: true });
+  });
+
   it('drops toggles the current model no longer offers', () => {
     expect(
       effectiveToggles({ webSearch: true, codeInterpreter: true }, { webSearch: false, imageGeneration: true, codeInterpreter: true }),

@@ -58,14 +58,40 @@ export async function saveDefaultModels(client: OwuiClient, modelIds: string[]):
   return updateUserSettings(client, { ...current, ui: { ...(current.ui ?? {}), models: modelIds } });
 }
 
-/** The model a new chat starts with: the user's default, then the server's, then the first visible model. */
-export function defaultModelId(models: ModelItem[], settings: UserSettings | undefined, config: ServerConfig | undefined): string | null {
+/**
+ * The models a new chat starts with, as on the web: your defaults (several when you saved a
+ * comparison), else the server's, else the first visible model. Models you can't see are left out.
+ */
+export function defaultModelIds(models: ModelItem[], settings: UserSettings | undefined, config: ServerConfig | undefined): string[] {
   const visible = new Set(models.map((model) => model.id));
-  const candidates = [
-    ...(settings?.ui?.models ?? []),
-    ...(typeof config?.default_models === 'string' ? config.default_models.split(',').map((id) => id.trim()) : []),
-  ];
-  return candidates.find((id) => id && visible.has(id)) ?? models[0]?.id ?? null;
+  const usable = (ids: string[]) => ids.filter((id) => id && visible.has(id));
+  const mine = usable(settings?.ui?.models ?? []);
+  if (mine.length) return mine;
+  const server = usable(typeof config?.default_models === 'string' ? config.default_models.split(',').map((id) => id.trim()) : []);
+  if (server.length) return server;
+  return models[0] ? [models[0].id] : [];
+}
+
+/** The first of `defaultModelIds`. */
+export function defaultModelId(models: ModelItem[], settings: UserSettings | undefined, config: ServerConfig | undefined): string | null {
+  return defaultModelIds(models, settings, config)[0] ?? null;
+}
+
+/**
+ * The selection after tapping a model in the picker, as on the web: with Compare on, the model
+ * joins (at the end) or leaves, but the last one stays; with it off, the model replaces the rest.
+ */
+export function pickModelIds(selected: string[], id: string, compare: boolean): string[] {
+  if (!compare) return [id];
+  if (!selected.includes(id)) return [...selected.filter(Boolean), id];
+  return selected.length > 1 ? selected.filter((item) => item !== id) : selected;
+}
+
+/** The input bar's model label: the first model's name, and "+2" for two more. */
+export function modelsLabel(names: string[]): string {
+  const [first, ...rest] = names;
+  if (!first) return 'Select a model';
+  return rest.length ? `${first} +${rest.length}` : first;
 }
 
 /**

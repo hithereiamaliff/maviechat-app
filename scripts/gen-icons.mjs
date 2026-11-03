@@ -17,6 +17,7 @@ const ICONS = [
   'arrow-right-start-on-rectangle',
   'arrow-top-right-on-square',
   'arrow-up',
+  'arrows-pointing-in',
   'arrows-pointing-out',
   'arrows-right-left',
   'bars-3',

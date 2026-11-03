@@ -48,9 +48,12 @@ export default function NewChat() {
   const temporary = enforced || (allowed && temporaryOn);
 
   const model = choice.model;
-  const description = model?.info?.meta?.description?.trim();
-  const author = modelAuthor(model);
-  const suggestions = useMemo(() => promptSuggestions(model, config.data), [model, config.data]);
+  // With Compare, the web shows one model's details at a time (the last, until you tap another's picture).
+  const [infoIdx, setInfoIdx] = useState<number | null>(null);
+  const infoModel = (infoIdx !== null ? choice.selected[infoIdx] : undefined) ?? choice.selected[choice.selected.length - 1] ?? model;
+  const description = infoModel?.info?.meta?.description?.trim();
+  const author = modelAuthor(infoModel);
+  const suggestions = useMemo(() => promptSuggestions(infoModel, config.data), [infoModel, config.data]);
   const insertSuggestion = (settings.data?.ui as { insertSuggestionPrompt?: boolean } | null | undefined)?.insertSuggestionPrompt ?? false;
 
   const start = async ({ text, files, toggles, toolIds }: OutgoingMessage) => {
@@ -58,7 +61,7 @@ export default function NewChat() {
       toast(choice.loading ? 'Loading models…' : 'No model is available to this account.', 'error');
       return false;
     }
-    const result = await send({ chatId: null, parentId: null, content: text, files, model, toggles, toolIds, temporary, params: chatParams });
+    const result = await send({ chatId: null, parentId: null, content: text, files, model, models: choice.selected, toggles, toolIds, temporary, params: chatParams });
     if (!result) return false;
     carryOver(NEW_CHAT, result.chatId);
     router.replace({ pathname: '/c/[id]', params: { id: result.chatId } });
@@ -119,9 +122,25 @@ export default function NewChat() {
               </View>
             ) : null}
             <View style={styles.titleRow}>
-              {model ? <ModelAvatar modelId={model.id} size={40} rounded={14} /> : null}
+              {choice.selected.length > 1 ? (
+                <View style={styles.avatars}>
+                  {choice.selected.map((item, index) => (
+                    <Pressable
+                      key={`${item.id}-${index}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Show ${item.name}'s details`}
+                      accessibilityState={{ selected: item === infoModel }}
+                      onPress={() => setInfoIdx(index)}
+                      style={[styles.stacked, index > 0 && styles.overlap, { borderColor: palette.background }]}>
+                      <ModelAvatar modelId={item.id} size={40} rounded={14} />
+                    </Pressable>
+                  ))}
+                </View>
+              ) : model ? (
+                <ModelAvatar modelId={model.id} size={40} rounded={14} />
+              ) : null}
               <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
-                {model?.name ?? (user.data?.name ? `Hello, ${user.data.name}` : 'Hello')}
+                {infoModel?.name ?? (user.data?.name ? `Hello, ${user.data.name}` : 'Hello')}
               </Text>
             </View>
             {description ? (
@@ -155,7 +174,8 @@ export default function NewChat() {
             draftKey={NEW_CHAT}
             placeholder="How can I help you today?"
             model={model}
-            modelLabel={model?.name ?? 'Select a model'}
+            models={choice.selected}
+            modelLabel={choice.label}
             onPickModel={() => setPickerOpen(true)}
             onSend={start}
             onStop={() => {}}
@@ -169,9 +189,13 @@ export default function NewChat() {
       <ModelPicker
         visible={pickerOpen}
         models={choice.models}
-        selectedId={model?.id ?? null}
-        defaultId={choice.defaultId}
-        onSelect={choice.pick}
+        selectedIds={choice.selected.map((item) => item.id)}
+        defaultIds={choice.defaultIds}
+        onChange={(ids) => {
+          choice.pick(ids);
+          setInfoIdx(null);
+        }}
+        compareAllowed={choice.compareAllowed}
         onClose={() => setPickerOpen(false)}
       />
       <ControlsSheet
@@ -196,6 +220,9 @@ const styles = StyleSheet.create({
   badgeText: { fontFamily: fonts.medium, fontSize: 13 },
   temporaryNote: { fontFamily: fonts.regular, fontSize: 13, textAlign: 'center' },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, maxWidth: '100%' },
+  avatars: { flexDirection: 'row' },
+  stacked: { borderWidth: 2, borderRadius: 16 },
+  overlap: { marginLeft: -16 },
   title: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 24 },
   description: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   author: { fontFamily: fonts.regular, fontSize: 14, textAlign: 'center' },

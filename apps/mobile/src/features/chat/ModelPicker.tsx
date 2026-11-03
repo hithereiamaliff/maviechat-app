@@ -4,6 +4,7 @@ import {
   modelSizeLabel,
   modelTags,
   OwuiHttpError,
+  pickModelIds,
   pickerModels,
   saveDefaultModels,
   type ModelItem,
@@ -22,17 +23,21 @@ import { searchModels } from './search';
 interface ModelPickerProps {
   visible: boolean;
   models: ModelItem[];
-  selectedId: string | null;
-  defaultId: string | null;
-  onSelect: (model: ModelItem) => void;
+  /** The models the next message goes to; the first leads. */
+  selectedIds: string[];
+  defaultIds: string[];
+  onChange: (ids: string[]) => void;
+  /** Compare (several models at once) is offered: admins, and accounts allowed `chat.multiple_models`. */
+  compareAllowed: boolean;
   onClose: () => void;
 }
 
 /**
  * Choose the model for the next message, as in the web's selector: fuzzy search, a filter
- * (All, Local, External or a tag), hidden models left out. "Set as default" saves the pick for new chats.
+ * (All, Local, External or a tag), hidden models left out. Compare lets several models answer
+ * at once. "Set as default" saves the pick for new chats.
  */
-export function ModelPicker({ visible, models, selectedId, defaultId, onSelect, onClose }: ModelPickerProps) {
+export function ModelPicker({ visible, models, selectedIds, defaultIds, onChange, compareAllowed, onClose }: ModelPickerProps) {
   const palette = usePalette();
   const { client } = useAuthed();
   const queryClient = useQueryClient();
@@ -40,6 +45,10 @@ export function ModelPicker({ visible, models, selectedId, defaultId, onSelect, 
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('');
   const [saving, setSaving] = useState(false);
+  const [compare, setCompare] = useState(selectedIds.length > 1);
+  // As on the web, a chat that already compares opens the picker with Compare on.
+  const comparing = compareAllowed && (compare || selectedIds.length > 1);
+  const isDefault = selectedIds.length === defaultIds.length && selectedIds.every((id, index) => defaultIds[index] === id);
 
   const listed = useMemo(() => pickerModels(models), [models]);
   const filters = useMemo(() => modelFilterOptions(listed), [listed]);
@@ -50,12 +59,12 @@ export function ModelPicker({ visible, models, selectedId, defaultId, onSelect, 
   );
 
   const setDefault = async () => {
-    if (!selectedId) return;
+    if (!selectedIds.length) return;
     setSaving(true);
     try {
-      await saveDefaultModels(client, [selectedId]);
+      await saveDefaultModels(client, selectedIds);
       await queryClient.invalidateQueries({ queryKey: ['user-settings'] });
-      toast('Default model saved', 'success');
+      toast(selectedIds.length > 1 ? 'Default models saved' : 'Default model saved', 'success');
     } catch (error) {
       toast(
         error instanceof OwuiHttpError && error.status === 403
@@ -69,7 +78,7 @@ export function ModelPicker({ visible, models, selectedId, defaultId, onSelect, 
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose} onShow={() => setCompare(selectedIds.length > 1)}>
       <View style={[styles.sheet, { backgroundColor: palette.background }]}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: palette.text }]}>Models</Text>
@@ -77,18 +86,43 @@ export function ModelPicker({ visible, models, selectedId, defaultId, onSelect, 
             <Text style={[styles.done, { color: palette.link }]}>Done</Text>
           </Pressable>
         </View>
-        <View style={[styles.search, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-          <Icon name="magnifying-glass" size={16} color={palette.textMuted} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search a model"
-            placeholderTextColor={palette.textFaint}
-            autoCorrect={false}
-            autoCapitalize="none"
-            style={[styles.searchInput, { color: palette.text }]}
-          />
+        <View style={styles.searchRow}>
+          <View style={[styles.search, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <Icon name="magnifying-glass" size={16} color={palette.textMuted} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search a model"
+              placeholderTextColor={palette.textFaint}
+              autoCorrect={false}
+              autoCapitalize="none"
+              style={[styles.searchInput, { color: palette.text }]}
+            />
+          </View>
+          {compareAllowed && listed.length > 1 ? (
+            <Pressable
+              accessibilityRole="switch"
+              accessibilityState={{ checked: comparing }}
+              accessibilityLabel="Compare"
+              accessibilityHint="Lets several models answer each message"
+              onPress={() => {
+                // Turning Compare off keeps only the first model, as on the web.
+                if (comparing && selectedIds.length > 1) onChange(selectedIds.slice(0, 1));
+                setCompare(!comparing);
+              }}
+              style={[styles.compare, { borderColor: palette.border }, comparing && { backgroundColor: palette.active, borderColor: palette.active }]}>
+              <Icon name="view-columns" size={16} color={comparing ? palette.onActive : palette.textMuted} />
+              <Text style={[styles.compareText, { color: comparing ? palette.onActive : palette.textMuted }]}>Compare</Text>
+            </Pressable>
+          ) : null}
         </View>
+        {comparing ? (
+          <Text style={[styles.hint, { color: palette.textMuted }]}>
+            {selectedIds.length > 1
+              ? `${selectedIds.length} models will answer each message, side by side. Tap a model to add or remove it.`
+              : 'Tap more models to have them answer each message side by side.'}
+          </Text>
+        ) : null}
         {filters.length > 0 ? (
           <View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.filters}>
@@ -110,7 +144,8 @@ export function ModelPicker({ visible, models, selectedId, defaultId, onSelect, 
         ) : null}
         <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
           {shown.map((model) => {
-            const selected = model.id === selectedId;
+            const order = selectedIds.indexOf(model.id);
+            const selected = order >= 0;
             const description = model.info?.meta?.description;
             const size = modelSizeLabel(model);
             const tags = modelTags(model);
@@ -121,8 +156,9 @@ export function ModelPicker({ visible, models, selectedId, defaultId, onSelect, 
                 accessibilityState={{ selected }}
                 accessibilityLabel={[model.name, size, model.loaded ? 'loaded' : null, tags.length ? `tags ${tags.join(', ')}` : null].filter(Boolean).join(', ')}
                 onPress={() => {
-                  onSelect(model);
-                  onClose();
+                  onChange(pickModelIds(selectedIds, model.id, comparing));
+                  // With Compare on, the picker stays open for more models.
+                  if (!comparing) onClose();
                 }}
                 style={({ pressed }) => [styles.row, (pressed || selected) && { backgroundColor: palette.surface }]}>
                 <ModelAvatar modelId={model.id} size={24} />
@@ -135,7 +171,7 @@ export function ModelPicker({ visible, models, selectedId, defaultId, onSelect, 
                     {model.loaded ? <View style={[styles.loaded, { backgroundColor: palette.success }]} /> : null}
                     {tags.length > 0 ? <Icon name="tag" size={13} color={palette.textFaint} /> : null}
                     {model.connection_type === 'external' ? <Icon name="link" size={13} color={palette.textFaint} /> : null}
-                    {model.id === defaultId ? <Text style={[styles.meta, { color: palette.textFaint }]}>default</Text> : null}
+                    {defaultIds.includes(model.id) ? <Text style={[styles.meta, { color: palette.textFaint }]}>default</Text> : null}
                   </View>
                   {description ? (
                     <Text style={[styles.description, { color: palette.textMuted }]} numberOfLines={1}>
@@ -143,13 +179,19 @@ export function ModelPicker({ visible, models, selectedId, defaultId, onSelect, 
                     </Text>
                   ) : null}
                 </View>
-                {selected ? <Icon name="check" size={18} color={palette.text} strokeWidth={2} /> : null}
+                {selected && comparing && selectedIds.length > 1 ? (
+                  <View style={[styles.order, { backgroundColor: palette.active }]}>
+                    <Text style={[styles.orderText, { color: palette.onActive }]}>{order + 1}</Text>
+                  </View>
+                ) : selected ? (
+                  <Icon name="check" size={18} color={palette.text} strokeWidth={2} />
+                ) : null}
               </Pressable>
             );
           })}
           {shown.length === 0 ? <Text style={[styles.empty, { color: palette.textMuted }]}>No models found</Text> : null}
         </ScrollView>
-        {selectedId && selectedId !== defaultId ? (
+        {selectedIds.length > 0 && !isDefault ? (
           <View style={styles.footer}>
             <Button label="Set as default" variant="secondary" loading={saving} onPress={() => void setDefault()} />
           </View>
@@ -164,17 +206,22 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 8 },
   title: { fontFamily: fonts.semibold, fontSize: 18 },
   done: { fontFamily: fonts.semibold, fontSize: 16 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginVertical: 8 },
   search: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginHorizontal: 16,
-    marginVertical: 8,
     paddingHorizontal: 12,
     height: 40,
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  compare: { flexDirection: 'row', alignItems: 'center', gap: 5, height: 40, paddingHorizontal: 12, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth },
+  compareText: { fontFamily: fonts.medium, fontSize: 13 },
+  hint: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18, marginHorizontal: 20, marginBottom: 6 },
+  order: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  orderText: { fontFamily: fonts.semibold, fontSize: 11 },
   searchInput: { flex: 1, fontFamily: fonts.regular, fontSize: 15, paddingVertical: 0 },
   filters: { gap: 6, paddingHorizontal: 16, paddingBottom: 6 },
   filter: { height: 30, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 15, borderWidth: StyleSheet.hairlineWidth },

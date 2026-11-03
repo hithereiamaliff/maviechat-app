@@ -1,15 +1,20 @@
 import {
   combineQueued,
   isTemporaryChatId,
+  mergeInput,
+  mergeResponses,
   modelActions,
   newestLeaf,
   OwuiHttpError,
+  saveMessage,
   selectBranch,
   updateChatControls,
   uuidv4,
   type ChatRecord,
   type FileItem,
   type HistoryMessage,
+  type MergedResponse,
+  type ReplyGroup,
 } from '@maviechat/owui-protocol';
 import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -54,7 +59,7 @@ export default function ChatScreen() {
   const toast = useToast();
   const deepTutor = useDeepTutor();
   const messageActions = useMessageActions(chatId);
-  const { query, messages, position, step, select } = useChatView(chatId);
+  const { query, messages, position, step, select, show } = useChatView(chatId);
   const choice = useModelChoice(query.data);
   const { send, regenerate, continueReply, stop } = useSendMessage();
   const queue = useQueue(chatId);
@@ -118,10 +123,17 @@ export default function ChatScreen() {
   const status = query.error instanceof OwuiHttpError ? query.error.status : null;
   const notFound = status === 404 || (temporary && !chat);
   const noAccess = status === 401 || status === 403;
-  const streaming = messages.some((message) => message.role === 'assistant' && message.done === false);
+  const history = chat?.chat?.history;
+  // With Compare, the other models' answers to the last message aren't on the shown branch, but count too.
+  const lastAsked = [...messages].reverse().find((message) => message.role === 'user');
+  const streaming =
+    messages.some((message) => message.role === 'assistant' && message.done === false) ||
+    (lastAsked?.childrenIds ?? []).some((id) => history?.messages[id]?.done === false);
   const lastId = messages[messages.length - 1]?.id ?? null;
   const queueEnabled = (settings.data?.ui as { enableMessageQueue?: boolean } | null | undefined)?.enableMessageQueue ?? true;
   const model = choice.model;
+  const selected = choice.selected;
+  const multiAsTabs = (settings.data?.ui as { displayMultiModelResponsesInTabs?: boolean } | null | undefined)?.displayMultiModelResponsesInTabs ?? false;
 
   // Like the web: the chat counts as read when you open it, when you leave it, and when a reply lands while you watch.
   const loaded = Boolean(chat);
@@ -139,7 +151,7 @@ export default function ChatScreen() {
 
   const deliver = async ({ text, files, toggles, toolIds }: OutgoingMessage, parentId: string | null) => {
     if (!model) return false;
-    const result = await send({ chatId, parentId, content: text, files, model, toggles, toolIds });
+    const result = await send({ chatId, parentId, content: text, files, model, models: selected, toggles, toolIds });
     if (result) select(result.replyId);
     return Boolean(result);
   };
@@ -170,7 +182,7 @@ export default function ChatScreen() {
     updateDraft(chatId, (draft) => ({ ...draft, queue: draft.queue.filter((item) => !ids.has(item.id)) }));
     const { prompt, files } = combineQueued(items);
     const { toggles, toolIds } = getDraft(chatId);
-    void send({ chatId, parentId: lastId, content: prompt, files, model, toggles, toolIds })
+    void send({ chatId, parentId: lastId, content: prompt, files, model, models: selected, toggles, toolIds })
       .then((result) => {
         if (result) {
           select(result.replyId);
@@ -182,7 +194,7 @@ export default function ChatScreen() {
       .finally(() => {
         busy.current = false;
       });
-  }, [streaming, queue, model, chat, chatId, lastId, send, select]);
+  }, [streaming, queue, model, selected, chat, chatId, lastId, send, select]);
 
   const sendQueuedNow = async (id: string) => {
     const item = getDraft(chatId).queue.find((entry) => entry.id === id);
@@ -214,7 +226,7 @@ export default function ChatScreen() {
       sendEdit: async (message, content) => {
         if (!model) return false;
         const files = (Array.isArray(message.files) ? message.files : []) as FileItem[];
-        const result = await send({ chatId, parentId: message.parentId, content, files, model, ...extras() });
+        const result = await send({ chatId, parentId: message.parentId, content, files, model, models: selected, ...extras() });
         if (result) select(result.replyId);
         return Boolean(result);
       },
@@ -247,7 +259,49 @@ export default function ChatScreen() {
       canDeleteMessage: messageActions.canDeleteMessage,
       canDeleteReply: messageActions.canDeleteReply,
     };
-  }, [chatId, models.data, model, messageActions, send, regenerate, continueReply, select, streaming, messages]);
+  }, [chatId, models.data, model, selected, messageActions, send, regenerate, continueReply, select, streaming, messages]);
+
+  // "Merge Responses": a model combines the shown answers; the result streams in and is kept on the shown reply.
+  const [mergingId, setMergingId] = useState<string | null>(null);
+  const merge = async (replyId: string, groups: ReplyGroup[]) => {
+    if (!history || mergingId) return;
+    const input = mergeInput(history, groups, replyId, chatId);
+    if (!input.model) return;
+    const write = (merged: MergedResponse | undefined) =>
+      queryClient.setQueryData<ChatRecord>(['chat', chatId], (current) => {
+        const tree = current?.chat?.history;
+        const reply = tree?.messages[replyId];
+        if (!current || !tree || !reply) return current;
+        const { merged: _old, ...rest } = reply;
+        const next = merged ? { ...rest, merged } : rest;
+        return { ...current, chat: { ...current.chat, history: { ...tree, messages: { ...tree.messages, [replyId]: next } } } };
+      });
+    setMergingId(replyId);
+    write({ status: true, content: '' });
+    let shownAt = 0;
+    let content: string;
+    try {
+      content = await mergeResponses(client, input, (text) => {
+        // A redraw at most every tenth of a second while it streams.
+        if (Date.now() - shownAt < 100) return;
+        shownAt = Date.now();
+        write({ status: true, content: text });
+      });
+    } catch (error) {
+      write(undefined);
+      toast(`Couldn't merge the answers: ${describeError(error)}`, 'error');
+      return;
+    } finally {
+      setMergingId(null);
+    }
+    write({ status: true, content });
+    const saved = queryClient.getQueryData<ChatRecord>(['chat', chatId])?.chat?.history;
+    const reply = saved?.messages[replyId];
+    if (temporary || !saved || !reply) return;
+    await saveMessage(client, chatId, reply, lastId ?? saved.currentId).catch((error: unknown) =>
+      toast(`Merged, but couldn't save it to the chat: ${describeError(error)}`, 'error'),
+    );
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
@@ -293,13 +347,19 @@ export default function ChatScreen() {
             pinToBottomKey={lastId ?? undefined}
             baseUrl={session.baseUrl}
             token={session.token}
+            history={history}
+            onShow={show}
+            multiAsTabs={multiAsTabs}
+            onMerge={streaming ? undefined : (replyId, groups) => void merge(replyId, groups)}
+            mergingId={mergingId}
           />
         )}
         {query.isError || notFound ? null : (
           <Composer
             draftKey={chatId}
             model={model}
-            modelLabel={model?.name ?? 'Select a model'}
+            models={selected}
+            modelLabel={choice.label}
             onPickModel={() => setPickerOpen(true)}
             onSend={onSend}
             onStop={() => void stop(chatId)}
@@ -321,9 +381,10 @@ export default function ChatScreen() {
       <ModelPicker
         visible={pickerOpen}
         models={choice.models}
-        selectedId={model?.id ?? null}
-        defaultId={choice.defaultId}
-        onSelect={choice.pick}
+        selectedIds={selected.map((item) => item.id)}
+        defaultIds={choice.defaultIds}
+        onChange={choice.pick}
+        compareAllowed={choice.compareAllowed}
         onClose={() => setPickerOpen(false)}
       />
     </View>

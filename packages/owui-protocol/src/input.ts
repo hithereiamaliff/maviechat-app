@@ -22,9 +22,11 @@ const TOGGLES = [
 export type ToggleKey = (typeof TOGGLES)[number]['key'];
 
 /** Which of web search, image generation and code interpreter the input bar offers: server, permission and model all allow it. */
-export function availableToggles(capabilities: Pick<Capabilities, 'feature'>, model: ModelItem | undefined): Record<ToggleKey, boolean> {
+export function availableToggles(capabilities: Pick<Capabilities, 'feature'>, model: ModelItem | ModelItem[] | undefined): Record<ToggleKey, boolean> {
+  // With several models (Compare), a toggle is offered only when every one of them supports it, as on the web.
+  const models = Array.isArray(model) ? model : [model];
   const result = {} as Record<ToggleKey, boolean>;
-  for (const toggle of TOGGLES) result[toggle.key] = capabilities.feature(toggle.feature) && modelSupports(model, toggle.capability);
+  for (const toggle of TOGGLES) result[toggle.key] = capabilities.feature(toggle.feature) && models.every((item) => modelSupports(item, toggle.capability));
   return result;
 }
 

@@ -2,6 +2,8 @@ export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
 export type QueryValue = string | number | boolean | null | undefined;
 
+type Method = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+
 export interface OwuiClientOptions {
   /** Server root, e.g. `https://chat.example.com`. Trailing slashes are removed. */
   baseUrl: string;
@@ -108,7 +110,26 @@ export class OwuiClient {
     return this.request<T>('POST', path, { ...options, form });
   }
 
-  async request<T>(method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH', path: string, options: RequestOptions = {}): Promise<T> {
+  async request<T>(method: Method, path: string, options: RequestOptions = {}): Promise<T> {
+    const response = await this.open(method, path, options);
+    const text = await response.text();
+    const data = parseJson(text);
+    if (!response.ok) throw new OwuiHttpError(response.status, errorDetail(data, text), path);
+    return data as T;
+  }
+
+  /**
+   * A POST whose answer is read as it arrives (server-sent events): the response itself, once the
+   * server has accepted the request. Refusals throw as they do for `request`.
+   */
+  async stream(path: string, body: unknown, options: Omit<RequestOptions, 'body' | 'form'> = {}): Promise<Response> {
+    const response = await this.open('POST', path, { ...options, body });
+    if (response.ok) return response;
+    const text = await response.text();
+    throw new OwuiHttpError(response.status, errorDetail(parseJson(text), text), path);
+  }
+
+  private async open(method: Method, path: string, options: RequestOptions): Promise<Response> {
     const headers: Record<string, string> = { Accept: 'application/json', ...this.options.headers };
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
     let body: string | FormData | undefined;
@@ -143,10 +164,7 @@ export class OwuiClient {
       options.signal?.removeEventListener('abort', onAbort);
     }
 
-    const text = await response.text();
-    const data = parseJson(text);
-    if (!response.ok) throw new OwuiHttpError(response.status, errorDetail(data, text), path);
-    return data as T;
+    return response;
   }
 }
 

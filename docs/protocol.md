@@ -210,6 +210,16 @@ The server merges these writes: it keeps its own copy of in-progress assistant m
 - **Overview** is the web's graph of `history.messages`; tapping a message follows its newest children to a leaf and shows that branch (saved as `currentId`).
 - Permissions (all default to allowed; admins always): `chat.controls` (the Controls tab), `chat.valves`, `chat.system_prompt`, `chat.params`. Some parameters are admin-only on the web: stream chunk size, compaction threshold, `use_mmap`, `use_mlock`, `num_thread`, `num_gpu`, custom params.
 
+**Several models (Compare) and Merge Responses (0.11.3 ✓, `npm run probe -- --a4`)**
+- **Choosing:** the model picker's Compare toggle (permission `chat.multiple_models`, default allowed; admins always). With it on, tapping a model adds it at the end or removes it (the last one stays); turning it off keeps only the first. "Set as default" saves the whole list as `ui.models`. A new chat starts with `ui.models` (all visible ones), else the server's `default_models`, else the first visible model. A saved chat reopens with `chat.models`.
+- **Sending:** still one `POST /api/chat/completions`. `model` and `model_item` are the first model's; `message_ids` lists every column `{model_id, message_id, modelIdx}`, and the server runs one task per entry. The user message's `models` lists them all. The same model may appear twice: `modelIdx` keeps the columns apart.
+- **Which answer is current:** the server marks each new message current as it inserts it. A new chat keeps the first model's answer as `currentId`; a saved chat ends on the last one's. The app shows the same card.
+- **Reading back:** a turn's columns are the user message's children grouped by `modelIdx` (replies saved before it existed: by `model`). Each column shows the version on the shown branch, else its newest. Regenerating one column (`buildRegenerateTurn` with its `modelIdx`) adds a version to that column only. Per-column arrows show the newest leaf of the next version and save it as `currentId`, as branch switches do.
+- **Toggles** (web search, image generation, code interpreter) are offered only when every chosen model supports them. Default toggles and tools come from the first model.
+- **Merge Responses** (on the last turn, once every shown answer is done): `POST /api/v1/tasks/moa/completions {model, prompt, responses, stream: true, chat_id}`. `model` is the shown reply's, `prompt` is the user message, and `responses` holds each column's shown text. The answer is an OpenAI-style event stream (`choices[0].delta.content`). The client keeps it on the shown reply as `merged: {status: true, content}` and saves that message. Saving a message replaces it whole, so send all of it.
+- **`chat_id` matters on some servers.** The web leaves it out. The server copies it into the request metadata, from which the model's connection builds per-chat headers. Without it, a provider that routes by session (on this server, the OpenCode Go connection, which needs `x-opencode-session`) answers 400 and the merge fails.
+- Settings: `ui.displayMultiModelResponsesInTabs` shows the columns as tabs instead of cards.
+
 ## 6. Socket.IO
 
 **Connection**
