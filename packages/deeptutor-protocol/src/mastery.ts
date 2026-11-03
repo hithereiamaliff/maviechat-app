@@ -294,6 +294,18 @@ export interface DtMasterySourceInput {
   metadata?: Record<string, unknown>;
 }
 
+/** A source as DeepTutor's learning tools take it (a path's materials, a book's sources). */
+export function learningSourceRef(source: DtMasterySourceInput): Record<string, unknown> {
+  return {
+    kind: source.kind,
+    label: source.label.slice(0, 200) || source.kind,
+    ...(source.sourceId ? { source_id: source.sourceId } : {}),
+    excerpt: (source.excerpt ?? '').slice(0, 8000),
+    available: source.available !== false,
+    metadata: source.metadata ?? {},
+  };
+}
+
 /**
  * A new path from a goal, as DeepTutor's wizard makes it: the goal first among its sources, no
  * modules yet (the outline is agreed in a chat afterwards). DeepTutor names it from the goal.
@@ -303,14 +315,7 @@ export async function createMasteryTopic(
   input: { goal: string; emoji?: string; sources?: DtMasterySourceInput[]; modules?: DtMapModuleInput[] },
 ): Promise<DtMasteryTopic> {
   const goal = input.goal.trim().slice(0, DT_GOAL_MAX);
-  const sources = [{ kind: 'goal' as const, label: 'Learning goal', excerpt: goal }, ...(input.sources ?? [])].map((source) => ({
-    kind: source.kind,
-    label: source.label.slice(0, 200) || source.kind,
-    ...(source.sourceId ? { source_id: source.sourceId } : {}),
-    excerpt: (source.excerpt ?? '').slice(0, 8000),
-    available: source.available !== false,
-    metadata: source.metadata ?? {},
-  }));
+  const sources = [{ kind: 'goal' as const, label: 'Learning goal', excerpt: goal }, ...(input.sources ?? [])].map(learningSourceRef);
   const body = { goal, emoji: input.emoji || '🧭', sources, modules: (input.modules ?? []).map(moduleInput) };
   return masteryTopicOf(await client.send<unknown>('POST', `${BASE}/topics`, { body, timeoutMs: 60_000 }).then((response) => response.data));
 }

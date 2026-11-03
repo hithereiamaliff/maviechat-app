@@ -200,6 +200,8 @@ export interface DtTurnRequest {
   masteryAnswer?: { question_id: string; text: string; answers?: Record<string, string> };
   /** The tutor's question you'd rather skip. */
   masterySkip?: { question_id: string };
+  /** Book pages the tutor reads along with the message (a page's chat). */
+  bookReferences?: { book_id: string; page_ids: string[] }[];
 }
 
 export type DtCommand = Record<string, unknown> & { protocol_version: string; type: string };
@@ -229,6 +231,7 @@ export function startTurnCommand(request: DtTurnRequest): DtCommand {
   if (request.masterySessionMode) command.mastery_session_mode = request.masterySessionMode;
   if (request.masteryAnswer) command.mastery_answer = request.masteryAnswer;
   if (request.masterySkip) command.mastery_skip = request.masterySkip;
+  if (request.bookReferences?.length) command.book_references = request.bookReferences;
   return command;
 }
 

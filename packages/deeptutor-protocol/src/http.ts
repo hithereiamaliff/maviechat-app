@@ -25,13 +25,16 @@ export class DtHttpError extends Error {
   readonly status: number;
   readonly detail: string | undefined;
   readonly path: string;
+  /** DeepTutor's own name for the error, when it sends one (`book_revision_conflict`, `book_paused`…). */
+  readonly code: string | undefined;
 
-  constructor(status: number, detail: string | undefined, path: string) {
+  constructor(status: number, detail: string | undefined, path: string, code?: string) {
     super(detail ? `${detail} (HTTP ${status})` : `HTTP ${status} from ${path}`);
     this.name = 'DtHttpError';
     this.status = status;
     this.detail = detail;
     this.path = path;
+    this.code = code;
   }
 
   /** The sign-in is missing or no longer accepted. */
@@ -141,12 +144,12 @@ export class DtClient {
     } catch {
       data = text;
     }
-    if (!response.ok) throw new DtHttpError(response.status, detailOf(data), path);
+    if (!response.ok) throw new DtHttpError(response.status, detailOf(data), path, codeOf(data));
     return { data: data as T, headers: response.headers };
   }
 }
 
-/** FastAPI errors: `{detail: "text"}`, or `{detail: [{msg}]}` when the input was invalid. */
+/** FastAPI errors: `{detail: "text"}`, `{detail: [{msg}]}` when the input was invalid, or `{detail: {code, message}}`. */
 function detailOf(data: unknown): string | undefined {
   if (typeof data !== 'object' || data === null || !('detail' in data)) return undefined;
   const { detail } = data as { detail: unknown };
@@ -155,5 +158,16 @@ function detailOf(data: unknown): string | undefined {
     const messages = detail.flatMap((item) => (typeof item === 'object' && item !== null && 'msg' in item ? [String((item as { msg: unknown }).msg)] : []));
     return messages.length ? messages.join('; ') : undefined;
   }
+  if (typeof detail === 'object' && detail !== null) {
+    const { message, code } = detail as { message?: unknown; code?: unknown };
+    if (typeof message === 'string' && message) return message;
+    if (typeof code === 'string' && code) return code;
+  }
   return undefined;
+}
+
+function codeOf(data: unknown): string | undefined {
+  const detail = typeof data === 'object' && data !== null && 'detail' in data ? (data as { detail: unknown }).detail : undefined;
+  const code = typeof detail === 'object' && detail !== null && !Array.isArray(detail) ? (detail as { code?: unknown }).code : undefined;
+  return typeof code === 'string' && code ? code : undefined;
 }

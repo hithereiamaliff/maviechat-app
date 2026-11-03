@@ -1,4 +1,4 @@
-import { pageAvailable, type DtAuthStatus, type DtLearningActivity, type DtLearningKind, type DtModule } from '@maviechat/deeptutor-protocol';
+import { bookOfPreferences, masteryOfPreferences, pageAvailable, type DtAuthStatus, type DtLearningActivity, type DtLearningKind, type DtModule, type DtSessionSummary } from '@maviechat/deeptutor-protocol';
 import { router } from 'expo-router';
 import type { IconName } from '@/components/Icon';
 import { openDtPage } from '@/features/deeptutor/settings/DtGeneralSettings';
@@ -83,7 +83,7 @@ export function openActivity(activity: DtLearningActivity): void {
       router.push({ pathname: '/learn/practice', params: { entry: activity.id } });
       return;
     case 'books':
-      openDtPage(`/learning/books/${id}`, activity.title || 'Book');
+      router.push({ pathname: '/learn/books/[id]', params: { id: activity.id } });
       return;
     case 'reading':
       openDtPage(`/learning/reading/${id}`, activity.title || 'Reading');
@@ -97,5 +97,12 @@ export function openActivity(activity: DtLearningActivity): void {
 export function startWay(way: LearningWay): void {
   if (way.kind === 'mastery') router.push('/learn/mastery/new');
   else if (way.kind === 'practice') router.push('/learn/practice');
-  else openDtPage(`${way.path}?create=1`, `New ${way.label === 'Books' ? 'Book' : way.label}`);
+  else if (way.kind === 'books') router.push('/learn/books/new');
+  else openDtPage(`${way.path}?create=1`, `New ${way.label}`);
+}
+
+/** Whether the app has a learning chat's own screen: a mastery path's chats and a book page's are native; others open DeepTutor's page. */
+export function opensNatively(session: DtSessionSummary): boolean {
+  const preferences = session.preferences as Record<string, unknown> | undefined;
+  return masteryOfPreferences(preferences) !== null || bookOfPreferences(preferences) !== null;
 }

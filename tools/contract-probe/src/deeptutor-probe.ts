@@ -1,6 +1,6 @@
 /**
  * DeepTutor contract probe (milestone M1.5):
- *   npm run probe:deeptutor -- [--url http://127.0.0.1:3782] [--env ~/.config/maviechat/deeptutor-test.env] [--no-fixtures] [--turn] [--learning]
+ *   npm run probe:deeptutor -- [--url http://127.0.0.1:3782] [--env ~/.config/maviechat/deeptutor-test.env] [--no-fixtures] [--turn] [--learning] [--books]
  *
  * `--turn` also runs one short "APP PROBE:" chat turn over `/ws` (it uses the account's model),
  * drops the socket mid-reply on purpose, checks the resumed reply equals the saved one, and
@@ -32,6 +32,9 @@
  * `--learning` checks the learning hub and mastery paths (src/deeptutor-learning-probe.ts): a
  * path made from a goal, a study chat whose question card is answered and graded, mode switch,
  * a point marked known and back, rename, review settings, a map edit, reset, then deletion.
+ * `--books` checks Books (src/deeptutor-books-probe.ts): a small "APP PROBE:" book through
+ * proposal, outline and one chapter written over `/ws/books` (a second socket following its
+ * events), reading progress, export, a chat about the page, pause, then deletion.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -132,6 +135,7 @@ import {
   tokenExpiry,
   TOKEN_COOKIE,
 } from '@maviechat/deeptutor-protocol';
+import { probeBooks } from './deeptutor-books-probe';
 import { probeLearning } from './deeptutor-learning-probe';
 import { loadEnvFile } from './env';
 import { shapeOf } from './shape';
@@ -153,6 +157,7 @@ const { values: args } = parseArgs({
     knowledge: { type: 'boolean' },
     calendar: { type: 'boolean' },
     learning: { type: 'boolean' },
+    books: { type: 'boolean' },
   },
 });
 
@@ -351,6 +356,14 @@ async function main() {
     await step('learning: hub index, a mastery path, a study chat with a graded question, settings, map edit, reset, delete', async () => {
       const outcome = await probeLearning(baseUrl, session.token as string, client);
       fixtures.learning = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.books) {
+    await step('books: proposal, outline, one chapter over /ws/books, progress, export, page chat, pause, delete', async () => {
+      const outcome = await probeBooks(baseUrl, session.token as string, client);
+      fixtures.books = outcome.fixture;
       return { value: true, note: outcome.note };
     });
   }

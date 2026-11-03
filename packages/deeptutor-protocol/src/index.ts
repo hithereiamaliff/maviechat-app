@@ -1,5 +1,6 @@
 export * from './account';
 export * from './auth';
+export * from './books';
 export * from './calendar';
 export * from './calendarTime';
 export * from './chatOptions';

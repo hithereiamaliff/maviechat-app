@@ -1,0 +1,331 @@
+{
+  "library": {
+    "canCreate": true,
+    "count": 0
+  },
+  "blockTypes": [
+    "animation",
+    "callout",
+    "code",
+    "figure",
+    "flash_cards",
+    "interactive",
+    "quiz",
+    "section",
+    "text",
+    "timeline"
+  ],
+  "estimateBasis": {
+    "concept": {
+      "blocks": "number",
+      "seconds": "number",
+      "words": "number"
+    },
+    "derivation": {
+      "blocks": "number",
+      "seconds": "number",
+      "words": "number"
+    },
+    "history": {
+      "blocks": "number",
+      "seconds": "number",
+      "words": "number"
+    },
+    "overview": {
+      "blocks": "number",
+      "seconds": "number",
+      "words": "number"
+    },
+    "practice": {
+      "blocks": "number",
+      "seconds": "number",
+      "words": "number"
+    },
+    "theory": {
+      "blocks": "number",
+      "seconds": "number",
+      "words": "number"
+    }
+  },
+  "create": {
+    "events": [
+      "stage_start",
+      "progress"
+    ],
+    "book": {
+      "description": "string",
+      "estimated_chapters": "number",
+      "rationale": "string",
+      "scope": "string",
+      "target_level": "string",
+      "title": "string"
+    }
+  },
+  "outline": {
+    "events": [
+      "stage_start",
+      "progress:exploration",
+      "exploration_ready",
+      "stage_end",
+      "progress:synthesis",
+      "spine_round"
+    ],
+    "spine": {
+      "book_id": "string",
+      "chapters": [
+        {
+          "content_type": "string",
+          "covers": [
+            "string"
+          ],
+          "id": "string",
+          "learning_objectives": [
+            "string"
+          ],
+          "order": "number",
+          "page_ids": [],
+          "prerequisites": [],
+          "source_anchors": [],
+          "summary": "string",
+          "title": "string"
+        }
+      ],
+      "concept_graph": {
+        "edges": [
+          "object"
+        ],
+        "nodes": [
+          "object"
+        ]
+      },
+      "exploration_summary": "string",
+      "updated_at": "number",
+      "version": "number"
+    },
+    "revision": "number"
+  },
+  "overview": {
+    "blocks": [
+      "text",
+      "concept_graph",
+      "text"
+    ],
+    "graph": {
+      "code": {
+        "content": "string",
+        "language": "string"
+      },
+      "graph": {
+        "edges": [
+          "object"
+        ],
+        "nodes": [
+          "object"
+        ]
+      },
+      "index": {
+        "chapters": [
+          "object"
+        ],
+        "node_to_chapter": {
+          "condensation_how_water_vapor_becomes_liquid_drop": "string",
+          "evaporation_how_liquid_water_becomes_vapor": "string"
+        }
+      },
+      "render_type": "string"
+    }
+  },
+  "page": {
+    "status": "ready",
+    "blocks": [
+      "section:ready",
+      "section:ready",
+      "section:ready",
+      "quiz:ready"
+    ],
+    "shapes": {
+      "section": {
+        "bridge_text": "string",
+        "focus": "string",
+        "format": "string",
+        "intro": "string",
+        "key_takeaway": "string",
+        "role": "string",
+        "subsections": [
+          {
+            "body": "string",
+            "focus": "string",
+            "heading": "string",
+            "role": "string",
+            "target_words": "number"
+          }
+        ]
+      },
+      "quiz": {
+        "bridge_text": "string",
+        "questions": [
+          {
+            "concentration": "string",
+            "correct_answer": "string",
+            "difficulty": "string",
+            "explanation": "string",
+            "options": "object",
+            "question": "string",
+            "question_id": "string",
+            "question_type": "string"
+          }
+        ],
+        "topic": "string"
+      }
+    }
+  },
+  "events": [
+    "stage_start",
+    "progress:exploration",
+    "exploration_ready",
+    "stage_end",
+    "progress:synthesis",
+    "spine_round",
+    "spine_ready",
+    "overview_ready",
+    "page_compile_started",
+    "page_planning",
+    "page_planned",
+    "block_started",
+    "block_ready",
+    "page_compiled"
+  ],
+  "export": {
+    "characters": true
+  },
+  "chat": {
+    "preferences": {
+      "answer_by": "string",
+      "book_id": "string",
+      "book_page_id": "string",
+      "book_references": [
+        {
+          "book_id": "string",
+          "page_ids": [
+            "string"
+          ]
+        }
+      ],
+      "capability": "string",
+      "history_references": [],
+      "knowledge_bases": [],
+      "language": "string",
+      "llm_selection": {
+        "model_id": "string",
+        "profile_id": "string"
+      },
+      "notebook_references": [],
+      "partner_group_references": [],
+      "question_notebook_references": [],
+      "reading_references": [],
+      "tools": [
+        "string"
+      ],
+      "workspace_dependencies": {
+        "book_references": [
+          {
+            "book_id": "string",
+            "page_ids": [
+              "string"
+            ]
+          }
+        ],
+        "history_references": [],
+        "knowledge_bases": [],
+        "notebook_references": [],
+        "question_notebook_references": [],
+        "reading_references": []
+      },
+      "workspace_id": "string"
+    }
+  },
+  "detail": {
+    "book": {
+      "blockTypes": [
+        "string"
+      ],
+      "canDelete": "boolean",
+      "canEdit": "boolean",
+      "chapterCount": "number",
+      "createdAt": "number",
+      "depth": "string",
+      "description": "string",
+      "explorationFailed": "boolean",
+      "generation": {
+        "canResume": "boolean",
+        "failedBlocks": "number",
+        "failedPages": "number",
+        "failureCategories": {},
+        "interrupted": "boolean",
+        "pauseReason": "string",
+        "queuedPages": "number",
+        "startedAt": "number",
+        "status": "string",
+        "working": "boolean"
+      },
+      "id": "string",
+      "knowledgeBases": [],
+      "language": "string",
+      "lazy": "boolean",
+      "pageChats": {
+        "pg_8ece08f940": "string"
+      },
+      "pageCount": "number",
+      "pauseKind": "string",
+      "pauseReason": "string",
+      "permission": "string",
+      "proposal": {
+        "description": "string",
+        "estimatedChapters": "number",
+        "rationale": "string",
+        "scope": "string",
+        "targetLevel": "string",
+        "title": "string"
+      },
+      "rawProposal": {
+        "description": "string",
+        "estimated_chapters": "number",
+        "rationale": "string",
+        "scope": "string",
+        "target_level": "string",
+        "title": "string"
+      },
+      "reading": {
+        "currentPageId": "string",
+        "percent": "number",
+        "totalPages": "number",
+        "visitedPages": "number"
+      },
+      "revision": "number",
+      "shared": "boolean",
+      "status": "string",
+      "title": "string",
+      "updatedAt": "number"
+    },
+    "progress": {
+      "bookmarked": [],
+      "currentPageId": "string",
+      "quizAttempts": [
+        {
+          "answer": "string",
+          "blockId": "string",
+          "correct": "null",
+          "pageId": "string",
+          "questionId": "string",
+          "submissionId": "string",
+          "timestamp": "number"
+        }
+      ],
+      "score": "number",
+      "visited": [
+        "string"
+      ],
+      "weakChapters": []
+    }
+  }
+}

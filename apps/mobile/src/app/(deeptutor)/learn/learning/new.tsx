@@ -8,7 +8,7 @@ import { fonts, radius, usePalette } from '@/theme';
 /**
  * New Learning Activity: the ways to learn this account may start (those the server has switched
  * on, and a learner's policy allows), each with what it does. Mastery paths and practice start
- * here; a book or a reading collection starts on DeepTutor's own page.
+ * here, as do books; a reading collection starts on DeepTutor's own page.
  */
 export default function NewLearningActivity() {
   const palette = usePalette();
@@ -30,7 +30,7 @@ export default function NewLearningActivity() {
           <Pressable
             key={way.kind}
             accessibilityRole="button"
-            accessibilityHint={way.kind === 'books' || way.kind === 'reading' ? "Opens DeepTutor's page" : undefined}
+            accessibilityHint={way.kind === 'reading' ? "Opens DeepTutor's page" : undefined}
             onPress={() => startWay(way)}
             style={({ pressed }) => [styles.card, { borderColor: palette.border }, pressed && { backgroundColor: palette.surface }]}>
             <View style={styles.top}>
@@ -38,7 +38,7 @@ export default function NewLearningActivity() {
                 <Icon name={way.icon} size={20} color={palette.text} />
               </View>
               <Text style={[styles.title, { color: palette.text }]}>{way.label}</Text>
-              <Icon name={way.kind === 'books' || way.kind === 'reading' ? 'arrow-top-right-on-square' : 'chevron-right'} size={16} color={palette.textFaint} />
+              <Icon name={way.kind === 'reading' ? 'arrow-top-right-on-square' : 'chevron-right'} size={16} color={palette.textFaint} />
             </View>
             <Text style={[styles.summary, { color: palette.text }]}>{way.summary}</Text>
             {way.points.map((point) => (

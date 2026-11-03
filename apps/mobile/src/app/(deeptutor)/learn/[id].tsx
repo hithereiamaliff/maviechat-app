@@ -1,5 +1,7 @@
 import {
   activeTurnOf,
+  bookOfPreferences,
+  bookTurnFields,
   getSession,
   isPinned,
   masteryOfPreferences,
@@ -40,9 +42,10 @@ import type { MasteryCardAnswer } from '@/features/deeptutor/chat/DtMasteryCard'
 import type { DtReplyActions } from '@/features/deeptutor/chat/DtReplyView';
 import type { QuizAnswer } from '@/features/deeptutor/chat/quiz';
 import { useDtChoice } from '@/features/deeptutor/chat/useDtChoice';
+import { BookBar } from '@/features/deeptutor/books/BookBar';
 import { deepTutorAttachment } from '@/features/deeptutor/crossReference';
 import { PathBar } from '@/features/deeptutor/learning/PathBar';
-import { useDtMasteryTopic, useDtNotebooks, useDtSession, useDtSessions } from '@/features/deeptutor/queries';
+import { useDtBook, useDtMasteryTopic, useDtNotebooks, useDtSession, useDtSessions } from '@/features/deeptutor/queries';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { switchToOpenWebUI } from '@/features/deeptutor/switch';
 import { TaskLinkSheet } from '@/features/deeptutor/tasks/TaskLinkSheet';
@@ -79,7 +82,10 @@ export default function DeepTutorChat() {
   // A mastery path's chat: the path it works on, and its mode.
   const path = masteryOfPreferences(detail.data?.preferences);
   const topic = useDtMasteryTopic(path?.pathId ?? '');
-  const native = isNativeCapability(capability) || Boolean(path);
+  // A chat about a book's page: the tutor reads the page with every message.
+  const page = path ? null : bookOfPreferences(detail.data?.preferences);
+  const pageBook = useDtBook(page?.bookId ?? '');
+  const native = isNativeCapability(capability) || Boolean(path) || Boolean(page);
   const running = turn?.reply.status === 'running' || turn?.reply.status === 'waiting';
 
   // After each reply in a path chat, the path is read again; a point newly mastered gets a note
@@ -185,7 +191,16 @@ export default function DeepTutorChat() {
         path
           ? // A path chat keeps its path and mode on every turn; the tutor brings its own tools.
             { content: text, sessionId: id, ...masteryTurnFields(path.pathId, null), llmSelection: choice.model, knowledgeBases: choice.selectedKnowledgeBases, ...extrasRequest(extras) }
-          : { content: text, sessionId: id, ...choice.request, ...extrasRequest(extras) },
+          : page
+            ? // A page's chat sends the page each time, with the book's knowledge bases (the chat keeps its own until the book is read).
+              {
+                content: text,
+                sessionId: id,
+                ...(pageBook.data ? bookTurnFields(pageBook.data.book, page.pageId) : { capability: 'chat', bookReferences: [{ book_id: page.bookId, page_ids: [page.pageId] }] }),
+                llmSelection: choice.model,
+                ...extrasRequest(extras),
+              }
+            : { content: text, sessionId: id, ...choice.request, ...extrasRequest(extras) },
       );
       return true;
     } catch (error) {
@@ -360,9 +375,11 @@ export default function DeepTutorChat() {
     [native, inPath, running, masteryState],
   );
   const openPath = () => (path ? router.push({ pathname: '/learn/mastery/[id]', params: { id: path.pathId } }) : undefined);
+  const openPage = () => (page?.pageId ? router.push({ pathname: '/learn/books/[id]/[page]', params: { id: page.bookId, page: page.pageId } }) : undefined);
   const waypoint = topic.data?.next?.pointName || topic.data?.modules.flatMap((module) => module.points).find((point) => point.status !== 'mastered')?.name;
   const menu: MenuItem[] = [
     ...(path ? [{ key: 'path', label: 'Open the Path', icon: 'map' as const, onPress: openPath }] : []),
+    ...(page?.pageId && !pageBook.isError ? [{ key: 'page', label: 'Open the Page', icon: 'book-open' as const, onPress: openPage }] : []),
     ...(owui.state.status === 'signed-in' && items.length > 0
       ? [{ key: 'ask', label: attaching ? 'Attaching…' : 'Ask About It in Open WebUI', icon: 'chat-bubble-left' as const, onPress: () => void askInOpenWebUI() }]
       : []),
@@ -390,6 +407,7 @@ export default function DeepTutorChat() {
       {path ? (
         <PathBar topic={topic.data} mode={path.mode ?? 'study'} onMode={running ? undefined : (mode) => void switchMode(mode)} onOpenPath={() => openPath()} />
       ) : null}
+      {page ? <BookBar bookId={page.bookId} pageId={page.pageId} /> : null}
       <KeyboardAvoidingView behavior="padding" style={styles.body}>
         {detail.isLoading && !turn ? (
           <ActivityIndicator style={styles.loading} color={palette.textMuted} />
@@ -404,22 +422,24 @@ export default function DeepTutorChat() {
             running={running}
             onSend={send}
             onStop={stop}
-            tools={choice.tools}
-            selectedTools={choice.selectedTools}
+            // A page's chat uses your own tool settings and the book's knowledge bases, as on DeepTutor.
+            tools={page ? [] : choice.tools}
+            selectedTools={page ? [] : choice.selectedTools}
             onToolsChange={choice.setSelectedTools}
             models={choice.models}
             model={choice.model}
             onModelChange={choice.setModel}
             // A path chat's mode is the path's own (above); DeepTutor's other modes aren't offered here.
-            modes={path ? [] : choice.modes}
-            mode={path ? 'mastery_path' : choice.mode}
+            modes={path || page ? [] : choice.modes}
+            mode={path ? 'mastery_path' : page ? 'chat' : choice.mode}
             onModeChange={choice.setMode}
-            placeholder={path ? (waypoint ? `Ask your tutor about "${waypoint}"` : 'Ask your tutor') : undefined}
+            placeholder={path ? (waypoint ? `Ask your tutor about "${waypoint}"` : 'Ask your tutor') : page ? 'Ask about this page' : undefined}
             config={choice.config}
             onSettingChange={choice.setSetting}
             knowledgeBases={choice.knowledgeBases}
-            selectedKnowledgeBases={choice.selectedKnowledgeBases}
+            selectedKnowledgeBases={page ? [] : choice.selectedKnowledgeBases}
             onKnowledgeBasesChange={choice.setSelectedKnowledgeBases}
+            knowledgeFixed={Boolean(page)}
             sessionId={id}
           />
         ) : (

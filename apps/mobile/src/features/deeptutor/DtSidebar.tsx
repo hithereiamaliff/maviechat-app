@@ -1,4 +1,4 @@
-import { listSessions, masteryOfPreferences, searchSessions, sessionStatusColor, sessionTitle } from '@maviechat/deeptutor-protocol';
+import { listSessions, searchSessions, sessionStatusColor, sessionTitle } from '@maviechat/deeptutor-protocol';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useGlobalSearchParams, usePathname } from 'expo-router';
@@ -12,6 +12,7 @@ import { useDebounced } from '@/lib/useDebounced';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
 import { radius, usePalette } from '@/theme';
+import { opensNatively } from './learning/ways';
 import { DT_ADMIN_PAGE, shelvesFor, type DtPage, type DtShelfKey } from './pages';
 import { useDtProfile, useDtTaskBoard } from './queries';
 import { buildDtSidebarRows, type DtSidebarRow } from './sidebarRows';
@@ -150,8 +151,8 @@ export function DtSidebar() {
         );
       case 'learning-chat': {
         const title = sessionTitle(item.session);
-        // A mastery path's chats are native; the other learning chats open in DeepTutor's own pages.
-        const native = masteryOfPreferences(item.session.preferences as Record<string, unknown> | undefined) !== null;
+        // A mastery path's chats and a book page's are native; the other learning chats open in DeepTutor's own pages.
+        const native = opensNatively(item.session);
         return (
           <SidebarChatRow
             title={title}

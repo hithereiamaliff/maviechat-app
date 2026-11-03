@@ -1,4 +1,4 @@
-import { isArchived, learningPath, listSessions, masteryOfPreferences, searchSessions, searchSnippet, sessionTitle, type DtSessionSummary } from '@maviechat/deeptutor-protocol';
+import { isArchived, learningPath, listSessions, searchSessions, searchSnippet, sessionTitle, type DtSessionSummary } from '@maviechat/deeptutor-protocol';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -8,6 +8,7 @@ import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { MenuButton } from '@/components/Menu';
 import { capabilityName } from '@/features/deeptutor/chat/capabilities';
+import { opensNatively } from '@/features/deeptutor/learning/ways';
 import { startChatWith } from '@/features/deeptutor/chat/extras';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { filterHistory, isTutorThread, type HistoryKind, type HistoryStatus } from '@/features/deeptutor/history';
@@ -63,7 +64,7 @@ export default function ChatHistory() {
   const failure = query ? found.error : all.error;
 
   const open = (item: DtSessionSummary) => {
-    const path = masteryOfPreferences(item.preferences as Record<string, unknown> | undefined) ? null : learningPath(item);
+    const path = opensNatively(item) ? null : learningPath(item);
     if (path) router.replace({ pathname: '/learn/web', params: { path, title: sessionTitle(item) } });
     else router.replace({ pathname: '/learn/[id]', params: { id: item.id } });
   };

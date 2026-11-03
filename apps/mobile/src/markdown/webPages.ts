@@ -10,6 +10,9 @@ const VEGA = 'https://cdn.jsdelivr.net/npm/vega@5.33.1/build/vega.min.js';
 const VEGA_LITE = 'https://cdn.jsdelivr.net/npm/vega-lite@5.23.0/build/vega-lite.min.js';
 const VEGA_EMBED = 'https://cdn.jsdelivr.net/npm/vega-embed@6.29.0/build/vega-embed.min.js';
 
+// KaTeX (MIT) for maths in generated pages, at a fixed version.
+const KATEX = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist';
+
 /** Tells the app the content's height, so the web view fits it without scrolling. */
 export const SIZE_SCRIPT = `<script>(function(){function post(){var h=Math.ceil(document.documentElement.scrollHeight);if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify({height:h}));}window.addEventListener('load',function(){post();setTimeout(post,400);setTimeout(post,1500);});if(window.ResizeObserver)new ResizeObserver(post).observe(document.body);})();</script>`;
 
@@ -76,4 +79,15 @@ export function previewPage(code: string, dark: boolean): string {
   if (/^\s*<svg[\s>]/i.test(code)) return page(cleanSvg(code), dark);
   if (/<html[\s>]/i.test(code)) return code;
   return page(code, dark);
+}
+
+/**
+ * A generated HTML page with KaTeX added, so `$…$`, `$$…$$`, `\(…\)` and `\[…\]` show as maths,
+ * unless the page brings KaTeX itself.
+ */
+export function withMath(html: string): string {
+  if (/katex/i.test(html)) return html;
+  const render = `renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},{left:'\\\\(',right:'\\\\)',display:false},{left:'\\\\[',right:'\\\\]',display:true}],throwOnError:false})`;
+  const head = `<link rel="stylesheet" href="${KATEX}/katex.min.css"><script defer src="${KATEX}/katex.min.js"></script><script defer src="${KATEX}/contrib/auto-render.min.js" onload="${render}"></script>`;
+  return /<\/head\s*>/i.test(html) ? html.replace(/<\/head\s*>/i, `${head}</head>`) : `${head}${html}`;
 }

@@ -8,7 +8,6 @@ import { IconButton } from '@/components/IconButton';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { KIND_ICONS, KIND_LABELS, LEARNING_WAYS, openActivity, startWay, waysFor } from '@/features/deeptutor/learning/ways';
 import { sessionDate, useDtAuthStatus, useDtLearningIndex, useDtModules } from '@/features/deeptutor/queries';
-import { openDtPage } from '@/features/deeptutor/settings/DtGeneralSettings';
 import { describeError } from '@/lib/errors';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 import { fonts, radius, usePalette } from '@/theme';
@@ -22,7 +21,7 @@ const FILTERS: { key: DtLearningKind | 'all'; label: string }[] = [
 /**
  * All Learning, as DeepTutor's hub: what needs your attention (reviews due, books paused or still
  * being written), then every learning activity, newest first, to filter by kind or search.
- * Mastery paths and practice open here; books, reading and videos open DeepTutor's own pages.
+ * Mastery paths, books and practice open here; reading and videos open DeepTutor's own pages.
  */
 export default function AllLearning() {
   const palette = usePalette();
@@ -103,9 +102,9 @@ export default function AllLearning() {
           />
         </View>
 
-        {filter === 'mastery' ? (
-          <Pressable accessibilityRole="button" onPress={() => router.push('/learn/mastery')} style={styles.open} hitSlop={4}>
-            <Text style={[styles.link, { color: palette.link }]}>Open Mastery Path</Text>
+        {filter === 'mastery' || filter === 'books' ? (
+          <Pressable accessibilityRole="button" onPress={() => router.push(filter === 'books' ? '/learn/books' : '/learn/mastery')} style={styles.open} hitSlop={4}>
+            <Text style={[styles.link, { color: palette.link }]}>{filter === 'books' ? 'Open Books' : 'Open Mastery Path'}</Text>
             <Icon name="chevron-right" size={14} color={palette.link} />
           </Pressable>
         ) : null}
@@ -151,7 +150,7 @@ export default function AllLearning() {
                   <Pressable
                     key={`book-${book.id}`}
                     accessibilityRole="button"
-                    onPress={() => openDtPage(`/learning/books/${encodeURIComponent(book.id)}`, book.title || 'Book')}
+                    onPress={() => router.push({ pathname: '/learn/books/[id]', params: { id: book.id } })}
                     style={({ pressed }) => [styles.row, { borderColor: palette.border }, pressed && { backgroundColor: palette.surface }]}>
                     <View style={[styles.tile, { backgroundColor: palette.surface }]}>
                       <Icon name="book-open" size={18} color={palette.text} />

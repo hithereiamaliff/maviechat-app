@@ -3,8 +3,6 @@ import {
   getAuthStatus,
   sessionTitle,
   type DtSession,
-  SOCKET_AUTH_FAILED,
-  socketCookieHeader,
   turnSocketUrl,
   type DtConnectionState,
   type DtTurnRequest,
@@ -16,6 +14,7 @@ import { useToast } from '@/components/Toast';
 import { pushTokenIfOn } from '@/features/notifications/push';
 import { watchDeepTutorTurn } from '@/features/notifications/relay';
 import { DT_EXPIRED_NOTICE, DT_QUERY_ROOT, useDeepTutor, useDtAuthed } from '@/session/DeepTutorProvider';
+import { dtSocketFactory } from '@/features/deeptutor/dtSocket';
 import { LiveTurns, type LiveTurn } from './liveTurns';
 
 interface DtLiveValue {
@@ -33,9 +32,6 @@ interface DtLiveValue {
 }
 
 const DtLiveContext = createContext<DtLiveValue | null>(null);
-
-// React Native's WebSocket takes request headers as a third argument, which the DOM typings don't declare.
-const SocketWithHeaders = WebSocket as unknown as new (url: string, protocols: undefined, options: { headers: Record<string, string> }) => WebSocket;
 
 /**
  * The DeepTutor space's live connection: one `/ws` socket for every chat, opened when a turn
@@ -77,22 +73,7 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
     };
     return new DtTurnConnection({
       url: turnSocketUrl(baseUrl),
-      connect: (url, handlers) => {
-        const socket = new SocketWithHeaders(url, undefined, { headers: { Cookie: socketCookieHeader(token) } });
-        let opened = false;
-        let refused = false;
-        socket.onopen = () => {
-          opened = true;
-          handlers.onOpen();
-        };
-        socket.onmessage = (event) => handlers.onMessage(event.data);
-        // A refused sign-in fails the handshake (HTTP 401/403) before the socket opens.
-        socket.onerror = (event) => {
-          if (!opened && /\b40[13]\b/.test(String((event as { message?: unknown }).message ?? ''))) refused = true;
-        };
-        socket.onclose = (event) => handlers.onClose(refused ? SOCKET_AUTH_FAILED : event.code);
-        return { send: (data) => socket.send(data), close: () => socket.close() };
-      },
+      connect: dtSocketFactory(token),
       onEvent: (event) => {
         const live = turns.apply(event);
         if (event.type === 'session') {

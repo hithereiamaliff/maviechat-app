@@ -5,12 +5,17 @@ import {
   getCalendarLayers,
   getTaskBlocks,
   getTaskBoard,
+  listBlockTypes,
+  listBooks,
   listCalendars,
   listOccurrences,
   type DateKey,
   DEFAULT_ATTACHMENT_LIMITS,
   getAttachmentLimits,
   getAuthStatus,
+  getBook,
+  getBookPage,
+  getEstimateBasis,
   getKbProgress,
   getKnowledgeBase,
   getLearningIndex,
@@ -311,4 +316,37 @@ export function useDtPointReport(pathId: string, pointId: string | null) {
 export function useDtKnowledgeMaterials(enabled: boolean) {
   const { client, session } = useDtAuthed();
   return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'mastery', 'kb-materials'], queryFn: () => listKnowledgeMaterials(client), enabled, staleTime: 60_000 });
+}
+
+/** Your books and those shared with you; read again every 30 s while shown (they're written in the background). */
+export function useDtBooks() {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'books', 'list'], queryFn: () => listBooks(client), refetchInterval: 30_000, staleTime: 5_000 });
+}
+
+/** A book with its outline, pages (without their blocks) and your progress. */
+export function useDtBook(bookId: string) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'books', 'book', bookId], queryFn: () => getBook(client, bookId), enabled: Boolean(bookId), staleTime: 5_000 });
+}
+
+/** One page with its blocks. */
+export function useDtBookPage(bookId: string, pageId: string) {
+  const { client, session } = useDtAuthed();
+  return useQuery({
+    queryKey: [DT_QUERY_ROOT, session.baseUrl, 'books', 'book', bookId, 'page', pageId],
+    queryFn: () => getBookPage(client, bookId, pageId),
+    enabled: Boolean(bookId && pageId),
+    staleTime: 5_000,
+  });
+}
+
+export function useDtBlockTypes(enabled: boolean) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'books', 'block-types'], queryFn: () => listBlockTypes(client), enabled, staleTime: 10 * 60_000 });
+}
+
+export function useDtEstimateBasis(depth: string, enabled: boolean) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'books', 'estimate', depth], queryFn: () => getEstimateBasis(client, depth), enabled, staleTime: 10 * 60_000 });
 }

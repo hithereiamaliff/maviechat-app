@@ -63,6 +63,8 @@ interface DtComposerProps {
   knowledgeBases: DtKnowledgeBase[] | undefined;
   selectedKnowledgeBases: string[];
   onKnowledgeBasesChange: (names: string[]) => void;
+  /** The chat's knowledge bases are set elsewhere (a book page's chat uses the book's): no picker. */
+  knowledgeFixed?: boolean;
   /** Kept out of the "earlier chat" list. */
   sessionId?: string;
   placeholder?: string;
@@ -103,6 +105,7 @@ export function DtComposer({
   knowledgeBases,
   selectedKnowledgeBases,
   onKnowledgeBasesChange,
+  knowledgeFixed = false,
   sessionId,
   placeholder,
   autoFocus = false,
@@ -129,7 +132,7 @@ export function DtComposer({
     { key: 'files', label: 'Files', icon: 'paper-clip', onPress: () => void attach.pickFiles() },
     { key: 'notebook', label: 'Notebook', icon: 'book-open', onPress: () => setSheet('notebook') },
     { key: 'chat', label: 'Earlier Chat', icon: 'chat-bubble-left', onPress: () => setSheet('chat') },
-    { key: 'knowledge', label: 'Knowledge Bases', icon: 'archive-box', onPress: () => setSheet('knowledge') },
+    ...(knowledgeFixed ? [] : [{ key: 'knowledge', label: 'Knowledge Bases', icon: 'archive-box' as const, onPress: () => setSheet('knowledge') }]),
   ];
   const { ref: plusRef, open: openPlus, menu: plusMenu } = useAnchoredMenu(plusItems);
   const chips: ExtraChip[] = [

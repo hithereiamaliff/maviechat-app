@@ -58,7 +58,8 @@ export function DtStages({ stages, running }: { stages: DtStage[]; running: bool
   );
 }
 
-function QuizItem({ question, number, answer, setAnswer }: { question: DtQuizQuestion; number: number; answer: QuizAnswer; setAnswer: (answer: QuizAnswer) => void }) {
+/** One question to answer: choices check at once; written answers show DeepTutor's answer to mark yourself against. */
+export function QuizItem({ question, number, answer, setAnswer }: { question: DtQuizQuestion; number: number; answer: QuizAnswer; setAnswer: (answer: QuizAnswer) => void }) {
   const palette = usePalette();
   const [draft, setDraft] = useState('');
   const choices = choicesFor(question);
@@ -103,7 +104,8 @@ function QuizItem({ question, number, answer, setAnswer }: { question: DtQuizQue
           })}
         </View>
       ) : answered ? (
-        <Text style={[styles.yourAnswer, { color: palette.text }]}>{`Your answer: ${answer.value}`}</Text>
+        // An answer kept from before may have no text (you marked it yourself).
+        answer.value ? <Text style={[styles.yourAnswer, { color: palette.text }]}>{`Your answer: ${answer.value}`}</Text> : null
       ) : (
         <View style={styles.written}>
           <TextInput
