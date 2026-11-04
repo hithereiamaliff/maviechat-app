@@ -15,6 +15,7 @@ import {
   abortSession,
   createSession,
   deleteSession,
+  errorText,
   getMachine,
   getMessages,
   getStatuses,
@@ -110,7 +111,13 @@ async function main(): Promise<void> {
       const response = await fetch(client.url(`/v1/oc/root/event`, { directory: scratch }), { headers: { ...client.authHeaders(), Accept: 'text/event-stream' }, signal: stream.signal });
       if (!response.ok || !response.body) throw new Error(`the event stream answered ${response.status}`);
       void readEvents(response.body as ReadableStream<Uint8Array>, (event) => events.push(event), stream.signal).catch(() => undefined);
-      const asked = (sessionID: string, after: number) => events.slice(after).find((event) => event.type === 'permission.asked' && event.properties.sessionID === sessionID);
+      // OpenCode reporting the turn failed (a provider error, say) ends the wait at once.
+      const failed = (sessionID: string, after: number) => events.slice(after).find((event) => event.type === 'session.error' && event.properties.sessionID === sessionID);
+      const asked = (sessionID: string, after: number) => {
+        const error = failed(sessionID, after);
+        if (error) throw new Error(`OpenCode reported: ${errorText(error.properties.error)}`);
+        return events.slice(after).find((event) => event.type === 'permission.asked' && event.properties.sessionID === sessionID);
+      };
       const idle = async (sessionID: string) => {
         await sleep(1500);
         const until = Date.now() + 180_000;
@@ -141,14 +148,30 @@ async function main(): Promise<void> {
           const mark = events.length;
           await sendPrompt(client, scratch, session.id, { text: 'Run the shell command `ls -a` here and reply with just the number of lines it printed.', model });
           const request = await waitFor('an approval request', () => asked(session.id, mark), 180_000);
-          await replyPermission(client, scratch, String(request.properties.id), 'once');
-          await idle(session.id);
+          // Each command asks on its own (the model may run another to count): each is allowed once.
+          const answered = new Set<string>();
+          const allowEach = async () => {
+            for (const event of events.slice(mark)) {
+              const id = String(event.properties.id ?? '');
+              if (event.type !== 'permission.asked' || event.properties.sessionID !== session.id || answered.has(id)) continue;
+              answered.add(id);
+              await replyPermission(client, scratch, id, 'once');
+            }
+          };
+          await allowEach();
+          const until = Date.now() + 180_000;
+          while (Date.now() < until) {
+            await sleep(1000);
+            await allowEach();
+            if (failed(session.id, mark)) throw new Error(`OpenCode reported: ${errorText(failed(session.id, mark)?.properties.error)}`);
+            if (((await getStatuses(client, scratch))[session.id]?.type ?? 'idle') === 'idle') break;
+          }
           const messages = await getMessages(client, scratch, session.id);
           const tools = messages.flatMap((entry) => entry.parts).filter((part) => part.type === 'tool') as { tool: string; state: { status: string } }[];
           const ran = tools.find((part) => part.tool === 'bash' && part.state.status === 'completed');
           if (!ran) throw new Error(`no finished command (${tools.map((part) => `${part.tool}:${part.state.status}`).join(', ') || 'no tools'})`);
           const deltas = events.slice(mark).filter((event) => event.type === 'message.part.delta').length;
-          return `asked for "${String(request.properties.permission)}"; allowed once; the command finished; ${deltas} streamed deltas`;
+          return `asked for "${String(request.properties.permission)}"; ${answered.size} request(s) allowed once; the command finished; ${deltas} streamed deltas`;
         });
 
         await step('a reply can be stopped mid-way', async () => {
@@ -156,7 +179,11 @@ async function main(): Promise<void> {
           created.push(session.id);
           const mark = events.length;
           await sendPrompt(client, scratch, session.id, { text: 'Write the numbers from 1 to 400, one per line, with nothing else.', model });
-          await waitFor('the reply to start', () => events.slice(mark).find((event) => event.type === 'message.part.delta' && event.properties.sessionID === session.id), 180_000);
+          await waitFor('the reply to start', () => {
+            const error = failed(session.id, mark);
+            if (error) throw new Error(`OpenCode reported: ${errorText(error.properties.error)}`);
+            return events.slice(mark).find((event) => event.type === 'message.part.delta' && event.properties.sessionID === session.id);
+          }, 180_000);
           await abortSession(client, scratch, session.id);
           await idle(session.id);
           const last = (await getMessages(client, scratch, session.id)).filter((entry) => entry.info.role === 'assistant').at(-1);
