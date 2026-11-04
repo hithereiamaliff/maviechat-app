@@ -1,0 +1,94 @@
+{
+  "state": {
+    "servers": 0,
+    "rejected": 0,
+    "deployment": 0,
+    "maxServers": 8
+  },
+  "catalog": {
+    "total": 39,
+    "categories": {
+      "search": 5,
+      "docs": 8,
+      "code": 7,
+      "data": 2,
+      "browser": 3,
+      "science": 3,
+      "maps": 4,
+      "business": 5,
+      "ai": 2,
+      "utility": 0
+    },
+    "oauth": [],
+    "withFields": 19,
+    "entry": {
+      "category": "string",
+      "description_i18n": {
+        "en": "string",
+        "zh": "string"
+      },
+      "display_name": "string",
+      "docs_url": "string",
+      "fields": [
+        {
+          "key": "string",
+          "label_i18n": "object",
+          "placeholder": "string",
+          "required": "boolean",
+          "secret": "boolean"
+        }
+      ],
+      "homepage": "string",
+      "id": "string",
+      "installed": "boolean",
+      "installed_as": [],
+      "logo_url": "string",
+      "requires_i18n": {
+        "en": "string",
+        "zh": "string"
+      },
+      "self_service": "boolean",
+      "tier": "string",
+      "transport": "string",
+      "trust": "string"
+    }
+  },
+  "catalogSearch": 19,
+  "refusals": {
+    "badName": "mcp.invalid_name",
+    "reservedName": "mcp.name_reserved",
+    "program": "mcp.stdio_not_allowed",
+    "loopback": "mcp.blocked_url",
+    "testLoopback": "refused",
+    "deleteAbsent": "ok",
+    "authorizeAbsent": "404",
+    "missingCredential": "mcp.missing_credential",
+    "adminOnly": "mcp.entry_admin_only"
+  },
+  "cli": {
+    "apps": 0,
+    "installable": 92,
+    "all": 101,
+    "categories": 35,
+    "entry": {
+      "category": "string",
+      "description": "string",
+      "display_name": "string",
+      "entry_point": "string",
+      "homepage": "string",
+      "id": "string",
+      "install_kind": "string",
+      "install_notes": "string",
+      "install_target": "string",
+      "installable": "boolean",
+      "installed": "boolean",
+      "origin": "string",
+      "pinned": "boolean",
+      "requires": "string",
+      "runtime": "string",
+      "source_url": "string",
+      "trust": "string",
+      "unsupported_reason": "string"
+    }
+  }
+}

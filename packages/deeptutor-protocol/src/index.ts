@@ -13,6 +13,7 @@ export * from './knowledge';
 export * from './learning';
 export * from './markdown';
 export * from './mastery';
+export * from './mcp';
 export * from './memory';
 export * from './notebooks';
 export * from './organize';

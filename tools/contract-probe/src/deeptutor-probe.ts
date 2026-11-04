@@ -48,6 +48,7 @@
  * the knowledge-base lists, and CLI apps (src/deeptutor-personalization-probe.ts); no model calls.
  * `--memory` checks Memory (src/deeptutor-memory-probe.ts) in the test account's own sheets; no model calls.
  * `--picks` checks a chat's voice, skills and memory (src/deeptutor-chat-picks-probe.ts): two short replies.
+ * `--services` checks MCP Services and CLI Apps (src/deeptutor-services-probe.ts) without reaching any MCP server.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -153,6 +154,7 @@ import { probePartners } from './deeptutor-partners-probe';
 import { probeChatPicks } from './deeptutor-chat-picks-probe';
 import { probeMemory } from './deeptutor-memory-probe';
 import { probePersonalization } from './deeptutor-personalization-probe';
+import { probeServices } from './deeptutor-services-probe';
 import { probeLearning } from './deeptutor-learning-probe';
 import { probeReading, probeVideo } from './deeptutor-reading-probe';
 import { loadEnvFile } from './env';
@@ -182,6 +184,7 @@ const { values: args } = parseArgs({
     personalization: { type: 'boolean' },
     memory: { type: 'boolean' },
     picks: { type: 'boolean' },
+    services: { type: 'boolean' },
   },
 });
 
@@ -436,6 +439,14 @@ async function main() {
     await step('chat picks: a voice, a skill and memory kept by a chat, then put back (two short replies)', async () => {
       const outcome = await probeChatPicks(baseUrl, session.token as string, client);
       fixtures.picks = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.services) {
+    await step('services: MCP servers and both stores read; saves, tests and installs refused before connecting; CLI apps', async () => {
+      const outcome = await probeServices(client);
+      fixtures.services = outcome.fixture;
       return { value: true, note: outcome.note };
     });
   }

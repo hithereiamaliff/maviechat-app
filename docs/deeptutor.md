@@ -565,6 +565,21 @@ A partner is a companion DeepTutor hosts: a soul (a persona in Markdown, in ever
 - `GET /api/settings/workspace/resources?workspace_id=` → the `skills` (`id`, `name`, `description`, `source`) and `mcp` servers (`id` `deployment:<name>` or `account:<name>`, `available`) a chat in that workspace may use; on our server five skills and no MCP servers.
 - Provider tools carry `tool_source` (`mcp` or `cli`) and `tool_provider` on their `tool_call` and `tool_result`; an MCP tool is named `mcp_<server>_<tool>` (other characters in the server's name become `_`). Their progress comes as `progress` events with `trace_kind: tool_progress`, the tool's `call_id`, and `progress_fraction` (MCP) or `elapsed_s` (CLI).
 
+## MCP Services and CLI Apps (B7.4, 2026-11-04)
+
+- **MCP Services** (`/learn/mcp`): your servers (how many of the 8 allowed), each with its state (connected, connecting, not connecting with why, needs sign-in, off), its address and tools; the ones DeepTutor couldn't connect ("Not connected", with why, and Remove); and the deployment's own (read-only; your admin decides which tools you may use). Opening the page makes DeepTutor connect to them, as its own page does.
+- **A server** (sheet): on or off; Test Connection; Reconnect when it failed or waits for sign-in (off and on again: 1.7.1 doesn't retry those itself); the credentials it has stored (names only); its tools; Edit; Delete (saying which workspaces' chats use it). Servers that sign in with their provider do it on DeepTutor's page in the app (the sign-in returns to DeepTutor, which needs its sign-in cookie).
+- **Add by URL / Edit** (sheet): name (new ones only: renaming would lose stored credentials in 1.7.1), URL, how it talks (automatic, Streamable HTTP, SSE), headers (values typed hidden, kept by DeepTutor as credentials; a stored one shows as Stored, with Replace), seconds a tool may take, only these tools; Test Connection; Save. Everything else in its settings goes back as it came.
+- **MCP Store** (`/learn/mcp/store`): search, categories with counts, more on demand; an entry shows what it is and needs, its links, and the credentials it asks for; Install (under its own name: 1.7.1 mislays the credentials of one installed under another), then a test.
+- **CLI Apps** (`/learn/cli-apps`): the apps installed on the server, each switched on or off for yourself when you were given it (locked otherwise), with a warning when your account may not run programs; the store (search, categories, the ones that can't be installed on request), read-only: installing runs the installer on the server, so admins do it on DeepTutor's page.
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --services`)
+
+- `GET /api/space/mcp/servers` → `servers` {name: settings}, `status` rows (`status`, `error`, `tools`), `configured_secrets` (field names), `oauth` {name: {authorized}}, `rejected`, `deployment`, `limits.max_servers` (8). Reading it connects every server; the test account has none, so the probe stops if it ever has one.
+- `PUT /servers/{name} {config, secrets}` replaces the server's settings; header values become `${secret:<server>/header.<Name>}` references kept apart. Refusals (`detail.code`): `mcp.invalid_name`, `mcp.name_reserved` (`mcp_…`, `cli_…`), `mcp.stdio_not_allowed`, `mcp.blocked_url` (private, loopback and metadata addresses; checked before connecting), `mcp.too_many_servers`, `mcp.private_origin_not_approved`. `POST /servers/{name}/test {config}` → `{ok, tools, error}` (200 even when it fails); `DELETE` (200 when absent); `POST /authorize` → `{authorize_url}` (404 for a server that isn't yours).
+- The store `GET /catalog?q&category&cursor&limit` ships with DeepTutor (39 self-service entries here); entries carry `description_i18n`, `fields` (key, label, secret, required) but no sign-in marker. `POST /catalog/{id}/install {name, secrets}`: `mcp.missing_credential`, `mcp.entry_admin_only` (entries that run on the server).
+- CLI apps: `GET /api/space/cli-apps/apps`, `PUT /apps/{id}/enabled {enabled}` (404 unknown, 403 not given to you), the store `GET /catalog?installable_only=` (92 installable of 101 here); installing and removing are admin-only.
+
 ## M1.5 checklist
 
 | | Item |
