@@ -2,13 +2,14 @@ import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FunctionsTab } from '@/features/admin/FunctionsTab';
 import { DefaultsTab, GroupsTab } from '@/features/admin/GroupsTabs';
 import { UsersTab } from '@/features/admin/UsersTab';
 import { ChatHeader } from '@/features/chat/ChatHeader';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, usePalette } from '@/theme';
 
-type Tab = 'users' | 'groups' | 'defaults';
+type Tab = 'users' | 'groups' | 'defaults' | 'functions';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'users', label: 'Users' },
   { key: 'groups', label: 'Groups' },
@@ -17,8 +18,8 @@ const TABS: { key: Tab; label: string }[] = [
 
 /**
  * Open WebUI's Admin Panel, for admins: users (approve, add, change, delete), groups and their
- * members, and what everyone may do. Server Settings opens the settings' Admin tab; evaluations
- * and functions open on the web until their slices land.
+ * members, what everyone may do, and functions (when plugins are on). Server Settings opens the
+ * settings' Admin tab; evaluations open on the web until their slice lands.
  */
 export default function AdminPanel() {
   const palette = usePalette();
@@ -26,9 +27,11 @@ export default function AdminPanel() {
   const capabilities = useCapabilities();
   const [tab, setTab] = useState<Tab>('users');
   const openWeb = (path: string) => void WebBrowser.openBrowserAsync(`${session.baseUrl}${path}`);
+  // Functions only where the server has plugins on, as on the web.
+  const shownTabs = capabilities?.feature('plugins') ? [...TABS, { key: 'functions' as const, label: 'Functions' }] : TABS;
   const tabs = (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} accessibilityRole="tablist">
-      {TABS.map((item) => {
+      {shownTabs.map((item) => {
         const on = item.key === tab;
         return (
           <Pressable key={item.key} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => setTab(item.key)} style={[styles.tab, on && { borderBottomColor: palette.text }]}>
@@ -46,7 +49,6 @@ export default function AdminPanel() {
         menu={[
           { key: 'settings', label: 'Server Settings', icon: 'cog-6-tooth', onPress: () => router.push({ pathname: '/settings', params: { tab: 'admin' } }) },
           { key: 'evaluations', label: 'Evaluations (Web)', icon: 'chart-bar', onPress: () => openWeb('/admin/evaluations') },
-          ...(capabilities?.feature('plugins') ? [{ key: 'functions', label: 'Functions (Web)', icon: 'bolt' as const, onPress: () => openWeb('/admin/functions') }] : []),
         ]}
       />
       {!capabilities?.isAdmin ? (
@@ -55,6 +57,8 @@ export default function AdminPanel() {
         <UsersTab tabs={tabs} />
       ) : tab === 'groups' ? (
         <GroupsTab tabs={tabs} />
+      ) : tab === 'functions' && capabilities.feature('plugins') ? (
+        <FunctionsTab tabs={tabs} />
       ) : (
         <DefaultsTab tabs={tabs} />
       )}

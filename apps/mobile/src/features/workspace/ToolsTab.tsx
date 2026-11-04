@@ -10,7 +10,7 @@ import { useAuthed, useCapabilities, useSessionUser } from '@/lib/server';
 import { AccessSheet, type AccessTarget } from './AccessSheet';
 import { ListControls } from './ListControls';
 import { useWorkspaceRefresh, useWorkspaceTools } from './queries';
-import { openToolOnWeb, ToolSheet, ToolValvesSheet } from './ToolSheets';
+import { openToolOnWeb, SharedValvesSheet, ToolSheet, type ValvesTarget } from './ToolSheets';
 import { ListState, listStyles, rowFacts, useWorkspaceRun, WorkspaceList, WorkspaceRow } from './WorkspaceList';
 
 /**
@@ -29,7 +29,7 @@ export function ToolsTab({ tabs }: { tabs: (count?: number) => ReactNode }) {
   const [view, setView] = useState<WorkspaceView>('');
   const [byName, setByName] = useState(false);
   const [showing, setShowing] = useState<string | null>(null);
-  const [valves, setValves] = useState<WorkspaceTool | null>(null);
+  const [valves, setValves] = useState<ValvesTarget | null>(null);
   const [sharing, setSharing] = useState<AccessTarget | null>(null);
   const tools = useWorkspaceTools();
   const items = filterTools(tools.data ?? [], { query, view, me: me.data?.id ?? '', byName });
@@ -56,7 +56,7 @@ export function ToolsTab({ tabs }: { tabs: (count?: number) => ReactNode }) {
     { key: 'view', label: tool.writeAccess ? 'View Code' : 'View', icon: 'code-bracket', onPress: () => setShowing(tool.id) },
     ...(tool.writeAccess
       ? [
-          { key: 'valves', label: 'Settings…', icon: 'cog-6-tooth' as const, onPress: () => setValves(tool) },
+          { key: 'valves', label: 'Settings…', icon: 'cog-6-tooth' as const, onPress: () => setValves({ kind: 'tools', id: tool.id, name: tool.name }) },
           { key: 'share', label: 'Share…', icon: 'users' as const, onPress: () => setSharing({ area: 'tools', id: tool.id, name: tool.name, grants: tool.accessGrants }) },
           { key: 'edit', label: 'Edit on the Web', icon: 'globe-alt' as const, onPress: () => openToolOnWeb(session.baseUrl, tool.id) },
         ]
@@ -99,7 +99,7 @@ export function ToolsTab({ tabs }: { tabs: (count?: number) => ReactNode }) {
         )}
       />
       <ToolSheet id={showing} onClose={() => setShowing(null)} />
-      <ToolValvesSheet tool={valves} onClose={() => setValves(null)} />
+      <SharedValvesSheet target={valves} onClose={() => setValves(null)} />
       <AccessSheet target={sharing} onClose={() => setSharing(null)} onSaved={refresh} />
     </View>
   );

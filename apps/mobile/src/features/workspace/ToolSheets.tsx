@@ -1,4 +1,4 @@
-import { getToolValves, getToolValvesSpec, updateToolValves, valveFields, valvesFromForm, valvesToForm, type ValveField, type WorkspaceTool } from '@maviechat/owui-protocol';
+import { getSharedValves, getSharedValvesSpec, updateSharedValves, valveFields, valvesFromForm, valvesToForm, type ValveField, type ValvesOf } from '@maviechat/owui-protocol';
 import { useQuery } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
@@ -67,25 +67,32 @@ function ToolView({ id, onClose }: { id: string; onClose: () => void }) {
   );
 }
 
-/** The settings a tool shares with everyone who uses it (keys, limits…), saved with Save; secrets stay hidden. */
-export function ToolValvesSheet({ tool, onClose }: { tool: WorkspaceTool | null; onClose: () => void }) {
+/** Whose settings: a tool or a function, by id and name. */
+export interface ValvesTarget {
+  kind: ValvesOf;
+  id: string;
+  name: string;
+}
+
+/** The settings a tool or function shares with everyone who uses it (keys, limits…), saved with Save; secrets stay hidden. */
+export function SharedValvesSheet({ target, onClose }: { target: ValvesTarget | null; onClose: () => void }) {
   return (
-    <Modal visible={tool !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      {tool ? <ValvesLoader tool={tool} onClose={onClose} /> : null}
+    <Modal visible={target !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      {target ? <ValvesLoader target={target} onClose={onClose} /> : null}
     </Modal>
   );
 }
 
-function ValvesLoader({ tool, onClose }: { tool: WorkspaceTool; onClose: () => void }) {
+function ValvesLoader({ target, onClose }: { target: ValvesTarget; onClose: () => void }) {
   const { client } = useAuthed();
-  const spec = useQuery({ queryKey: ['workspace', 'tool-valves-spec', tool.id], queryFn: () => getToolValvesSpec(client, tool.id), staleTime: 0 });
-  const values = useQuery({ queryKey: ['workspace', 'tool-valves', tool.id], queryFn: () => getToolValves(client, tool.id), staleTime: 0 });
+  const spec = useQuery({ queryKey: ['workspace', 'valves-spec', target.kind, target.id], queryFn: () => getSharedValvesSpec(client, target.kind, target.id), staleTime: 0 });
+  const values = useQuery({ queryKey: ['workspace', 'valves', target.kind, target.id], queryFn: () => getSharedValves(client, target.kind, target.id), staleTime: 0 });
   if (!(spec.isFetchedAfterMount && values.isFetchedAfterMount) || spec.isError || values.isError) return <SheetLoading error={spec.isError ? spec.error : values.isError ? values.error : null} onClose={onClose} />;
   const fields = valveFields(spec.data);
-  return <ValvesForm tool={tool} fields={fields} initial={valvesToForm(fields, values.data ?? {})} onClose={onClose} />;
+  return <ValvesForm target={target} fields={fields} initial={valvesToForm(fields, values.data ?? {})} onClose={onClose} />;
 }
 
-function ValvesForm({ tool, fields, initial, onClose }: { tool: WorkspaceTool; fields: ValveField[]; initial: Record<string, unknown>; onClose: () => void }) {
+function ValvesForm({ target, fields, initial, onClose }: { target: ValvesTarget; fields: ValveField[]; initial: Record<string, unknown>; onClose: () => void }) {
   const palette = usePalette();
   const toast = useToast();
   const { client } = useAuthed();
@@ -98,7 +105,7 @@ function ValvesForm({ tool, fields, initial, onClose }: { tool: WorkspaceTool; f
     setBusy(true);
     setProblem('');
     try {
-      await updateToolValves(client, tool.id, values);
+      await updateSharedValves(client, target.kind, target.id, values);
       toast('Saved for everyone who uses it');
       onClose();
     } catch (error) {
@@ -109,18 +116,18 @@ function ValvesForm({ tool, fields, initial, onClose }: { tool: WorkspaceTool; f
   };
   return (
     <KeyboardAvoidingView behavior="padding" style={[styles.sheet, { backgroundColor: palette.background }]}>
-      <SheetHeader title={`${tool.name} Settings`} onCancel={onClose} onSave={() => void save()} canSave={fields.length > 0} busy={busy} readOnly={!fields.length} />
+      <SheetHeader title={`${target.name} Settings`} onCancel={onClose} onSave={() => void save()} canSave={fields.length > 0} busy={busy} readOnly={!fields.length} />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {problem ? <Text style={[styles.note, styles.problem, { color: palette.danger, borderColor: palette.danger }]}>{problem}</Text> : null}
         {fields.length ? (
           <>
-            <Text style={[styles.note, { color: palette.textMuted }]}>Shared by everyone who uses this tool. Default uses the tool’s own value.</Text>
+            <Text style={[styles.note, { color: palette.textMuted }]}>Shared by everyone who uses it. Default uses its own value.</Text>
             {fields.map((field) => (
               <ValveRow key={field.key} field={field} value={form[field.key]} onChange={(value) => setForm({ ...form, [field.key]: value })} />
             ))}
           </>
         ) : (
-          <Text style={[styles.note, { color: palette.textMuted }]}>This tool has no shared settings.</Text>
+          <Text style={[styles.note, { color: palette.textMuted }]}>It has no shared settings.</Text>
         )}
       </ScrollView>
     </KeyboardAvoidingView>

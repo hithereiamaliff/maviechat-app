@@ -1,6 +1,7 @@
 export * from './access';
 export * from './account';
 export * from './adminConnections';
+export * from './adminFunctions';
 export * from './adminGroups';
 export * from './adminModels';
 export * from './adminSettings';
