@@ -157,7 +157,19 @@ export function Sidebar() {
     ...(capabilities && canUseWorkspace(capabilities)
       ? [{ key: 'workspace', label: 'Workspace', icon: 'squares-2x2' as const, onPress: openWorkspace }]
       : []),
-    ...(capabilities?.isAdmin ? [{ key: 'admin', label: 'Admin Panel', icon: 'wrench-screwdriver' as const, onPress: () => openOnWeb('/admin') }] : []),
+    ...(capabilities?.isAdmin
+      ? [
+          {
+            key: 'admin',
+            label: 'Admin Panel',
+            icon: 'wrench-screwdriver' as const,
+            onPress: () => {
+              sidebar.close();
+              router.push('/admin');
+            },
+          },
+        ]
+      : []),
     {
       key: 'settings',
       label: 'Settings',

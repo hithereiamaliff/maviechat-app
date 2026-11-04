@@ -111,9 +111,6 @@
               "string"
             ],
             "description": "null",
-            "filterIds": [
-              "string"
-            ],
             "knowledge": "null",
             "suggestion_prompts": "null",
             "tags": [],

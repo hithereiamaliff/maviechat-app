@@ -1,5 +1,7 @@
 export * from './access';
 export * from './account';
+export * from './adminGroups';
+export * from './adminUsers';
 export * from './auth';
 export * from './capabilities';
 export * from './chatgpt';

@@ -49,6 +49,9 @@ export default function AppLayout() {
           <Stack.Screen name="connection" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="workspace" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="knowledge/[id]" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+          <Stack.Screen name="admin/index" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+          <Stack.Screen name="admin/user" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+          <Stack.Screen name="admin/group" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="settings" options={{ presentation: 'modal', animation: 'slide_from_bottom', gestureEnabled: true }} />
         </Stack>
       </SpaceDrawer>

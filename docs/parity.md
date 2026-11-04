@@ -187,7 +187,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Item |
 |---|---|
-| [ ] | Users: overview, add/edit, roles, pending approvals; Groups and permissions |
+| [x] | Users: overview, add/edit, roles, pending approvals; Groups and permissions. M4.1 (2026-11-04), a native Admin Panel from the user menu: users (search; order by joined, name, last active or role; 30 a page; active dots; who's waiting, with Approve; add with a role; a user's page with role chips, groups, sign-in providers, what they can use (models, knowledge, tools of how many) and what they may do (defaults OR their groups, worked out on the phone); edit name, email, new password (signs them out); delete, saying their chats go). The primary admin is changed only by themselves; nobody demotes or deletes themselves. Groups: list with member counts, new (starts from today's defaults, as on the web), name, description, who may share with it (members, anyone, nobody), members (add several, take one out), what it allows (marked where everyone has it anyway; keys a group never set stay unset). Default permissions with Server Defaults. Every permission save lists its changes first and is laid over a fresh read. Not yet: a user's chats (needs `enable_admin_chat_access`), CSV import (web) |
 | [ ] | Settings tabs via the form engine, each with a diff before saving: General, Authentication, Interface (banners, visibility), Connections, Models, Sub-agents, Integrations, Apps, Documents, Audio, Images, Web Search, Code Execution, Pipelines, Analytics, Evaluations, Database |
 | [ ] | Evaluations: leaderboard, feedback |
 | [ ] | Functions: list, create/edit (CodeMirror WebView), valves |
