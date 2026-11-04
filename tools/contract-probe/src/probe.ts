@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -59,6 +59,7 @@ import { probeM3Models } from './m3-models-probe';
 import { probeM3Text } from './m3-text-probe';
 import { probeM3Tools } from './m3-tools-probe';
 import { probeM4Connections } from './m4-connections-probe';
+import { probeM4Evaluations } from './m4-evaluations-probe';
 import { probeM4Forms } from './m4-forms-probe';
 import { probeM4Functions } from './m4-functions-probe';
 import { probeM4Models } from './m4-models-probe';
@@ -88,6 +89,7 @@ const { values: args } = parseArgs({
     m4models: { type: 'boolean' },
     m4forms: { type: 'boolean' },
     m4functions: { type: 'boolean' },
+    m4evaluations: { type: 'boolean' },
   },
 });
 
@@ -403,6 +405,13 @@ async function main() {
         const m4functions = await probeM4Functions({ client, capabilities, allowCode: baseUrl === 'http://127.0.0.1:3013' });
         for (const result of m4functions.steps) results.push({ ...result, name: `M4: ${result.name}` });
         fixtures['write.m4-functions'] = m4functions.fixture;
+      }
+
+      if (args.m4evaluations && capabilities) {
+        // Admin writes only ever on the scratch instance's port.
+        const m4evaluations = await probeM4Evaluations({ client, capabilities, allowWrites: baseUrl === 'http://127.0.0.1:3013' });
+        for (const result of m4evaluations.steps) results.push({ ...result, name: `M4: ${result.name}` });
+        fixtures['write.m4-evaluations'] = m4evaluations.fixture;
       }
 
       if (args.write) {

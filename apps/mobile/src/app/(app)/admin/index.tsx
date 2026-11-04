@@ -1,32 +1,31 @@
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { EvaluationsTab } from '@/features/admin/EvaluationsTab';
 import { FunctionsTab } from '@/features/admin/FunctionsTab';
 import { DefaultsTab, GroupsTab } from '@/features/admin/GroupsTabs';
 import { UsersTab } from '@/features/admin/UsersTab';
 import { ChatHeader } from '@/features/chat/ChatHeader';
-import { useAuthed, useCapabilities } from '@/lib/server';
+import { useCapabilities } from '@/lib/server';
 import { fonts, usePalette } from '@/theme';
 
-type Tab = 'users' | 'groups' | 'defaults' | 'functions';
+type Tab = 'users' | 'groups' | 'defaults' | 'evaluations' | 'functions';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'users', label: 'Users' },
   { key: 'groups', label: 'Groups' },
   { key: 'defaults', label: 'Default Permissions' },
+  { key: 'evaluations', label: 'Evaluations' },
 ];
 
 /**
  * Open WebUI's Admin Panel, for admins: users (approve, add, change, delete), groups and their
- * members, what everyone may do, and functions (when plugins are on). Server Settings opens the
- * settings' Admin tab; evaluations open on the web until their slice lands.
+ * members, what everyone may do, evaluations, and functions (when plugins are on). Server
+ * Settings opens the settings' Admin tab.
  */
 export default function AdminPanel() {
   const palette = usePalette();
-  const { session } = useAuthed();
   const capabilities = useCapabilities();
   const [tab, setTab] = useState<Tab>('users');
-  const openWeb = (path: string) => void WebBrowser.openBrowserAsync(`${session.baseUrl}${path}`);
   // Functions only where the server has plugins on, as on the web.
   const shownTabs = capabilities?.feature('plugins') ? [...TABS, { key: 'functions' as const, label: 'Functions' }] : TABS;
   const tabs = (
@@ -48,7 +47,6 @@ export default function AdminPanel() {
         title="Admin Panel"
         menu={[
           { key: 'settings', label: 'Server Settings', icon: 'cog-6-tooth', onPress: () => router.push({ pathname: '/settings', params: { tab: 'admin' } }) },
-          { key: 'evaluations', label: 'Evaluations (Web)', icon: 'chart-bar', onPress: () => openWeb('/admin/evaluations') },
         ]}
       />
       {!capabilities?.isAdmin ? (
@@ -57,6 +55,8 @@ export default function AdminPanel() {
         <UsersTab tabs={tabs} />
       ) : tab === 'groups' ? (
         <GroupsTab tabs={tabs} />
+      ) : tab === 'evaluations' ? (
+        <EvaluationsTab tabs={tabs} />
       ) : tab === 'functions' && capabilities.feature('plugins') ? (
         <FunctionsTab tabs={tabs} />
       ) : (
