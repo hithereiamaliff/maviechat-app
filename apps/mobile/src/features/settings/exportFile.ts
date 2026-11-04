@@ -11,6 +11,9 @@ export async function shareFile(name: string, content: string | Uint8Array): Pro
 
 export const shareJsonFile = (name: string, json: string): Promise<void> => shareFile(name, json);
 
+/** A file name for an export of many things, stamped with the time (as the web names them). */
+export const stampedName = (what: string): string => `${what}-export-${Date.now()}.json`;
+
 /** A title as a file name: without characters file systems refuse, 80 characters at most. */
 export const fileNameOf = (title: string, fallback: string): string => title.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || fallback;
 

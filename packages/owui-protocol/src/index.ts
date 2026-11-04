@@ -39,3 +39,5 @@ export * from './variables';
 export * from './version';
 export * from './workspaceModelEditor';
 export * from './workspaceModels';
+export * from './workspacePrompts';
+export * from './workspaceSkills';
