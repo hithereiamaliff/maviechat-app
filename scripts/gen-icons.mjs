@@ -52,6 +52,7 @@ const ICONS = [
   'ellipsis-horizontal',
   'envelope',
   'exclamation-triangle',
+  'eye',
   'eye-slash',
   'film',
   'folder',

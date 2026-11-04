@@ -1,4 +1,9 @@
 import {
+  channelErrors,
+  getChannelSchemas,
+  getChannelStatus,
+  getPartnerChannels,
+  savePartnerChannels,
   applyGroupFrame,
   createPartnerGroup,
   deleteGroupSession,
@@ -140,12 +145,14 @@ function chatHarness(baseUrl: string, token: string, partnerId: string) {
 }
 
 /**
- * B6.1 against a live DeepTutor, in the test account: a partner made as the app makes one (a
+ * B6 against a live DeepTutor, in the test account: a partner made as the app makes one (a
  * library soul, the default model, every skill), then a conversation over `/ws/partners/{id}`
  * (the sign-in in the Cookie header): a reply streamed and read back from history the same; a
  * second reply followed again after the socket was dropped mid-way; the conversation listed,
- * archived, brought back and deleted; the partner stopped and deleted. No chat-app channels, so
- * nothing outside DeepTutor is contacted. Uses the account's model for two short replies.
+ * archived, brought back and deleted. Then its set-up (B6.2), a group (B6.3) and chat-app settings
+ * on a partner never started (B6.4); the partner stopped and deleted. No chat app is switched on
+ * and no scan started, so nothing outside DeepTutor is contacted. Uses the account's model for
+ * about ten short replies.
  */
 export async function probePartners(baseUrl: string, token: string, client: DtClient): Promise<{ note: string; fixture: Record<string, unknown> }> {
   const fixture: Record<string, unknown> = {};
@@ -219,11 +226,13 @@ export async function probePartners(baseUrl: string, token: string, client: DtCl
     fixture.setup = setup.fixture;
     const groupCheck = await probePartnerGroups(baseUrl, token, client, partnerId, soul.id);
     fixture.groups = groupCheck.fixture;
+    const channelCheck = await probePartnerChannels(client, soul.id);
+    fixture.channels = channelCheck.fixture;
 
     await stopPartner(client, partnerId);
     if ((await getPartner(client, partnerId)).running) throw new Error('still running after stop');
     return {
-      note: `a partner made from the "${soul.id}" soul; a reply streamed and read back the same; a second followed again after a dropped socket; the conversation listed, archived, brought back and deleted; ${setup.note}; ${groupCheck.note}; the partner stopped (${own.length} partners and ${groups.length} groups of the account's own left alone)`,
+      note: `a partner made from the "${soul.id}" soul; a reply streamed and read back the same; a second followed again after a dropped socket; the conversation listed, archived, brought back and deleted; ${setup.note}; ${groupCheck.note}; ${channelCheck.note}; the partner stopped (${own.length} partners and ${groups.length} groups of the account's own left alone)`,
       fixture,
     };
   } finally {
@@ -536,4 +545,44 @@ async function probePartnerGroups(baseUrl: string, token: string, client: DtClie
     if (groupId) await deletePartnerGroup(client, groupId).catch(() => undefined);
     await deletePartner(client, second.id).catch(() => undefined);
   }
+}
+
+/**
+ * B6.4 without contacting any chat app: a third partner made stopped, its chat-app settings saved
+ * with every app off (so no listener starts), read back with their secrets and masked without them,
+ * an app turned on with nobody allowed refused (422), the status read, the settings cleared, then
+ * the partner deleted. Scanning to connect (Feishu, WeCom, WeChat) asks those services, so it isn't tried.
+ */
+async function probePartnerChannels(client: DtClient, soulId: string): Promise<{ note: string; fixture: Record<string, unknown> }> {
+  const fixture: Record<string, unknown> = {};
+  const schemas = await getChannelSchemas(client);
+  const telegram = schemas.find((schema) => schema.name === 'telegram');
+  fixture.schemas = schemas.map((schema) => ({ name: schema.name, available: schema.available, fields: schema.fields.length, secrets: schema.secretFields }));
+  if (!telegram?.available || !telegram.secretFields.includes('token')) throw new Error('no Telegram schema with its token secret');
+  const partner = (await createPartner(client, { name: `APP PROBE partner three ${Date.now().toString(36)}`, soul: { source: 'library', id: soulId }, start: false })).partner;
+  try {
+    if (partner.running) throw new Error('a partner made stopped is running');
+    if (Object.keys(await getPartnerChannels(client, partner.id)).length) throw new Error('a new partner has chat-app settings');
+    const settings = { ...telegram.defaultConfig, enabled: false, token: 'app-probe-not-a-token', allow_from: ['12345'] };
+    await savePartnerChannels(client, partner.id, { telegram: settings });
+    const raw = await getPartnerChannels(client, partner.id);
+    if (raw.telegram?.token !== 'app-probe-not-a-token' || JSON.stringify(raw.telegram?.allow_from) !== '["12345"]') throw new Error('the settings did not read back with their secret');
+    const masked = await getPartner(client, partner.id);
+    if (!masked.channels.includes('telegram')) throw new Error('the app is not listed on the partner');
+    try {
+      await savePartnerChannels(client, partner.id, { telegram: { ...settings, enabled: true, allow_from: [] } });
+      throw new Error('an app turned on with nobody allowed was taken');
+    } catch (error) {
+      const problems = channelErrors(error);
+      if (!problems.length) throw error;
+      fixture.refusal = problems;
+    }
+    const status = await getChannelStatus(client, partner.id);
+    if (status.running || status.channels.telegram?.enabled) throw new Error('the stopped partner reports a running app');
+    await savePartnerChannels(client, partner.id, {});
+    if (Object.keys(await getPartnerChannels(client, partner.id)).length) throw new Error('the settings were not cleared');
+  } finally {
+    await deletePartner(client, partner.id).catch(() => undefined);
+  }
+  return { note: `then chat-app settings on a stopped partner (apps off): saved, read back with the secret, an app on with nobody allowed refused, cleared (${schemas.filter((schema) => schema.available).length} apps available)`, fixture };
 }

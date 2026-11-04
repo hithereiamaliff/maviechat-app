@@ -505,6 +505,22 @@ A partner is a companion DeepTutor hosts: a soul (a persona in Markdown, in ever
 - History is the last 200 messages at most (no pages); discussions are listed once they have a message; deleting one keeps its pins. Pins are `POST …/whiteboard/pins {event_id}` and `DELETE …/whiteboard/pins/{event_id}`; DeepTutor's web app has no pin buttons in 1.7.1, though the members read the whiteboard.
 - Times here are UTC with an offset.
 
+## Partner chat apps (B6.4, 2026-11-04)
+
+- **Chat Apps** (Partner Settings → Chat Apps → Set Up; `/learn/partners/channels?id=`), for the partner's owner: every app DeepTutor can run, each with a dot and a few words (not set up, off, running, waiting for a scan, not running because the partner is stopped), and the apps this server can't run listed apart with DeepTutor's reason. A banner offers Restart Chat Apps when they failed to restart after a change (only while the partner runs). Status is read again every few seconds while the partner runs and an app is on.
+- **One app's sheet:** its settings drawn from DeepTutor's own schema (switches, choices, a line per ID for who may talk to it, numbers, text with secrets hidden until shown, groups of settings, JSON for the rest), "On" first; our words for the settings every app has. How it's doing, with the code to scan when the app shows one (WhatsApp's linked-device code arrives this way). A warning when it's on and nobody may talk to it. Save shows DeepTutor's refusals setting by setting; Remove deletes its settings.
+- **Connecting by a scan:** Feishu and WeCom get a code from DeepTutor (Get a Code), shown with Open in Feishu/WeCom for this phone; once scanned it's saved by itself and the form shows what was saved. WeChat shows its own code to scan with WeChat on another device. Leaving the sheet mid-way calls the attempt off.
+- Apps listen while the partner runs; each needs a bot or account of its own, made in that app. Linking your own account in one stays in Partner Settings (Link Your Account).
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --partners`)
+
+- `GET /api/partners/channels/schema`: each app's `display_name`, `available` (with `unavailable_reason`), `default_config`, `secret_fields` (dotted paths) and a JSON schema (`properties`, `enum`, `anyOf` with null for optional ones, nested objects). On this server 15 are available; Matrix isn't (its add-on isn't installed).
+- A partner's settings come with `GET /api/partners/{id}?include_secrets=true` (owner only); without it secrets read `***`. `PATCH /api/partners/{id} {channels}` replaces every app's settings at once, so the app re-reads them just before saving one, and never sends `***` back.
+- Refusals are 422: `{detail: {message, errors: [{loc, msg}]}}` per setting, or `{detail: {message: "Enabled channels require at least one allowed sender: …", channels}}` when an app is on with nobody allowed.
+- `GET …/channels/status`: per app `enabled`, `running` and `setup {status, message, qr_data_url, qr_payload}`; `POST …/channels/reload` restarts them (a failed restart is the partner's `last_reload_error`).
+- Feishu and WeCom: `POST …/channel-onboarding/start {channel}` → `{session_id, status: pending_scan, qr_data_url, fallback_url, poll_interval_seconds, expires_at}`; poll `GET …/channel-onboarding/{session}` until `ready`, then `POST …/apply` saves the settings; `DELETE` calls it off. WeChat: `POST …/channels/weixin/qr` → `{session_id, status, qr_svg, scan_payload}`, polled at `GET …/channels/weixin/qr/{session}` (the code comes only when new) until `confirmed`.
+- The probe saves Telegram switched off on a stopped partner, so nothing outside DeepTutor is contacted; the scans call Feishu, WeCom or WeChat, so they're checked against recorded answers only.
+
 ## M1.5 checklist
 
 | | Item |

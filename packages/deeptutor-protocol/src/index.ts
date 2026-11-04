@@ -13,6 +13,7 @@ export * from './mastery';
 export * from './markdown';
 export * from './notebooks';
 export * from './organize';
+export * from './partnerChannels';
 export * from './partnerChat';
 export * from './partnerGroups';
 export * from './partners';

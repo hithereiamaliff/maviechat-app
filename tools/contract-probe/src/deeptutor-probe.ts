@@ -42,7 +42,8 @@
  * transcript with start times, a place and a note at a time, then deletion.
  * `--partners` checks Partners (src/deeptutor-partners-probe.ts): a partner made from a library
  * soul, a reply over `/ws/partners/{id}` read back from history, a reply followed again after a
- * dropped socket, the conversation archived, brought back and deleted, then the partner deleted.
+ * dropped socket, the conversation archived, brought back and deleted; its set-up, a group of two,
+ * and chat-app settings on a partner never started (no app switched on, no scan); all deleted.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -398,7 +399,7 @@ async function main() {
   }
 
   if (args.partners) {
-    await step('partners: one made from a library soul, a reply over /ws/partners, a reply followed again, conversations, stop, delete', async () => {
+    await step('partners: one made from a library soul, a reply over /ws/partners, a reply followed again, conversations, set-up, a group, chat-app settings, delete', async () => {
       const outcome = await probePartners(baseUrl, session.token as string, client);
       fixtures.partners = outcome.fixture;
       return { value: true, note: outcome.note };

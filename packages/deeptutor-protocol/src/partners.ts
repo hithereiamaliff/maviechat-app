@@ -176,6 +176,8 @@ export interface DtNewPartner {
   llmSelection?: DtLlmSelection | null;
   /** Skills copied into its library (the web copies all of yours). */
   skills?: string[];
+  /** Start it at once (the default, as the web does). */
+  start?: boolean;
 }
 
 /**
@@ -193,7 +195,7 @@ export async function createPartner(client: DtClient, input: DtNewPartner): Prom
     builtin_tools: null,
     mcp_tools: [],
     assets: { knowledge_bases: [], skills: input.skills ?? [], notebooks: [] },
-    start: true,
+    start: input.start ?? true,
   };
   if (input.description?.trim()) body.description = input.description.trim();
   if (input.emoji) body.emoji = input.emoji;

@@ -27,14 +27,17 @@ export class DtHttpError extends Error {
   readonly path: string;
   /** DeepTutor's own name for the error, when it sends one (`book_revision_conflict`, `book_paused`…). */
   readonly code: string | undefined;
+  /** The answer as DeepTutor sent it (some carry details by field). */
+  readonly body: unknown;
 
-  constructor(status: number, detail: string | undefined, path: string, code?: string) {
+  constructor(status: number, detail: string | undefined, path: string, code?: string, body?: unknown) {
     super(detail ? `${detail} (HTTP ${status})` : `HTTP ${status} from ${path}`);
     this.name = 'DtHttpError';
     this.status = status;
     this.detail = detail;
     this.path = path;
     this.code = code;
+    this.body = body;
   }
 
   /** The sign-in is missing or no longer accepted. */
@@ -144,7 +147,7 @@ export class DtClient {
     } catch {
       data = text;
     }
-    if (!response.ok) throw new DtHttpError(response.status, detailOf(data), path, codeOf(data));
+    if (!response.ok) throw new DtHttpError(response.status, detailOf(data), path, codeOf(data), data);
     return { data: data as T, headers: response.headers };
   }
 }

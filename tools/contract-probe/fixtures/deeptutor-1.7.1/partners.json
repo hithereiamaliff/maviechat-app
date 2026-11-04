@@ -99,7 +99,7 @@
   "groups": {
     "round": {
       "messages": 3,
-      "traces": 240,
+      "traces": 425,
       "kinds": [
         "message",
         "message",
@@ -107,5 +107,142 @@
       ]
     },
     "sessions": 1
+  },
+  "channels": {
+    "schemas": [
+      {
+        "name": "dingtalk",
+        "available": true,
+        "fields": 6,
+        "secrets": [
+          "client_secret"
+        ]
+      },
+      {
+        "name": "discord",
+        "available": true,
+        "fields": 9,
+        "secrets": [
+          "token"
+        ]
+      },
+      {
+        "name": "email",
+        "available": true,
+        "fields": 23,
+        "secrets": [
+          "imap_password",
+          "smtp_password"
+        ]
+      },
+      {
+        "name": "feishu",
+        "available": true,
+        "fields": 17,
+        "secrets": [
+          "app_secret",
+          "encrypt_key",
+          "verification_token"
+        ]
+      },
+      {
+        "name": "matrix",
+        "available": false,
+        "fields": 0,
+        "secrets": []
+      },
+      {
+        "name": "mattermost",
+        "available": true,
+        "fields": 9,
+        "secrets": [
+          "bot_token"
+        ]
+      },
+      {
+        "name": "msteams",
+        "available": true,
+        "fields": 18,
+        "secrets": [
+          "app_password"
+        ]
+      },
+      {
+        "name": "mochat",
+        "available": true,
+        "fields": 24,
+        "secrets": [
+          "claw_token"
+        ]
+      },
+      {
+        "name": "qq",
+        "available": true,
+        "fields": 7,
+        "secrets": [
+          "secret"
+        ]
+      },
+      {
+        "name": "napcat",
+        "available": true,
+        "fields": 10,
+        "secrets": [
+          "access_token"
+        ]
+      },
+      {
+        "name": "slack",
+        "available": true,
+        "fields": 14,
+        "secrets": [
+          "bot_token",
+          "app_token"
+        ]
+      },
+      {
+        "name": "telegram",
+        "available": true,
+        "fields": 13,
+        "secrets": [
+          "token"
+        ]
+      },
+      {
+        "name": "weixin",
+        "available": true,
+        "fields": 10,
+        "secrets": [
+          "token"
+        ]
+      },
+      {
+        "name": "wecom",
+        "available": true,
+        "fields": 7,
+        "secrets": [
+          "secret"
+        ]
+      },
+      {
+        "name": "whatsapp",
+        "available": true,
+        "fields": 6,
+        "secrets": [
+          "bridge_token"
+        ]
+      },
+      {
+        "name": "zulip",
+        "available": true,
+        "fields": 10,
+        "secrets": [
+          "api_key"
+        ]
+      }
+    ],
+    "refusal": [
+      "Enabled channels require at least one allowed sender: telegram"
+    ]
   }
 }

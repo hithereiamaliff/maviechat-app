@@ -510,16 +510,16 @@ function AddAssets({ partnerId, have, onDone, onClose }: { partnerId: string; ha
 
 // ── Chat apps ────────────────────────────────────────────────────────────────
 
-/** The chat apps it's in; setting one up stays on DeepTutor's web page (each needs an account of its own). */
+/** The chat apps it's in, with a way to set them up (their own page) and to link your own account in one. */
 export function ChatAppsCard({ partner, onLink }: { partner: DtPartner; onLink: () => void }) {
   const palette = usePalette();
   return (
-    <Card title="Chat Apps" note="Telegram, WhatsApp, Slack, WeChat and more: each needs a bot or account of its own, set up on DeepTutor’s web page.">
+    <Card title="Chat Apps" note="Telegram, WhatsApp, Slack, WeChat and more: each needs a bot or account of its own.">
       <Text style={[styles.rowLabel, { color: partner.channels.length ? palette.text : palette.textFaint }]}>{partner.channels.length ? partner.channels.map(channelLabel).join(', ') : 'Not in any chat app yet'}</Text>
-      {partner.lastReloadError ? <Text style={[styles.note, { color: palette.danger }]}>Its chat apps failed to restart. Stop and start it (Partners page, its menu).</Text> : null}
+      {partner.lastReloadError ? <Text style={[styles.note, { color: palette.danger }]}>Its chat apps failed to restart: open Set Up to restart them.</Text> : null}
       <View style={styles.buttons}>
-        <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/learn/web', params: { path: `/partners/${encodeURIComponent(partner.id)}?tab=channels`, title: partner.name } })} hitSlop={6}>
-          <Text style={[styles.link, { color: palette.link }]}>Set Up on the Web</Text>
+        <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/learn/partners/channels', params: { id: partner.id } })} hitSlop={6}>
+          <Text style={[styles.link, { color: palette.link }]}>Set Up</Text>
         </Pressable>
         <View style={styles.spacer} />
         <Pressable accessibilityRole="button" onPress={onLink} hitSlop={6}>
