@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -16,8 +17,8 @@ const TABS: { key: Tab; label: string }[] = [
 
 /**
  * Open WebUI's Admin Panel, for admins: users (approve, add, change, delete), groups and their
- * members, and what everyone may do. Server settings, evaluations and functions open on the web
- * until their slices land.
+ * members, and what everyone may do. Server Settings opens the settings' Admin tab; evaluations
+ * and functions open on the web until their slices land.
  */
 export default function AdminPanel() {
   const palette = usePalette();
@@ -43,7 +44,7 @@ export default function AdminPanel() {
       <ChatHeader
         title="Admin Panel"
         menu={[
-          { key: 'settings', label: 'Server Settings (Web)', icon: 'cog-6-tooth', onPress: () => openWeb('/admin/settings') },
+          { key: 'settings', label: 'Server Settings', icon: 'cog-6-tooth', onPress: () => router.push({ pathname: '/settings', params: { tab: 'admin' } }) },
           { key: 'evaluations', label: 'Evaluations (Web)', icon: 'chart-bar', onPress: () => openWeb('/admin/evaluations') },
           ...(capabilities?.feature('plugins') ? [{ key: 'functions', label: 'Functions (Web)', icon: 'bolt' as const, onPress: () => openWeb('/admin/functions') }] : []),
         ]}

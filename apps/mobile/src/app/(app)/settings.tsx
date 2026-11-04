@@ -1,6 +1,8 @@
-import { ScrollView } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { ScrollView } from 'react-native';
 import { useCapabilities } from '@/lib/server';
+import { AdminSettings } from '@/features/admin/settings/AdminSettings';
 import { AboutSettings } from '@/features/settings/AboutSettings';
 import { AccountSettings } from '@/features/settings/AccountSettings';
 import { ArchivedChats } from '@/features/settings/ArchivedChats';
@@ -14,12 +16,14 @@ import { PromptAndParams } from '@/features/settings/PromptAndParams';
 import { rowStyles } from '@/features/settings/rows';
 import { SettingsFrame, type SettingsTab } from '@/features/settings/SettingsFrame';
 
-type Tab = 'general' | 'interface' | 'notifications' | 'personalization' | 'audio' | 'data' | 'archived' | 'account' | 'about';
+type Tab = 'general' | 'interface' | 'notifications' | 'personalization' | 'audio' | 'data' | 'archived' | 'account' | 'about' | 'admin';
 
 /** The web's settings modal in its phone layout: a strip of tabs on top, in the web's order. */
 export default function SettingsScreen() {
   const capabilities = useCapabilities();
-  const [tab, setTab] = useState<Tab>('general');
+  // `?tab=admin` opens the server's settings (the Admin Panel's Server Settings).
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const [tab, setTab] = useState<Tab>(params.tab === 'admin' ? 'admin' : 'general');
   // As on the web, Interface is for admins and accounts allowed to change their settings, and
   // Personalization for accounts with memories (the admin's switch, and the permission).
   const interfaceTab = capabilities ? capabilities.isAdmin || capabilities.can('settings.interface', true) : false;
@@ -34,6 +38,7 @@ export default function SettingsScreen() {
     { key: 'archived', label: 'Archived Chats', icon: 'archive-box' },
     { key: 'account', label: 'Account', icon: 'user-circle' },
     { key: 'about', label: 'About', icon: 'information-circle' },
+    ...(capabilities?.isAdmin ? [{ key: 'admin' as const, label: 'Admin', icon: 'wrench-screwdriver' as const }] : []),
   ];
   const shown = tabs.some((item) => item.key === tab) ? tab : 'general';
   return (
@@ -58,6 +63,8 @@ export default function SettingsScreen() {
         <ArchivedChats />
       ) : shown === 'account' ? (
         <AccountSettings />
+      ) : shown === 'admin' ? (
+        <AdminSettings />
       ) : (
         <AboutSettings />
       )}

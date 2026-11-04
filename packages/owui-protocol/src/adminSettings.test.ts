@@ -1,0 +1,81 @@
+import { describe, expect, it } from 'vitest';
+import { OwuiClient, type FetchLike } from './http';
+import {
+  AUTHENTICATION_SECTIONS,
+  describeSettingChange,
+  formValue,
+  GENERAL_SECTIONS,
+  saveBanners,
+  settingChanges,
+  settingConflicts,
+  settingProblems,
+  settingShown,
+  settingsPayload,
+  settingValues,
+  storedValue,
+  type SettingField,
+} from './adminSettings';
+
+const fields = [...GENERAL_SECTIONS, ...AUTHENTICATION_SECTIONS].flatMap((section) => section.fields);
+const field = (key: string) => fields.find((item) => item.key === key) as SettingField;
+const STORED = { ENABLE_FOLDERS: true, FOLDER_MAX_FILE_COUNT: '', ENABLE_SIGNUP: false, DEFAULT_USER_ROLE: 'pending', RESPONSE_WATERMARK: null, JWT_EXPIRES_IN: '4w', ADMIN_EMAIL: null, AUTOMATION_MAX_COUNT: '' };
+
+describe('admin settings form', () => {
+  it('shows stored values as the form edits them, and keeps their types going back', () => {
+    expect(formValue(field('FOLDER_MAX_FILE_COUNT'), '')).toBe('');
+    expect(formValue(field('FOLDER_MAX_FILE_COUNT'), 12)).toBe('12');
+    expect(storedValue(field('FOLDER_MAX_FILE_COUNT'), '12', '')).toBe(12);
+    expect(storedValue(field('FOLDER_MAX_FILE_COUNT'), ' ', 12)).toBe('');
+    expect(storedValue(field('RESPONSE_WATERMARK'), '', null)).toBeNull();
+    expect(storedValue(field('ENABLE_SIGNUP'), true, false)).toBe(true);
+  });
+
+  it('finds no change when nothing was touched, or touched back', () => {
+    expect(settingChanges(fields, STORED, {})).toEqual([]);
+    expect(settingChanges(fields, STORED, { RESPONSE_WATERMARK: '', FOLDER_MAX_FILE_COUNT: '', JWT_EXPIRES_IN: '4w', ENABLE_SIGNUP: false })).toEqual([]);
+    expect(settingChanges(fields, { FOLDER_MAX_FILE_COUNT: 5 }, { FOLDER_MAX_FILE_COUNT: '5' })).toEqual([]);
+    expect(settingChanges(fields, STORED, { ENABLE_SIGNUP: true, JWT_EXPIRES_IN: '7d' })).toEqual(['ENABLE_SIGNUP', 'JWT_EXPIRES_IN']);
+  });
+
+  it('lays only the changes over a fresh read, everything else as it came', () => {
+    const fresh = { ...STORED, ENABLE_FOLDERS: false, UNKNOWN_EXTRA: { keep: true } };
+    const payload = settingsPayload(fields, fresh, STORED, { ENABLE_SIGNUP: true, DEFAULT_USER_ROLE: 'pending' });
+    expect(payload).toEqual({ ...fresh, ENABLE_SIGNUP: true });
+    // The admin switched folders off while someone else did the same on the server: both touched it.
+    expect(settingConflicts(fields, STORED, fresh, { ENABLE_FOLDERS: false })).toEqual(['ENABLE_FOLDERS']);
+    expect(settingConflicts(fields, STORED, fresh, { ENABLE_SIGNUP: true })).toEqual([]);
+  });
+
+  it('checks durations and limits as the server reads them', () => {
+    expect(settingProblems(fields, STORED, { JWT_EXPIRES_IN: '1d12h' })).toEqual([]);
+    expect(settingProblems(fields, STORED, { JWT_EXPIRES_IN: '-1' })).toEqual([]);
+    expect(settingProblems(fields, STORED, { JWT_EXPIRES_IN: 'forever' })).toHaveLength(1);
+    expect(settingProblems(fields, STORED, { FOLDER_MAX_FILE_COUNT: '2.5' })).toHaveLength(1);
+    expect(settingProblems(fields, STORED, { FOLDER_MAX_FILE_COUNT: '' })).toEqual([]);
+  });
+
+  it('shows dependent fields only when what they need is on', () => {
+    const values = settingValues(fields, STORED, { ENABLE_FOLDERS: false });
+    expect(settingShown(field('FOLDER_MAX_FILE_COUNT'), values)).toBe(false);
+    expect(settingShown(field('FOLDER_MAX_FILE_COUNT'), STORED)).toBe(true);
+    expect(settingShown(field('ADMIN_EMAIL'), STORED)).toBe(false);
+  });
+
+  it('says what changes, never a secret, and asks before making everyone an admin', () => {
+    expect(describeSettingChange(field('DEFAULT_USER_ROLE'), 'pending', 'admin')).toBe('New accounts are: “Waiting for approval” → “Admins”');
+    expect(describeSettingChange({ key: 'K', label: 'Key', kind: 'secret' }, 'old-secret', 'new-secret')).toBe('Key: changed');
+    expect(describeSettingChange(field('FOLDER_MAX_FILE_COUNT'), '', 10)).toBe('Files a folder can hold: no limit → “10”');
+    expect(field('DEFAULT_USER_ROLE').confirm?.('admin')).toBeTruthy();
+    expect(field('DEFAULT_USER_ROLE').confirm?.('user')).toBeNull();
+  });
+
+  it('sends banners whole, an empty title as none', async () => {
+    const calls: unknown[] = [];
+    const fetch: FetchLike = async (_url, init) => {
+      calls.push(typeof init?.body === 'string' ? JSON.parse(init.body) : undefined);
+      return new Response('[]', { status: 200 });
+    };
+    await saveBanners(new OwuiClient({ baseUrl: 'https://chat.test', token: 't', fetch }), [{ id: 'b1', type: 'warning', title: '', content: 'Down at 9', dismissible: true, timestamp: 1_730_000_000 }]);
+    expect(calls[0]).toEqual({ banners: [{ id: 'b1', type: 'warning', title: null, content: 'Down at 9', dismissible: true, timestamp: 1_730_000_000 }] });
+  });
+});
