@@ -139,7 +139,7 @@ export function shelvesFor(learner: boolean): DtShelf[] {
   }));
 }
 
-/** DeepTutor's admin pages (account menu, admins only). */
+/** DeepTutor's admin pages (account menu, admins only): the app's Users screen (`/learn/admin`), or `path` on the web. */
 export const DT_ADMIN_PAGE: DtPage = { key: 'admin', label: 'Admin', icon: 'shield-check', path: '/admin/users' };
 /** DeepTutor's full settings, for what the app's Settings doesn't cover. */
 export const DT_SETTINGS_PAGE: DtPage = { key: 'settings', label: 'DeepTutor Settings', icon: 'cog-6-tooth', path: '/settings' };

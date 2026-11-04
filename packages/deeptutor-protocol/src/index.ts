@@ -1,4 +1,5 @@
 export * from './account';
+export * from './admin';
 export * from './auth';
 export * from './books';
 export * from './calendar';

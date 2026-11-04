@@ -101,7 +101,19 @@ export function DtSidebar() {
   };
 
   const userMenu: MenuItem[] = [
-    ...(session.account.isAdmin ? [{ key: 'admin', label: DT_ADMIN_PAGE.label, icon: DT_ADMIN_PAGE.icon, onPress: () => openPage(DT_ADMIN_PAGE.path, DT_ADMIN_PAGE.label) }] : []),
+    ...(session.account.isAdmin
+      ? [
+          {
+            key: 'admin',
+            label: DT_ADMIN_PAGE.label,
+            icon: DT_ADMIN_PAGE.icon,
+            onPress: () => {
+              sidebar.close();
+              if (pathname !== '/learn/admin') router.replace('/learn/admin');
+            },
+          },
+        ]
+      : []),
     {
       key: 'settings',
       label: 'Settings',
