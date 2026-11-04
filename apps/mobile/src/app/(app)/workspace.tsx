@@ -10,6 +10,7 @@ import { useToast } from '@/components/Toast';
 import { ChatHeader } from '@/features/chat/ChatHeader';
 import { ModelAvatar } from '@/features/chat/ModelAvatar';
 import { fileNameOf, shareFile } from '@/features/settings/exportFile';
+import { AccessSheet, type AccessTarget } from '@/features/workspace/AccessSheet';
 import { ModelEditor, type ModelEditorTarget } from '@/features/workspace/ModelEditor';
 import { useWorkspaceModels, useWorkspaceModelTags, useWorkspaceRefresh } from '@/features/workspace/queries';
 import { describeError } from '@/lib/errors';
@@ -51,6 +52,7 @@ export default function Workspace() {
   const [tag, setTag] = useState('');
   const [byName, setByName] = useState(false);
   const [editor, setEditor] = useState<ModelEditorTarget | null>(null);
+  const [sharing, setSharing] = useState<AccessTarget | null>(null);
   const models = useWorkspaceModels({ query: debounced, view, tag, orderBy: byName ? 'name' : 'updated_at', direction: byName ? 'asc' : 'desc' });
   const tags = useWorkspaceModelTags();
   const items = models.data?.pages.flatMap((page) => page.items) ?? [];
@@ -85,6 +87,7 @@ export default function Workspace() {
     ...(model.writeAccess
       ? [
           { key: 'edit', label: 'Edit', icon: 'pencil-square' as const, onPress: () => setEditor({ kind: 'edit', id: model.id }) },
+          { key: 'share', label: 'Share…', icon: 'users' as const, onPress: () => setSharing({ area: 'models', id: model.id, name: model.name, grants: model.accessGrants }) },
           { key: 'hide', label: model.hidden ? 'Show in Pickers' : 'Hide from Pickers', icon: model.hidden ? ('eye' as const) : ('eye-slash' as const), onPress: () => run(() => setWorkspaceModelHidden(client, model.id, !model.hidden), model.hidden ? 'Shown in everyone’s picker' : 'Hidden from everyone’s picker') },
           ...(canCreate ? [{ key: 'clone', label: 'Clone', icon: 'rectangle-stack' as const, onPress: () => setEditor({ kind: 'clone', id: model.id }) }] : []),
           ...(canExport ? [{ key: 'export', label: 'Export', icon: 'arrow-down' as const, onPress: () => void exportModel(model) }] : []),
@@ -178,7 +181,7 @@ export default function Workspace() {
                   {item.description || (item.baseModelId ? `Built on ${item.baseModelId}` : item.id)}
                 </Text>
                 <Text style={[styles.meta, { color: palette.textFaint }]} numberOfLines={1}>
-                  {[item.isActive ? '' : 'Off', item.hidden ? 'Hidden' : '', item.writeAccess ? '' : 'Read-only', item.ownerName && view !== 'created' ? `by ${item.ownerName}` : ''].filter(Boolean).join(' · ') || item.id}
+                  {[item.isActive ? '' : 'Off', item.hidden ? 'Hidden' : '', item.writeAccess ? '' : 'Read-only', item.accessGrants.some((grant) => grant.principal_id === '*') ? 'Everyone' : item.accessGrants.length ? 'Shared' : '', item.ownerName && view !== 'created' ? `by ${item.ownerName}` : ''].filter(Boolean).join(' · ') || item.id}
                 </Text>
               </View>
               {item.writeAccess ? <Switch accessibilityLabel={`${item.name} on`} value={item.isActive} onValueChange={() => run(() => toggleWorkspaceModel(client, item.id), item.isActive ? `${item.name} is off for everyone` : `${item.name} is on`)} /> : null}
@@ -188,6 +191,7 @@ export default function Workspace() {
         />
       )}
       <ModelEditor target={editor} onClose={() => setEditor(null)} />
+      <AccessSheet target={sharing} onClose={() => setSharing(null)} onSaved={refresh} />
     </View>
   );
 }

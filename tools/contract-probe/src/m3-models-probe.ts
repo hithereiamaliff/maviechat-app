@@ -1,4 +1,8 @@
 import {
+  accessRights,
+  droppedGrants,
+  getSessionUser,
+  updateAccess,
   builtinToolsMeta,
   builtinToolsOf,
   capabilitiesOf,
@@ -110,6 +114,22 @@ export async function probeM3Models({ client, capabilities }: { client: OwuiClie
       if (back.params.custom_params === undefined) throw new Error('the custom parameter was dropped');
       if (tool && !(meta.toolIds as unknown[] | undefined)?.includes(tool.id)) throw new Error('the tool wasn’t kept');
       return `${base.id} as the base; a save while off kept it off; hidden: ${String(fixture.hiddenInPicker)}; capabilities, built-in tools, a tool, a suggested prompt, stop sequences (as a list) and a custom parameter read back`;
+    });
+    await step('workspace models: sharing kept only as this account may grant it', async () => {
+      if (!made) throw new Error('no probe model');
+      const me = (await getSessionUser(client)).id;
+      const rights = accessRights(capabilities, 'models');
+      fixture.rights = rights;
+      const everyone = [{ principal_type: 'user' as const, principal_id: '*', permission: 'read' as const }];
+      const keptEveryone = await updateAccess(client, 'models', id, everyone);
+      const everyoneDropped = droppedGrants(everyone, keptEveryone).length > 0;
+      if (everyoneDropped === rights.everyone) throw new Error(`"everyone" was ${everyoneDropped ? 'dropped' : 'kept'}, though this account ${rights.everyone ? 'may' : 'may not'} grant it`);
+      const self = [{ principal_type: 'user' as const, principal_id: me, permission: 'read' as const }];
+      const keptSelf = await updateAccess(client, 'models', id, self);
+      fixture.personKept = droppedGrants(self, keptSelf).length === 0;
+      const cleared = await updateAccess(client, 'models', id, []);
+      if (cleared.length) throw new Error('making it private again kept grants');
+      return `everyone ${everyoneDropped ? 'dropped' : 'kept'} (sharing.public_models ${rights.everyone}); a person ${fixture.personKept ? 'kept' : 'dropped'} (allow_users ${rights.people}, sharing.models ${rights.list}); private again`;
     });
     await step('workspace models: export needs its permission', async () => {
       const status = await statusOf(() => exportWorkspaceModels(client));

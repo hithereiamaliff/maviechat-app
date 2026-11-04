@@ -77,6 +77,13 @@
     },
     "temperature": 0.3
   },
+  "rights": {
+    "list": false,
+    "everyone": false,
+    "people": true,
+    "groups": true
+  },
+  "personKept": true,
   "export": 401,
   "afterDelete": 404
 }
