@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { OwuiClient, type FetchLike } from './http';
 import {
   AUTHENTICATION_SECTIONS,
+  CHAT_SECTIONS,
+  CODE_EXECUTION_SECTIONS,
   describeSettingChange,
   formValue,
   GENERAL_SECTIONS,
@@ -77,5 +79,28 @@ describe('admin settings form', () => {
     };
     await saveBanners(new OwuiClient({ baseUrl: 'https://chat.test', token: 't', fetch }), [{ id: 'b1', type: 'warning', title: '', content: 'Down at 9', dismissible: true, timestamp: 1_730_000_000 }]);
     expect(calls[0]).toEqual({ banners: [{ id: 'b1', type: 'warning', title: null, content: 'Down at 9', dismissible: true, timestamp: 1_730_000_000 }] });
+  });
+});
+
+describe('more admin settings pages', () => {
+  const code = CODE_EXECUTION_SECTIONS.flatMap((section) => section.fields);
+  const chat = CHAT_SECTIONS.flatMap((section) => section.fields);
+  const find = (fields: SettingField[], key: string) => fields.find((item) => item.key === key) as SettingField;
+
+  it('shows Jupyter settings only for Jupyter, and its token only for token sign-in', () => {
+    const stored = { ENABLE_CODE_EXECUTION: true, CODE_EXECUTION_ENGINE: 'pyodide', CODE_EXECUTION_JUPYTER_AUTH: '' };
+    expect(settingShown(find(code, 'CODE_EXECUTION_JUPYTER_URL'), stored)).toBe(false);
+    const jupyter = settingValues(code, stored, { CODE_EXECUTION_ENGINE: 'jupyter', CODE_EXECUTION_JUPYTER_AUTH: 'token' });
+    expect(settingShown(find(code, 'CODE_EXECUTION_JUPYTER_URL'), jupyter)).toBe(true);
+    expect(settingShown(find(code, 'CODE_EXECUTION_JUPYTER_AUTH_TOKEN'), jupyter)).toBe(true);
+    expect(settingShown(find(code, 'CODE_EXECUTION_JUPYTER_AUTH_PASSWORD'), jupyter)).toBe(false);
+    expect(find(code, 'CODE_EXECUTION_JUPYTER_AUTH_TOKEN').kind).toBe('secret');
+  });
+
+  it('keeps numbers within what the server takes', () => {
+    const stored = { ENABLE_CONTEXT_COMPACTION: true, CONTEXT_COMPACTION_RETENTION_PERCENTAGE: 40, CONTEXT_COMPACTION_TOKEN_CAP: null };
+    expect(settingProblems(chat, stored, { CONTEXT_COMPACTION_RETENTION_PERCENTAGE: '60' })).toHaveLength(1);
+    expect(settingProblems(chat, stored, { CONTEXT_COMPACTION_RETENTION_PERCENTAGE: '25' })).toEqual([]);
+    expect(settingChanges(chat, stored, { CONTEXT_COMPACTION_TOKEN_CAP: '' })).toEqual([]);
   });
 });

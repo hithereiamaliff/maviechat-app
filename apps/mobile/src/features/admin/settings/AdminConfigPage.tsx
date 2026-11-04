@@ -15,6 +15,7 @@ import {
   type BannerType,
   type SettingEdits,
   type SettingOption,
+  type OwuiClient,
   type SettingSection,
 } from '@maviechat/owui-protocol';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -27,7 +28,7 @@ import { useAdminGroups } from '@/features/admin/queries';
 import { Note, SectionTitle } from '@/features/settings/rows';
 import { Chip } from '@/features/workspace/ListControls';
 import { describeError } from '@/lib/errors';
-import { useAuthed } from '@/lib/server';
+import { useAuthed, useModels } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
 import { SettingsForm } from './SettingsForm';
 
@@ -49,32 +50,47 @@ export function reviewChanges(title: string, lines: string[], warnings: string[]
   ]);
 }
 
-/**
- * A page of the admin config (General and Authentication share it): the admin's edits, a bar
- * that says how many and saves them after listing them. The save is laid over a fresh read;
- * if something the admin changed was changed elsewhere meanwhile, it asks first.
- */
+/** A page of the admin config (General and Authentication share it). */
 export function AdminConfigPage({ sections, children }: { sections: SettingSection[]; children?: ReactNode }) {
+  return (
+    <SettingsEndpointPage name="config" read={getAdminConfig} save={saveAdminConfig} sections={sections}>
+      {children}
+    </SettingsEndpointPage>
+  );
+}
+
+type Tree = Record<string, unknown>;
+
+/**
+ * A settings page backed by one endpoint: the admin's edits, a bar that says how many and saves
+ * them after listing them. The save is laid over a fresh read; if something the admin changed
+ * was changed elsewhere meanwhile, it asks first.
+ */
+export function SettingsEndpointPage({ name, read: readConfig, save: saveConfig, sections, children }: { name: string; read: (client: OwuiClient) => Promise<Tree>; save: (client: OwuiClient, config: Tree) => Promise<unknown>; sections: SettingSection[]; children?: ReactNode }) {
   const palette = usePalette();
   const toast = useToast();
   const { client } = useAuthed();
   const refresh = useSettingsRefresh();
-  const config = useQuery({ queryKey: ['admin', 'config'], queryFn: () => getAdminConfig(client), staleTime: 0 });
+  const config = useQuery({ queryKey: ['admin', 'endpoint', name], queryFn: () => readConfig(client), staleTime: 0 });
   const groups = useAdminGroups();
+  const models = useModels();
   const [edits, setEdits] = useState<SettingEdits>({});
   const [busy, setBusy] = useState(false);
   const fields = sections.flatMap((section) => section.fields);
   const read = config.data ?? {};
   const changes = config.data ? settingChanges(fields, read, edits) : [];
   const problems = config.data ? settingProblems(fields, read, edits) : [];
-  const options: Record<string, SettingOption[]> = { groups: [{ value: '', label: 'No group' }, ...(groups.data ?? []).map((group) => ({ value: group.id, label: group.name }))] };
+  const options: Record<string, SettingOption[]> = {
+    groups: [{ value: '', label: 'No group' }, ...(groups.data ?? []).map((group) => ({ value: group.id, label: group.name }))],
+    models: [{ value: '', label: 'The chat’s own model' }, ...(models.data ?? []).map((model) => ({ value: model.id, label: model.name ?? model.id }))],
+  };
 
   const save = async () => {
     setBusy(true);
     try {
-      const fresh = await getAdminConfig(client);
+      const fresh = await readConfig(client);
       const send = async () => {
-        await saveAdminConfig(client, settingsPayload(fields, fresh, read, edits));
+        await saveConfig(client, settingsPayload(fields, fresh, read, edits));
         setEdits({});
         refresh();
         toast('Saved for this server');

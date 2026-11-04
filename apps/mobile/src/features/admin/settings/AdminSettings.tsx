@@ -1,4 +1,19 @@
-import { AUTHENTICATION_SECTIONS, GENERAL_SECTIONS } from '@maviechat/owui-protocol';
+import {
+  AUTHENTICATION_SECTIONS,
+  CHAT_SECTIONS,
+  CODE_EXECUTION_SECTIONS,
+  GENERAL_SECTIONS,
+  getChatConfig,
+  getCodeExecutionConfig,
+  getSubagentsConfig,
+  getTaskConfig,
+  saveChatConfig,
+  saveCodeExecutionConfig,
+  saveSubagentsConfig,
+  saveTaskConfig,
+  SUBAGENT_SECTIONS,
+  TASK_SECTIONS,
+} from '@maviechat/owui-protocol';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -6,11 +21,11 @@ import { Icon } from '@/components/Icon';
 import { ActionRow, Group, Note, SectionTitle } from '@/features/settings/rows';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, usePalette } from '@/theme';
-import { AdminConfigPage, BannersEditor } from './AdminConfigPage';
+import { AdminConfigPage, BannersEditor, SettingsEndpointPage } from './AdminConfigPage';
 import { ConnectionsPage } from './ConnectionsPage';
 import { ModelsPage } from './ModelsPage';
 
-type Page = 'general' | 'authentication' | 'connections' | 'models';
+type Page = 'general' | 'authentication' | 'connections' | 'models' | 'interface' | 'subagents' | 'code-execution';
 
 /** The web's admin settings tabs, in its groups; those not in the app yet open on the web, signed in. */
 const WEB_PAGES: { group: string; pages: { key: string; label: string }[] }[] = [
@@ -21,14 +36,12 @@ const WEB_PAGES: { group: string; pages: { key: string; label: string }[] }[] = 
       { key: 'integrations', label: 'Integrations' },
       { key: 'documents', label: 'Documents' },
       { key: 'web', label: 'Web Search' },
-      { key: 'code-execution', label: 'Code Execution' },
       { key: 'pipelines', label: 'Pipelines' },
     ],
   },
   {
     group: 'Experience',
     pages: [
-      { key: 'interface', label: 'Interface' },
       { key: 'audio', label: 'Audio' },
       { key: 'images', label: 'Images' },
     ],
@@ -38,7 +51,7 @@ const WEB_PAGES: { group: string; pages: { key: string; label: string }[] }[] = 
 
 /**
  * The settings modal's Admin tab (admins only): the server's own settings. General,
- * Authentication, Connections and Models are here; each saves only what changed, after listing it. The
+ * Authentication, Connections, Models, Sub-agents, Interface and Code Execution are here; each saves only what changed, after listing it. The
  * rest open on the web until their slices land.
  */
 export function AdminSettings() {
@@ -66,8 +79,17 @@ export function AdminSettings() {
             </AdminConfigPage>
           ) : page === 'connections' ? (
             <ConnectionsPage />
-          ) : (
+          ) : page === 'models' ? (
             <ModelsPage />
+          ) : page === 'interface' ? (
+            <>
+              <SettingsEndpointPage name="tasks" read={getTaskConfig} save={saveTaskConfig} sections={TASK_SECTIONS} />
+              <SettingsEndpointPage name="chats" read={getChatConfig} save={saveChatConfig} sections={CHAT_SECTIONS} />
+            </>
+          ) : page === 'subagents' ? (
+            <SettingsEndpointPage name="subagents" read={getSubagentsConfig} save={saveSubagentsConfig} sections={SUBAGENT_SECTIONS} />
+          ) : (
+            <SettingsEndpointPage name="code-execution" read={getCodeExecutionConfig} save={saveCodeExecutionConfig} sections={CODE_EXECUTION_SECTIONS} />
           )}
         </>
       ) : (
@@ -85,6 +107,14 @@ export function AdminSettings() {
             <Group>
               <ActionRow label="Connections" hint="OpenAI-compatible and Ollama servers, their keys and models" onPress={() => setPage('connections')} />
               <ActionRow label="Models" hint="On or off, hidden, what new chats start with, pinned, who may use them" onPress={() => setPage('models')} />
+              <ActionRow label="Sub-agents" hint="Helpers models can hand parts of a task to" onPress={() => setPage('subagents')} />
+            </Group>
+          </View>
+          <View style={styles.section}>
+            <SectionTitle title="Tools and experience" />
+            <Group>
+              <ActionRow label="Interface" hint="Titles, tags, follow-ups, searches; long chats; tool approvals" onPress={() => setPage('interface')} />
+              <ActionRow label="Code Execution" hint="The Run button and the code interpreter" onPress={() => setPage('code-execution')} />
             </Group>
           </View>
           {WEB_PAGES.map((group) => (

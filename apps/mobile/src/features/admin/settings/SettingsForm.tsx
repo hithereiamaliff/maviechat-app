@@ -1,6 +1,6 @@
 import { formValue, settingShown, settingValues, type SettingEdits, type SettingField, type SettingOption, type SettingSection } from '@maviechat/owui-protocol';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { Group, Note, SectionTitle, SwitchRow } from '@/features/settings/rows';
 import { Chip } from '@/features/workspace/ListControls';
@@ -46,7 +46,9 @@ function FieldRow({ field, value, onChange, options }: { field: SettingField; va
     <View style={styles.row}>
       <Text style={[styles.label, { color: palette.text }]}>{field.label}</Text>
       {field.hint ? <Text style={[styles.hint, { color: palette.textMuted }]}>{field.hint}</Text> : null}
-      {field.kind === 'select' ? (
+      {field.kind === 'select' && options.length > 6 ? (
+        <OptionPicker label={field.label} value={value} options={options} onChange={onChange} />
+      ) : field.kind === 'select' ? (
         <View style={styles.chips}>
           {options.map((option) => (
             <Chip key={option.value || 'none'} label={option.label} on={value === option.value} onPress={() => onChange(option.value)} />
@@ -80,6 +82,59 @@ function FieldRow({ field, value, onChange, options }: { field: SettingField; va
   );
 }
 
+/** A choice among many (models, say): the current one, and a searchable list to pick from. */
+function OptionPicker({ label, value, options, onChange }: { label: string; value: string; options: SettingOption[]; onChange: (value: string) => void }) {
+  const palette = usePalette();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const current = options.find((option) => option.value === value);
+  const wanted = query.trim().toLowerCase();
+  const shown = options.filter((option) => !wanted || `${option.label} ${option.value}`.toLowerCase().includes(wanted));
+  return (
+    <>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${label}: ${current?.label ?? (value || 'none')}`} onPress={() => setOpen(true)} style={[styles.picker, { borderColor: palette.border, backgroundColor: palette.surface }]}>
+        <Text style={[styles.label, styles.flex, { color: palette.text }]} numberOfLines={1}>
+          {current?.label ?? (value || 'None')}
+        </Text>
+        <Icon name="chevron-down" size={14} color={palette.textMuted} />
+      </Pressable>
+      <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(false)}>
+        <View style={[styles.sheet, { backgroundColor: palette.background }]}>
+          <View style={styles.sheetHeader}>
+            <Text style={[styles.sheetTitle, { color: palette.text }]} numberOfLines={1}>
+              {label}
+            </Text>
+            <Pressable accessibilityRole="button" onPress={() => setOpen(false)} hitSlop={10}>
+              <Text style={[styles.label, { color: palette.link }]}>Done</Text>
+            </Pressable>
+          </View>
+          <View style={styles.pad}>
+            <TextInput value={query} onChangeText={setQuery} placeholder="Search" placeholderTextColor={palette.textFaint} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" accessibilityLabel="Search" style={[styles.input, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]} />
+          </View>
+          <ScrollView contentContainerStyle={styles.options} keyboardShouldPersistTaps="handled">
+            {shown.map((option) => (
+              <Pressable
+                key={option.value || 'none'}
+                accessibilityRole="button"
+                accessibilityState={{ selected: option.value === value }}
+                onPress={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+                style={({ pressed }) => [styles.option, pressed && { backgroundColor: palette.surface }]}>
+                <Text style={[styles.label, styles.flex, { color: palette.text }]} numberOfLines={1}>
+                  {option.label}
+                </Text>
+                {option.value === value ? <Icon name="check" size={16} color={palette.link} /> : null}
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
   section: { gap: 6 },
   row: { gap: 6, paddingHorizontal: 14, paddingVertical: 10 },
@@ -89,4 +144,12 @@ const styles = StyleSheet.create({
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   input: { flex: 1, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 9, fontFamily: fonts.regular, fontSize: 15 },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
+  flex: { flex: 1 },
+  picker: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10 },
+  sheet: { flex: 1 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+  sheetTitle: { flex: 1, fontFamily: fonts.semibold, fontSize: 17 },
+  pad: { paddingHorizontal: 16, paddingBottom: 8 },
+  options: { paddingHorizontal: 8, paddingBottom: 48 },
+  option: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 12, borderRadius: radius.md },
 });
