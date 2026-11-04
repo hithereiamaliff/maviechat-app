@@ -1,0 +1,8 @@
+{
+  "about": "MavieChat's app icon (design B, chosen 2026-11-04): a white M with a small amber speech bubble under its middle, on a teal gradient. Coordinates are on a 1024 x 1024 square; render.py turns them into the app's icon files.",
+  "bg": ["#134E4A", "#0D9488"],
+  "layers": [
+    { "paint": "#FFFFFF", "shapes": [["line", [[290, 726], [290, 298], [512, 520], [734, 298], [734, 726]], 116]] },
+    { "paint": "#FBBF24", "shapes": [["rbox", 430, 622, 164, 116, 44], ["poly", [[452, 712], [508, 730], [440, 782]], 12]] }
+  ]
+}
