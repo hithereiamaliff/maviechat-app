@@ -10,10 +10,12 @@
     "typecheck": "tsc --noEmit -p .",
     "compare": "tsx src/compare.ts",
     "scratch:setup": "tsx src/scratch-setup.ts",
-    "bench:chat": "tsx src/bench-long-chat.ts"
+    "bench:chat": "tsx src/bench-long-chat.ts",
+    "probe:opencode": "tsx src/opencode-probe.ts"
   },
   "dependencies": {
     "@maviechat/deeptutor-protocol": "*",
+    "@maviechat/opencode-protocol": "*",
     "@maviechat/owui-protocol": "*"
   }
 }

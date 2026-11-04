@@ -1,7 +1,6 @@
 import { OcHttpError, OcNetworkError, type FetchLike, type OcClient } from './http';
 import type {
   Agent,
-  FileContent,
   FileDiff,
   FileNode,
   Machine,
@@ -117,7 +116,6 @@ export const listProjects = (client: OcClient, directory: string) => client.oc<P
 
 /** A folder's contents (relative `path`, empty for the project itself). */
 export const listFiles = (client: OcClient, directory: string, path = '') => client.oc<FileNode[]>('GET', '/file', { query: { directory, path } });
-export const readFile = (client: OcClient, directory: string, path: string) => client.oc<FileContent>('GET', '/file/content', { query: { directory, path } });
 
 /** The agents you pick for a prompt: primary ones that aren't hidden. */
 export const pickableAgents = (agents: Agent[]): Agent[] => agents.filter((agent) => agent.mode !== 'subagent' && !agent.hidden);

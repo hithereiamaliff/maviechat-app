@@ -42,9 +42,11 @@ describe('requests', () => {
   });
 
   it('keeps file reads inside the project', () => {
-    expect(checkRequest('GET', '/file/content', query({ directory: '/home/dev/work/app', path: 'src/index.ts' }), folders)).toMatchObject({ ok: true });
-    expect(checkRequest('GET', '/file/content', query({ directory: '/home/dev/work/app', path: '../../.ssh/id_ed25519' }), folders)).toMatchObject({ ok: false, status: 403 });
+    expect(checkRequest('GET', '/file', query({ directory: '/home/dev/work/app', path: 'src' }), folders)).toMatchObject({ ok: true });
+    expect(checkRequest('GET', '/file', query({ directory: '/home/dev/work/app', path: '../../.ssh' }), folders)).toMatchObject({ ok: false, status: 403 });
     expect(checkRequest('GET', '/file', query({ directory: '/home/dev/work/app', path: '/etc' }), folders)).toMatchObject({ ok: false, status: 403 });
+    // File contents stay closed altogether (a project's .env).
+    expect(checkRequest('GET', '/file/content', query({ directory: '/home/dev/work/app', path: 'src/index.ts' }), folders)).toMatchObject({ ok: false, status: 404 });
   });
 });
 

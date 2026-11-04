@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Readable } from 'node:stream';
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { checkRequest, withApprovals } from './rules.ts';
+import { cleanAgents, cleanProviders, eventFilter } from './sanitize.ts';
 import type { DeviceStore } from './store.ts';
 
 /** An OpenCode server on this machine, as one login the app can pick. */
@@ -221,6 +222,19 @@ export function createGateway(config: GatewayConfig, store: DeviceStore, fetchIm
       return reply(502, { error: `OpenCode (${login.name}) isn't answering on this machine.` });
     }
 
+    // Answers that carry more than the phone should hold are cut down here (provider API keys, agent prompts).
+    const clean = method === 'GET' && upstream.ok ? (forwarded[2] === '/config/providers' ? cleanProviders : forwarded[2] === '/agent' ? cleanAgents : null) : null;
+    if (clean) {
+      if (timer) clearTimeout(timer);
+      let body: unknown;
+      try {
+        body = clean(await upstream.json());
+      } catch {
+        return reply(502, { error: `OpenCode (${login.name}) answered oddly.` });
+      }
+      return reply(upstream.status, body);
+    }
+
     const headers: Record<string, string> = { 'Content-Type': upstream.headers.get('content-type') ?? 'application/json', 'Cache-Control': 'no-store' };
     if (streaming) headers['X-Accel-Buffering'] = 'no';
     response.writeHead(upstream.status, headers);
@@ -230,7 +244,9 @@ export function createGateway(config: GatewayConfig, store: DeviceStore, fetchIm
       return finish(upstream.status);
     }
     if (streaming) config.log(`${method} ${label} ${upstream.status} open`);
-    const stream = Readable.fromWeb(upstream.body as unknown as WebReadableStream<Uint8Array>);
+    // The event stream only carries the kinds of event the app uses.
+    const source = streaming && upstream.ok ? upstream.body.pipeThrough(eventFilter()) : upstream.body;
+    const stream = Readable.fromWeb(source as unknown as WebReadableStream<Uint8Array>);
     stream.on('error', () => response.destroy());
     stream.pipe(response);
     response.on('close', () => {

@@ -67,8 +67,8 @@ export const ROUTES: readonly Route[] = [
   route('GET', '/question', '/question'),
   route('POST', `/question/${ID}/reply`, '/question/:id/reply'),
   route('POST', `/question/${ID}/reject`, '/question/:id/reject'),
+  // Folder listings for picking a project. File contents stay closed: they could include a project's .env.
   route('GET', '/file', '/file', { pathParam: 'path' }),
-  route('GET', '/file/content', '/file/content', { pathParam: 'path' }),
 ];
 
 export type Verdict = { ok: true; label: string } | { ok: false; status: 403 | 404; error: string; label: string };

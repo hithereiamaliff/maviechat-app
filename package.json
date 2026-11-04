@@ -18,6 +18,7 @@
     "bundle": "npm run bundle --workspace @maviechat/mobile",
     "probe": "npm run probe --workspace @maviechat/contract-probe --",
     "probe:deeptutor": "npm run probe:deeptutor --workspace @maviechat/contract-probe --",
+    "probe:opencode": "npm run probe:opencode --workspace @maviechat/contract-probe --",
     "compare": "npm run compare --workspace @maviechat/contract-probe --",
     "scratch:setup": "npm run scratch:setup --workspace @maviechat/contract-probe --",
     "bench:chat": "npm run bench:chat --workspace @maviechat/contract-probe --",

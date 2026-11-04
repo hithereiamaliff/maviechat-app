@@ -31,7 +31,8 @@ export default function OpenCodeHome() {
   const [model, setModel] = useState<ModelPick | null>(null);
   const [agent, setAgent] = useState<string | null>(null);
   const [approvals, setApprovals] = useState(true);
-  const chosenModel = model ?? models.data?.fallback ?? null;
+  // Unless you pick one, OpenCode uses its own default model.
+  const chosenModel = model;
 
   const send = async (text: string): Promise<boolean> => {
     if (!directory) {

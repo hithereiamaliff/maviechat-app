@@ -48,10 +48,14 @@ beforeEach(async () => {
       if (request.url?.startsWith('/event')) {
         response.writeHead(200, { 'Content-Type': 'text/event-stream' });
         response.write('data: {"type":"server.connected","properties":{}}\n\n');
+        response.write('data: {"type":"integration.updated","properties":{"token":"secret-thing"}}\n\n');
         response.write('data: {"type":"session.idle","properties":{"sessionID":"ses_1"}}\n\n');
         return;
       }
       if (request.method === 'POST' && request.url?.startsWith('/session?')) return response.writeHead(200, { 'Content-Type': 'application/json' }).end(body);
+      if (request.url?.startsWith('/config/providers')) {
+        return response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ providers: [{ id: 'p', name: 'P', key: 'sk-live-secret', options: { apiKey: 'sk-live-secret' }, models: {} }], default: {} }));
+      }
       response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify([{ id: 'ses_1' }]));
     });
   });
@@ -131,7 +135,7 @@ describe('opencode gateway', () => {
     const count = seen.length;
     expect((await fetch(`${base}/v1/oc/root/session?directory=/etc`, authed(token))).status).toBe(403);
     expect((await fetch(`${base}/v1/oc/root/session`, authed(token))).status).toBe(403);
-    expect((await fetch(`${base}/v1/oc/root/file/content?directory=/home/dev/work/app&path=../../.ssh/id_rsa`, authed(token))).status).toBe(403);
+    expect((await fetch(`${base}/v1/oc/root/file?directory=/home/dev/work/app&path=../../.ssh`, authed(token))).status).toBe(403);
     expect((await fetch(`${base}/v1/oc/root/session/ses_1/shell?directory=/home/dev/work/app`, authed(token, { method: 'POST', body: '{}' }))).status).toBe(404);
     expect((await fetch(`${base}/v1/oc/other/session?directory=/home/dev/work/app`, authed(token))).status).toBe(404);
     expect(seen.length).toBe(count);
@@ -162,7 +166,15 @@ describe('opencode gateway', () => {
     }
     expect(text).toContain('"type":"server.connected"');
     expect(text).toContain('"type":"session.idle"');
+    expect(text).not.toContain('secret-thing');
     controller.abort();
+  });
+
+  it('never forwards provider API keys', async () => {
+    const token = await pair();
+    const text = await (await fetch(`${base}/v1/oc/root/config/providers?directory=/home/dev/work/app`, authed(token))).text();
+    expect(text).not.toContain('sk-live-secret');
+    expect(JSON.parse(text)).toEqual({ providers: [{ id: 'p', name: 'P', models: {} }], default: {} });
   });
 
   it('unpairs a phone: its token stops working', async () => {

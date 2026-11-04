@@ -53,7 +53,7 @@ export interface ModelChoice {
   provider: string;
 }
 
-/** Every model this OpenCode can use, and the default one. */
+/** Every model this OpenCode can use. Until one is picked, OpenCode uses its own default. */
 export function useOcModels(directory: string | null) {
   const { client, accountId } = useOcAuthed();
   return useQuery({
@@ -65,9 +65,7 @@ export function useOcModels(directory: string | null) {
           .filter((model: Model) => model.status !== 'deprecated')
           .map((model: Model) => ({ providerID: provider.id, modelID: model.id, name: model.name || model.id, provider: provider.name })),
       );
-      const firstProvider = result.providers[0]?.id;
-      const fallback = firstProvider ? { providerID: firstProvider, modelID: result.default[firstProvider] ?? '' } : null;
-      return { models, fallback };
+      return { models };
     },
     enabled: Boolean(directory),
     staleTime: 5 * 60_000,

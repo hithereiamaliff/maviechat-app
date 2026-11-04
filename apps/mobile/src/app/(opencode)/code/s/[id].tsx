@@ -35,9 +35,9 @@ export default function OpenCodeSession() {
   const [model, setModel] = useState<ModelPick | null>(null);
   const [agent, setAgent] = useState<string | null>(null);
 
-  // Unless chosen here, a reply uses what the last prompt used.
+  // Unless chosen here, a reply uses what the last prompt used (or OpenCode's own default).
   const lastUser = [...live.messages].reverse().find((entry) => entry.info.role === 'user')?.info as UserMessage | undefined;
-  const chosenModel = model ?? (lastUser?.model ? { providerID: lastUser.model.providerID, modelID: lastUser.model.modelID } : (models.data?.fallback ?? null));
+  const chosenModel = model ?? (lastUser?.model ? { providerID: lastUser.model.providerID, modelID: lastUser.model.modelID } : null);
   const chosenAgent = agent ?? lastUser?.agent ?? agents.data?.[0]?.name ?? null;
   const working = isWorking(live);
   const title = session.data?.title || 'Session';
