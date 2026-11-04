@@ -44,6 +44,8 @@
  * soul, a reply over `/ws/partners/{id}` read back from history, a reply followed again after a
  * dropped socket, the conversation archived, brought back and deleted; its set-up, a group of two,
  * and chat-app settings on a partner never started (no app switched on, no scan); all deleted.
+ * `--personalization` checks Personas, Skills (and their tags), that a connected agent stays out of
+ * the knowledge-base lists, and CLI apps (src/deeptutor-personalization-probe.ts); no model calls.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -146,6 +148,7 @@ import {
 } from '@maviechat/deeptutor-protocol';
 import { probeBooks } from './deeptutor-books-probe';
 import { probePartners } from './deeptutor-partners-probe';
+import { probePersonalization } from './deeptutor-personalization-probe';
 import { probeLearning } from './deeptutor-learning-probe';
 import { probeReading, probeVideo } from './deeptutor-reading-probe';
 import { loadEnvFile } from './env';
@@ -172,6 +175,7 @@ const { values: args } = parseArgs({
     reading: { type: 'boolean' },
     video: { type: 'boolean' },
     partners: { type: 'boolean' },
+    personalization: { type: 'boolean' },
   },
 });
 
@@ -402,6 +406,14 @@ async function main() {
     await step('partners: one made from a library soul, a reply over /ws/partners, a reply followed again, conversations, set-up, a group, chat-app settings, delete', async () => {
       const outcome = await probePartners(baseUrl, session.token as string, client);
       fixtures.partners = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.personalization) {
+    await step('personalization: personas, skills and tags made, changed and deleted; an agent connection kept out of knowledge bases; CLI apps', async () => {
+      const outcome = await probePersonalization(client);
+      fixtures.personalization = outcome.fixture;
       return { value: true, note: outcome.note };
     });
   }

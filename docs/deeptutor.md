@@ -521,6 +521,22 @@ A partner is a companion DeepTutor hosts: a soul (a persona in Markdown, in ever
 - Feishu and WeCom: `POST …/channel-onboarding/start {channel}` → `{session_id, status: pending_scan, qr_data_url, fallback_url, poll_interval_seconds, expires_at}`; poll `GET …/channel-onboarding/{session}` until `ready`, then `POST …/apply` saves the settings; `DELETE` calls it off. WeChat: `POST …/channels/weixin/qr` → `{session_id, status, qr_svg, scan_payload}`, polled at `GET …/channels/weixin/qr/{session}` (the code comes only when new) until `confirmed`.
 - The probe saves Telegram switched off on a stopped partner, so nothing outside DeepTutor is contacted; the scans call Feishu, WeCom or WeChat, so they're checked against recorded answers only.
 
+## Personalization: Personas and Skills (B7.1, 2026-11-04)
+
+- **All Personalization** (`/learn/personalization`): the six things that are yours in every workspace, with counts (agents, personas, skills, CLI apps you can use). MCP Services has no count: reading its list makes DeepTutor connect to every server in it. Personas and Skills open here; My Agents, MCP Services, CLI Apps and Memory open DeepTutor's pages until their slices.
+- **Personas** (`/learn/personas`): yours, then your admin's presets (read-only). Reading one shows its Markdown without the file's header. New Persona and Edit open a sheet: the name (made into one DeepTutor accepts as you type: lowercase letters, digits, dashes), a one-line description, how it speaks (DeepTutor writes the header itself); a new name renames it. Delete: chats that answer in it go back to the default voice.
+- **Skills** (`/learn/skills`): filter by tag (All, each tag, Untagged, with counts). Yours can be changed; built-in ones and those your admin gave you are read-only. New Skill and Edit: name, description, tags (the library's, or a new one, which joins the library), the playbook. A skill's header (settings such as `always` and `requires`) is kept as it came, or edited with the whole file; only what changed is sent. Delete says which workspaces' chats can use it now. Manage Tags: add, rename (every skill with it follows), delete (it comes off every skill). Installing from DeepTutor's skill hub stays on its page (it calls the hub's servers).
+- **Fixed:** connected agents, which DeepTutor keeps as knowledge bases, no longer show in the chat's knowledge-base choice or the Knowledge Center (picking one makes a chat run that agent program on the server).
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --personalization`)
+
+- Every Personalization endpoint refuses learner accounts (403); the shelf is hidden for them.
+- Personas: `GET /api/personas` (yours by name, then the admin's as `source: admin`, `read_only`), `GET /api/personas/{name}` (the whole file), `POST` (409 when you have one by that name; a preset's name is allowed and takes its place; 400 for a bad name), `PUT {description?, content?, rename_to?}` (404 for a preset unless you're the admin), `DELETE`. Names match `^[a-z0-9][a-z0-9-]{0,63}$`. The saved file always gets a fresh header of name and description; a header inside `content` is dropped. Our server has three presets: peer, research-assistant, teacher.
+- Skills: `GET /api/skills/list`, `GET /api/skills/{name}` (the whole SKILL.md), `POST /api/skills/create`, `PUT` (`content` **replaces the whole file**, then name, description and tags are written into its header; 403 for built-ins), `DELETE`. Tags: `/api/skills/tags/list`, `/create`, `PUT`/`DELETE /tags/{tag}`, which reach every skill of yours with the tag; tags match `^[a-z0-9][a-z0-9\- _]{0,31}$`. Built-ins here: docx, pdf, pptx, skill-creator, xlsx.
+- `GET /api/settings/workspace/resource-usage?kind=skills&resource_id=` lists the workspaces whose chats may use a skill; one that hasn't narrowed its skills counts as using every skill, so General is always among them.
+- A connected agent is a knowledge base with `metadata.type: subagent`. Connecting one without a folder only writes the account's knowledge-base list (nothing runs), so the probe connects a `codex`, checks both lists leave it out, and disconnects it. `GET /api/subagents/detect` and `/backends/options` try to run each agent program on the server (`--version`): neither the app nor the probes call them (no agent program is installed in our container).
+- CLI apps: `GET /api/space/cli-apps/apps` → `apps`, `access {unrestricted, exec_denied}`; none on our server; switching an unknown one → 404.
+
 ## M1.5 checklist
 
 | | Item |

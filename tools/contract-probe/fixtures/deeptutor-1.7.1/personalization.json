@@ -1,0 +1,41 @@
+{
+  "personas": {
+    "count": 3,
+    "presets": [
+      "peer",
+      "research-assistant",
+      "teacher"
+    ]
+  },
+  "presetFile": {
+    "header": true,
+    "body": true
+  },
+  "presetEdit": 404,
+  "personaDuplicate": 409,
+  "personaBadName": 400,
+  "skills": {
+    "count": 5,
+    "builtin": [
+      "docx",
+      "pdf",
+      "pptx",
+      "skill-creator",
+      "xlsx"
+    ],
+    "assigned": 0
+  },
+  "builtinFile": {
+    "header": true,
+    "body": 3160
+  },
+  "builtinEdit": 403,
+  "usage": 1,
+  "connections": 0,
+  "cliApps": {
+    "apps": 0,
+    "unrestricted": false,
+    "execDenied": false
+  },
+  "cliUnknown": 404
+}

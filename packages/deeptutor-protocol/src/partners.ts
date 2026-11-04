@@ -1,4 +1,5 @@
 import type { DtClient } from './http';
+import { listSkills } from './skills';
 import { applyTurnEvent, emptyReply, type DtReply } from './turnReply';
 import { parseServerEvent, type DtLlmSelection, type DtStreamEvent } from './turns';
 
@@ -208,9 +209,7 @@ export async function createPartner(client: DtClient, input: DtNewPartner): Prom
 
 /** Names of the skills you can give a partner (`GET /api/skills/list`). */
 export async function listSkillNames(client: DtClient): Promise<string[]> {
-  const raw = await client.get<unknown>('/api/skills/list');
-  const rows = isTree(raw) ? list(raw.skills) : list(raw);
-  return rows.map((row) => (isTree(row) ? text(row.name) : text(row))).filter(Boolean);
+  return (await listSkills(client)).map((skill) => skill.name);
 }
 
 // ── Conversations ────────────────────────────────────────────────────────────

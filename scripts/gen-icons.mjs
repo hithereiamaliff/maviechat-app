@@ -66,6 +66,7 @@ const ICONS = [
   'light-bulb',
   'link',
   'list-bullet',
+  'lock-closed',
   'magnifying-glass',
   'map',
   'microphone',

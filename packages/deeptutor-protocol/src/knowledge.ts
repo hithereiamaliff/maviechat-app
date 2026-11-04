@@ -1,4 +1,5 @@
 import type { DtClient } from './http';
+import { isAgentConnection } from './subagents';
 
 /*
  * DeepTutor's Knowledge Center (1.7.1): knowledge bases built from your documents, searched by
@@ -71,10 +72,10 @@ function infoOf(raw: unknown): DtKnowledgeBaseInfo | null {
   };
 }
 
-/** The account's knowledge bases, with their state. */
+/** The account's knowledge bases, with their state (connected agents, kept as knowledge bases too, left out). */
 export async function listKnowledgeCenter(client: DtClient): Promise<DtKnowledgeBaseInfo[]> {
   const response = await client.get<unknown>('/api/knowledge-bases');
-  return (Array.isArray(response) ? response : []).flatMap((item) => infoOf(item) ?? []);
+  return (Array.isArray(response) ? response : []).flatMap((item) => (isAgentConnection(item) ? [] : (infoOf(item) ?? [])));
 }
 
 export async function getKnowledgeBase(client: DtClient, name: string): Promise<DtKnowledgeBaseInfo> {

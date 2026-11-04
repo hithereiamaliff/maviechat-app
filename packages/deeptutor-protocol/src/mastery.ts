@@ -1,4 +1,5 @@
 import { DtHttpError, type DtClient } from './http';
+import { isAgentConnection } from './subagents';
 
 /*
  * DeepTutor's mastery paths (1.7.1, `/api/mastery-paths`): a goal becomes a map of modules and
@@ -533,7 +534,7 @@ export interface DtMaterialChoice {
 export async function listKnowledgeMaterials(client: DtClient): Promise<DtMaterialChoice[]> {
   const body = record(await client.get<unknown>('/api/dashboard/source-library/knowledge'));
   return rows(body.items)
-    .filter((row) => record(row.metadata).type !== 'subagent')
+    .filter((row) => !isAgentConnection(row))
     .map((row) => ({ id: text(row.id) || text(row.name), label: text(row.name) || text(row.id), available: row.available !== false && row.unreadable !== true }))
     .filter((row) => row.id);
 }

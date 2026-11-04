@@ -1,4 +1,5 @@
 import type { DtClient } from './http';
+import { isAgentConnection } from './subagents';
 import type { DtLlmSelection } from './turns';
 
 /** A model the account may use (an admin grants them). */
@@ -99,7 +100,8 @@ export async function listKnowledgeBases(client: DtClient): Promise<DtKnowledgeB
   const list = Array.isArray(response) ? response : [];
   return list.flatMap((item): DtKnowledgeBase[] => {
     const kb = (item ?? {}) as Record<string, unknown>;
-    if (typeof kb.name !== 'string' || !kb.name || kb.available === false) return [];
+    // A connected agent is kept as a knowledge base too; picking one would run it on the server.
+    if (typeof kb.name !== 'string' || !kb.name || kb.available === false || isAgentConnection(kb)) return [];
     return [{ name: kb.name, isDefault: kb.is_default === true, status: typeof kb.status === 'string' ? kb.status : '' }];
   });
 }
