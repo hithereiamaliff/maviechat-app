@@ -1,5 +1,6 @@
 import { Redirect, Stack } from 'expo-router';
 import { useEffect } from 'react';
+import { PushSetup } from '@/features/notifications/PushSetup';
 import { OcLiveProvider } from '@/features/opencode/live';
 import { OcSidebar } from '@/features/opencode/OcSidebar';
 import { OcProjectProvider } from '@/features/opencode/project';
@@ -25,6 +26,7 @@ export default function OpenCodeLayout() {
     // Keyed by the account in use: switching machines starts its streams and screens afresh.
     <OcLiveProvider key={state.accountId}>
       <OcProjectProvider>
+        <PushSetup />
         <SpaceDrawer sidebar={() => <OcSidebar />}>
           <Stack screenOptions={{ headerShown: false, animation: 'none', gestureEnabled: false, contentStyle: { backgroundColor: palette.background } }} />
         </SpaceDrawer>

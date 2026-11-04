@@ -155,3 +155,49 @@ describe('the default model', () => {
     expect(JSON.parse(String(init.body))).toEqual({ model: 'opencode-go/deepseek-v4.1-flash' });
   });
 });
+
+describe('subagents', () => {
+  const permission = (id: string, sessionID: string) => ({ id, sessionID, permission: 'edit', patterns: ['a.ts'], metadata: {}, always: [] });
+
+  it('shows what a subagent (or its own subagent) asks in the session that started it', () => {
+    let live = liveFromHistory('ses_parent', []);
+    live = applyEvent(live, ev('session.created', { info: { id: 'ses_child', parentID: 'ses_parent' } }));
+    live = applyEvent(live, ev('session.created', { info: { id: 'ses_grandchild', parentID: 'ses_child' } }));
+    live = applyEvent(live, ev('session.created', { info: { id: 'ses_stranger', parentID: 'ses_other' } }));
+    expect(live.children).toEqual(['ses_child', 'ses_grandchild']);
+    live = applyEvent(live, ev('permission.asked', permission('per_1', 'ses_child')));
+    live = applyEvent(live, ev('question.asked', { id: 'que_1', sessionID: 'ses_grandchild', questions: [] }));
+    live = applyEvent(live, ev('permission.asked', permission('per_2', 'ses_stranger')));
+    expect(live.permissions.map((item) => item.id)).toEqual(['per_1']);
+    expect(live.questions.map((item) => item.id)).toEqual(['que_1']);
+    // A subagent's own messages stay in its session.
+    expect(applyEvent(live, ev('message.updated', { info: { id: 'msg_c', sessionID: 'ses_child', role: 'assistant', time: { created: 1 } } }))).toBe(live);
+    live = applyEvent(live, ev('permission.replied', { sessionID: 'ses_child', requestID: 'per_1', reply: 'once' }));
+    live = applyEvent(live, ev('question.rejected', { sessionID: 'ses_grandchild', requestID: 'que_1' }));
+    expect(live.permissions).toEqual([]);
+    expect(live.questions).toEqual([]);
+    expect(applyEvent(live, ev('permission.replied', { requestID: 'per_unknown' }))).toBe(live);
+  });
+
+  it('finds subagents in the history and in a running task, for requests already waiting', () => {
+    const task = (id: string, child: string) => ({ id, messageID: 'msg_1', sessionID: 'ses_parent', type: 'tool', callID: id, tool: 'task', state: { status: 'running', input: {}, metadata: { sessionId: child }, time: { start: 1 } } });
+    const history = [{ info: { id: 'msg_1', sessionID: 'ses_parent', role: 'assistant', time: { created: 1 } }, parts: [task('prt_1', 'ses_child')] }];
+    let live = liveFromHistory('ses_parent', history as never, { permissions: [permission('per_1', 'ses_child'), permission('per_2', 'ses_x')] });
+    expect(live.children).toEqual(['ses_child']);
+    expect(live.permissions.map((item) => item.id)).toEqual(['per_1']);
+    live = applyEvent(live, ev('message.part.updated', { part: task('prt_2', 'ses_child2') }));
+    expect(live.children).toEqual(['ses_child', 'ses_child2']);
+  });
+});
+
+describe('notifications', () => {
+  it('hands the push token to the machine with a prompt, only when there is one', async () => {
+    const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+    const client = new OcClient({ gatewayUrl: 'https://g', token: 't', login: 'root', fetch });
+    await sendPrompt(client, '/d', 'ses_1', { text: 'hi' }, { pushToken: 'ExponentPushToken[abc]' });
+    await sendPrompt(client, '/d', 'ses_1', { text: 'hi' });
+    const headers = (call: number) => (fetch.mock.calls[call] as unknown as [string, RequestInit])[1].headers as Record<string, string>;
+    expect(headers(0)['x-maviechat-push']).toBe('ExponentPushToken[abc]');
+    expect(headers(1)['x-maviechat-push']).toBeUndefined();
+  });
+});

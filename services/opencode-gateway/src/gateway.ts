@@ -2,8 +2,10 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Readable } from 'node:stream';
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { checkRequest, withApprovals } from './rules.ts';
+import { isPushToken } from './push.ts';
 import { cleanAgents, cleanConfig, cleanProviders, defaultModelPatch, eventFilter } from './sanitize.ts';
 import type { DeviceStore } from './store.ts';
+import type { Watcher } from './watch.ts';
 
 /** Answers cut down before they reach the phone: provider API keys, agent prompts, the config but its default model. */
 const CLEANERS = new Map<string, (body: unknown) => unknown>([
@@ -101,7 +103,8 @@ function parseJson(buffer: Buffer): unknown {
   }
 }
 
-const basic = (login: Login) => `Basic ${Buffer.from(`${login.username}:${login.password}`).toString('base64')}`;
+/** How the gateway signs in to one of this machine's OpenCode servers. */
+export const basic = (login: Login) => `Basic ${Buffer.from(`${login.username}:${login.password}`).toString('base64')}`;
 
 /**
  * The gateway's jobs:
@@ -110,9 +113,10 @@ const basic = (login: Login) => `Basic ${Buffer.from(`${login.username}:${login.
  *   the paired phones;
  * - `/v1/oc/:login/…`: OpenCode's API for that login, limited by `rules.ts`, with OpenCode's
  *   password added here so the phone never holds it.
- * Every `/v1` call but pairing needs `Authorization: Bearer <device token>`.
+ * Every `/v1` call but pairing needs `Authorization: Bearer <device token>`. A prompt that carries
+ * the phone's push token (`x-maviechat-push`) has its session watched for notifications (watch.ts).
  */
-export function createGateway(config: GatewayConfig, store: DeviceStore, fetchImpl: Fetch, now: () => number = Date.now) {
+export function createGateway(config: GatewayConfig, store: DeviceStore, fetchImpl: Fetch, now: () => number = Date.now, watcher: Watcher | null = null) {
   const lockout = new Lockout(10, 10 * 60_000, 15 * 60_000, now);
   const pairing = new Lockout(5, 60_000, 5 * 60_000, now);
 
@@ -192,7 +196,9 @@ export function createGateway(config: GatewayConfig, store: DeviceStore, fetchIm
     const revoke = /^\/v1\/devices\/([A-Za-z0-9_-]{1,64})$/.exec(url.pathname);
     if (method === 'DELETE' && revoke?.[1]) {
       label = '/v1/devices/:id';
-      return store.revoke(revoke[1]) ? reply(200, { revoked: true }) : reply(404, { error: 'No such device' });
+      if (!store.revoke(revoke[1])) return reply(404, { error: 'No such device' });
+      watcher?.forgetDevice(revoke[1]);
+      return reply(200, { revoked: true });
     }
 
     const forwarded = /^\/v1\/oc\/([A-Za-z0-9_-]{1,64})(\/.*)$/.exec(url.pathname);
@@ -218,6 +224,14 @@ export function createGateway(config: GatewayConfig, store: DeviceStore, fetchIm
       }
     }
 
+    // A prompt from a phone that wants notifications: its session is watched from now on.
+    const prompt = method === 'POST' ? /^\/session\/([A-Za-z0-9_-]+)\/prompt_async$/.exec(forwarded[2]) : null;
+    const pushToken = request.headers['x-maviechat-push'];
+    const unwatch =
+      watcher && prompt?.[1] && isPushToken(pushToken)
+        ? watcher.watch({ deviceId: device.id, pushToken, loginId: login.id, sessionId: prompt[1], directory: url.searchParams.get('directory') ?? '' })
+        : null;
+
     const streaming = forwarded[2] === '/event';
     const controller = new AbortController();
     const timer = streaming ? null : setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -236,8 +250,10 @@ export function createGateway(config: GatewayConfig, store: DeviceStore, fetchIm
       });
     } catch {
       if (timer) clearTimeout(timer);
+      unwatch?.();
       return reply(502, { error: `OpenCode (${login.name}) isn't answering on this machine.` });
     }
+    if (unwatch && !upstream.ok) unwatch();
 
     // Answers that carry more than the phone should hold are cut down here. Not even an error
     // from the settings routes is passed on as it came.
@@ -284,7 +300,7 @@ export function createGateway(config: GatewayConfig, store: DeviceStore, fetchIm
  * The admin side, for `maviechat-gateway` inside the container only (it listens on 127.0.0.1):
  * a new pairing code and link, the paired devices, and revoking one.
  */
-export function createAdmin(config: GatewayConfig, store: DeviceStore) {
+export function createAdmin(config: GatewayConfig, store: DeviceStore, watcher: Watcher | null = null) {
   return async function handle(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const url = new URL(request.url ?? '/', 'http://admin');
     const reply = (status: number, body: unknown) => {
@@ -298,7 +314,11 @@ export function createAdmin(config: GatewayConfig, store: DeviceStore) {
     }
     if (request.method === 'GET' && url.pathname === '/admin/devices') return reply(200, store.list().map(({ tokenHash: _hash, ...rest }) => rest));
     const revoke = /^\/admin\/devices\/([A-Za-z0-9_-]{1,64})$/.exec(url.pathname);
-    if (request.method === 'DELETE' && revoke?.[1]) return reply(store.revoke(revoke[1]) ? 200 : 404, {});
+    if (request.method === 'DELETE' && revoke?.[1]) {
+      if (!store.revoke(revoke[1])) return reply(404, {});
+      watcher?.forgetDevice(revoke[1]);
+      return reply(200, {});
+    }
     return reply(404, { error: 'Not found' });
   };
 }

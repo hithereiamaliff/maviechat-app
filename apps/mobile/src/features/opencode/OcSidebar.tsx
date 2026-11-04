@@ -100,6 +100,15 @@ export function OcSidebar() {
       },
     },
     {
+      key: 'notifications',
+      label: 'Notifications',
+      icon: 'bell',
+      onPress: () => {
+        sidebar.close();
+        router.push('/code/notifications');
+      },
+    },
+    {
       key: 'owui',
       label: owuiSignedIn ? 'Switch to Open WebUI' : 'Connect Open WebUI',
       icon: owuiSignedIn ? 'arrows-right-left' : 'chat-bubble-left-right',

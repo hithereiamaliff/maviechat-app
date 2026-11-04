@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createAdmin, createGateway, type GatewayConfig } from './gateway.ts';
 import { ASK_BEFORE_CHANGES } from './rules.ts';
 import { DeviceStore } from './store.ts';
+import type { Watcher } from './watch.ts';
 
 interface Seen {
   method: string;
@@ -32,10 +33,24 @@ let adminBase = '';
 let seen: Seen[] = [];
 let logs: string[] = [];
 let store: DeviceStore;
+// What the gateway asked the notification watcher to do.
+let watched: { deviceId: string; pushToken: string; loginId: string; sessionId: string; directory: string }[] = [];
+let unwatched: string[] = [];
+let forgotten: string[] = [];
+const watcher = {
+  watch: (input: (typeof watched)[number]) => {
+    watched.push(input);
+    return () => unwatched.push(input.sessionId);
+  },
+  forgetDevice: (deviceId: string) => forgotten.push(deviceId),
+} as unknown as Watcher;
 
 beforeEach(async () => {
   seen = [];
   logs = [];
+  watched = [];
+  unwatched = [];
+  forgotten = [];
   // A stand-in OpenCode server with Basic auth.
   upstream = createServer((request, response) => {
     void readAll(request).then((body) => {
@@ -53,6 +68,7 @@ beforeEach(async () => {
         return;
       }
       if (request.method === 'POST' && request.url?.startsWith('/session?')) return response.writeHead(200, { 'Content-Type': 'application/json' }).end(body);
+      if (request.url?.startsWith('/session/ses_broken/')) return response.writeHead(500, { 'Content-Type': 'application/json' }).end('{}');
       if (request.method === 'PATCH' && request.url?.startsWith('/global/config')) {
         if (body.includes('broken')) return response.writeHead(500, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'write failed near sk-mcp-secret' }));
         const saved = { ...(JSON.parse(body) as object), mcp: { exa: { type: 'remote', headers: { 'x-api-key': 'sk-mcp-secret' } } } };
@@ -78,8 +94,8 @@ beforeEach(async () => {
     log: (line) => logs.push(line),
   };
   store = new DeviceStore(null);
-  const handle = createGateway(config, store, (input, init) => fetch(input, init));
-  const handleAdmin = createAdmin(config, store);
+  const handle = createGateway(config, store, (input, init) => fetch(input, init), Date.now, watcher);
+  const handleAdmin = createAdmin(config, store, watcher);
   gateway = createServer((request, response) => void handle(request, response));
   admin = createServer((request, response) => void handleAdmin(request, response));
   base = await listen(gateway);
@@ -218,6 +234,23 @@ describe('opencode gateway', () => {
     expect((await fetch(`${base}/v1/oc/root/global/config`, authed(token))).status).toBe(404);
   });
 
+  it('watches a prompted session for the phone that sent its push token, and lets go when OpenCode refuses', async () => {
+    const token = await pair();
+    const prompt = (session: string, headers: Record<string, string>) =>
+      fetch(`${base}/v1/oc/root/session/${session}/prompt_async?directory=/home/dev/work/app`, authed(token, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: '{"parts":[]}' }));
+    const pushToken = 'ExponentPushToken[abc123DEF]';
+    expect((await prompt('ses_1', { 'x-maviechat-push': pushToken })).status).toBe(200);
+    expect(watched).toEqual([{ deviceId: expect.any(String), pushToken, loginId: 'root', sessionId: 'ses_1', directory: '/home/dev/work/app' }]);
+    // OpenCode never sees the token.
+    expect(seen.at(-1)?.url).toBe('/session/ses_1/prompt_async?directory=/home/dev/work/app');
+    // No token, or something that isn't one: no watch.
+    await prompt('ses_2', {});
+    await prompt('ses_3', { 'x-maviechat-push': 'not-a-token' });
+    expect(watched).toHaveLength(1);
+    expect((await prompt('ses_broken', { 'x-maviechat-push': pushToken })).status).toBe(500);
+    expect(unwatched).toEqual(['ses_broken']);
+  });
+
   it('unpairs a phone: its token stops working', async () => {
     const token = await pair();
     const devices = (await (await fetch(`${base}/v1/devices`, authed(token))).json()) as { id: string; current: boolean }[];
@@ -225,5 +258,7 @@ describe('opencode gateway', () => {
     expect(self).toBeDefined();
     expect((await fetch(`${base}/v1/devices/${self?.id}`, authed(token, { method: 'DELETE' }))).status).toBe(200);
     expect((await fetch(`${base}/v1/machine`, authed(token))).status).toBe(401);
+    // Its notifications stop too.
+    expect(forgotten).toEqual([self?.id]);
   });
 });

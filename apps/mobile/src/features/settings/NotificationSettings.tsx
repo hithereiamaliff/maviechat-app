@@ -6,6 +6,7 @@ import { disablePush, enablePush, owuiAccountOf, sendTestPush, usePushState } fr
 import { describePushError, isRelayServer } from '@/features/notifications/relay';
 import { watchForTest, type TestWatch } from '@/features/notifications/testWatch';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
+import { useOpenCode } from '@/session/OpenCodeProvider';
 import { useSession } from '@/session/SessionProvider';
 import { fonts, radius, usePalette } from '@/theme';
 
@@ -23,6 +24,9 @@ export function NotificationSettings() {
   // Any signed-in Open WebUI account on those servers, not only the one in use, gets notifications.
   const anyOwuiServed = owui.accounts.some((entry) => entry.signedIn && isRelayServer('owui', entry.baseUrl));
   const deepTutorServed = deepTutorBaseUrl !== null && isRelayServer('deeptutor', deepTutorBaseUrl);
+  // A paired OpenCode machine sends its own notifications, whoever runs it.
+  const openCodePaired = useOpenCode().accounts.some((entry) => entry.signedIn);
+  const relayServed = anyOwuiServed || deepTutorServed;
   const push = usePushState();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -90,7 +94,7 @@ export function NotificationSettings() {
   const testColor =
     testState?.step === 'arrived' ? palette.success : testState?.step === 'missing' || testState?.step === 'failed' ? palette.danger : palette.textMuted;
 
-  if (!anyOwuiServed && !deepTutorServed) {
+  if (!relayServed && !openCodePaired) {
     return (
       <View style={styles.wrap}>
         <Text style={[styles.section, { color: palette.textMuted }]}>Notifications</Text>
@@ -145,9 +149,17 @@ export function NotificationSettings() {
           {"This iPhone is ready, but Open WebUI hasn't reported any replies to MavieChat's notification service yet. An admin adds its webhook once, in Open WebUI's Settings: Admin → System → General → Events → Webhooks."}
         </Text>
       ) : null}
-      <Text style={[styles.note, { color: palette.textFaint }]}>
-        {"When a reply finishes or fails, MavieChat's notification service notifies this iPhone with the chat title and the start of the reply. Open WebUI tells it about every reply; DeepTutor's replies are handed to it as they start. While MavieChat is open, every chat gets a banner except the one on screen."}
-      </Text>
+      {relayServed ? (
+        <Text style={[styles.note, { color: palette.textFaint }]}>
+          {"When a reply finishes or fails, MavieChat's notification service notifies this iPhone with the chat title and the start of the reply. Open WebUI tells it about every reply; DeepTutor's replies are handed to it as they start."}
+        </Text>
+      ) : null}
+      {openCodePaired ? (
+        <Text style={[styles.note, { color: palette.textFaint }]}>
+          {'For OpenCode sessions you start from this iPhone, the paired machine notifies it when they finish or fail, or need your approval or an answer, with the session title. Sessions started at the terminal don’t notify.'}
+        </Text>
+      ) : null}
+      <Text style={[styles.note, { color: palette.textFaint }]}>{'While MavieChat is open, every chat and session gets a banner except the one on screen.'}</Text>
       {session && !owuiServed && !anyOwuiServed ? (
         <Text style={[styles.note, { color: palette.textFaint }]}>
           {"The notification service serves only TechMavie Digital's servers, so this covers DeepTutor's replies, not your Open WebUI server's."}

@@ -108,7 +108,8 @@ export const owuiAccountOf = (session: StoredSession): OwuiAccount => ({ session
  * Every Open WebUI account on a server the relay serves also gives the phone a place in the
  * relay, and Open WebUI's server-wide webhook then reports each finished or failed reply.
  * DeepTutor needs nothing more: each of its replies is handed to the relay as it starts, with
- * this token. Safe to repeat.
+ * this token. Nor does OpenCode: each prompt from this phone carries the token to the paired
+ * machine, which sends the notifications itself. Safe to repeat.
  */
 export async function enablePush(owuiAccounts: OwuiAccount[], { ask }: { ask: boolean }): Promise<PushStatus> {
   const served = relayAccounts(owuiAccounts);
@@ -186,11 +187,12 @@ export async function sendTestPush(session: StoredSession): Promise<RelayAnswer>
 }
 
 /**
- * First launch in either space: ask once and switch on, when a signed-in server is one the relay
- * serves (elsewhere notifications can't work, so the app doesn't ask). Later launches refresh the
- * token and registration quietly.
+ * First launch in any space: ask once and switch on, when a signed-in server is one the relay
+ * serves or an OpenCode machine is paired (it sends its own notifications). Elsewhere
+ * notifications can't work, so the app doesn't ask. Later launches refresh the token and
+ * registration quietly.
  */
-export async function setUpPushOnLaunch(owuiAccounts: OwuiAccount[], deepTutorBaseUrl: string | null): Promise<void> {
+export async function setUpPushOnLaunch(owuiAccounts: OwuiAccount[], deepTutorBaseUrl: string | null, openCodePaired = false): Promise<void> {
   const served = relayAccounts(owuiAccounts);
   let current = await loadState();
   // No account on the relay's servers now: the phone's places under earlier accounts don't apply.
@@ -198,7 +200,7 @@ export async function setUpPushOnLaunch(owuiAccounts: OwuiAccount[], deepTutorBa
     current = { ...current, userId: null, userIds: [], lastEventAt: null };
     await saveState(current);
   }
-  if (served.length === 0 && !(deepTutorBaseUrl && isRelayServer('deeptutor', deepTutorBaseUrl))) return;
+  if (served.length === 0 && !(deepTutorBaseUrl && isRelayServer('deeptutor', deepTutorBaseUrl)) && !openCodePaired) return;
   if (!current.asked) await enablePush(served, { ask: true });
   else if (current.enabled) await enablePush(served, { ask: false });
 }

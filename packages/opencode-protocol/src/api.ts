@@ -82,8 +82,11 @@ export interface PromptInput {
   agent?: string;
 }
 
-/** Sends a prompt. OpenCode answers at once and works on; the reply arrives on the event stream. */
-export const sendPrompt = (client: OcClient, directory: string, id: string, input: PromptInput) =>
+/**
+ * Sends a prompt. OpenCode answers at once and works on; the reply arrives on the event stream.
+ * With this phone's push token, the machine notifies it when the session finishes or needs you.
+ */
+export const sendPrompt = (client: OcClient, directory: string, id: string, input: PromptInput, options: { pushToken?: string | null } = {}) =>
   client.oc<void>('POST', `/session/${encodeURIComponent(id)}/prompt_async`, {
     query: { directory },
     body: {
@@ -91,6 +94,7 @@ export const sendPrompt = (client: OcClient, directory: string, id: string, inpu
       ...(input.model ? { model: input.model } : {}),
       ...(input.agent ? { agent: input.agent } : {}),
     },
+    headers: options.pushToken ? { 'x-maviechat-push': options.pushToken } : {},
     timeoutMs: 120_000,
   });
 

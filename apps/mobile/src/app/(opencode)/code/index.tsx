@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-nat
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
+import { pushTokenIfOn } from '@/features/notifications/push';
 import { describeOcError } from '@/features/opencode/errors';
 import { OcComposer, type ModelPick } from '@/features/opencode/OcComposer';
 import { OcHeader } from '@/features/opencode/OcHeader';
@@ -53,7 +54,9 @@ export default function OpenCodeHome() {
         { ...(agent ? { agent } : {}), ...(model ? { model: { id: model.modelID, providerID: model.providerID } } : {}) },
         approvals,
       );
-      await sendPrompt(client, directory, session.id, { text, model: model ?? undefined, agent: agent ?? undefined });
+      // With notifications on, the machine tells this phone when the session finishes or needs you.
+      const pushToken = await pushTokenIfOn().catch(() => null);
+      await sendPrompt(client, directory, session.id, { text, model: model ?? undefined, agent: agent ?? undefined }, { pushToken });
       void queryClient.invalidateQueries({ queryKey: ocKey(accountId, 'sessions') });
       router.replace({ pathname: '/code/s/[id]', params: { id: session.id, dir: directory } });
       return true;

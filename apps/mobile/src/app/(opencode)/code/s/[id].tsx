@@ -1,12 +1,15 @@
 import { abortSession, answerQuestion, deleteSession, getSession, isWorking, rejectQuestion, renameSession, replyPermission, sendPrompt, type MessageWithParts, type UserMessage } from '@maviechat/opencode-protocol';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from '@/components/Toast';
+import { setViewingChat } from '@/features/notifications/presence';
+import { pushTokenIfOn } from '@/features/notifications/push';
+import { ChangesBar, ChangesSheet, useOcDiff } from '@/features/opencode/Changes';
 import { describeOcError } from '@/features/opencode/errors';
 import { useOcSessionLive } from '@/features/opencode/live';
 import { OcComposer, type ModelPick } from '@/features/opencode/OcComposer';
@@ -30,6 +33,9 @@ export default function OpenCodeSession() {
   const session = useQuery({ queryKey: ocKey(accountId, 'session', id), queryFn: () => getSession(client, directory, id) });
   const models = useOcModels(directory);
   const agents = useOcAgents(directory);
+  const diff = useOcDiff(id, directory);
+  const changed = diff.data ?? [];
+  const [showChanges, setShowChanges] = useState(false);
   const list = useRef<FlashListRef<MessageWithParts>>(null);
   const following = useRef(true);
   const [model, setModel] = useState<ModelPick | null>(null);
@@ -44,11 +50,21 @@ export default function OpenCodeSession() {
   const working = isWorking(live);
   const title = session.data?.title || 'Session';
 
+  // A notification about the session on screen needs no banner.
+  useFocusEffect(
+    useCallback(() => {
+      setViewingChat(id);
+      return () => setViewingChat(null);
+    }, [id]),
+  );
+
   const fail = (error: unknown) => toast(describeOcError(error), 'error');
   const send = async (text: string): Promise<boolean> => {
     try {
       following.current = true;
-      await sendPrompt(client, directory, id, { text, model: chosenModel ?? undefined, agent: chosenAgent ?? undefined });
+      // With notifications on, the machine tells this phone when the session finishes or needs you.
+      const pushToken = await pushTokenIfOn().catch(() => null);
+      await sendPrompt(client, directory, id, { text, model: chosenModel ?? undefined, agent: chosenAgent ?? undefined }, { pushToken });
       return true;
     } catch (error) {
       fail(error);
@@ -57,6 +73,7 @@ export default function OpenCodeSession() {
   };
 
   const menu = [
+    ...(changed.length ? [{ key: 'changes', label: 'Changes', icon: 'document-text' as const, onPress: () => setShowChanges(true) }] : []),
     {
       key: 'rename',
       label: 'Rename',
@@ -161,6 +178,7 @@ export default function OpenCodeSession() {
           contentContainerStyle={styles.list}
         />
         <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+          {changed.length > 0 ? <ChangesBar files={changed} onPress={() => setShowChanges(true)} /> : null}
           <OcComposer
             working={working}
             models={models.data?.models ?? []}
@@ -175,6 +193,7 @@ export default function OpenCodeSession() {
           />
         </View>
       </KeyboardAvoidingView>
+      <ChangesSheet visible={showChanges} files={changed} onClose={() => setShowChanges(false)} />
     </View>
   );
 }
@@ -192,5 +211,5 @@ const styles = StyleSheet.create({
   loading: { marginTop: 24 },
   todos: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 12, gap: 4 },
   todoTitle: { fontFamily: fonts.medium, fontSize: 13 },
-  composer: { paddingHorizontal: 12, paddingTop: 6 },
+  composer: { paddingHorizontal: 12, paddingTop: 6, gap: 6 },
 });
