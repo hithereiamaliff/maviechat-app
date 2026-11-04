@@ -15,18 +15,20 @@ interface CodeBlockProps {
   title?: string;
   /** False while the block is still streaming: diagrams and previews wait for all of it. */
   complete?: boolean;
+  /** Starts folded to its first line (Open WebUI's "always collapse code blocks"). */
+  folded?: boolean;
 }
 
 /**
  * A code block, highlighted, with Copy and Collapse. Mermaid and Vega blocks draw as diagrams
  * (with the code a tap away), and HTML and SVG blocks offer a preview, as on the web.
  */
-export const CodeBlock = memo(function CodeBlock({ code, lang, title, complete = true }: CodeBlockProps) {
+export const CodeBlock = memo(function CodeBlock({ code, lang, title, complete = true, folded = false }: CodeBlockProps) {
   const palette = usePalette();
   const syntax = useSyntaxColors();
   const dark = useColorScheme() === 'dark';
   const lines = useMemo(() => highlightCode(code.replace(/\n$/, ''), lang), [code, lang]);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(folded);
   const [copied, setCopied] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const [previewing, setPreviewing] = useState(false);

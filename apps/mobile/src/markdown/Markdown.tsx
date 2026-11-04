@@ -20,6 +20,8 @@ interface MarkdownProps {
   baseUrl?: string;
   /** Lets relative image URLs on the server load with the session. */
   token?: string;
+  /** Code blocks start folded. */
+  foldCode?: boolean;
 }
 
 interface Context {
@@ -31,10 +33,11 @@ interface Context {
   /** For `@M:` mentions; undefined until the model list has loaded. */
   models?: ModelItem[];
   copy: (text: string) => void;
+  foldCode: boolean;
 }
 
 /** Renders markdown as native views (no web view). */
-export const Markdown = memo(function Markdown({ text, muted = false, sources, baseUrl, token }: MarkdownProps) {
+export const Markdown = memo(function Markdown({ text, muted = false, sources, baseUrl, token, foldCode = false }: MarkdownProps) {
   const palette = usePalette();
   const toast = useToast();
   const models = useQueryClient().getQueryData<ModelItem[]>(['models']);
@@ -48,6 +51,7 @@ export const Markdown = memo(function Markdown({ text, muted = false, sources, b
     models,
     // As on the web, tapping inline code copies it.
     copy: (code) => void Clipboard.setStringAsync(code).then(() => toast('Copied to clipboard')),
+    foldCode,
   };
   return <View>{tokens.map((block, index) => renderBlock(block, `${index}`, context))}</View>;
 });
@@ -100,7 +104,7 @@ function renderBlock(token: Token, key: string, context: Context): ReactNode {
     }
     case 'code': {
       const code = token as Tokens.Code;
-      return <CodeBlock key={key} code={code.text} lang={code.lang ?? undefined} complete={isClosedCodeBlock(code.raw)} />;
+      return <CodeBlock key={key} code={code.text} lang={code.lang ?? undefined} complete={isClosedCodeBlock(code.raw)} folded={context.foldCode} />;
     }
     case 'blockquote': {
       const quote = token as Tokens.Blockquote;

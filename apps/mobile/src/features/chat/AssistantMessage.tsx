@@ -15,7 +15,6 @@ import {
   type ModelAction,
   type ReplyAnnotation,
 } from '@maviechat/owui-protocol';
-import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { memo, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -25,6 +24,8 @@ import { MenuButton, type MenuItem } from '@/components/Menu';
 import { ReadAloudButton } from '@/components/ReadAloudButton';
 import { useToast } from '@/components/Toast';
 import { useCapabilities, useUserSettings } from '@/lib/server';
+import { copyReply } from '@/lib/copy';
+import { useInterface } from '@/lib/uiSettings';
 import { useStoredState } from '@/lib/storedState';
 import { Markdown } from '@/markdown/Markdown';
 import { fonts, radius, usePalette } from '@/theme';
@@ -98,6 +99,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   // Read Aloud follows the `chat.tts` permission (allowed unless denied) and your speed setting.
   const canSpeak = capabilities?.can('chat.tts', true) ?? false;
   const ttsRate = (settings.data?.ui as { audio?: { tts?: { playbackRate?: unknown } } } | undefined)?.audio?.tts?.playbackRate;
+  const ui = useInterface();
   const [revealed, setRevealed] = useState(false);
   // Kept by message (the list reuses rows as you scroll).
   const [rating, setRating] = useStoredState<boolean>(`rate-panel:${message.id}`, false);
@@ -182,11 +184,17 @@ export const AssistantMessage = memo(function AssistantMessage({
 
       {items.map((item) =>
         item.kind === 'text' ? (
-          <Markdown key={item.id} text={item.text} sources={sources} baseUrl={baseUrl} token={token} />
+          ui('renderMarkdownInAssistantMessages') ? (
+            <Markdown key={item.id} text={item.text} sources={sources} baseUrl={baseUrl} token={token} foldCode={ui('collapseCodeBlocks')} />
+          ) : (
+            <Text key={item.id} selectable style={[styles.plain, { color: palette.text }]}>
+              {item.text}
+            </Text>
+          )
         ) : item.kind === 'group' ? (
-          <StepGroup key={item.id} item={item} />
+          <StepGroup key={item.id} item={item} open={ui('expandDetails')} />
         ) : (
-          <StepView key={item.id} step={item} />
+          <StepView key={item.id} step={item} open={ui('expandDetails')} />
         ),
       )}
 
@@ -205,7 +213,7 @@ export const AssistantMessage = memo(function AssistantMessage({
 
       <Sources sources={sources} />
 
-      {isLast && !streaming && onFollowUp && (message.followUps?.length ?? 0) > 0 ? (
+      {(isLast || ui('keepFollowUpPrompts')) && !streaming && onFollowUp && (message.followUps?.length ?? 0) > 0 ? (
         <View style={styles.followUps}>
           <Text style={[styles.followUpTitle, { color: palette.textMuted }]}>Follow up</Text>
           {message.followUps?.map((followUp, index) => (
@@ -231,9 +239,7 @@ export const AssistantMessage = memo(function AssistantMessage({
             label="Copy response"
             size={18}
             color={palette.textMuted}
-            onPress={() => {
-              void Clipboard.setStringAsync(plainText(blocks)).then(() => toast('Copied to clipboard'));
-            }}
+            onPress={() => void copyReply(plainText(blocks), ui('copyFormatted')).then(() => toast('Copied to clipboard'))}
           />
           {canSpeak ? <ReadAloudButton id={message.id} markdown={outputText(message.output) || message.content || ''} rate={typeof ttsRate === 'number' ? ttsRate : undefined} /> : null}
           {usage ? (
@@ -270,7 +276,11 @@ export const AssistantMessage = memo(function AssistantMessage({
             </>
           ) : null}
           {isLast && onContinue ? <IconButton icon="play" label="Continue response" size={18} color={palette.textMuted} onPress={onContinue} /> : null}
-          {regenerateItems.length > 0 ? <MenuButton items={regenerateItems} label="Regenerate" icon="arrow-path" size={18} color={palette.textMuted} /> : null}
+          {onRegenerate && !ui('regenerateMenu') ? (
+            <IconButton icon="arrow-path" label="Regenerate" size={18} color={palette.textMuted} onPress={() => onRegenerate()} />
+          ) : regenerateItems.length > 0 ? (
+            <MenuButton items={regenerateItems} label="Regenerate" icon="arrow-path" size={18} color={palette.textMuted} />
+          ) : null}
           {onAction
             ? actions.map((action) => (
                 <Pressable
@@ -305,6 +315,7 @@ export const AssistantMessage = memo(function AssistantMessage({
 });
 
 const styles = StyleSheet.create({
+  plain: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 24, marginVertical: 4 },
   wrap: { marginTop: 18 },
   model: { fontFamily: fonts.semibold, fontSize: 15, marginBottom: 4 },
   status: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 4 },

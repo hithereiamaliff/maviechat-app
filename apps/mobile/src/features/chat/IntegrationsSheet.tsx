@@ -28,6 +28,7 @@ export function IntegrationsSheet({
   toolIds,
   onToggleTool,
   approval,
+  always = [],
 }: {
   visible: boolean;
   onClose: () => void;
@@ -39,12 +40,14 @@ export function IntegrationsSheet({
   onToggleTool: (id: string, on: boolean) => void;
   /** Tool permissions, when the server allows them. */
   approval?: { mode: 'full' | 'ask'; onChange: (mode: 'full' | 'ask') => void };
+  /** On for every message by your settings ("always search the web"): shown on, not switchable here. */
+  always?: ToggleKey[];
 }) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
   const shown = ORDER.filter((key) => available[key]);
 
-  const row = (key: string, icon: IconName, label: string, hint: string | null | undefined, on: boolean, change: (on: boolean) => void) => (
+  const row = (key: string, icon: IconName, label: string, hint: string | null | undefined, on: boolean, change: (on: boolean) => void, locked = false) => (
     <View key={key} style={styles.row}>
       <Icon name={icon} size={20} color={palette.textMuted} />
       <View style={styles.rowText}>
@@ -57,7 +60,7 @@ export function IntegrationsSheet({
           </Text>
         ) : null}
       </View>
-      <Switch value={on} onValueChange={change} accessibilityLabel={label} />
+      <Switch value={on} onValueChange={change} accessibilityLabel={label} disabled={locked} />
     </View>
   );
 
@@ -73,7 +76,9 @@ export function IntegrationsSheet({
         </View>
         <ScrollView contentContainerStyle={styles.list}>
           {shown.map((key) =>
-            row(key, TOGGLE_INFO[key].icon, TOGGLE_INFO[key].label, TOGGLE_INFO[key].hint, Boolean(toggles[key]), (on) => onToggle(key, on)),
+            always.includes(key)
+              ? row(key, TOGGLE_INFO[key].icon, TOGGLE_INFO[key].label, 'Always on, by your Interface settings', true, () => undefined, true)
+              : row(key, TOGGLE_INFO[key].icon, TOGGLE_INFO[key].label, TOGGLE_INFO[key].hint, Boolean(toggles[key]), (on) => onToggle(key, on)),
           )}
           {tools.length > 0 ? (
             <>

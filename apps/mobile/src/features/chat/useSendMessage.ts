@@ -7,6 +7,7 @@ import {
   buildTurn,
   chatFeatures,
   effectiveToggles,
+  interfaceOn,
   isTemporaryChatId,
   OwuiHttpError,
   requestFiles,
@@ -166,7 +167,12 @@ export function useSendMessage() {
         params: requestParams(userParams, chatParams),
         stream: streamResponse(model, userParams, chatParams),
         features: capabilities
-          ? chatFeatures(capabilities, effectiveToggles(job.toggles ?? {}, availableToggles(capabilities, model)), memory)
+          ? chatFeatures(
+              capabilities,
+              // "Always search the web" (Interface) counts for every message, follow-ups and queued ones too.
+              effectiveToggles({ ...(job.toggles ?? {}), ...(interfaceOn(ui, 'webSearch') ? { webSearch: true } : {}) }, availableToggles(capabilities, model)),
+              memory,
+            )
           : { voice: false, image_generation: false, code_interpreter: false, web_search: false },
         variables: templateVariables({
           name: user.data?.name ?? session.user.name,

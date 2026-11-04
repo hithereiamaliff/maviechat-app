@@ -66,6 +66,10 @@ interface MessageListProps {
   onShow?: (leafId: string) => void;
   /** Answers from several models as tabs rather than cards (the web's interface setting). */
   multiAsTabs?: boolean;
+  /** Keeps a reply being written in view while you're at the bottom (the web's "auto-scroll"). */
+  followReplies?: boolean;
+  /** After you switch a message's version, scrolls its top into view. */
+  scrollOnBranchChange?: boolean;
   /** "Merge Responses" for the turn whose shown reply this is. */
   onMerge?: (replyId: string, groups: ReplyGroup[]) => void;
   mergingId?: string | null;
@@ -94,6 +98,8 @@ export function MessageList({
   history,
   onShow,
   multiAsTabs = false,
+  followReplies = true,
+  scrollOnBranchChange = true,
   onMerge,
   mergingId = null,
 }: MessageListProps) {
@@ -117,6 +123,15 @@ export function MessageList({
   const [editing, setEditing] = useState<HistoryMessage | null>(null);
   const lastId = messages[messages.length - 1]?.id;
 
+  // The other version takes the same place in the list; its top is brought into view, as on the web.
+  const switchVersion = (messageId: string, direction: -1 | 1) => {
+    const index = messages.findIndex((message) => message.id === messageId);
+    onStep(messageId, direction);
+    if (!scrollOnBranchChange || index < 0) return;
+    following.current = false;
+    setTimeout(() => list.current?.scrollToIndex({ index, animated: true, viewPosition: 0 }), 120);
+  };
+
   useEffect(() => {
     if (!pinToBottomKey) return;
     following.current = true;
@@ -134,7 +149,7 @@ export function MessageList({
         contentContainerStyle={styles.content}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
-        maintainVisibleContentPosition={{ startRenderingFromBottom: true, autoscrollToBottomThreshold: 0.2 }}
+        maintainVisibleContentPosition={{ startRenderingFromBottom: true, autoscrollToBottomThreshold: followReplies ? 0.2 : undefined }}
         onLoad={() => list.current?.scrollToEnd({ animated: false })}
         scrollEventThrottle={64}
         onScroll={(event) => {
@@ -144,7 +159,7 @@ export function MessageList({
           if (near !== atBottom) setAtBottom(near);
         }}
         onContentSizeChange={() => {
-          if (following.current) list.current?.scrollToEnd({ animated: false });
+          if (following.current && followReplies) list.current?.scrollToEnd({ animated: false });
         }}
         renderItem={({ item }) => {
           const branch = position(item.id);
@@ -199,7 +214,7 @@ export function MessageList({
             <UserMessage
               message={item}
               branch={branch}
-              onStep={(step) => onStep(item.id, step)}
+              onStep={(step) => switchVersion(item.id, step)}
               baseUrl={baseUrl}
               token={token}
               onSaveEdit={saveEdit ? (content) => saveEdit(item, content) : undefined}
@@ -208,7 +223,7 @@ export function MessageList({
               onDelete={remove && actions.canDeleteMessage && (item.parentId !== null || branch.count > 1) ? () => remove(item) : undefined}
             />
           ) : (
-            reply(item, branch, (step) => onStep(item.id, step))
+            reply(item, branch, (step) => switchVersion(item.id, step))
           );
         }}
       />

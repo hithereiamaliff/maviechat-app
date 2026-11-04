@@ -1,0 +1,11 @@
+{
+  "settings": {
+    "shape": {
+      "ui": {
+        "params": {
+          "tool_approval_mode": "string"
+        }
+      }
+    }
+  }
+}

@@ -18,6 +18,7 @@ import { useToast } from '@/components/Toast';
 import { deepTutorAttachment } from '@/features/deeptutor/crossReference';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useServerConfig } from '@/lib/server';
+import { useInterface } from '@/lib/uiSettings';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
 import { isPhoto, photo, PHOTO_OPTIONS, readAsDataUrl, type Picked } from '@/lib/pickedFiles';
@@ -36,6 +37,7 @@ export function useAttachments({ draftKey, model, temporary }: { draftKey: strin
   const config = useServerConfig();
   const toast = useToast();
   const deepTutor = useDeepTutor();
+  const ui = useInterface();
 
   const upload = async (file: Picked, image: boolean) => {
     const itemId = uuidv4();
@@ -50,6 +52,8 @@ export function useAttachments({ draftKey, model, temporary }: { draftKey: strin
       size: file.size,
       error: '',
       itemId,
+      // "Send whole documents" (Interface): read in full rather than searched, as the web marks it.
+      ...(!image && ui('defaultUploadContext') ? { context: 'full' } : {}),
     };
     updateDraft(draftKey, (draft) => ({
       ...draft,
@@ -63,7 +67,8 @@ export function useAttachments({ draftKey, model, temporary }: { draftKey: strin
       const uploaded = await uploadFile(client, form, { process: !image });
       if (typeof uploaded.error === 'string' && uploaded.error) toast(uploaded.error);
       if (!image && (await waitForProcessing(client, uploaded.id)) === 'failed') throw new Error("the server couldn't read it");
-      patchFile(draftKey, itemId, fileItemFromUpload(uploaded, { name: file.name, size: file.size, itemId }));
+      const item = fileItemFromUpload(uploaded, { name: file.name, size: file.size, itemId });
+      patchFile(draftKey, itemId, placeholder.context ? { ...item, context: placeholder.context } : item);
     } catch (error) {
       removeFile(draftKey, itemId);
       toast(`Couldn't attach ${file.name}: ${describeError(error)}`, 'error');

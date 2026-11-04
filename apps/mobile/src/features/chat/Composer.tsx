@@ -21,6 +21,7 @@ import { useToast } from '@/components/Toast';
 import { DeepTutorPicker } from '@/features/deeptutor/DeepTutorPicker';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useModels, useServerConfig, useTools, useUserSettings } from '@/lib/server';
+import { useInterface } from '@/lib/uiSettings';
 import { useGrowingInput } from '@/lib/useGrowingInput';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
@@ -108,6 +109,7 @@ export function Composer({
   const { session, client } = useAuthed();
   const capabilities = useCapabilities();
   const settings = useUserSettings();
+  const ui = useInterface();
   const config = useServerConfig();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -132,7 +134,9 @@ export function Composer({
   const atModel = draft.atModel ? allModels.data?.find((item) => item.id === draft.atModel) : undefined;
 
   const available = capabilities ? availableToggles(capabilities, atModel ?? (models?.length ? models : model)) : NO_TOGGLES;
-  const toggles = effectiveToggles(draft.toggles, available);
+  // "Always search the web" (Interface): on for every message where it's available, as on the web.
+  const always: ToggleKey[] = ui('webSearch') && available.webSearch ? ['webSearch'] : [];
+  const toggles = effectiveToggles(always.length ? { ...draft.toggles, webSearch: true } : draft.toggles, available);
   const usable = usableTools(tools.data ?? []);
   const toolIds = draft.toolIds.filter((id) => usable.some((tool) => tool.id === id));
   const hasContent = draft.text.trim().length > 0 || draft.files.length > 0;
@@ -300,7 +304,8 @@ export function Composer({
               <Pressable
                 key={key}
                 accessibilityRole="button"
-                accessibilityLabel={`${TOGGLE_INFO[key].label} on. Turn off`}
+                accessibilityLabel={always.includes(key) ? `${TOGGLE_INFO[key].label} always on` : `${TOGGLE_INFO[key].label} on. Turn off`}
+                disabled={always.includes(key)}
                 onPress={() => setToggle(key, false)}
                 style={[styles.chip, { backgroundColor: palette.active }]}>
                 <Icon name={TOGGLE_INFO[key].icon} size={17} color={palette.onActive} />
@@ -371,6 +376,7 @@ export function Composer({
         visible={sheetOpen}
         onClose={() => setSheetOpen(false)}
         available={available}
+        always={always}
         toggles={toggles}
         onToggle={setToggle}
         tools={usable}

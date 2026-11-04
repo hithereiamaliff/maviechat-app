@@ -20,6 +20,7 @@ export * from './params';
 export * from './prompts';
 export * from './replies';
 export * from './server';
+export * from './settings';
 export * from './sharing';
 export * from './shortcuts';
 export * from './socket';

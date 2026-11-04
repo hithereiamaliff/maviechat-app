@@ -6,10 +6,11 @@ import { setThemePreference, THEME_CHOICES, useThemePreference } from '@/theme/p
 import { NotificationSettings } from './NotificationSettings';
 
 /**
- * General, in either space's Settings: the theme (for the whole app) and this iPhone's
- * notifications, then the space's own settings (`children`). `note` says what else is to come.
+ * General, in either space's Settings: the theme (for the whole app) and, unless the space has a
+ * Notifications tab, this iPhone's notifications; then the space's own settings (`children`).
+ * `note` says what else is to come.
  */
-export function GeneralSettings({ note, children }: { note: string; children?: ReactNode }) {
+export function GeneralSettings({ note, notifications = true, children }: { note: string; notifications?: boolean; children?: ReactNode }) {
   const palette = usePalette();
   const preference = useThemePreference();
 
@@ -37,9 +38,9 @@ export function GeneralSettings({ note, children }: { note: string; children?: R
         })}
       </View>
       <Text style={[styles.note, { color: palette.textFaint }]}>
-        {`Saved on this iPhone for both Open WebUI and DeepTutor, as the web apps save it per browser. ${note}`}
+        {`Saved on this iPhone for both Open WebUI and DeepTutor, as the web apps save it per browser. ${note}`.trim()}
       </Text>
-      <NotificationSettings />
+      {notifications ? <NotificationSettings /> : null}
       {children}
     </ScrollView>
   );

@@ -52,15 +52,17 @@ export function Disclosure({
   icon,
   label,
   busy,
+  initiallyOpen = false,
   children,
 }: {
   icon: IconName;
   label: string;
   busy: boolean;
+  initiallyOpen?: boolean;
   children: ReactNode;
 }) {
   const palette = usePalette();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initiallyOpen);
   return (
     <View style={styles.step}>
       <Pressable
@@ -106,21 +108,22 @@ function StepContent({ step }: { step: StepBlock }) {
   }
 }
 
-export function StepView({ step }: { step: StepBlock }) {
+/** `open`: starts opened (Open WebUI's "always expand details"). */
+export function StepView({ step, open = false }: { step: StepBlock; open?: boolean }) {
   return (
-    <Disclosure icon={stepIcon(step)} label={stepLabel(step)} busy={!step.done}>
+    <Disclosure icon={stepIcon(step)} label={stepLabel(step)} busy={!step.done} initiallyOpen={open}>
       <StepContent step={step} />
     </Disclosure>
   );
 }
 
 /** Two or more consecutive steps, folded into one line ("Explored · 3 steps"). */
-export function StepGroup({ item }: { item: Extract<DisplayItem, { kind: 'group' }> }) {
+export function StepGroup({ item, open = false }: { item: Extract<DisplayItem, { kind: 'group' }>; open?: boolean }) {
   const busy = item.steps.some((step) => !step.done);
   return (
-    <Disclosure icon="sparkles" label={busy ? `Exploring… · ${item.steps.length} steps` : `Explored · ${item.steps.length} steps`} busy={busy}>
+    <Disclosure icon="sparkles" label={busy ? `Exploring… · ${item.steps.length} steps` : `Explored · ${item.steps.length} steps`} busy={busy} initiallyOpen={open}>
       {item.steps.map((step) => (
-        <StepView key={step.id} step={step} />
+        <StepView key={step.id} step={step} open={open} />
       ))}
     </Disclosure>
   );

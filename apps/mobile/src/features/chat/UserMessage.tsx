@@ -6,6 +6,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { useToast } from '@/components/Toast';
+import { useInterface } from '@/lib/uiSettings';
+import { Markdown } from '@/markdown/Markdown';
 import { fonts, radius, usePalette } from '@/theme';
 import { BranchNav } from './BranchNav';
 
@@ -37,6 +39,7 @@ export const UserMessage = memo(function UserMessage({
 }) {
   const palette = usePalette();
   const toast = useToast();
+  const ui = useInterface();
   const [showActions, setShowActions] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -112,9 +115,13 @@ export const UserMessage = memo(function UserMessage({
       {fileViews}
       {message.content ? (
         <View style={[styles.bubble, { backgroundColor: palette.bubble }]}>
-          <Text selectable style={[styles.text, { color: palette.text }]}>
-            {message.content}
-          </Text>
+          {ui('renderMarkdownInUserMessages') ? (
+            <Markdown text={message.content} />
+          ) : (
+            <Text selectable style={[styles.text, { color: palette.text }]}>
+              {message.content}
+            </Text>
+          )}
         </View>
       ) : null}
       <View style={styles.actions}>

@@ -3,12 +3,14 @@ import {
   combineQueued,
   forkChat,
   isTemporaryChatId,
+  messageBlocks,
   mergeInput,
   mergeResponses,
   modelActions,
   newestLeaf,
   OwuiHttpError,
   pendingAskUser,
+  plainText,
   resolveToolCall,
   saveMessage,
   selectBranch,
@@ -22,6 +24,7 @@ import {
   type ReplyGroup,
 } from '@maviechat/owui-protocol';
 import { useQueryClient } from '@tanstack/react-query';
+import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -48,7 +51,8 @@ import { useChatActions } from '@/features/chats/useChatActions';
 import { sendChatToDeepTutor } from '@/features/deeptutor/crossReference';
 import { useLive } from '@/features/live/LiveProvider';
 import { describeError } from '@/lib/errors';
-import { useAuthed, useModels, useUserSettings } from '@/lib/server';
+import { useAuthed, useModels } from '@/lib/server';
+import { useInterface } from '@/lib/uiSettings';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
 
@@ -60,7 +64,7 @@ export default function ChatScreen() {
   const { client, session } = useAuthed();
   const queryClient = useQueryClient();
   const models = useModels();
-  const settings = useUserSettings();
+  const ui = useInterface();
   const actions = useChatActions();
   const picker = useFolderPicker();
   const shareSheet = useShareSheet();
@@ -151,10 +155,10 @@ export default function ChatScreen() {
   const lastReply = messages[messages.length - 1];
   const asking = !temporary && lastReply?.role === 'assistant' ? pendingAskUser(lastReply) : null;
   const lastId = messages[messages.length - 1]?.id ?? null;
-  const queueEnabled = (settings.data?.ui as { enableMessageQueue?: boolean } | null | undefined)?.enableMessageQueue ?? true;
+  const queueEnabled = ui('enableMessageQueue');
   const model = choice.model;
   const selected = choice.selected;
-  const multiAsTabs = (settings.data?.ui as { displayMultiModelResponsesInTabs?: boolean } | null | undefined)?.displayMultiModelResponsesInTabs ?? false;
+  const multiAsTabs = ui('displayMultiModelResponsesInTabs');
 
   // Like the web: the chat counts as read when you open it, when you leave it, and when a reply lands while you watch.
   const loaded = Boolean(chat);
@@ -169,6 +173,17 @@ export default function ChatScreen() {
     if (wasStreaming.current && !streaming) markRead(chatId);
     wasStreaming.current = streaming;
   }, [streaming, chatId, markRead]);
+
+  // "Copy each reply when it's done": the reply's words, as the web copies them.
+  const autoCopy = ui('responseAutoCopy');
+  const wasWriting = useRef(false);
+  useEffect(() => {
+    if (wasWriting.current && !streaming && autoCopy && lastReply?.role === 'assistant') {
+      const text = plainText(messageBlocks(lastReply));
+      if (text.trim()) void Clipboard.setStringAsync(text);
+    }
+    wasWriting.current = streaming;
+  }, [streaming, autoCopy, lastReply]);
 
   // A model picked with `@` answers alone, until it's taken off (as on the web).
   const targets = (atModelId?: string | null) => {
@@ -409,6 +424,8 @@ export default function ChatScreen() {
             position={position}
             onStep={step}
             onFollowUp={(text) => {
+              // Into the message box, or straight off (the web's setting).
+              if (ui('insertFollowUpPrompt')) return updateDraft(chatId, (draft) => ({ ...draft, text }));
               const { toggles, toolIds } = getDraft(chatId);
               void onSend({ text, files: [], toggles, toolIds });
             }}
@@ -418,6 +435,8 @@ export default function ChatScreen() {
             history={history}
             onShow={show}
             multiAsTabs={multiAsTabs}
+            followReplies={ui('scrollOnResponseGeneration')}
+            scrollOnBranchChange={ui('scrollOnBranchChange')}
             onMerge={streaming ? undefined : (replyId, groups) => void merge(replyId, groups)}
             mergingId={mergingId}
           />

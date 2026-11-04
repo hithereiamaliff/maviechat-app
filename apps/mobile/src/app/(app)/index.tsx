@@ -16,7 +16,8 @@ import { Suggestions } from '@/features/chat/Suggestions';
 import { useModelChoice } from '@/features/chat/useModelChoice';
 import { useSendMessage } from '@/features/chat/useSendMessage';
 import { openLink } from '@/lib/links';
-import { useCapabilities, useServerConfig, useSessionUser, useUserSettings } from '@/lib/server';
+import { useCapabilities, useServerConfig, useSessionUser } from '@/lib/server';
+import { useInterface } from '@/lib/uiSettings';
 import { fonts, usePalette } from '@/theme';
 
 /**
@@ -29,13 +30,15 @@ export default function NewChat() {
   const config = useServerConfig();
   const user = useSessionUser();
   const capabilities = useCapabilities();
-  const settings = useUserSettings();
   const choice = useModelChoice(undefined);
   const { send } = useSendMessage();
   const typed = useDraftText(NEW_CHAT);
   const composer = useRef<ComposerHandle>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [temporaryOn, setTemporaryOn] = useState(false);
+  const ui = useInterface();
+  // Until you switch it yourself, a new chat is temporary when your settings say so.
+  const [temporaryChoice, setTemporaryOn] = useState<boolean | null>(null);
+  const temporaryOn = temporaryChoice ?? ui('temporaryChatByDefault');
   const [fullDescription, setFullDescription] = useState(false);
   // The new chat's own system prompt and parameters (Controls), saved with it once it exists.
   const [chatParams, setChatParams] = useState<Record<string, unknown>>({});
@@ -54,7 +57,7 @@ export default function NewChat() {
   const description = infoModel?.info?.meta?.description?.trim();
   const author = modelAuthor(infoModel);
   const suggestions = useMemo(() => promptSuggestions(infoModel, config.data), [infoModel, config.data]);
-  const insertSuggestion = (settings.data?.ui as { insertSuggestionPrompt?: boolean } | null | undefined)?.insertSuggestionPrompt ?? false;
+  const insertSuggestion = ui('insertSuggestionPrompt');
 
   const start = async ({ text, files, toggles, toolIds, atModelId }: OutgoingMessage) => {
     // A model picked with `@` answers alone (as on the web).
@@ -102,7 +105,7 @@ export default function NewChat() {
                   updateDraft(NEW_CHAT, (draft) => ({ ...draft, files: [], previews: {} }));
                   toast('Attachments removed. Add them again for this chat.');
                 }
-                setTemporaryOn((value) => !value);
+                setTemporaryOn(!temporaryOn);
               }}
             />
             ) : null}
@@ -183,7 +186,7 @@ export default function NewChat() {
             onStop={() => {}}
             streaming={false}
             temporary={temporary}
-            onTemporary={allowed && !enforced ? () => setTemporaryOn((value) => !value) : undefined}
+            onTemporary={allowed && !enforced ? () => setTemporaryOn(!temporaryOn) : undefined}
           />
 
           <Suggestions suggestions={suggestions} input={typed} inserts={insertSuggestion} onSelect={suggest} />
