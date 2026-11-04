@@ -2,6 +2,7 @@ export * from './access';
 export * from './account';
 export * from './adminConnections';
 export * from './adminGroups';
+export * from './adminModels';
 export * from './adminSettings';
 export * from './adminUsers';
 export * from './auth';

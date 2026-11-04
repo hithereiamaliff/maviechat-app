@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -59,6 +59,7 @@ import { probeM3Models } from './m3-models-probe';
 import { probeM3Text } from './m3-text-probe';
 import { probeM3Tools } from './m3-tools-probe';
 import { probeM4Connections } from './m4-connections-probe';
+import { probeM4Models } from './m4-models-probe';
 import { probeM4Settings } from './m4-settings-probe';
 import { probeM4Users } from './m4-users-probe';
 import { probeChatActions } from './write-probe';
@@ -82,6 +83,7 @@ const { values: args } = parseArgs({
     m4users: { type: 'boolean' },
     m4settings: { type: 'boolean' },
     m4connections: { type: 'boolean' },
+    m4models: { type: 'boolean' },
   },
 });
 
@@ -376,6 +378,13 @@ async function main() {
         const m4connections = await probeM4Connections({ client, capabilities, allowWrites: baseUrl === 'http://127.0.0.1:3013' });
         for (const result of m4connections.steps) results.push({ ...result, name: `M4: ${result.name}` });
         fixtures['write.m4-connections'] = m4connections.fixture;
+      }
+
+      if (args.m4models && capabilities) {
+        // Admin writes only ever on the scratch instance's port.
+        const m4models = await probeM4Models({ client, capabilities, allowWrites: baseUrl === 'http://127.0.0.1:3013' });
+        for (const result of m4models.steps) results.push({ ...result, name: `M4: ${result.name}` });
+        fixtures['write.m4-models'] = m4models.fixture;
       }
 
       if (args.write) {
