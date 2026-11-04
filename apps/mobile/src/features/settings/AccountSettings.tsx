@@ -63,7 +63,7 @@ export function AccountSettings() {
   const palette = usePalette();
   const toast = useToast();
   const { client, session } = useAuthed();
-  const { signOut } = useSession();
+  const { expireSession } = useSession();
   const queryClient = useQueryClient();
   const capabilities = useCapabilities();
   const config = useServerConfig();
@@ -255,7 +255,7 @@ export function AccountSettings() {
         <Button label="Save" loading={saving} disabled={!changed || saving || making} onPress={() => void submit()} />
       </View>
 
-      {passwordForm ? <PasswordSection onChanged={() => void signOut({ notice: 'Your password was changed. Sign in with the new one.' })} /> : null}
+      {passwordForm ? <PasswordSection onChanged={() => void expireSession('Your password was changed. Sign in with the new one.')} /> : null}
       {apiKeys ? <ApiKeySection admin={capabilities?.isAdmin ?? false} token={session.token} /> : null}
 
       <VariableEditor

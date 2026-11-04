@@ -4,11 +4,11 @@ Turns Open WebUI's "chat finished" and "chat failed" events into push notificati
 
 - **`POST /v1/devices`**, **`DELETE /v1/devices`**: the app adds or removes `{pushToken}`.
   - It sends `Authorization: Bearer <Open WebUI token>`. The relay checks it with `OWUI_URL/api/v1/auths/` and files the phone under that user's id.
-  - A phone belongs to one account at a time, with up to 10 phones per account.
+  - A phone can belong to several accounts at once (the app's account switcher), up to 10, with up to 10 phones per account.
 - **`POST /v1/devices/test`**: a test notification to the caller's phone.
 - **`POST /v1/events/<EVENTS_SECRET>`**: Open WebUI's server-wide webhook.
   - Set it up once in Open WebUI's Settings window: Admin → System → General → Events → Webhooks → **+**, for events `chat.finished` and `chat.failed`, sent for all users.
-  - For each event the relay notifies that user's phones with "Reply ready: <chat title>" and the start of the reply.
+  - For each event the relay notifies that user's phones with "Reply ready: <chat title>" and the start of the reply. The notification carries the user id, so the app opens it in the right account.
   - Phones Apple reports as gone are dropped.
 - **`POST /v1/deeptutor/watch`**: notify a phone when a DeepTutor turn ends or asks a question. DeepTutor has no hook of its own.
   - The app sends `Authorization: Bearer <DeepTutor token>` and `{pushToken, sessionId, turnId, title, server}`.

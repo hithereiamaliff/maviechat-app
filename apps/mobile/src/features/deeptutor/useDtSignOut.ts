@@ -5,12 +5,16 @@ import { useSession } from '@/session/SessionProvider';
 import { saveSpace } from '@/session/storage';
 import { signOutWebView } from './webSignIn';
 
-/** Signing out of DeepTutor, after asking: Open WebUI stays signed in, and the app goes there (or to the welcome screen). */
+/**
+ * Signing out of the DeepTutor account in use, after asking. Another DeepTutor account still signed
+ * in takes over; with none left, the app goes to Open WebUI (or the welcome screen).
+ */
 export function useDtSignOut(): () => void {
-  const { signOut } = useDeepTutor();
+  const { signOut, state } = useDeepTutor();
+  const who = state.status === 'signed-in' ? state.session.account.username : 'DeepTutor';
   const owuiSignedIn = useSession().state.status === 'signed-in';
   return () =>
-    Alert.alert('Sign out of DeepTutor?', 'Your Open WebUI sign-in stays as it is.', [
+    Alert.alert(`Sign out of ${who}?`, 'MavieChat forgets this DeepTutor account on this iPhone. Your Open WebUI sign-in stays as it is.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign Out',
@@ -18,9 +22,13 @@ export function useDtSignOut(): () => void {
         onPress: () => {
           // A DeepTutor page on screen keeps its own cookie, so it signs out too.
           signOutWebView();
-          void signOut().then(() => {
-            void saveSpace('owui');
+          void signOut().then((stillIn) => {
             if (router.canDismiss()) router.dismissAll();
+            if (stillIn) {
+              router.replace('/learn');
+              return;
+            }
+            void saveSpace('owui');
             router.replace(owuiSignedIn ? '/' : '/welcome');
           });
         },

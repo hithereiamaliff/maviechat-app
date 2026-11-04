@@ -87,7 +87,7 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
         notify: (message, tone) => toast(message, tone),
         isViewing: (chatId) => viewing.current === chatId,
         // Open WebUI reports saved chats' replies only, so temporary chats keep the app's own notice.
-        pushAnnounces: (chatId) => !isTemporaryChatId(chatId) && pushAnnouncesReplies(),
+        pushAnnounces: (chatId) => !isTemporaryChatId(chatId) && pushAnnouncesReplies(session.user.id),
       }),
   );
 

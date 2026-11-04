@@ -5,6 +5,7 @@ import { router, useGlobalSearchParams, usePathname } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { useAccountsSheet } from '@/features/accounts/AccountsSheet';
 import type { MenuItem } from '@/components/Menu';
 import { SidebarAction, SidebarChatRow, SidebarHeading, SidebarNote, SidebarPanel, SidebarSearch, SidebarUser, sidebarStyles } from '@/features/sidebar/parts';
 import { useSidebar } from '@/features/sidebar/SidebarContext';
@@ -33,6 +34,7 @@ export function DtSidebar() {
   const sidebar = useSidebar();
   const { client, session } = useDtAuthed();
   const confirmSignOut = useDtSignOut();
+  const accountsSheet = useAccountsSheet('deeptutor');
   const owuiSignedIn = useSession().state.status === 'signed-in';
   const queryClient = useQueryClient();
   const actions = useDtChatActions();
@@ -140,6 +142,15 @@ export function DtSidebar() {
       onPress: () => {
         sidebar.close();
         router.push('/learn/connection');
+      },
+    },
+    {
+      key: 'accounts',
+      label: 'Accounts',
+      icon: 'users',
+      onPress: () => {
+        sidebar.close();
+        accountsSheet.open();
       },
     },
     { key: 'signout', label: 'Sign Out', icon: 'arrow-right-start-on-rectangle', onPress: confirmSignOut },
@@ -250,6 +261,7 @@ export function DtSidebar() {
       </View>
 
       <SidebarUser name={session.account.username} menu={userMenu} />
+      {accountsSheet.element}
     </SidebarPanel>
   );
 }

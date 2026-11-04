@@ -1,4 +1,4 @@
-import { deleteNotificationTarget, uuidv4, type OwuiClient } from '@maviechat/owui-protocol';
+import { deleteNotificationTarget, OwuiClient, uuidv4 } from '@maviechat/owui-protocol';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
@@ -14,8 +14,10 @@ export interface PushState {
   enabled: boolean;
   /** iOS's permission prompt was shown once already (it can't be shown again). */
   asked: boolean;
-  /** The Open WebUI account the phone is registered under, and the token it registered. */
+  /** The first Open WebUI account the phone is registered under (what earlier versions kept). */
   userId: string | null;
+  /** Every Open WebUI account the phone is registered under with the relay. */
+  userIds?: string[];
   pushToken?: string | null;
   /** From the relay: when Open WebUI last sent it an event (null: the server-wide webhook isn't set up). */
   lastEventAt?: number | null;
@@ -36,7 +38,7 @@ async function loadState(): Promise<PushState> {
   if (state) return state;
   try {
     const stored = JSON.parse((await SecureStore.getItemAsync(KEY, options)) ?? 'null') as PushState | null;
-    if (stored?.version === 1 && typeof stored.deviceId === 'string') state = stored;
+    if (stored?.version === 1 && typeof stored.deviceId === 'string') state = { ...stored, userIds: Array.isArray(stored.userIds) ? stored.userIds : stored.userId ? [stored.userId] : [] };
   } catch {
     // a damaged entry starts over
   }
@@ -63,16 +65,16 @@ export function usePushState(): PushState | null {
 }
 
 /**
- * True when finished replies reach this iPhone as push notifications: switched on here, the
- * phone has a place in the relay under the Open WebUI account, and Open WebUI's server-wide
- * webhook has reported to the relay.
+ * True when this account's finished replies reach this iPhone as push notifications: switched on
+ * here, the phone has a place in the relay under that Open WebUI account, and Open WebUI's
+ * server-wide webhook has reported to the relay.
  */
-export function pushAnnouncesReplies(): boolean {
-  return Boolean(state?.enabled && state.userId && state.lastEventAt != null);
+export function pushAnnouncesReplies(userId: string): boolean {
+  return Boolean(state?.enabled && state.userIds?.includes(userId) && state.lastEventAt != null);
 }
 
-/** The Open WebUI account, when the relay serves its server (other servers' sign-ins never go to the relay). */
-const relayAccount = (owui: OwuiAccount | null): OwuiAccount | null => (owui && isRelayServer('owui', owui.session.baseUrl) ? owui : null);
+/** The Open WebUI accounts on servers the relay serves (other servers' sign-ins never go to the relay). */
+const relayAccounts = (accounts: OwuiAccount[]): OwuiAccount[] => accounts.filter((account) => isRelayServer('owui', account.session.baseUrl));
 
 let freshToken: Promise<string | null> | null = null;
 
@@ -99,15 +101,17 @@ export interface OwuiAccount {
   session: StoredSession;
 }
 
+export const owuiAccountOf = (session: StoredSession): OwuiAccount => ({ session, client: new OwuiClient({ baseUrl: session.baseUrl, token: session.token }) });
+
 /**
  * Switches notifications on for this phone: iOS permission (asked once) and the Expo push token.
- * With an Open WebUI account on a server the relay serves, the phone also takes a place in the
- * relay under it, and Open WebUI's server-wide webhook then reports every finished or failed
- * reply. DeepTutor needs nothing more: each of its replies is handed to the relay as it starts,
- * with this token. Safe to repeat.
+ * Every Open WebUI account on a server the relay serves also gives the phone a place in the
+ * relay, and Open WebUI's server-wide webhook then reports each finished or failed reply.
+ * DeepTutor needs nothing more: each of its replies is handed to the relay as it starts, with
+ * this token. Safe to repeat.
  */
-export async function enablePush(owuiAccount: OwuiAccount | null, { ask }: { ask: boolean }): Promise<PushStatus> {
-  const owui = relayAccount(owuiAccount);
+export async function enablePush(owuiAccounts: OwuiAccount[], { ask }: { ask: boolean }): Promise<PushStatus> {
+  const served = relayAccounts(owuiAccounts);
   const current = await loadState();
   let permission = await Notifications.getPermissionsAsync();
   if (!permission.granted && ask && permission.canAskAgain) permission = await Notifications.requestPermissionsAsync();
@@ -116,22 +120,35 @@ export async function enablePush(owuiAccount: OwuiAccount | null, { ask }: { ask
     return 'blocked';
   }
   const pushToken = await expoPushToken();
-  if (!owui) {
-    await saveState({ ...current, enabled: true, asked: true, pushToken, userId: null, lastEventAt: null });
+  if (served.length === 0) {
+    await saveState({ ...current, enabled: true, asked: true, pushToken, userId: null, userIds: [], lastEventAt: null });
     return 'on';
   }
-  const answer: RelayAnswer = await registerWithRelay(relayFetch, owui.session.token, pushToken);
-  if (!current.legacyCleaned) {
-    // The per-user webhook of earlier versions would now notify twice.
-    await deleteNotificationTarget(owui.client, legacyTargetId(current.deviceId)).catch(() => undefined);
+  const registered: string[] = [];
+  let lastEventAt: number | null = null;
+  let firstError: unknown = null;
+  for (const owui of served) {
+    try {
+      const answer: RelayAnswer = await registerWithRelay(relayFetch, owui.session.token, pushToken);
+      registered.push(owui.session.user.id);
+      if (answer.lastEventAt != null) lastEventAt = Math.max(lastEventAt ?? 0, answer.lastEventAt);
+      if (!current.legacyCleaned) {
+        // The per-user webhook of earlier versions would now notify twice.
+        await deleteNotificationTarget(owui.client, legacyTargetId(current.deviceId)).catch(() => undefined);
+      }
+    } catch (error) {
+      firstError ??= error;
+    }
   }
+  if (registered.length === 0) throw firstError;
   await saveState({
     ...current,
     enabled: true,
     asked: true,
-    userId: owui.session.user.id,
+    userId: registered[0] ?? null,
+    userIds: registered,
     pushToken,
-    lastEventAt: answer.lastEventAt,
+    lastEventAt,
     legacyCleaned: true,
   });
   return 'on';
@@ -140,18 +157,23 @@ export async function enablePush(owuiAccount: OwuiAccount | null, { ask }: { ask
 /** Whether the relay serves this Open WebUI sign-in's server. */
 const servedSession = (session: StoredSession | null): session is StoredSession => session !== null && isRelayServer('owui', session.baseUrl);
 
-/** Switches notifications off on this phone, taking it off the relay for the Open WebUI account first. */
-export async function disablePush(owuiSession: StoredSession | null): Promise<void> {
+/** Switches notifications off on this phone, taking it off the relay for each Open WebUI account first. */
+export async function disablePush(owuiSessions: StoredSession[]): Promise<void> {
   const current = await loadState();
-  if (servedSession(owuiSession) && current.enabled && current.pushToken) await unregisterFromRelay(relayFetch, owuiSession.token, current.pushToken);
-  await saveState({ ...current, enabled: false, userId: null });
+  if (current.enabled && current.pushToken) {
+    for (const session of owuiSessions) {
+      if (servedSession(session)) await unregisterFromRelay(relayFetch, session.token, current.pushToken).catch(() => undefined);
+    }
+  }
+  await saveState({ ...current, enabled: false, userId: null, userIds: [] });
 }
 
-/** Before signing out of Open WebUI: that account's replies stop reaching this phone, while DeepTutor's carry on. */
+/** Before signing out of an Open WebUI account: its replies stop reaching this phone, while the others' (and DeepTutor's) carry on. */
 export async function leaveRelay(owuiSession: StoredSession): Promise<void> {
   const current = await loadState();
   if (servedSession(owuiSession) && current.enabled && current.pushToken) await unregisterFromRelay(relayFetch, owuiSession.token, current.pushToken);
-  await saveState({ ...current, userId: null });
+  const userIds = (current.userIds ?? []).filter((id) => id !== owuiSession.user.id);
+  await saveState({ ...current, userId: userIds[0] ?? null, userIds });
 }
 
 /** A test notification straight from the relay. */
@@ -168,15 +190,15 @@ export async function sendTestPush(session: StoredSession): Promise<RelayAnswer>
  * serves (elsewhere notifications can't work, so the app doesn't ask). Later launches refresh the
  * token and registration quietly.
  */
-export async function setUpPushOnLaunch(owui: OwuiAccount | null, deepTutorBaseUrl: string | null): Promise<void> {
-  const served = relayAccount(owui);
+export async function setUpPushOnLaunch(owuiAccounts: OwuiAccount[], deepTutorBaseUrl: string | null): Promise<void> {
+  const served = relayAccounts(owuiAccounts);
   let current = await loadState();
-  // Signed in to another server now: the phone's place under an earlier account doesn't apply here.
-  if (!served && current.userId) {
-    current = { ...current, userId: null, lastEventAt: null };
+  // No account on the relay's servers now: the phone's places under earlier accounts don't apply.
+  if (served.length === 0 && (current.userIds?.length || current.userId)) {
+    current = { ...current, userId: null, userIds: [], lastEventAt: null };
     await saveState(current);
   }
-  if (!served && !(deepTutorBaseUrl && isRelayServer('deeptutor', deepTutorBaseUrl))) return;
+  if (served.length === 0 && !(deepTutorBaseUrl && isRelayServer('deeptutor', deepTutorBaseUrl))) return;
   if (!current.asked) await enablePush(served, { ask: true });
   else if (current.enabled) await enablePush(served, { ask: false });
 }

@@ -26,7 +26,7 @@ describe('notifications', () => {
   it('turns finished and failed chat events into notifications, and skips the rest', () => {
     const finished = chatOutcome({ event: 'chat.finished', data: { user_id: 'u1', chat_id: 'c-123456789', title: 'Ipoh trip', message: 'Start early.' } });
     expect(finished).toEqual({ userId: 'u1', kind: 'chat.finished', chatId: 'c-123456789', title: 'Ipoh trip', text: 'Start early.' });
-    expect(notificationFor(finished!, phone)).toMatchObject({ to: phone, title: 'Reply ready: Ipoh trip', body: 'Start early.', data: { kind: 'chat.finished', chatId: 'c-123456789' }, threadId: 'c-123456789' });
+    expect(notificationFor(finished!, phone)).toMatchObject({ to: phone, title: 'Reply ready: Ipoh trip', body: 'Start early.', data: { kind: 'chat.finished', userId: 'u1', chatId: 'c-123456789' }, threadId: 'c-123456789' });
 
     const failed = chatOutcome({ event: 'chat.failed', actor: { id: 'u2' }, data: { url: '/c-987654321', message: 'Model timed out' } });
     expect(failed).toMatchObject({ userId: 'u2', kind: 'chat.failed', chatId: 'c-987654321', title: null });
@@ -40,17 +40,29 @@ describe('notifications', () => {
 });
 
 describe('device list', () => {
-  it('moves a phone between accounts, caps each account and forgets departed phones', () => {
-    const store = new DeviceStore(null);
+  it('keeps a phone under several accounts, caps both sides and forgets departed phones', () => {
+    let clock = 0;
+    const store = new DeviceStore(null, () => (clock += 1));
     store.add('u1', phone);
     store.add('u2', phone);
-    expect(store.tokensFor('u1')).toEqual([]);
+    expect(store.tokensFor('u1')).toEqual([phone]);
     expect(store.tokensFor('u2')).toEqual([phone]);
+    // Registering again doesn't duplicate it.
+    store.add('u1', phone);
+    expect(store.tokensFor('u1')).toEqual([phone]);
+    // Ten accounts at most on one phone: the one it joined longest ago lets go.
+    for (let i = 0; i < 10; i++) store.add(`many${i}`, phone);
+    expect(store.tokensFor('u2')).toEqual([]);
+    expect(store.tokensFor('u1')).toEqual([]);
+    expect(store.tokensFor('many9')).toEqual([phone]);
+    expect(store.tokensFor('many0')).toEqual([phone]);
+    store.add('u2', phone);
     for (let i = 0; i < 12; i++) store.add('u3', `ExponentPushToken[t${i}]`);
     expect(store.tokensFor('u3')).toHaveLength(10);
     expect(store.tokensFor('u3')[0]).toBe('ExponentPushToken[t11]');
     store.forget(phone);
     expect(store.tokensFor('u2')).toEqual([]);
+    expect(store.tokensFor('many5')).toEqual([]);
     expect(store.remove('u3', 'ExponentPushToken[t11]')).toBe(true);
     expect(store.remove('u3', 'ExponentPushToken[t11]')).toBe(false);
   });

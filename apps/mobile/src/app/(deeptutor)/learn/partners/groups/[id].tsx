@@ -68,10 +68,10 @@ export default function GroupDiscussion() {
   const list = useRef<FlashListRef<DtGroupRound>>(null);
   const members = useMemo(() => group.data?.members ?? [], [group.data]);
 
-  const signOut = deepTutor.signOut;
+  const expireSession = deepTutor.expireSession;
   useEffect(() => {
-    if (chat.state === 'signed-out') void signOut({ notice: DT_EXPIRED_NOTICE });
-  }, [chat.state, signOut]);
+    if (chat.state === 'signed-out') void expireSession(DT_EXPIRED_NOTICE);
+  }, [chat.state, expireSession]);
 
   const send = () => {
     const text = draft.trim();

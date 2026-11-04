@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { router, useRootNavigationState } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
+import { isRelayServer } from './relay';
 import { useSession } from '@/session/SessionProvider';
 import { saveSpace } from '@/session/storage';
 import { shouldPresent } from './presence';
@@ -14,20 +15,26 @@ Notifications.setNotificationHandler({
   },
 });
 
-/** Opens the chat a tapped notification is about (Open WebUI's or DeepTutor's), from a cold start too. */
+/**
+ * Opens the chat a tapped notification is about (Open WebUI's or DeepTutor's), from a cold start
+ * too. A reply in another Open WebUI account switches to that account first.
+ */
 export function NotificationRoot() {
   const response = Notifications.useLastNotificationResponse();
   const ready = Boolean(useRootNavigationState()?.key);
-  const owui = useSession().state.status;
+  const owui = useSession();
+  const owuiStatus = owui.state.status;
+  const activeUserId = owui.state.status === 'signed-in' ? owui.state.session.user.id : null;
+  const { accounts, switchAccount } = owui;
   const deeptutor = useDeepTutor().state.status;
   const handled = useRef<string | null>(null);
 
   useEffect(() => {
     if (!ready || !response || response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
-    const data = response.notification.request.content.data as { kind?: unknown; chatId?: unknown; sessionId?: unknown } | null;
+    const data = response.notification.request.content.data as { kind?: unknown; chatId?: unknown; sessionId?: unknown; userId?: unknown } | null;
     const forDeepTutor = typeof data?.kind === 'string' && data.kind.startsWith('deeptutor');
     // Wait for the space's own sign-in to load before going there.
-    if ((forDeepTutor ? deeptutor : owui) !== 'signed-in') return;
+    if ((forDeepTutor ? deeptutor : owuiStatus) !== 'signed-in') return;
     const id = response.notification.request.identifier;
     if (handled.current === id) return;
     handled.current = id;
@@ -38,10 +45,21 @@ export function NotificationRoot() {
       else router.replace('/learn');
       return;
     }
-    void saveSpace('owui');
-    if (typeof data?.chatId === 'string' && data.chatId) router.replace({ pathname: '/c/[id]', params: { id: data.chatId } });
-    else router.replace('/');
-  }, [ready, owui, deeptutor, response]);
+    const open = () => {
+      void saveSpace('owui');
+      if (typeof data?.chatId === 'string' && data.chatId) router.replace({ pathname: '/c/[id]', params: { id: data.chatId } });
+      else router.replace('/');
+    };
+    const userId = typeof data?.userId === 'string' ? data.userId : null;
+    const account = userId && userId !== activeUserId ? accounts.find((entry) => entry.userId === userId && entry.signedIn && isRelayServer('owui', entry.baseUrl)) : undefined;
+    if (!account) {
+      open();
+      return;
+    }
+    void switchAccount(account.id)
+      .then((result) => (result === 'switched' ? open() : router.replace('/login')))
+      .catch(() => open());
+  }, [ready, owuiStatus, deeptutor, response, activeUserId, accounts, switchAccount]);
 
   return null;
 }

@@ -24,7 +24,7 @@ export default function DeepTutorLayout() {
   if (state.status === 'loading') return null;
   if (state.status !== 'signed-in') return <Redirect href="/deeptutor-login" />;
   return (
-    <DtLiveProvider>
+    <DtLiveProvider key={state.accountId}>
       <PushSetup />
       {/* DeepTutor's web pages keep their own swipes (back, scrolling sideways); the sidebar button still opens the sidebar. */}
       <SpaceDrawer sidebar={() => <DtSidebar />} swipeEnabled={pathname !== '/learn/web'}>

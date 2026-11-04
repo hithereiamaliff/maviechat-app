@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Linking, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { deliveryProblem } from '@/features/notifications/iosDelivery';
-import { disablePush, enablePush, sendTestPush, usePushState } from '@/features/notifications/push';
+import { disablePush, enablePush, owuiAccountOf, sendTestPush, usePushState } from '@/features/notifications/push';
 import { describePushError, isRelayServer } from '@/features/notifications/relay';
 import { watchForTest, type TestWatch } from '@/features/notifications/testWatch';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
@@ -16,11 +16,12 @@ export function NotificationSettings() {
   const palette = usePalette();
   const owui = useSession();
   const session = owui.state.status === 'signed-in' ? owui.state.session : null;
-  const account = session && owui.client ? { client: owui.client, session } : null;
   const deepTutor = useDeepTutor().state;
   const deepTutorBaseUrl = deepTutor.status === 'signed-in' ? deepTutor.session.baseUrl : null;
   // The notification service serves TechMavie Digital's two servers only.
   const owuiServed = session !== null && isRelayServer('owui', session.baseUrl);
+  // Any signed-in Open WebUI account on those servers, not only the one in use, gets notifications.
+  const anyOwuiServed = owui.accounts.some((entry) => entry.signedIn && isRelayServer('owui', entry.baseUrl));
   const deepTutorServed = deepTutorBaseUrl !== null && isRelayServer('deeptutor', deepTutorBaseUrl);
   const push = usePushState();
   const [busy, setBusy] = useState(false);
@@ -53,8 +54,9 @@ export function NotificationSettings() {
     setProblem(null);
     setTestState(null);
     try {
-      if (on) setBlocked((await enablePush(account, { ask: true })) === 'blocked');
-      else await disablePush(session);
+      const sessions = await owui.signedInSessions();
+      if (on) setBlocked((await enablePush(sessions.map(owuiAccountOf), { ask: true })) === 'blocked');
+      else await disablePush(sessions);
     } catch (error) {
       setProblem(describePushError(error));
     } finally {
@@ -88,7 +90,7 @@ export function NotificationSettings() {
   const testColor =
     testState?.step === 'arrived' ? palette.success : testState?.step === 'missing' || testState?.step === 'failed' ? palette.danger : palette.textMuted;
 
-  if (!owuiServed && !deepTutorServed) {
+  if (!anyOwuiServed && !deepTutorServed) {
     return (
       <View style={styles.wrap}>
         <Text style={[styles.section, { color: palette.textMuted }]}>Notifications</Text>
@@ -146,7 +148,7 @@ export function NotificationSettings() {
       <Text style={[styles.note, { color: palette.textFaint }]}>
         {"When a reply finishes or fails, MavieChat's notification service notifies this iPhone with the chat title and the start of the reply. Open WebUI tells it about every reply; DeepTutor's replies are handed to it as they start. While MavieChat is open, every chat gets a banner except the one on screen."}
       </Text>
-      {session && !owuiServed ? (
+      {session && !owuiServed && !anyOwuiServed ? (
         <Text style={[styles.note, { color: palette.textFaint }]}>
           {"The notification service serves only TechMavie Digital's servers, so this covers DeepTutor's replies, not your Open WebUI server's."}
         </Text>

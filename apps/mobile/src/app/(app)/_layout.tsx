@@ -36,7 +36,8 @@ export default function AppLayout() {
   }
 
   return (
-    <LiveProvider currentChatId={currentChatId}>
+    // Keyed by the account in use: switching accounts starts its socket, streams and screens afresh.
+    <LiveProvider key={state.accountId} currentChatId={currentChatId}>
       <PushSetup />
       <SpaceDrawer sidebar={() => <Sidebar />}>
         <Stack

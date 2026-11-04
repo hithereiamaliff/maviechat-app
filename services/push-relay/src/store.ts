@@ -10,6 +10,8 @@ interface Saved {
 }
 
 const MAX_PER_USER = 10;
+/** One phone may hold several accounts on the server (the app's account switcher); this many at most. */
+const MAX_USERS_PER_DEVICE = 10;
 
 export class DeviceStore {
   private saved: Saved = { version: 1, users: {}, lastEventAt: null };
@@ -37,9 +39,17 @@ export class DeviceStore {
     return (this.saved.users[userId] ?? []).map((device) => device.token);
   }
 
-  /** A phone (its push token) now belongs to this user, and to no one else. */
+  /**
+   * A phone (its push token) now also belongs to this user: someone signed in to several accounts
+   * hears from each. Past MAX_USERS_PER_DEVICE accounts, the one it was added to longest ago lets go.
+   */
   add(userId: string, token: string): void {
-    for (const id of Object.keys(this.saved.users)) this.drop(id, token);
+    this.drop(userId, token);
+    const holders = Object.entries(this.saved.users)
+      .map(([id, devices]) => ({ id, addedAt: devices.find((device) => device.token === token)?.addedAt }))
+      .filter((holder): holder is { id: string; addedAt: number } => holder.addedAt !== undefined)
+      .sort((a, b) => a.addedAt - b.addedAt);
+    for (const holder of holders.slice(0, Math.max(0, holders.length - (MAX_USERS_PER_DEVICE - 1)))) this.drop(holder.id, token);
     const devices = [{ token, addedAt: this.now() }, ...(this.saved.users[userId] ?? [])].slice(0, MAX_PER_USER);
     this.saved.users[userId] = devices;
     this.persist();

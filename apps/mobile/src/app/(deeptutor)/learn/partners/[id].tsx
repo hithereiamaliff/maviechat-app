@@ -95,13 +95,13 @@ export default function PartnerChat() {
     onProactive: (content) => toast(content.length > 160 ? `${content.slice(0, 160)}…` : content),
   });
 
-  const signOut = deepTutor.signOut;
+  const expireSession = deepTutor.expireSession;
   const refetchPartner = partner.refetch;
   useEffect(() => {
-    if (chat.state === 'signed-out') void signOut({ notice: DT_EXPIRED_NOTICE });
+    if (chat.state === 'signed-out') void expireSession(DT_EXPIRED_NOTICE);
     // Its running dot changes once the socket has started it.
     if (chat.state === 'ready') void refetchPartner();
-  }, [chat.state, signOut, refetchPartner]);
+  }, [chat.state, expireSession, refetchPartner]);
 
   const name = partner.data?.name ?? 'Partner';
   const face = useMemo(() => partner.data ?? { name: 'Partner' }, [partner.data]);

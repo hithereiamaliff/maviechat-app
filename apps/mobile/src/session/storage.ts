@@ -1,6 +1,10 @@
 import * as SecureStore from 'expo-secure-store';
+import { emptyIndex, parseAccountIndex, type AccountIndex } from './accounts';
 import { parseStoredDtSession, type StoredDtSession } from './deeptutor-session';
 import { parseStoredSession, type StoredSession } from './stored-session';
+
+const ACCOUNTS_KEY = 'maviechat.accounts';
+const accountKey = (id: string) => `maviechat.account.${id}`;
 
 const SESSION_KEY = 'maviechat.session';
 const LAST_SERVER_KEY = 'maviechat.lastServerUrl';
@@ -13,6 +17,44 @@ const options: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
 };
 
+/** The accounts list (no tokens in it), or an empty one. */
+export async function loadAccountIndex(): Promise<AccountIndex> {
+  return parseAccountIndex(await SecureStore.getItemAsync(ACCOUNTS_KEY, options)) ?? emptyIndex();
+}
+
+let indexQueue: Promise<unknown> = Promise.resolve();
+
+/**
+ * Changes the accounts list one change at a time, each from a fresh read: both spaces load at
+ * launch together, and neither may lose the other's change.
+ */
+export function updateAccountIndex<T>(change: (index: AccountIndex) => Promise<[AccountIndex, T]> | [AccountIndex, T]): Promise<[AccountIndex, T]> {
+  const run = indexQueue.then(async (): Promise<[AccountIndex, T]> => {
+    const [next, result] = await change(await loadAccountIndex());
+    await SecureStore.setItemAsync(ACCOUNTS_KEY, JSON.stringify(next), options);
+    return [next, result];
+  });
+  indexQueue = run.catch(() => undefined);
+  return run;
+}
+
+/** One account's sign-in (its token included), kept apart from the list. */
+export function loadAccountSecret(id: string): Promise<string | null> {
+  return SecureStore.getItemAsync(accountKey(id), options);
+}
+
+export async function saveAccountSecret(id: string, value: string): Promise<void> {
+  await SecureStore.setItemAsync(accountKey(id), value, options);
+}
+
+export async function deleteAccountSecret(id: string): Promise<void> {
+  await SecureStore.deleteItemAsync(accountKey(id), options);
+}
+
+/*
+ * The single sign-ins from before accounts. They're read once to move them in, and the account in
+ * use is still written here, so an update rolled back to an older version stays signed in.
+ */
 export async function loadSession(): Promise<StoredSession | null> {
   return parseStoredSession(await SecureStore.getItemAsync(SESSION_KEY, options));
 }

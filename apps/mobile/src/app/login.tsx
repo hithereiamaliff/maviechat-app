@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { IconButton } from '@/components/IconButton';
 import { TextField } from '@/components/TextField';
+import { useAccountsSheet } from '@/features/accounts/AccountsSheet';
 import { TwoStepSignIn } from '@/features/auth/TwoStepSignIn';
 import { switchToDeepTutor } from '@/features/deeptutor/switch';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
@@ -17,12 +18,18 @@ type Message = { tone: 'error' | 'info'; text: string };
 export default function Login() {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
-  const { state, signIn } = useSession();
+  const { state, signIn, accounts } = useSession();
   const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
+  const params = useLocalSearchParams<{ from?: string; add?: string }>();
   // Opened from the welcome screen: a way back to the choice.
-  const fromWelcome = useLocalSearchParams<{ from?: string }>().from === 'welcome';
-  const [serverUrl, setServerUrl] = useState(() => (state.status === 'signed-out' ? (state.lastServerUrl ?? '') : ''));
-  const [email, setEmail] = useState('');
+  const fromWelcome = params.from === 'welcome';
+  // Opened from Accounts: adds another account beside the one in use.
+  const adding = params.add === '1';
+  const accountsSheet = useAccountsSheet('owui');
+  const [serverUrl, setServerUrl] = useState(() =>
+    state.status === 'signed-out' ? (state.lastServerUrl ?? '') : state.status === 'signed-in' ? state.session.baseUrl : '',
+  );
+  const [email, setEmail] = useState(() => (state.status === 'signed-out' ? (state.login ?? '') : ''));
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   // Open WebUI 0.12's second step, after the password.
@@ -31,7 +38,9 @@ export default function Login() {
     state.status === 'signed-out' && state.notice ? { tone: 'info', text: state.notice } : null,
   );
 
-  if (state.status === 'signed-in') return <Redirect href="/" />;
+  if (state.status === 'signed-in' && !adding) return <Redirect href="/" />;
+  // Another account to switch to instead of signing in here.
+  const others = accounts.some((entry) => entry.signedIn && (state.status !== 'signed-in' || entry.id !== state.accountId));
 
   async function submit() {
     if (!serverUrl.trim() || !email.trim() || !password) {
@@ -67,7 +76,7 @@ export default function Login() {
         keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Text style={[styles.title, { color: palette.text }]}>MavieChat</Text>
-          <Text style={[styles.subtitle, { color: palette.textMuted }]}>Sign in to your Open WebUI server.</Text>
+          <Text style={[styles.subtitle, { color: palette.textMuted }]}>{adding ? 'Add another Open WebUI account. The one in use stays signed in.' : 'Sign in to your Open WebUI server.'}</Text>
         </View>
 
         {twoStep ? (
@@ -123,8 +132,14 @@ export default function Login() {
             </Text>
           ) : null}
 
-          <Button label="Sign in" onPress={() => void submit()} loading={busy} />
+          <Button label={adding ? 'Add Account' : 'Sign in'} onPress={() => void submit()} loading={busy} />
+          {others && !adding ? (
+            <Pressable accessibilityRole="button" onPress={accountsSheet.open} hitSlop={8} style={styles.other}>
+              <Text style={[styles.otherText, { color: palette.link }]}>Use Another Account</Text>
+            </Pressable>
+          ) : null}
           {/* Either space works on its own: DeepTutor alone needs no Open WebUI account. */}
+          {adding ? null : (
           <Pressable
             accessibilityRole="button"
             onPress={() =>
@@ -134,6 +149,7 @@ export default function Login() {
             style={styles.other}>
             <Text style={[styles.otherText, { color: palette.link }]}>{deepTutorSignedIn ? 'Back to DeepTutor' : 'Sign in to DeepTutor instead'}</Text>
           </Pressable>
+          )}
         </View>
         )}
 
@@ -141,11 +157,16 @@ export default function Login() {
           MavieChat is an independent app for Open WebUI and DeepTutor servers and is not affiliated with either.
         </Text>
       </ScrollView>
-      {fromWelcome ? (
+      {fromWelcome || adding ? (
         <View style={[styles.back, { top: insets.top + 4 }]}>
-          <IconButton icon="chevron-left" label="Back to the choice" onPress={() => router.replace('/welcome')} />
+          {adding ? (
+            <IconButton icon="chevron-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+          ) : (
+            <IconButton icon="chevron-left" label="Back to the choice" onPress={() => router.replace('/welcome')} />
+          )}
         </View>
       ) : null}
+      {accountsSheet.element}
     </KeyboardAvoidingView>
   );
 }

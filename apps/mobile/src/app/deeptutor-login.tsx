@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { IconButton } from '@/components/IconButton';
 import { TextField } from '@/components/TextField';
+import { useAccountsSheet } from '@/features/accounts/AccountsSheet';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { describeDtSignInError } from '@/session/errors';
 import { useSession } from '@/session/SessionProvider';
@@ -17,19 +18,27 @@ type Message = { tone: 'error' | 'info'; text: string };
 export default function DeepTutorLogin() {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
-  const { state, signIn } = useDeepTutor();
+  const { state, signIn, accounts } = useDeepTutor();
   const owui = useSession();
+  const params = useLocalSearchParams<{ from?: string; add?: string }>();
   // Opened from the welcome screen: a way back to the choice.
-  const fromWelcome = useLocalSearchParams<{ from?: string }>().from === 'welcome';
-  const [serverUrl, setServerUrl] = useState(() => (state.status === 'signed-out' ? (state.lastServerUrl ?? '') : ''));
-  const [username, setUsername] = useState('');
+  const fromWelcome = params.from === 'welcome';
+  // Opened from Accounts: adds another account beside the one in use.
+  const adding = params.add === '1';
+  const accountsSheet = useAccountsSheet('deeptutor');
+  const [serverUrl, setServerUrl] = useState(() =>
+    state.status === 'signed-out' ? (state.lastServerUrl ?? '') : state.status === 'signed-in' ? state.session.baseUrl : '',
+  );
+  const [username, setUsername] = useState(() => (state.status === 'signed-out' ? (state.login ?? '') : ''));
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<Message | null>(() =>
     state.status === 'signed-out' && state.notice ? { tone: 'info', text: state.notice } : null,
   );
 
-  if (state.status === 'signed-in') return <Redirect href="/learn" />;
+  if (state.status === 'signed-in' && !adding) return <Redirect href="/learn" />;
+  // Another account to switch to instead of signing in here.
+  const others = accounts.some((entry) => entry.signedIn && (state.status !== 'signed-in' || entry.id !== state.accountId));
 
   async function submit() {
     if (!serverUrl.trim() || !username.trim() || !password) {
@@ -58,7 +67,9 @@ export default function DeepTutorLogin() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: palette.text }]}>DeepTutor</Text>
           <Text style={[styles.subtitle, { color: palette.textMuted }]}>
-            Sign in to your DeepTutor server. Your Open WebUI sign-in stays as it is, and you can switch between the two.
+            {adding
+              ? 'Add another DeepTutor account. The one in use stays signed in.'
+              : 'Sign in to your DeepTutor server. Your Open WebUI sign-in stays as it is, and you can switch between the two.'}
           </Text>
         </View>
 
@@ -103,24 +114,36 @@ export default function DeepTutorLogin() {
             </Text>
           ) : null}
 
-          <Button label="Sign in" onPress={() => void submit()} loading={busy} />
+          <Button label={adding ? 'Add Account' : 'Sign in'} onPress={() => void submit()} loading={busy} />
+          {others && !adding ? (
+            <Pressable accessibilityRole="button" onPress={accountsSheet.open} hitSlop={8} style={styles.back}>
+              <Text style={[styles.backText, { color: palette.link }]}>Use Another Account</Text>
+            </Pressable>
+          ) : null}
           {/* Either space works on its own: Open WebUI alone needs no DeepTutor account. */}
+          {adding ? null : (
           <Pressable accessibilityRole="button" onPress={() =>
               owui.state.status === 'signed-in' ? router.replace('/') : router.replace({ pathname: '/login', params: fromWelcome ? { from: 'welcome' } : {} })
             } hitSlop={8} style={styles.back}>
             <Text style={[styles.backText, { color: palette.link }]}>{owui.state.status === 'signed-in' ? 'Back to Open WebUI' : 'Sign in to Open WebUI instead'}</Text>
           </Pressable>
+          )}
         </View>
 
         <Text style={[styles.footer, { color: palette.textMuted }]}>
           MavieChat is an independent app for Open WebUI and DeepTutor servers and is not affiliated with either.
         </Text>
       </ScrollView>
-      {fromWelcome ? (
+      {fromWelcome || adding ? (
         <View style={[styles.backButton, { top: insets.top + 4 }]}>
-          <IconButton icon="chevron-left" label="Back to the choice" onPress={() => router.replace('/welcome')} />
+          {adding ? (
+            <IconButton icon="chevron-left" label="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/learn'))} />
+          ) : (
+            <IconButton icon="chevron-left" label="Back to the choice" onPress={() => router.replace('/welcome')} />
+          )}
         </View>
       ) : null}
+      {accountsSheet.element}
     </KeyboardAvoidingView>
   );
 }

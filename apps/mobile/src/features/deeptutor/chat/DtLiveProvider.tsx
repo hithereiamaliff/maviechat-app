@@ -39,7 +39,7 @@ const DtLiveContext = createContext<DtLiveValue | null>(null);
  */
 export function DtLiveProvider({ children }: { children: ReactNode }) {
   const { client, session } = useDtAuthed();
-  const { signOut } = useDeepTutor();
+  const { expireSession } = useDeepTutor();
   const queryClient = useQueryClient();
   const toast = useToast();
   const [turns] = useState(() => new LiveTurns());
@@ -115,9 +115,9 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (state !== 'signed-out') return;
     getAuthStatus(client)
-      .then((status) => (status.authenticated ? undefined : signOut({ notice: DT_EXPIRED_NOTICE })))
+      .then((status) => (status.authenticated ? undefined : expireSession(DT_EXPIRED_NOTICE)))
       .catch(() => undefined);
-  }, [state, client, signOut]);
+  }, [state, client, expireSession]);
 
   // Ready before you send: an open socket and this phone's push token. A reply then reaches the
   // relay within a second of sending, before iOS freezes the app if you leave straight away

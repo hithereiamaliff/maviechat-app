@@ -9,6 +9,8 @@ export interface PushMessage {
     chatId?: string;
     /** A DeepTutor session. */
     sessionId?: string;
+    /** The Open WebUI account the reply belongs to: the app switches to it when the notification is opened. */
+    userId?: string;
   };
   sound: 'default';
   priority: 'high';
@@ -86,7 +88,7 @@ export function notificationFor(outcome: ChatOutcome, pushToken: string): PushMe
     to: pushToken,
     title: outcome.title ? `${heading}: ${outcome.title}` : heading,
     body: outcome.text || (finished ? 'Open the chat to read it.' : 'Open the chat to try again.'),
-    data: { kind: outcome.kind, ...(outcome.chatId ? { chatId: outcome.chatId } : {}) },
+    data: { kind: outcome.kind, userId: outcome.userId, ...(outcome.chatId ? { chatId: outcome.chatId } : {}) },
     sound: 'default',
     priority: 'high',
     ...(outcome.chatId ? { threadId: outcome.chatId } : {}),

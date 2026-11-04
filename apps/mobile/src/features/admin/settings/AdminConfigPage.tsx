@@ -71,7 +71,7 @@ export function SettingsEndpointPage({ name, read: readConfig, save: saveConfig,
   const palette = usePalette();
   const toast = useToast();
   const { client } = useAuthed();
-  const { signOut } = useSession();
+  const { expireSession } = useSession();
   const refresh = useSettingsRefresh();
   const config = useQuery({ queryKey: ['admin', 'endpoint', name], queryFn: () => readConfig(client), staleTime: 0 });
   const groups = useAdminGroups();
@@ -96,7 +96,7 @@ export function SettingsEndpointPage({ name, read: readConfig, save: saveConfig,
         setEdits({});
         // A two-step sign-in change signs everyone out (0.12): this session is gone too.
         if ((answer as Tree | undefined)?.sessions_revoked === true) {
-          await signOut({ notice: 'Two-step sign-in changed, so everyone was signed out. Sign in again.' });
+          await expireSession('Two-step sign-in changed, so everyone was signed out. Sign in again.');
           return;
         }
         refresh();

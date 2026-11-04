@@ -20,12 +20,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
 import type { MenuItem } from '@/components/Menu';
+import { useAccountsSheet, useOwuiAccountSignOut } from '@/features/accounts/AccountsSheet';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
 import { useShareSheet } from '@/features/chats/ShareSheet';
 import { useTagsSheet } from '@/features/chats/TagsSheet';
 import { useChatActions } from '@/features/chats/useChatActions';
 import { switchToDeepTutor } from '@/features/deeptutor/switch';
-import { leaveRelay } from '@/features/notifications/push';
 import { useAuthed, useCapabilities, useServerConfig, useSessionUser, useUserSettings } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
@@ -49,7 +49,9 @@ export function Sidebar() {
   const palette = usePalette();
   const sidebar = useSidebar();
   const { client, session } = useAuthed();
-  const { signOut } = useSession();
+  const owui = useSession();
+  const signOutOf = useOwuiAccountSignOut();
+  const accountsSheet = useAccountsSheet('owui');
   const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
   const queryClient = useQueryClient();
   const capabilities = useCapabilities();
@@ -198,11 +200,23 @@ export function Sidebar() {
       },
     },
     {
+      key: 'accounts',
+      label: 'Accounts',
+      icon: 'users',
+      onPress: () => {
+        sidebar.close();
+        accountsSheet.open();
+      },
+    },
+    {
       key: 'signout',
       label: 'Sign Out',
       icon: 'arrow-right-start-on-rectangle',
-      // Notifications for this account stop on this phone: it leaves the relay first (DeepTutor's carry on).
-      onPress: () => void leaveRelay(session).catch(() => undefined).finally(() => void signOut()),
+      // This account's notifications stop on this phone (DeepTutor's carry on); the latest other account takes over.
+      onPress: () =>
+        void (owui.state.status === 'signed-in' ? signOutOf(owui.state.accountId) : Promise.resolve(false)).then((stillIn) => {
+          if (stillIn) router.replace('/');
+        }),
     },
   ];
 
@@ -332,6 +346,7 @@ export function Sidebar() {
       {picker.element}
       {shareSheet.element}
       {tagsSheet.element}
+      {accountsSheet.element}
     </SidebarPanel>
   );
 }
