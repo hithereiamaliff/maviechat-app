@@ -105,6 +105,42 @@ export function sharedChatUrl(baseUrl: string, shareId: string): string {
   return `${baseUrl.replace(/\/+$/, '')}/s/${encodeURIComponent(shareId)}`;
 }
 
+/** A chat of yours with a share link (Settings → Data Controls → Shared Chats). */
+export interface SharedChat {
+  chatId: string;
+  title: string;
+  shareId: string | null;
+  /** Unix seconds. */
+  updated_at: number;
+  created_at: number;
+}
+
+export type SharedChatOrder = { by: 'updated_at' | 'title'; direction: 'asc' | 'desc' };
+
+/** Shared chats per page of `GET /api/v1/chats/shared`. */
+export const SHARED_PAGE_SIZE = 60;
+
+/** Your shared chats, a page at a time, searched by title; newest change first unless `order` says otherwise. */
+export async function listSharedChats(client: OwuiClient, page = 1, query?: string, order?: SharedChatOrder): Promise<SharedChat[]> {
+  const raw = await client.get<unknown>('/api/v1/chats/shared', {
+    query: { page, query: query?.trim() || undefined, order_by: order?.by, direction: order?.direction },
+  });
+  return rows(raw)
+    .map((row) => ({
+      chatId: text(row.chat_id) || text(row.id),
+      title: text(row.title),
+      shareId: text(row.share_id) || null,
+      updated_at: typeof row.updated_at === 'number' ? row.updated_at : 0,
+      created_at: typeof row.created_at === 'number' ? row.created_at : 0,
+    }))
+    .filter((chat) => chat.chatId);
+}
+
+/** Deletes every share link of yours (and who could open them). */
+export function unshareAllChats(client: OwuiClient): Promise<boolean> {
+  return client.delete<boolean>('/api/v1/chats/share/all');
+}
+
 const grantsOf = (raw: unknown): ShareGrant[] =>
   rows(raw).flatMap((grant): ShareGrant[] => {
     const type = grant.principal_type;

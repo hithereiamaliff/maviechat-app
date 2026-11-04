@@ -1,5 +1,5 @@
 import type { HistoryMessage } from './history';
-import type { OwuiClient } from './http';
+import { OwuiHttpError, type OwuiClient } from './http';
 
 /** `POST /api/v1/files/` answer (`FileModelResponse`); unknown fields are kept. */
 export interface UploadedFile {
@@ -56,6 +56,70 @@ export async function waitForProcessing(
     if (status !== 'pending' || Date.now() > deadline) return status;
     await sleep(intervalMs);
   }
+}
+
+/** A file of yours on the server (Settings → Data Controls → Manage Files). */
+export interface StoredFile {
+  id: string;
+  filename: string;
+  /** Bytes, when the server knows. */
+  size: number | null;
+  contentType: string | null;
+  /** Unix seconds. */
+  created_at: number;
+  /** Whose it is (admins see everyone's). */
+  userId: string;
+}
+
+/** Files per page of the search. */
+export const FILES_PAGE_SIZE = 50;
+
+function storedFileOf(raw: unknown): StoredFile | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const row = raw as Record<string, unknown>;
+  const meta = typeof row.meta === 'object' && row.meta !== null ? (row.meta as Record<string, unknown>) : {};
+  if (typeof row.id !== 'string') return null;
+  return {
+    id: row.id,
+    filename: typeof row.filename === 'string' && row.filename ? row.filename : typeof meta.name === 'string' ? meta.name : 'File',
+    size: typeof meta.size === 'number' ? meta.size : null,
+    contentType: typeof meta.content_type === 'string' ? meta.content_type : null,
+    created_at: typeof row.created_at === 'number' ? row.created_at : 0,
+    userId: typeof row.user_id === 'string' ? row.user_id : '',
+  };
+}
+
+/**
+ * Your files whose names contain `query` (any case; `*` and `?` work as wildcards), a page at a
+ * time, without their text. The server answers 404 when none match: an empty list here.
+ */
+export async function searchFiles(client: OwuiClient, query: string, skip = 0): Promise<StoredFile[]> {
+  const words = query.trim();
+  try {
+    const raw = await client.get<unknown>('/api/v1/files/search', { query: { filename: words ? `*${words}*` : '*', skip, limit: FILES_PAGE_SIZE, content: false } });
+    return (Array.isArray(raw) ? raw : []).map(storedFileOf).filter((file): file is StoredFile => file !== null);
+  } catch (error) {
+    if (error instanceof OwuiHttpError && error.status === 404) return [];
+    throw error;
+  }
+}
+
+/** How many files you have (admins: everyone's). */
+export function countFiles(client: OwuiClient): Promise<number> {
+  return client.get<number>('/api/v1/files/count');
+}
+
+/** Where a file's content is fetched from (with your token). */
+export function fileContentUrl(baseUrl: string, id: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/api/v1/files/${encodeURIComponent(id)}/content`;
+}
+
+/** A size as people read it: "820 B", "14 KB", "3.2 MB". */
+export function fileSizeLabel(bytes: number | null): string {
+  if (bytes === null || bytes < 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(bytes < 10 * 1024 * 1024 ? 1 : 0)} MB`;
 }
 
 export function deleteFile(client: OwuiClient, id: string): Promise<unknown> {

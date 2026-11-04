@@ -1,4 +1,4 @@
-import { listArchivedChats, type ChatListItem } from '@maviechat/owui-protocol';
+import { exportArchivedChats, exportFileNameAt, listArchivedChats, type ChatListItem } from '@maviechat/owui-protocol';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -6,10 +6,14 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
+import { MenuButton } from '@/components/Menu';
+import { useToast } from '@/components/Toast';
 import { useChatActions } from '@/features/chats/useChatActions';
-import { useAuthed } from '@/lib/server';
+import { describeError } from '@/lib/errors';
+import { useAuthed, useCapabilities } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
 import { fonts, radius, usePalette } from '@/theme';
+import { shareJsonFile } from './exportFile';
 
 /** The server answers 60 archived chats a page. */
 const PAGE_SIZE = 60;
@@ -18,11 +22,14 @@ function day(seconds: number): string {
   return new Date(seconds * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-/** Archived Chats, as the web's settings tab: search, open, unarchive or delete each, or unarchive all. */
+/** Archived Chats, as the web's settings tab: search, open, unarchive or delete each; unarchive all, or export them. */
 export function ArchivedChats() {
   const palette = usePalette();
   const { client } = useAuthed();
+  const toast = useToast();
+  const capabilities = useCapabilities();
   const actions = useChatActions();
+  const [exporting, setExporting] = useState(false);
   const [search, setSearch] = useState('');
   const query = useDebounced(search.trim(), 300);
   const list = useInfiniteQuery({
@@ -32,6 +39,19 @@ export function ArchivedChats() {
     getNextPageParam: (last, all) => (last.length >= PAGE_SIZE ? all.length + 1 : undefined),
   });
   const chats = list.data?.pages.flat() ?? [];
+
+  // In the same format as Data Controls' export, so the file can be imported again.
+  const exportAll = async () => {
+    setExporting(true);
+    try {
+      const { json } = await exportArchivedChats(client);
+      await shareJsonFile(exportFileNameAt('archived', Date.now()), json);
+    } catch (error) {
+      toast(`Couldn’t export them: ${describeError(error)}`, 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const open = (chat: ChatListItem) => {
     router.dismissAll();
@@ -54,10 +74,17 @@ export function ArchivedChats() {
           />
           {search ? <IconButton icon="x-mark" label="Clear search" size={16} color={palette.textMuted} onPress={() => setSearch('')} /> : null}
         </View>
-        {chats.length > 0 && !query ? (
-          <Pressable accessibilityRole="button" onPress={actions.unarchiveAll} hitSlop={6}>
-            <Text style={[styles.all, { color: palette.link }]}>Unarchive All</Text>
-          </Pressable>
+        {exporting ? <ActivityIndicator size="small" color={palette.textMuted} /> : null}
+        {chats.length > 0 && !query && !exporting ? (
+          <MenuButton
+            label="Archived chats actions"
+            size={20}
+            color={palette.textMuted}
+            items={[
+              { key: 'unarchive', label: 'Unarchive All', icon: 'archive-box-arrow-down', onPress: actions.unarchiveAll },
+              ...((capabilities?.can('chat.export', true) ?? false) ? [{ key: 'export', label: 'Export', icon: 'arrow-up-on-square' as const, onPress: () => void exportAll() }] : []),
+            ]}
+          />
         ) : null}
       </View>
       <FlashList
@@ -113,7 +140,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   searchInput: { flex: 1, fontFamily: fonts.regular, fontSize: 15, paddingVertical: 0 },
-  all: { fontFamily: fonts.medium, fontSize: 14 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: 16, paddingRight: 8, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
   rowText: { flex: 1, gap: 2 },
   title: { fontFamily: fonts.medium, fontSize: 15 },

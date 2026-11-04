@@ -16,7 +16,8 @@
  * tool and answers it as the app does (src/a5-probe.ts). `--a6` tags, shares, clones and forks a
  * probe chat made without a model, and builds the downloads (src/a6-probe.ts).
  * `--a8` saves settings the app's way and puts them back exactly (src/a8-probe.ts), then tries
- * memories, the profile, your variables, a refused password change and an API key (src/a8-account-probe.ts).
+ * memories, the profile, your variables, a refused password change and an API key (src/a8-account-probe.ts),
+ * and the data controls: export, import, shared chats and files (src/a8-data-probe.ts).
  *
  * It never prints or stores tokens, passwords, emails or message text: fixtures
  * hold response shapes, counts and feature flags only (fixtures/<server version>/).
@@ -51,6 +52,7 @@ import { probeA4 } from './a4-probe';
 import { probeA5 } from './a5-probe';
 import { probeA6 } from './a6-probe';
 import { probeA8Account } from './a8-account-probe';
+import { probeA8Data } from './a8-data-probe';
 import { probeA8 } from './a8-probe';
 import { probeChatActions } from './write-probe';
 
@@ -311,6 +313,9 @@ async function main() {
         const account = await probeA8Account({ client, capabilities, config: serverConfig });
         for (const result of account.steps) results.push({ ...result, name: `A8: ${result.name}` });
         fixtures['write.a8-account'] = account.fixture;
+        const data = await probeA8Data({ client, capabilities });
+        for (const result of data.steps) results.push({ ...result, name: `A8: ${result.name}` });
+        fixtures['write.a8-data'] = data.fixture;
       }
 
       if (args.write) {

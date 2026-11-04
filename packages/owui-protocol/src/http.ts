@@ -23,6 +23,8 @@ export interface RequestOptions {
   signal?: AbortSignal;
   /** Overrides the client's timeout for this request (uploads can be slow). */
   timeoutMs?: number;
+  /** Headers for this request only (an `Accept` other than JSON, say). */
+  headers?: Record<string, string>;
 }
 
 /** A non-2xx answer from the server. `detail` is Open WebUI's error text when it sent one. */
@@ -105,6 +107,14 @@ export class OwuiClient {
     return this.request<T>('DELETE', path, options);
   }
 
+  /** A GET whose answer is kept as text (a stream of JSON lines, say); refusals throw as for `request`. */
+  async getText(path: string, options: Omit<RequestOptions, 'body' | 'form'> = {}): Promise<string> {
+    const response = await this.open('GET', path, options);
+    const text = await response.text();
+    if (!response.ok) throw new OwuiHttpError(response.status, errorDetail(parseJson(text), text), path);
+    return text;
+  }
+
   /** Multipart upload; fetch sets the boundary, so no Content-Type header is sent. */
   postForm<T>(path: string, form: FormData, options?: Omit<RequestOptions, 'body'>): Promise<T> {
     return this.request<T>('POST', path, { ...options, form });
@@ -130,7 +140,7 @@ export class OwuiClient {
   }
 
   private async open(method: Method, path: string, options: RequestOptions): Promise<Response> {
-    const headers: Record<string, string> = { Accept: 'application/json', ...this.options.headers };
+    const headers: Record<string, string> = { Accept: 'application/json', ...this.options.headers, ...options.headers };
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
     let body: string | FormData | undefined;
     if (options.form) {

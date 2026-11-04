@@ -111,6 +111,16 @@ export function unarchiveAllChats(client: OwuiClient): Promise<boolean> {
   return client.post<boolean>('/api/v1/chats/unarchive/all');
 }
 
+/** Archives every chat of yours (no permission needed). */
+export function archiveAllChats(client: OwuiClient): Promise<boolean> {
+  return client.post<boolean>('/api/v1/chats/archive/all');
+}
+
+/** Deletes every chat of yours, archived ones too. Refused (401) without the `chat.delete` permission. */
+export function deleteAllChats(client: OwuiClient): Promise<boolean> {
+  return client.delete<boolean>('/api/v1/chats/');
+}
+
 /** Brings the unread dot back (reading is reported over the socket: `SocketSession.markRead`). */
 export function markChatUnread(client: OwuiClient, id: string): Promise<unknown> {
   return client.post<unknown>(`${chatPath(id)}/unread`);

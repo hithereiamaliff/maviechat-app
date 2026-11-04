@@ -5,6 +5,7 @@ import { AboutSettings } from '@/features/settings/AboutSettings';
 import { AccountSettings } from '@/features/settings/AccountSettings';
 import { ArchivedChats } from '@/features/settings/ArchivedChats';
 import { OwuiAudioSettings } from '@/features/settings/AudioSettings';
+import { DataControls } from '@/features/settings/DataControls';
 import { GeneralSettings } from '@/features/settings/GeneralSettings';
 import { InterfaceSettings } from '@/features/settings/InterfaceSettings';
 import { NotificationSettings } from '@/features/settings/NotificationSettings';
@@ -13,7 +14,7 @@ import { PromptAndParams } from '@/features/settings/PromptAndParams';
 import { rowStyles } from '@/features/settings/rows';
 import { SettingsFrame, type SettingsTab } from '@/features/settings/SettingsFrame';
 
-type Tab = 'general' | 'interface' | 'notifications' | 'personalization' | 'audio' | 'archived' | 'account' | 'about';
+type Tab = 'general' | 'interface' | 'notifications' | 'personalization' | 'audio' | 'data' | 'archived' | 'account' | 'about';
 
 /** The web's settings modal in its phone layout: a strip of tabs on top, in the web's order. */
 export default function SettingsScreen() {
@@ -29,6 +30,7 @@ export default function SettingsScreen() {
     { key: 'notifications', label: 'Notifications', icon: 'bell' },
     ...(memoriesTab ? [{ key: 'personalization' as const, label: 'Personalization', icon: 'light-bulb' as const }] : []),
     { key: 'audio', label: 'Audio', icon: 'speaker-wave' },
+    { key: 'data', label: 'Data Controls', icon: 'circle-stack' },
     { key: 'archived', label: 'Archived Chats', icon: 'archive-box' },
     { key: 'account', label: 'Account', icon: 'user-circle' },
     { key: 'about', label: 'About', icon: 'information-circle' },
@@ -50,6 +52,8 @@ export default function SettingsScreen() {
         <PersonalizationSettings />
       ) : shown === 'audio' ? (
         <OwuiAudioSettings />
+      ) : shown === 'data' ? (
+        <DataControls />
       ) : shown === 'archived' ? (
         <ArchivedChats />
       ) : shown === 'account' ? (

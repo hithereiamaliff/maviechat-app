@@ -1,0 +1,126 @@
+{
+  "export": {
+    "count": 35,
+    "archived": 29,
+    "shape": {
+      "archived": "boolean",
+      "chat": {
+        "branchPointMessageId": "string",
+        "history": {
+          "currentId": "string",
+          "messages": {
+            "<id>": {
+              "childrenIds": [],
+              "content": "string",
+              "done": "boolean",
+              "id": "string",
+              "parentId": "null",
+              "role": "string",
+              "timestamp": "number"
+            }
+          }
+        },
+        "messages": [
+          {
+            "childrenIds": [],
+            "content": "string",
+            "done": "boolean",
+            "id": "string",
+            "parentId": "null",
+            "role": "string",
+            "timestamp": "number"
+          }
+        ],
+        "models": [],
+        "originalChatId": "string",
+        "tags": [],
+        "timestamp": "number",
+        "title": "string"
+      },
+      "context_usage": "null",
+      "created_at": "number",
+      "current_message_id": "string",
+      "folder_id": "null",
+      "id": "string",
+      "meta": {
+        "forked_from": "string",
+        "forked_from_message_id": "string",
+        "tags": []
+      },
+      "pinned": "boolean",
+      "share_id": "null",
+      "summary": "null",
+      "tasks": "null",
+      "title": "string",
+      "updated_at": "number",
+      "user_id": "string",
+      "variables": {}
+    }
+  },
+  "imported": {
+    "shape": {
+      "archived": "boolean",
+      "chat": {
+        "history": {
+          "currentId": "string",
+          "messages": {
+            "<id>": {
+              "childrenIds": [
+                "string"
+              ],
+              "content": "string",
+              "done": "boolean",
+              "id": "string",
+              "model": "string",
+              "models": [
+                "string"
+              ],
+              "parentId": "null|string",
+              "role": "string",
+              "timestamp": "number"
+            }
+          }
+        },
+        "models": [
+          "string"
+        ],
+        "title": "string"
+      },
+      "context_usage": "null",
+      "created_at": "number",
+      "current_message_id": "string",
+      "folder_id": "null",
+      "id": "string",
+      "meta": {},
+      "pinned": "boolean",
+      "share_id": "null",
+      "summary": "null",
+      "tasks": "null",
+      "title": "string",
+      "updated_at": "number",
+      "user_id": "string",
+      "variables": {}
+    }
+  },
+  "shared": {
+    "before": 0,
+    "shape": {
+      "chatId": "string",
+      "created_at": "number",
+      "shareId": "string",
+      "title": "string",
+      "updated_at": "number"
+    }
+  },
+  "files": {
+    "count": 1,
+    "shape": {
+      "contentType": "string",
+      "created_at": "number",
+      "filename": "string",
+      "id": "string",
+      "size": "number",
+      "userId": "string"
+    }
+  }
+}
