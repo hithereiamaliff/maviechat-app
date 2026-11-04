@@ -8,6 +8,9 @@
  * scratch folder it creates and removes (/root/work/maviechat-opencode-scratch): an edit refused
  * at the approval, a command allowed once, and a reply stopped mid-way. It deletes the sessions it
  * made and unpairs the test device. Prints no tokens, codes or session titles.
+ *
+ * With OC_PUSH_TOKEN (an Expo push token, a made-up one will do) the prompts ask the machine for
+ * notifications; the gateway's log then shows a "push: <kind> sent" line for each one it sent.
  */
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
@@ -35,6 +38,7 @@ const SCRATCH = '/root/work/maviechat-opencode-scratch';
 const gateway = process.env.OC_GATEWAY ?? '';
 const code = process.env.OC_PAIR_CODE ?? '';
 const withPrompts = process.argv.includes('--prompts');
+const pushToken = process.env.OC_PUSH_TOKEN || null;
 // `--model provider/model` for the prompts; without it OpenCode uses its own default.
 const modelArg = process.argv[process.argv.indexOf('--model') + 1] ?? '';
 const model = process.argv.includes('--model') && modelArg.includes('/') ? { providerID: modelArg.slice(0, modelArg.indexOf('/')), modelID: modelArg.slice(modelArg.indexOf('/') + 1) } : undefined;
@@ -150,7 +154,7 @@ async function main(): Promise<void> {
           const session = await createSession(client, scratch, { title: 'APP PROBE refused edit' });
           created.push(session.id);
           const mark = events.length;
-          await sendPrompt(client, scratch, session.id, { text: 'Create a file named hello.txt containing the word hi. Do nothing else.', model });
+          await sendPrompt(client, scratch, session.id, { text: 'Create a file named hello.txt containing the word hi. Do nothing else.', model }, { pushToken });
           const request = await waitFor('an approval request', () => asked(session.id, mark), 180_000);
           await replyPermission(client, scratch, String(request.properties.id), 'reject');
           await idle(session.id);
@@ -162,7 +166,7 @@ async function main(): Promise<void> {
           const session = await createSession(client, scratch, { title: 'APP PROBE allowed command' });
           created.push(session.id);
           const mark = events.length;
-          await sendPrompt(client, scratch, session.id, { text: 'Run the shell command `ls -a` here and reply with just the number of lines it printed.', model });
+          await sendPrompt(client, scratch, session.id, { text: 'Run the shell command `ls -a` here and reply with just the number of lines it printed.', model }, { pushToken });
           const request = await waitFor('an approval request', () => asked(session.id, mark), 180_000);
           // Each command asks on its own (the model may run another to count): each is allowed once.
           const answered = new Set<string>();
@@ -194,7 +198,7 @@ async function main(): Promise<void> {
           const session = await createSession(client, scratch, { title: 'APP PROBE stop' }, false);
           created.push(session.id);
           const mark = events.length;
-          await sendPrompt(client, scratch, session.id, { text: 'Write the numbers from 1 to 400, one per line, with nothing else.', model });
+          await sendPrompt(client, scratch, session.id, { text: 'Write the numbers from 1 to 400, one per line, with nothing else.', model }, { pushToken });
           await waitFor('the reply to start', () => {
             const error = failed(session.id, mark);
             if (error) throw new Error(`OpenCode reported: ${errorText(error.properties.error)}`);
