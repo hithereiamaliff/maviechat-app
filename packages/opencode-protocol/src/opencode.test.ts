@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createSession, pairDevice, parseModelRef, parsePairingLink, pickableAgents, sendPrompt, setDefaultModel } from './api';
 import { parseEvent, readEvents, SseParser } from './events';
 import { OcClient, OcHttpError } from './http';
+import { sessionChanges } from './changes';
 import { applyEvent, emptyLive, errorText, isWorking, liveFromHistory, type SessionLive } from './live';
 import type { OcEvent } from './types';
 
@@ -199,5 +200,28 @@ describe('notifications', () => {
     const headers = (call: number) => (fetch.mock.calls[call] as unknown as [string, RequestInit])[1].headers as Record<string, string>;
     expect(headers(0)['x-maviechat-push']).toBe('ExponentPushToken[abc]');
     expect(headers(1)['x-maviechat-push']).toBeUndefined();
+  });
+});
+
+describe('changes', () => {
+  it('collects what each of your messages led to, newest first, from the messages themselves', () => {
+    const diff = (file: string, additions: number, deletions: number) => ({ file, patch: '@@ -1 +1 @@\n-a\n+b\n', additions, deletions, status: 'modified' as const });
+    const user = (id: string, text: string, diffs?: ReturnType<typeof diff>[], synthetic = false) => ({
+      info: { id, sessionID: 's', role: 'user' as const, time: { created: 1 }, ...(diffs ? { summary: { diffs } } : {}) },
+      parts: [{ id: `${id}_p`, messageID: id, sessionID: 's', type: 'text' as const, text, synthetic }],
+    });
+    const messages = [
+      user('msg_1', 'Look around first', []),
+      user('msg_2', 'Fix the login bug\nand add a test', [diff('src/login.ts', 3, 1), diff('test/login.test.ts', 20, 0)]),
+      user('msg_3', 'Rename it', [diff('src/login.ts', 2, 2)]),
+      user('msg_4', 'no summary yet'),
+    ];
+    const changes = sessionChanges(messages as never);
+    expect(changes.turns.map((turn) => [turn.messageID, turn.prompt, turn.files.length])).toEqual([
+      ['msg_3', 'Rename it', 1],
+      ['msg_2', 'Fix the login bug', 2],
+    ]);
+    expect([changes.files, changes.additions, changes.deletions]).toEqual([2, 25, 3]);
+    expect(sessionChanges([]).turns).toEqual([]);
   });
 });

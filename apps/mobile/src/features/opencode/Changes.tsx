@@ -1,84 +1,63 @@
-import { getDiff, type FileDiff } from '@maviechat/opencode-protocol';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { FileDiff, SessionChanges } from '@maviechat/opencode-protocol';
 import { useMemo, useState } from 'react';
-import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
-import { useOcAuthed } from '@/session/OpenCodeProvider';
 import { fonts, radius, usePalette } from '@/theme';
-import { RECONNECTED, useOcEvents } from './live';
 import { parsePatch, splitPath, type PatchLine } from './patch';
-import { ocKey } from './queries';
 
 /** Lines shown per file before "Show all". */
 const FIRST_LINES = 400;
 
-const totals = (files: FileDiff[]) => ({
-  added: files.reduce((sum, file) => sum + (file.additions || 0), 0),
-  removed: files.reduce((sum, file) => sum + (file.deletions || 0), 0),
-});
-
-/**
- * What a session changed in its project, file by file, kept current: OpenCode reports a new diff
- * as the session edits, and it's read again when the session stops or the stream comes back.
- */
-export function useOcDiff(sessionId: string, directory: string) {
-  const { client, accountId } = useOcAuthed();
-  const queryClient = useQueryClient();
-  const key = ocKey(accountId, 'diff', sessionId);
-  const query = useQuery({ queryKey: key, queryFn: () => getDiff(client, directory, sessionId), enabled: Boolean(directory) });
-  useOcEvents(directory, (event) => {
-    const props = event.properties as { sessionID?: unknown; diff?: unknown; status?: { type?: unknown } };
-    if (event.type === RECONNECTED) void queryClient.invalidateQueries({ queryKey: key });
-    else if (props.sessionID !== sessionId) return;
-    else if (event.type === 'session.diff' && Array.isArray(props.diff)) queryClient.setQueryData(key, props.diff as FileDiff[]);
-    else if (event.type === 'session.idle' || (event.type === 'session.status' && props.status?.type === 'idle')) void queryClient.invalidateQueries({ queryKey: key });
-  });
-  return query;
-}
+const noun = (count: number) => (count === 1 ? 'file' : 'files');
 
 /** A line above the composer once the session has changed files: how many and how much. Opens the changes. */
-export function ChangesBar({ files, onPress }: { files: FileDiff[]; onPress: () => void }) {
+export function ChangesBar({ changes, onPress }: { changes: SessionChanges; onPress: () => void }) {
   const palette = usePalette();
-  const { added, removed } = totals(files);
-  const noun = files.length === 1 ? 'file' : 'files';
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${files.length} ${noun} changed, ${added} lines added, ${removed} removed. Show the changes`}
+      accessibilityLabel={`${changes.files} ${noun(changes.files)} changed, ${changes.additions} lines added, ${changes.deletions} removed. Show the changes`}
       onPress={onPress}
       style={({ pressed }) => [styles.bar, { borderColor: palette.border, backgroundColor: pressed ? palette.surface : palette.background }]}>
       <Icon name="document-text" size={16} color={palette.textMuted} />
       <Text style={[styles.barText, { color: palette.text }]}>
-        {files.length} {noun} changed
+        {changes.files} {noun(changes.files)} changed
       </Text>
-      <Text style={[styles.count, { color: palette.success }]}>+{added}</Text>
-      <Text style={[styles.count, { color: palette.danger }]}>−{removed}</Text>
+      <Text style={[styles.count, { color: palette.success }]}>+{changes.additions}</Text>
+      <Text style={[styles.count, { color: palette.danger }]}>−{changes.deletions}</Text>
       <View style={styles.flex} />
       <Icon name="chevron-right" size={14} color={palette.textFaint} />
     </Pressable>
   );
 }
 
-/** Every file the session changed, each opening to its lines: added in green, removed in red. */
-export function ChangesSheet({ visible, files, onClose }: { visible: boolean; files: FileDiff[]; onClose: () => void }) {
+/**
+ * Every file the session changed, under the message that asked for it (newest first), each
+ * opening to its lines: added in green, removed in red.
+ */
+export function ChangesSheet({ visible, changes, onClose }: { visible: boolean; changes: SessionChanges; onClose: () => void }) {
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      {visible ? <ChangesList files={files} onClose={onClose} /> : null}
+      {visible ? <ChangesList changes={changes} onClose={onClose} /> : null}
     </Modal>
   );
 }
 
-function ChangesList({ files, onClose }: { files: FileDiff[]; onClose: () => void }) {
+const keyOf = (messageID: string, file: FileDiff, index: number) => `${messageID}:${file.file ?? index}`;
+
+function ChangesList({ changes, onClose }: { changes: SessionChanges; onClose: () => void }) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
   // A single changed file opens straight away.
-  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set(files.length === 1 && files[0]?.file ? [files[0].file] : []));
-  const { added, removed } = totals(files);
-  const toggle = (file: string) =>
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => {
+    const only = changes.turns.length === 1 && changes.turns[0]?.files.length === 1 ? changes.turns[0] : null;
+    return new Set(only?.files[0] ? [keyOf(only.messageID, only.files[0], 0)] : []);
+  });
+  const toggle = (key: string) =>
     setOpen((current) => {
       const next = new Set(current);
-      if (!next.delete(file)) next.add(file);
+      if (!next.delete(key)) next.add(key);
       return next;
     });
   return (
@@ -90,18 +69,22 @@ function ChangesList({ files, onClose }: { files: FileDiff[]; onClose: () => voi
         </Pressable>
       </View>
       <Text style={[styles.summary, { color: palette.textMuted }]}>
-        {files.length} {files.length === 1 ? 'file' : 'files'} · <Text style={{ color: palette.success }}>+{added}</Text> <Text style={{ color: palette.danger }}>−{removed}</Text>
+        {changes.files} {noun(changes.files)} · <Text style={{ color: palette.success }}>+{changes.additions}</Text> <Text style={{ color: palette.danger }}>−{changes.deletions}</Text>
       </Text>
-      <FlatList
-        data={files}
-        keyExtractor={(file, index) => file.file ?? String(index)}
-        renderItem={({ item, index }) => {
-          const name = item.file ?? String(index);
-          return <FileChanges file={item} open={open.has(name)} onToggle={() => toggle(name)} />;
-        }}
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 16 }]}
-        ListEmptyComponent={<Text style={[styles.empty, { color: palette.textMuted }]}>This session hasn’t changed any files.</Text>}
-      />
+      <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 16 }]}>
+        {changes.turns.map((turn) => (
+          <View key={turn.messageID} style={styles.turn}>
+            <Text style={[styles.turnTitle, { color: palette.textMuted }]} numberOfLines={2}>
+              {turn.prompt ? `After “${turn.prompt}”` : 'After your message'}
+            </Text>
+            {turn.files.map((file, index) => {
+              const key = keyOf(turn.messageID, file, index);
+              return <FileChanges key={key} file={file} open={open.has(key)} onToggle={() => toggle(key)} />;
+            })}
+          </View>
+        ))}
+        {changes.turns.length === 0 ? <Text style={[styles.empty, { color: palette.textMuted }]}>This session hasn’t changed any files.</Text> : null}
+      </ScrollView>
     </View>
   );
 }
@@ -182,7 +165,9 @@ const styles = StyleSheet.create({
   title: { fontFamily: fonts.semibold, fontSize: 18 },
   done: { fontFamily: fonts.semibold, fontSize: 16 },
   summary: { fontFamily: fonts.regular, fontSize: 14, marginHorizontal: 20, marginBottom: 8 },
-  list: { paddingHorizontal: 12, gap: 8 },
+  list: { paddingHorizontal: 12, gap: 16 },
+  turn: { gap: 8 },
+  turnTitle: { fontFamily: fonts.medium, fontSize: 13, marginHorizontal: 4 },
   empty: { fontFamily: fonts.regular, fontSize: 14, textAlign: 'center', marginTop: 24 },
   file: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, overflow: 'hidden' },
   fileRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10 },

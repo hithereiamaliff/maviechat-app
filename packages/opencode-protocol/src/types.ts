@@ -42,6 +42,8 @@ export interface UserMessage {
   time: { created: number };
   agent?: string;
   model?: { providerID: string; modelID: string; variant?: string };
+  /** What the reply to this message changed in the project (OpenCode 1.19 keeps it here). */
+  summary?: { diffs?: FileDiff[] };
 }
 
 /** OpenCode's error object on a failed reply: a name and, usually, `data.message`. */

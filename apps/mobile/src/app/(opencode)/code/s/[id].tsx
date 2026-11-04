@@ -1,15 +1,15 @@
-import { abortSession, answerQuestion, deleteSession, getSession, isWorking, rejectQuestion, renameSession, replyPermission, sendPrompt, type MessageWithParts, type UserMessage } from '@maviechat/opencode-protocol';
+import { abortSession, answerQuestion, deleteSession, getSession, isWorking, rejectQuestion, renameSession, replyPermission, sendPrompt, sessionChanges, type MessageWithParts, type UserMessage } from '@maviechat/opencode-protocol';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from '@/components/Toast';
 import { setViewingChat } from '@/features/notifications/presence';
 import { pushTokenIfOn } from '@/features/notifications/push';
-import { ChangesBar, ChangesSheet, useOcDiff } from '@/features/opencode/Changes';
+import { ChangesBar, ChangesSheet } from '@/features/opencode/Changes';
 import { describeOcError } from '@/features/opencode/errors';
 import { useOcSessionLive } from '@/features/opencode/live';
 import { OcComposer, type ModelPick } from '@/features/opencode/OcComposer';
@@ -33,8 +33,6 @@ export default function OpenCodeSession() {
   const session = useQuery({ queryKey: ocKey(accountId, 'session', id), queryFn: () => getSession(client, directory, id) });
   const models = useOcModels(directory);
   const agents = useOcAgents(directory);
-  const diff = useOcDiff(id, directory);
-  const changed = diff.data ?? [];
   const [showChanges, setShowChanges] = useState(false);
   const list = useRef<FlashListRef<MessageWithParts>>(null);
   const following = useRef(true);
@@ -48,6 +46,8 @@ export default function OpenCodeSession() {
   // A session with no model yet uses the agent's own, else the machine's default.
   const defaultModel = agents.data?.find((item) => item.name === chosenAgent)?.model ?? models.data?.defaultModel ?? null;
   const working = isWorking(live);
+  // What the session changed, from your messages (OpenCode keeps each reply's changes there).
+  const changes = useMemo(() => sessionChanges(live.messages), [live.messages]);
   const title = session.data?.title || 'Session';
 
   // A notification about the session on screen needs no banner.
@@ -73,7 +73,7 @@ export default function OpenCodeSession() {
   };
 
   const menu = [
-    ...(changed.length ? [{ key: 'changes', label: 'Changes', icon: 'document-text' as const, onPress: () => setShowChanges(true) }] : []),
+    ...(changes.files ? [{ key: 'changes', label: 'Changes', icon: 'document-text' as const, onPress: () => setShowChanges(true) }] : []),
     {
       key: 'rename',
       label: 'Rename',
@@ -178,7 +178,7 @@ export default function OpenCodeSession() {
           contentContainerStyle={styles.list}
         />
         <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
-          {changed.length > 0 ? <ChangesBar files={changed} onPress={() => setShowChanges(true)} /> : null}
+          {changes.files > 0 ? <ChangesBar changes={changes} onPress={() => setShowChanges(true)} /> : null}
           <OcComposer
             working={working}
             models={models.data?.models ?? []}
@@ -193,7 +193,7 @@ export default function OpenCodeSession() {
           />
         </View>
       </KeyboardAvoidingView>
-      <ChangesSheet visible={showChanges} files={changed} onClose={() => setShowChanges(false)} />
+      <ChangesSheet visible={showChanges} changes={changes} onClose={() => setShowChanges(false)} />
     </View>
   );
 }
