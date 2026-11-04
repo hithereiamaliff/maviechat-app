@@ -1,0 +1,31 @@
+{
+  "before": 0,
+  "row": {
+    "active_turn_id": "string",
+    "capability": "string",
+    "compressed_summary": "string",
+    "created_at": "number",
+    "id": "string",
+    "imported": {
+      "agentId": "string",
+      "agentName": "string",
+      "folder": "string",
+      "source": "string"
+    },
+    "last_message": "string",
+    "message_count": "number",
+    "preferences": {
+      "import": {
+        "external_id": "string",
+        "source": "string",
+        "source_cwd": "string"
+      }
+    },
+    "session_id": "string",
+    "status": "string",
+    "summary_up_to_msg_id": "number",
+    "title": "string",
+    "updated_at": "number"
+  },
+  "title": "from the first question"
+}

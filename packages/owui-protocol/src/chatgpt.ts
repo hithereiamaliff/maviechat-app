@@ -28,7 +28,8 @@ export interface PlainConversation {
 
 type Tree = Record<string, unknown>;
 const isTree = (value: unknown): value is Tree => typeof value === 'object' && value !== null && !Array.isArray(value);
-const seconds = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null);
+// Some exports give milliseconds: anything past 1e10 can't be seconds (that's the year 2286).
+const seconds = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? (value > 1e10 ? value / 1000 : value) : null);
 const text = (value: unknown): string => (typeof value === 'string' ? value : '');
 
 /** Whether a list looks like ChatGPT's export: any entry carries a message tree. */
@@ -63,10 +64,10 @@ function thread(mapping: Tree, current: unknown): Tree[] {
   return nodes;
 }
 
-/** A message's words: its text parts (pictures and other attachments aren't in the export's text), else its `text`. */
+/** A message's words: its text parts (and voice transcripts, which come as parts with `text`; pictures aren't in the export's text), else its `text`. */
 function words(message: Tree): string {
   const content = isTree(message.content) ? message.content : {};
-  const parts = Array.isArray(content.parts) ? content.parts.filter((part): part is string => typeof part === 'string') : [];
+  const parts = Array.isArray(content.parts) ? content.parts.map((part) => (typeof part === 'string' ? part : isTree(part) ? text(part.text) : '')).filter(Boolean) : [];
   const joined = parts.length ? parts.join('\n') : text(content.text);
   return joined.trim() ? joined : '';
 }
@@ -110,7 +111,8 @@ export function readChatGptExport(list: unknown[], nowSeconds = Date.now() / 100
     }
     const created = seconds(item.create_time) ?? messages[0]?.at ?? nowSeconds;
     conversations.push({
-      id: text(item.conversation_id) || text(item.id) || null,
+      // The two are the same in ChatGPT's exports; DeepTutor's importer reads `id` first, so we do too.
+      id: text(item.id) || text(item.conversation_id) || null,
       title: text(item.title).trim(),
       created,
       updated: seconds(item.update_time) ?? messages[messages.length - 1]?.at ?? created,

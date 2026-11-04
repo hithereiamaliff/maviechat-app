@@ -67,4 +67,23 @@ describe('ChatGPT export', () => {
     const looped = { mapping: { a: { id: 'a', parent: 'b', children: ['b'], message: { author: { role: 'user' }, content: { parts: ['hi'] } } }, b: { id: 'b', parent: 'a', children: ['a'], message: null } }, current_node: 'a' };
     expect(readChatGptExport([looped]).conversations[0]?.messages).toHaveLength(1);
   });
+
+  it('keeps voice transcripts, reads milliseconds, and takes the export’s own id first', () => {
+    const voice = {
+      id: 'conv-1',
+      conversation_id: 'conv-1-old',
+      create_time: 1_700_000_000_000,
+      mapping: {
+        a: { id: 'a', parent: null, children: ['b'], message: { author: { role: 'user' }, create_time: 1_700_000_000_500, content: { parts: [{ content_type: 'audio_transcription', text: 'Spoken question' }, { asset_pointer: 'file-1' }] } } },
+        b: { id: 'b', parent: 'a', children: [], message: { author: { role: 'assistant' }, content: { parts: ['Answer'] } } },
+      },
+      current_node: 'b',
+    };
+    const [conversation] = readChatGptExport([voice]).conversations;
+    expect(conversation).toMatchObject({ id: 'conv-1', created: 1_700_000_000 });
+    expect(conversation?.messages.map((message) => [message.role, message.text, message.at])).toEqual([
+      ['user', 'Spoken question', 1_700_000_000.5],
+      ['assistant', 'Answer', null],
+    ]);
+  });
 });

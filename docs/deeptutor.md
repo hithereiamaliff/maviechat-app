@@ -580,6 +580,18 @@ A partner is a companion DeepTutor hosts: a soul (a persona in Markdown, in ever
 - The store `GET /catalog?q&category&cursor&limit` ships with DeepTutor (39 self-service entries here); entries carry `description_i18n`, `fields` (key, label, secret, required) but no sign-in marker. `POST /catalog/{id}/install {name, secrets}`: `mcp.missing_credential`, `mcp.entry_admin_only` (entries that run on the server).
 - CLI apps: `GET /api/space/cli-apps/apps`, `PUT /apps/{id}/enabled {enabled}` (404 unknown, 403 not given to you), the store `GET /catalog?installable_only=` (92 installable of 101 here); installing and removing are admin-only.
 
+## My Agents (B7.5, 2026-11-04)
+
+- **My Agents** (`/learn/agents`): imported conversations, grouped as DeepTutor's page groups them (by the import they belong to, else Claude Code by project folder, Codex by day), plus ChatGPT's in a group of their own: DeepTutor 1.7.1's page lists only Claude Code and Codex imports, so ChatGPT imports were invisible there. A group (`/learn/agents/group?key=`) lists its chats with search over titles and last messages; open one (it carries on as a DeepTutor chat), rename, delete. Imported chats are also offered under Earlier Chat in the composer, to refer to from any chat.
+- **Import from ChatGPT**: pick `conversations.json` (from the zip ChatGPT emails, unzipped in Files; up to 50 MB), read on the phone with the same reader as Open WebUI's import (now also keeping voice transcripts, reading millisecond times, and taking the export's own id first, as DeepTutor's importer does), then sent 100 conversations (about 4 MB) at a time with progress. Ones already imported stay as they are, so importing again picks up where it stopped. Claude Code and Codex folders are imported on DeepTutor's page (they need a computer's folders).
+- **Connected agents**: listed with their kind and folder; Disconnect (the agent program stays). Connecting one stays on DeepTutor's page, since finding which agents the server has runs each program there.
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --imports`)
+
+- `GET /api/imports/chat-history?limit=1..200&offset=` → `sessions`, the same rows as `/api/sessions` with `preferences.import {source, source_cwd, external_id, agent_id, agent_name}`; never in `/api/sessions` (ids start `imported_`), but open and carry on through `/api/sessions/{id}` and the chat socket like any other.
+- `POST /api/imports/chat-history {source: chatgpt|claude_code|codex, agent_id?, agent_name?, sessions: [{external_id, title, source_cwd, created_at, updated_at, messages: [{role user|assistant, content, created_at?}]}]}` → `{imported, skipped, sessions}`; at most 1,000 conversations a call (413). The chat's id is `imported_<source>_<external id with other characters made ->`, so importing again only skips. Deleting is `DELETE /api/sessions/{id}`.
+- Connections: `GET /api/subagents/connections` and `DELETE /api/subagents/connections/{name}` (B7.1's facts).
+
 ## M1.5 checklist
 
 | | Item |

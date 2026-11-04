@@ -19,7 +19,7 @@ interface Tile {
 
 /**
  * All Personalization, as DeepTutor's hub: what's yours in every workspace, each with how many
- * there are. All but My Agents open here; it opens DeepTutor's own page for now.
+ * there are; each opens here.
  */
 export default function Personalization() {
   const palette = usePalette();
@@ -31,7 +31,7 @@ export default function Personalization() {
   const plural = (count: number | undefined, one: string, many: string) => (count === undefined ? undefined : `${count} ${count === 1 ? one : many}`);
 
   const tiles: Tile[] = [
-    { key: 'agents', title: 'My Agents', blurb: 'Agent programs on the server a chat can consult, and conversations imported from them.', icon: 'cpu-chip', web: '/agents', count: agents.data === null ? undefined : plural(agents.data?.length, 'agent', 'agents') },
+    { key: 'agents', title: 'My Agents', blurb: 'Agent programs on the server a chat can consult, and conversations imported from them.', icon: 'cpu-chip', route: '/learn/agents', count: agents.data === null ? undefined : plural(agents.data?.length, 'agent', 'agents') },
     { key: 'personas', title: 'Personas', blurb: 'Voices a chat can answer in.', icon: 'identification', route: '/learn/personas', count: plural(personas.data?.length, 'persona', 'personas') },
     { key: 'skills', title: 'Skills', blurb: 'Playbooks the model opens when a chat needs one.', icon: 'sparkles', route: '/learn/skills', count: plural(skills.data?.length, 'skill', 'skills') },
     // No count: reading the list makes DeepTutor connect to every server in it.

@@ -1,4 +1,4 @@
-import { getCliApps, getPersona, getSkill, listAgentConnections, listPersonas, listSkills, listSkillTags } from '@maviechat/deeptutor-protocol';
+import { getCliApps, getPersona, getSkill, listAgentConnections, listAllImportedChats, listPersonas, listSkills, listSkillTags } from '@maviechat/deeptutor-protocol';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 
@@ -42,6 +42,13 @@ export function useAgentConnections() {
   const { client } = useDtAuthed();
   const key = usePersonalizationKey();
   return useQuery({ queryKey: key('agents'), queryFn: () => listAgentConnections(client), staleTime: 30_000 });
+}
+
+/** Imported conversations, every one (they're left out of the chat history). */
+export function useImportedChats(enabled = true) {
+  const { client } = useDtAuthed();
+  const key = usePersonalizationKey();
+  return useQuery({ queryKey: key('imported'), queryFn: () => listAllImportedChats(client), enabled, staleTime: 30_000 });
 }
 
 export function useCliApps() {

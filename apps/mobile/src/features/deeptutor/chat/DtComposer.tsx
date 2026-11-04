@@ -1,10 +1,11 @@
-import { sameSelection, sessionTitle, type DtChatTool, type DtKnowledgeBase, type DtLlmOption, type DtLlmSelection } from '@maviechat/deeptutor-protocol';
+import { importSourceName, sameSelection, sessionTitle, type DtChatTool, type DtKnowledgeBase, type DtLlmOption, type DtLlmSelection } from '@maviechat/deeptutor-protocol';
 import { useImperativeHandle, useRef, useState, type ComponentRef, type ReactNode, type Ref } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
 import { useAnchoredMenu, type MenuItem } from '@/components/Menu';
 import { updateDraft, useDraftText } from '@/features/chat/drafts';
+import { useImportedChats } from '@/features/deeptutor/personalization/queries';
 import { useDtAttachmentLimits, useDtNotebooks, useDtSessions } from '@/features/deeptutor/queries';
 import { useGrowingInput } from '@/lib/useGrowingInput';
 import { fonts, radius, usePalette } from '@/theme';
@@ -129,6 +130,8 @@ export function DtComposer({
   const { extras, setExtras } = attach;
   const notebooks = useDtNotebooks(sheet === 'notebook');
   const chats = useDtSessions('');
+  // Imported conversations aren't in the chat history; learner accounts can't list them.
+  const imported = useImportedChats(sheet === 'chat' && Boolean(personal));
   const canSend = (text.trim().length > 0 || extras.attachments.length > 0) && !sending && !running;
   const plusItems: MenuItem[] = [
     { key: 'photos', label: 'Photos', icon: 'photo', onPress: () => void attach.pickPhotos() },
@@ -191,7 +194,10 @@ export function DtComposer({
     ...(personal?.useMemory ? [{ key: 'memory', icon: 'light-bulb' as const, label: 'My memory', onRemove: () => personal.setUseMemory(false) }] : []),
   ];
   const toggle = <T extends { id: string }>(list: T[], item: T) => (list.some((other) => other.id === item.id) ? list.filter((other) => other.id !== item.id) : [...list, item]);
-  const chatItems: PickItem[] = (chats.data ?? []).filter((chat) => chat.id !== sessionId).map((chat) => ({ id: chat.id, label: sessionTitle(chat) }));
+  const chatItems: PickItem[] = [
+    ...(chats.data ?? []).filter((chat) => chat.id !== sessionId).map((chat) => ({ id: chat.id, label: sessionTitle(chat) })),
+    ...(imported.data ?? []).filter((chat) => chat.id !== sessionId).map((chat) => ({ id: chat.id, label: sessionTitle(chat), hint: `Imported from ${importSourceName(chat.imported.source)}` })),
+  ];
   const modelLabel = models?.find((option) => sameSelection(option, model))?.label ?? (models?.length ? 'Choose a model' : 'Default model');
   const usable = tools ?? [];
   const chosen = selectedTools.filter((name) => usable.some((tool) => tool.name === name));

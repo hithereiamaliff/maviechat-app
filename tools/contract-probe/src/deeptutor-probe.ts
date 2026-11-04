@@ -49,6 +49,7 @@
  * `--memory` checks Memory (src/deeptutor-memory-probe.ts) in the test account's own sheets; no model calls.
  * `--picks` checks a chat's voice, skills and memory (src/deeptutor-chat-picks-probe.ts): two short replies.
  * `--services` checks MCP Services and CLI Apps (src/deeptutor-services-probe.ts) without reaching any MCP server.
+ * `--imports` checks imported conversations (src/deeptutor-imports-probe.ts) with one made-up ChatGPT conversation.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -152,6 +153,7 @@ import {
 import { probeBooks } from './deeptutor-books-probe';
 import { probePartners } from './deeptutor-partners-probe';
 import { probeChatPicks } from './deeptutor-chat-picks-probe';
+import { probeImports } from './deeptutor-imports-probe';
 import { probeMemory } from './deeptutor-memory-probe';
 import { probePersonalization } from './deeptutor-personalization-probe';
 import { probeServices } from './deeptutor-services-probe';
@@ -185,6 +187,7 @@ const { values: args } = parseArgs({
     memory: { type: 'boolean' },
     picks: { type: 'boolean' },
     services: { type: 'boolean' },
+    imports: { type: 'boolean' },
   },
 });
 
@@ -447,6 +450,14 @@ async function main() {
     await step('services: MCP servers and both stores read; saves, tests and installs refused before connecting; CLI apps', async () => {
       const outcome = await probeServices(client);
       fixtures.services = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.imports) {
+    await step('imports: a ChatGPT conversation imported, opened, imported again without a copy, kept out of the history, deleted', async () => {
+      const outcome = await probeImports(client);
+      fixtures.imports = outcome.fixture;
       return { value: true, note: outcome.note };
     });
   }
