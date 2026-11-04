@@ -490,6 +490,21 @@ A partner is a companion DeepTutor hosts: a soul (a persona in Markdown, in ever
 - A command DeepTutor answers itself comes as `accepted` → `content` → `done`, with no reply events.
 - `POST …/sessions/branch {source_key, new_key}` copies every message and archives the source.
 
+## Partner groups (B6.3, 2026-11-04)
+
+- **New Group** (Partners page, or the sidebar's Partners → New Group; `/learn/partners/groups/new`): an emoji on one of DeepTutor's colours, name and purpose, two or more of your partners (numbered in the order picked, which is the order they answer), and how they answer: side by side, one after another, or arguing it out (a second round where each challenges the others). DeepTutor keeps the emoji and colour from then on.
+- **The discussion** (`/learn/partners/groups/[id]`, `?session=`): your message goes to everyone, or to the members you name with `@` (the box offers them; a line says who'll answer, and names it doesn't know). Each member answers in its seat, its reasoning and tools streaming in (seen by you only) through the same reply view as a chat; seats keep member order, openings before rebuttals before a summary; members still to start show "Waiting its turn". Stop ends the round ("You stopped this round"; answers given stay).
+- **On an answer:** Follow Up (quotes it into your next message), Ask Another (that member puts a question to another, which you can change first; it's approved at once, as on the web), Pin (to the whiteboard), and Try Again on an answer that failed (DeepTutor supports it; its web app has no button). A member's own proposal to ask another waits for you: Let Them Discuss, or Not Now. A follow-up shows as its own block: who asked whom, the question, the answer. Sum Up This Round asks a member who answered to write consensus, disagreements and a recommendation (offered once a round has two answers, isn't stopped and isn't summed up).
+- **Menu:** New Discussion, Discussions (open or delete one), Whiteboard (what every member keeps in mind, in every discussion; unpin), Manage Group (name, purpose, members, how they answer), Delete Group.
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --partners`)
+
+- REST under `/api/partner-groups` (only the owner sees a group: others get 404, admins too); the socket `/ws/partner-groups/{id}` with the `Cookie` header (never `?token=`; checked in DeepTutor's log). There's no `ready`: it's usable once open. On opening, `{action: attach, session_key}` replays what's running in that discussion, or the last thing that ran.
+- A message is `{content, session_key, mentions}`: `[]` everyone, a list of member ids, or null to let DeepTutor read the `@names` itself. Frames: `user_message` (its `mentions` are the members who'll answer), `partner_started` (no turn id in a round: it's your message's), `partner_trace` (a member's steps, by the hundred: a one-word round from two members sent 240), `partner_message` (stored), `invocation_updated`, then `done`, `cancelled` or `error`. Actions: `approve_invocation`, `reject_invocation`, `create_invocation` (answered with a pending `invocation_updated`), `retry_partner` (only a failed seat; same event id), `summarize_round` (a member of the round, once it's finished), `cancel`.
+- A follow-up runs as a turn of its own: the question (`invocation_question`, by the asking member) is stored first, then the other member's answer (`invocation_reply`); both carry the `invocation_id`, and the proposal ends `completed` or `failed`.
+- History is the last 200 messages at most (no pages); discussions are listed once they have a message; deleting one keeps its pins. Pins are `POST …/whiteboard/pins {event_id}` and `DELETE …/whiteboard/pins/{event_id}`; DeepTutor's web app has no pin buttons in 1.7.1, though the members read the whiteboard.
+- Times here are UTC with an offset.
+
 ## M1.5 checklist
 
 | | Item |

@@ -1,4 +1,4 @@
-import { getPartner, listPartnerGroups, listPartners, listPartnerSessions, listSkillNames, listSouls, recentPartnerConversations } from '@maviechat/deeptutor-protocol';
+import { getPartner, getPartnerGroup, groupWhiteboard, listGroupSessions, listPartnerGroups, listPartners, listPartnerSessions, listSkillNames, listSouls, recentPartnerConversations } from '@maviechat/deeptutor-protocol';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
@@ -14,7 +14,7 @@ export function useDtPartner(id: string) {
   return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'partners', 'one', id], queryFn: () => getPartner(client, id), enabled: Boolean(id), retry: false });
 }
 
-/** Your partner groups (their pages are DeepTutor's own until B6.3). */
+/** Your partner groups. */
 export function useDtPartnerGroups() {
   const { client, session } = useDtAuthed();
   return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'partners', 'groups'], queryFn: () => listPartnerGroups(client), staleTime: 15_000 });
@@ -47,4 +47,22 @@ export function usePartnersRefresh(): () => void {
   const { session } = useDtAuthed();
   const queryClient = useQueryClient();
   return useCallback(() => void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'partners'] }), [queryClient, session.baseUrl]);
+}
+
+/** One group of yours. */
+export function useDtGroup(id: string) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'partners', 'group', id], queryFn: () => getPartnerGroup(client, id), enabled: Boolean(id), retry: false });
+}
+
+/** A group's discussions (those with a message). */
+export function useDtGroupSessions(id: string, enabled = true) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'partners', 'group-sessions', id], queryFn: () => listGroupSessions(client, id), enabled: Boolean(id) && enabled });
+}
+
+/** What's pinned for a group's members. */
+export function useDtWhiteboard(id: string, enabled = true) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'partners', 'whiteboard', id], queryFn: () => groupWhiteboard(client, id), enabled: Boolean(id) && enabled });
 }

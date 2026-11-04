@@ -1,4 +1,24 @@
 import {
+  applyGroupFrame,
+  createPartnerGroup,
+  deleteGroupSession,
+  deletePartnerGroup,
+  DtGroupSocket,
+  groupFrames,
+  groupHistory,
+  groupRounds,
+  groupSocketUrl,
+  groupWhiteboard,
+  listGroupInvocations,
+  listGroupSessions,
+  newGroupSessionKey,
+  NO_GROUP_LIVE,
+  pinGroupMessage,
+  resolveMentions,
+  unpinGroupMessage,
+  updatePartnerGroup,
+  type DtGroupFrame,
+  type DtGroupLive,
   addPartnerAssets,
   archivePartnerSession,
   branchPartnerSession,
@@ -197,11 +217,13 @@ export async function probePartners(baseUrl: string, token: string, client: DtCl
 
     const setup = await probePartnerSetup(baseUrl, token, client, partnerId, models.options);
     fixture.setup = setup.fixture;
+    const groupCheck = await probePartnerGroups(baseUrl, token, client, partnerId, soul.id);
+    fixture.groups = groupCheck.fixture;
 
     await stopPartner(client, partnerId);
     if ((await getPartner(client, partnerId)).running) throw new Error('still running after stop');
     return {
-      note: `a partner made from the "${soul.id}" soul; a reply streamed and read back the same; a second followed again after a dropped socket; the conversation listed, archived, brought back and deleted; ${setup.note}; the partner stopped (${own.length} partners and ${groups.length} groups of the account's own left alone)`,
+      note: `a partner made from the "${soul.id}" soul; a reply streamed and read back the same; a second followed again after a dropped socket; the conversation listed, archived, brought back and deleted; ${setup.note}; ${groupCheck.note}; the partner stopped (${own.length} partners and ${groups.length} groups of the account's own left alone)`,
       fixture,
     };
   } finally {
@@ -360,4 +382,158 @@ async function probePartnerSetup(baseUrl: string, token: string, client: DtClien
     note: `then its identity, picture, soul, model, tools and library changed and read back, a link code made, a file read by the partner, /help answered by DeepTutor, and a branch made${workspace ? '; bound to a workspace and back' : ''}`,
     fixture,
   };
+}
+
+/** A group socket that reports to promises: open, and each operation's end. */
+function groupHarness(baseUrl: string, token: string, groupId: string) {
+  let state = 'closed';
+  let live: DtGroupLive = NO_GROUP_LIVE;
+  const frames: DtGroupFrame[] = [];
+  const waiters: { test: () => boolean; resolve: () => void }[] = [];
+  const check = () => {
+    for (const waiter of [...waiters]) {
+      if (waiter.test()) {
+        waiters.splice(waiters.indexOf(waiter), 1);
+        waiter.resolve();
+      }
+    }
+  };
+  const socket = new DtGroupSocket({
+    url: groupSocketUrl(baseUrl, groupId),
+    connect: nodeSockets(token),
+    onFrame: (frame) => {
+      frames.push(frame);
+      live = applyGroupFrame(live, frame);
+      check();
+    },
+    onState: (next) => {
+      state = next;
+      check();
+    },
+  });
+  const until = (what: string, test: () => boolean, ms = 240_000) =>
+    new Promise<void>((resolve, reject) => {
+      if (test()) return resolve();
+      const timer = setTimeout(() => reject(new Error(`timed out waiting for ${what} (socket ${state})`)), ms);
+      waiters.push({ test, resolve: () => (clearTimeout(timer), resolve()) });
+    });
+  const ends = () => frames.filter((frame) => frame.type === 'done' || frame.type === 'cancelled' || frame.type === 'error').length;
+  return {
+    socket,
+    frames,
+    get live() {
+      return live;
+    },
+    open: () => until('the socket to open', () => state === 'open', 30_000),
+    /** Sends a frame that starts an operation, and waits for its end. */
+    run: async (data: string) => {
+      const before = ends();
+      live = { ...live, running: live.running + 1 };
+      if (!socket.send(data)) throw new Error('the group socket is not open');
+      await until('the operation to end', () => ends() > before);
+      return frames.slice().reverse().find((frame) => frame.type === 'done' || frame.type === 'cancelled' || frame.type === 'error') as DtGroupFrame;
+    },
+    until,
+  };
+}
+
+/**
+ * B6.3 on the probe's own partners: a second partner and a group of the two; its mode changed and
+ * back; a round to everyone over `/ws/partner-groups/{id}` (each member's answer streamed, then
+ * stored); the round summed up by one member; a follow-up asked of the other, approved and
+ * answered; a message to one member by @name; a round stopped mid-way; an answer pinned to the
+ * whiteboard and unpinned; the discussion deleted; then the group and the second partner deleted.
+ * Uses the account's model for about seven short answers.
+ */
+async function probePartnerGroups(baseUrl: string, token: string, client: DtClient, firstId: string, soulId: string): Promise<{ note: string; fixture: Record<string, unknown> }> {
+  const fixture: Record<string, unknown> = {};
+  const stamp = Date.now().toString(36);
+  const second = (await createPartner(client, { name: `APP PROBE partner two ${stamp}`, emoji: '🦊', color: PARTNER_COLORS[2], language: 'en', soul: { source: 'library', id: soulId } })).partner;
+  let groupId = '';
+  let harness: ReturnType<typeof groupHarness> | null = null;
+  try {
+    const group = await createPartnerGroup(client, { name: `APP PROBE group ${stamp}`, description: 'Deleted by the probe', memberIds: [firstId, second.id] });
+    groupId = group.id;
+    if (group.members.length !== 2 || group.mode !== 'panel_parallel') throw new Error('the new group reads back different');
+    if ((await updatePartnerGroup(client, groupId, { mode: 'sequential' })).mode !== 'sequential') throw new Error('the mode did not change');
+    await updatePartnerGroup(client, groupId, { mode: 'panel_parallel' });
+
+    const key = newGroupSessionKey();
+    harness = groupHarness(baseUrl, token, groupId);
+    harness.socket.open(key);
+    await harness.open();
+
+    // A round to everyone.
+    let end = await harness.run(groupFrames.message(key, 'APP PROBE: name one colour, in one word.', []));
+    if (end.type !== 'done') throw new Error(`the round ended with ${end.type}${end.type === 'error' ? `: ${end.content}` : ''}`);
+    const user = harness.frames.find((frame) => frame.type === 'user_message');
+    if (!user || user.type !== 'user_message' || user.message.mentions.length !== 2) throw new Error('your message did not name both members');
+    const traces = harness.frames.filter((frame) => frame.type === 'partner_trace').length;
+    let history = await groupHistory(client, groupId, key);
+    let rounds = groupRounds(history, [firstId, second.id]);
+    fixture.round = { messages: history.length, traces, kinds: history.map((message) => message.kind) };
+    const round = rounds[0];
+    if (rounds.length !== 1 || round?.seats.length !== 2 || round.seats.some((seat) => seat.state !== 'done' || !seat.reply.answer.trim())) throw new Error('the round does not have two answers');
+    const turnId = round.turnId;
+
+    // Summed up by the first member.
+    end = await harness.run(groupFrames.summarise(key, turnId, firstId));
+    if (end.type !== 'done') throw new Error(`the summary ended with ${end.type}`);
+    history = await groupHistory(client, groupId, key);
+    if (!history.some((message) => message.kind === 'round_summary' && message.authorId === firstId && message.turnId === turnId)) throw new Error('no summary in the round');
+
+    // A follow-up: the first asks the second; approved, then answered.
+    const before = harness.frames.length;
+    if (!harness.socket.send(groupFrames.ask(key, firstId, second.id, 'APP PROBE: please say the word yes.'))) throw new Error('could not ask');
+    await harness.until('the proposal', () => harness!.frames.slice(before).some((frame) => frame.type === 'invocation_updated' && frame.invocation.status === 'pending'));
+    const proposal = harness.frames.slice(before).find((frame) => frame.type === 'invocation_updated');
+    if (!proposal || proposal.type !== 'invocation_updated') throw new Error('no proposal');
+    end = await harness.run(groupFrames.approve(key, proposal.invocation.id));
+    if (end.type !== 'done') throw new Error(`the follow-up ended with ${end.type}`);
+    history = await groupHistory(client, groupId, key);
+    rounds = groupRounds(history, [firstId, second.id]);
+    const followUp = rounds.find((item) => item.question?.invocationId === proposal.invocation.id);
+    if (!followUp || followUp.seats[0]?.partnerId !== second.id || followUp.seats[0].state !== 'done') throw new Error('the follow-up has no answer from the second member');
+    if ((await listGroupInvocations(client, groupId, key)).find((item) => item.id === proposal.invocation.id)?.status !== 'completed') throw new Error('the follow-up is not completed');
+
+    // A message to the second member only, by name.
+    const named = resolveMentions(`@${second.name} APP PROBE: please say the word no.`, [group.members[0]!, group.members[1]!].map((member) => ({ id: member.id, name: member.name })));
+    if (JSON.stringify(named.mentions) !== JSON.stringify([second.id])) throw new Error('the name was not matched');
+    end = await harness.run(groupFrames.message(key, `@${second.name} APP PROBE: please say the word no.`, named.mentions));
+    if (end.type !== 'done') throw new Error(`the named message ended with ${end.type}`);
+    history = await groupHistory(client, groupId, key);
+    rounds = groupRounds(history, [firstId, second.id]);
+    const toOne = rounds.filter((item) => item.user).at(-1);
+    if (toOne?.seats.length !== 1 || toOne.seats[0]?.partnerId !== second.id) throw new Error('the named message was answered by others too');
+
+    // A round stopped once a member starts.
+    const started = harness.frames.length;
+    if (!harness.socket.send(groupFrames.message(key, 'APP PROBE: count from 1 to 60, one number per line.', []))) throw new Error('could not send the round to stop');
+    await harness.until('a member to start', () => harness!.frames.slice(started).some((frame) => frame.type === 'partner_started'));
+    if (!harness.socket.send(groupFrames.cancel(key))) throw new Error('could not stop the round');
+    await harness.until('the round to stop', () => harness!.frames.slice(started).some((frame) => frame.type === 'cancelled'));
+    history = await groupHistory(client, groupId, key);
+    if (!groupRounds(history, [firstId, second.id]).at(-1)?.stopped) throw new Error('the stopped round is not marked');
+
+    // The whiteboard.
+    const first = groupRounds(history, [firstId, second.id])[0]?.seats.find((seat) => seat.partnerId === firstId && seat.message);
+    if (!first?.message) throw new Error('no answer to pin');
+    await pinGroupMessage(client, groupId, first.message.eventId);
+    if (!(await groupWhiteboard(client, groupId)).some((pin) => pin.eventId === first.message!.eventId)) throw new Error('the pin is not on the whiteboard');
+    await unpinGroupMessage(client, groupId, first.message.eventId);
+    if ((await groupWhiteboard(client, groupId)).some((pin) => pin.eventId === first.message!.eventId)) throw new Error('the pin stayed');
+
+    const sessions = await listGroupSessions(client, groupId);
+    fixture.sessions = sessions.length;
+    if (!sessions.some((item) => item.key === key)) throw new Error('the discussion is not listed');
+    harness.socket.close();
+    harness = null;
+    await deleteGroupSession(client, groupId, key);
+    if ((await listGroupSessions(client, groupId)).some((item) => item.key === key)) throw new Error('the discussion is still listed');
+    return { note: 'then a group of two: a round to both (streamed, then stored), summed up, a follow-up approved and answered, a message by @name answered by one, a round stopped, a pin on the whiteboard and off, the discussion deleted', fixture };
+  } finally {
+    harness?.socket.close();
+    if (groupId) await deletePartnerGroup(client, groupId).catch(() => undefined);
+    await deletePartner(client, second.id).catch(() => undefined);
+  }
 }

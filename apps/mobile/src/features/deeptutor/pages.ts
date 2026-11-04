@@ -19,7 +19,8 @@ export interface DtPage {
     | '/learn/learning'
     | '/learn/learning/new'
     | '/learn/partners'
-    | '/learn/partners/new';
+    | '/learn/partners/new'
+    | '/learn/partners/groups/new';
   /** Hidden from learner accounts, which DeepTutor limits to chat and some learning. */
   notForLearners?: boolean;
 }
@@ -95,7 +96,7 @@ export const DT_SHELVES: DtShelf[] = [
         pages: [
           { key: 'partners', label: 'All Partners', icon: 'user-group', path: '/partners', route: '/learn/partners' },
           { key: 'partner-new', label: 'New Partner', icon: 'plus', path: '/partners/new', route: '/learn/partners/new' },
-          { key: 'group-new', label: 'New Group', icon: 'users', path: '/partners/groups/new' },
+          { key: 'group-new', label: 'New Group', icon: 'users', path: '/partners/groups/new', route: '/learn/partners/groups/new' },
         ],
       },
     ],

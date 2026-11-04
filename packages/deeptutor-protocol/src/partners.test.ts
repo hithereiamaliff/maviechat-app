@@ -13,7 +13,6 @@ import {
   getPartnerSoul,
   getPartnerToolOptions,
   listPartnerCommands,
-  listPartnerGroups,
   listPartnerLinks,
   listPartnerWorkspaces,
   listPartners,
@@ -91,10 +90,7 @@ describe('partners', () => {
     expect(await listSkillNames(recordingClient([{ name: 'a' }, 'b']).client)).toEqual(['a', 'b']);
   });
 
-  it('reads groups and recent conversations, in their own time formats', async () => {
-    const groups = await listPartnerGroups(recordingClient([{ group_id: 'g', name: 'Panel', members: [{ partner_id: 'ada', name: 'Ada' }], discussion_mode: 'debate', updated_at: '2026-11-04T06:00:00+00:00' }]).client);
-    expect(groups[0]).toMatchObject({ id: 'g', emoji: '👥', mode: 'debate', updatedAt: Date.UTC(2026, 10, 4, 6) });
-    expect(groups[0]?.members[0]?.id).toBe('ada');
+  it('reads recent conversations, in their own time format', async () => {
     const recent = await recentPartnerConversations(recordingClient({ sessions: [{ kind: 'partner', owner_id: 'ada', owner_name: 'Ada', session_key: 'web-1', title: 'Hi', updated_at: 1_762_236_000.5 }] }).client);
     expect(recent).toEqual([{ kind: 'partner', ownerId: 'ada', ownerName: 'Ada', sessionKey: 'web-1', title: 'Hi', updatedAt: 1_762_236_000_500 }]);
   });

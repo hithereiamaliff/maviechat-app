@@ -95,5 +95,17 @@
       "/tool",
       "/link"
     ]
+  },
+  "groups": {
+    "round": {
+      "messages": 3,
+      "traces": 240,
+      "kinds": [
+        "message",
+        "message",
+        "message"
+      ]
+    },
+    "sessions": 1
   }
 }

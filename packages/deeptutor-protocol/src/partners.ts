@@ -211,39 +211,6 @@ export async function listSkillNames(client: DtClient): Promise<string[]> {
   return rows.map((row) => (isTree(row) ? text(row.name) : text(row))).filter(Boolean);
 }
 
-// ── Groups (listed here; their pages are DeepTutor's own for now) ────────────
-
-export interface DtPartnerGroup {
-  id: string;
-  name: string;
-  description: string;
-  emoji: string;
-  color: string;
-  members: Pick<DtPartner, 'id' | 'name' | 'emoji' | 'color' | 'avatar' | 'running'>[];
-  /** `panel_parallel`, `sequential` or `debate`. */
-  mode: string;
-  /** Milliseconds. */
-  updatedAt: number | null;
-}
-
-export const DISCUSSION_MODE_LABELS: Record<string, string> = { panel_parallel: 'Parallel answers', sequential: 'One after another', debate: 'Cross-examination' };
-
-export async function listPartnerGroups(client: DtClient): Promise<DtPartnerGroup[]> {
-  return list(await client.get<unknown>('/api/partner-groups'))
-    .filter(isTree)
-    .map((row) => ({
-      id: text(row.group_id),
-      name: text(row.name) || 'Group',
-      description: text(row.description),
-      emoji: text(row.emoji) || '👥',
-      color: /^#[0-9a-f]{6}$/i.test(text(row.color)) ? text(row.color) : '',
-      members: list(row.members).map(partnerOf),
-      mode: text(row.discussion_mode) || 'panel_parallel',
-      updatedAt: partnerTime(row.updated_at),
-    }))
-    .filter((group) => group.id);
-}
-
 // ── Conversations ────────────────────────────────────────────────────────────
 
 /** A conversation with a partner or group, as the sidebar lists them (newest first). */

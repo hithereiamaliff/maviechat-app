@@ -13,11 +13,6 @@ import { describeError } from '@/lib/errors';
 import { useDtAuthed } from '@/session/DeepTutorProvider';
 import { fonts, radius, usePalette } from '@/theme';
 
-/** DeepTutor's own page for what the app doesn't do yet (groups until B6.3), with a way back. */
-function openOnWeb(path: string, title: string) {
-  router.push({ pathname: '/learn/web', params: { path, title } });
-}
-
 /**
  * Partners, as DeepTutor's page lists them: your partners (and ones shared with you) with whether
  * each is running and the chat apps it's in, your latest conversations, and your groups.
@@ -35,7 +30,7 @@ export default function Partners() {
 
   const openRecent = (row: DtPartnerRecent) => {
     if (row.kind === 'partner') router.push({ pathname: '/learn/partners/[id]', params: { id: row.ownerId, session: row.sessionKey } });
-    else openOnWeb(`/partners/groups/${encodeURIComponent(row.ownerId)}?session=${encodeURIComponent(row.sessionKey)}`, row.ownerName || 'Group');
+    else router.push({ pathname: '/learn/partners/groups/[id]', params: { id: row.ownerId, session: row.sessionKey } });
   };
 
   return (
@@ -100,7 +95,7 @@ export default function Partners() {
                 Groups
               </Text>
               {list.length >= 2 ? (
-                <Pressable accessibilityRole="button" onPress={() => openOnWeb('/partners/groups/new', 'New Group')} hitSlop={8} style={styles.add}>
+                <Pressable accessibilityRole="button" onPress={() => router.push('/learn/partners/groups/new')} hitSlop={8} style={styles.add}>
                   <Icon name="plus" size={14} color={palette.link} />
                   <Text style={[styles.addText, { color: palette.link }]}>New Group</Text>
                 </Pressable>
@@ -187,8 +182,8 @@ function GroupCard({ group }: { group: DtPartnerGroup }) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityHint="Opens the group in DeepTutor’s web app"
-      onPress={() => openOnWeb(`/partners/groups/${encodeURIComponent(group.id)}`, group.name)}
+      accessibilityHint="Opens the group’s discussion"
+      onPress={() => router.push({ pathname: '/learn/partners/groups/[id]', params: { id: group.id } })}
       style={({ pressed }) => [styles.card, { borderColor: palette.border }, pressed && { backgroundColor: palette.surface }]}>
       <View style={[styles.tile, { backgroundColor: group.color ? `${group.color}33` : palette.surfaceStrong }]}>
         <Text style={styles.tileEmoji}>{group.emoji}</Text>
@@ -211,7 +206,7 @@ function GroupCard({ group }: { group: DtPartnerGroup }) {
           </Text>
         </View>
       </View>
-      <Icon name="arrow-top-right-on-square" size={14} color={palette.textFaint} />
+      <Icon name="chevron-right" size={14} color={palette.textFaint} />
     </Pressable>
   );
 }
