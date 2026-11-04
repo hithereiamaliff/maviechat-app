@@ -80,7 +80,7 @@ describe('Co-Writer pages', () => {
       {
         suggestions: [
           { id: 's1', operation: 'replace', block_id: 'b', markdown: 'New text', blocks: [{ id: 'b', type: 'paragraph' }], explanation: 'Clearer', status: 'pending' },
-          { id: 's2', operation: 'insert', block_id: 'b', markdown: '- a list', blocks: null, status: 'pending' },
+          { id: 's2', operation: 'insert', block_id: 'b', markdown: '| a | b |\n|---|---|\n| 1 | 2 |', blocks: null, status: 'pending' },
           { id: 's3', operation: 'comment', block_id: 'b', markdown: 'Note', status: 'dismissed' },
         ],
       },

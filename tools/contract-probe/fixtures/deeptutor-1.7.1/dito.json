@@ -1,0 +1,14 @@
+{
+  "tools": [
+    "note_read",
+    "note_suggest"
+  ],
+  "keptPage": true,
+  "suggestions": [
+    {
+      "operation": "replace",
+      "blocks": false
+    }
+  ],
+  "reviewed": "accepted with blocks made from its Markdown"
+}

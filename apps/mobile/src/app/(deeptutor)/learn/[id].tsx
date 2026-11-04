@@ -49,6 +49,7 @@ import type { DtReplyActions } from '@/features/deeptutor/chat/DtReplyView';
 import type { QuizAnswer } from '@/features/deeptutor/chat/quiz';
 import { useDtChoice } from '@/features/deeptutor/chat/useDtChoice';
 import { BookBar } from '@/features/deeptutor/books/BookBar';
+import { NoteBar } from '@/features/deeptutor/notes/NoteBar';
 import { deepTutorAttachment } from '@/features/deeptutor/crossReference';
 import { PathBar } from '@/features/deeptutor/learning/PathBar';
 import { ReadingBar } from '@/features/deeptutor/reading/ReadingBar';
@@ -95,6 +96,8 @@ export default function DeepTutorChat() {
   const pageBook = useDtBook(page?.bookId ?? '');
   // A chat about a reading collection: the tutor reads the file and the page you're on.
   const reading = path || page ? null : readingOfPreferences(detail.data?.preferences);
+  // A conversation with Dito about a Co-Writer page names the page on every turn, so Dito can read it and suggest edits.
+  const noteId = path || page || reading ? '' : typeof detail.data?.preferences?.note_document_id === 'string' ? detail.data.preferences.note_document_id : '';
   const readingId = reading?.collectionId ?? '';
   const native = isNativeCapability(capability) || Boolean(path) || Boolean(page) || Boolean(reading);
   // A video chat from before DeepTutor 1.7.1 moves into Reading when it's opened, as on the web:
@@ -253,7 +256,7 @@ export default function DeepTutorChat() {
                 llmSelection: choice.model,
                 ...extrasRequest(extras),
               }
-            : { content: text, sessionId: id, ...choice.request, ...extrasRequest(extras) },
+            : { content: text, sessionId: id, ...choice.request, ...extrasRequest(extras), ...(noteId ? { noteDocumentId: noteId } : {}) },
       );
       return true;
     } catch (error) {
@@ -468,6 +471,7 @@ export default function DeepTutorChat() {
         <PathBar topic={topic.data} mode={path.mode ?? 'study'} onMode={running ? undefined : (mode) => void switchMode(mode)} onOpenPath={() => openPath()} />
       ) : null}
       {page ? <BookBar bookId={page.bookId} pageId={page.pageId} /> : null}
+      {noteId ? <NoteBar pageId={noteId} /> : null}
       {reading ? <ReadingBar collectionId={reading.collectionId} materialId={reading.materialId} cited={cited.pages} times={cited.times} /> : null}
       {legacy ? (
         <View style={styles.moving}>

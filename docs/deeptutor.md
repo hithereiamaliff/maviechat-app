@@ -607,6 +607,18 @@ DeepTutor 1.7.1's Co-Writer is a notebook of pages made of blocks (BlockNote's: 
 - Flashcards are `learning` blocks of kind `flashcards` (`props.data` is JSON text with `cards [{front, back}]`): `GET /api/documents/review/due` (a new card is due at once), `POST /{id}/review {card_id, remembered}` → `{interval_days, due_at}`; `GET /api/documents/flashcards/export` and `/{id}/flashcards/export` → Anki's tab-separated import file.
 - `POST /api/documents/export/docx {title, content}` → a .docx (the client gets bytes: `DtClient.sendBytes`); `POST /api/documents/import/docx` (multipart `file`) → a new Markdown-only page titled by the file's name.
 
+## Co-Writer: Dito on the phone (B8.2, 2026-11-04)
+
+- **On a page** (below it): **Ask Dito About This Page** (pages of blocks with something written; an older Markdown-only page says to open it on the web once), the **suggested edits** waiting for you (what kind: add after a line, change a line, remove a line, a comment; the new text; why), each with **Accept** or **Dismiss** (or **Review on the Web** when only DeepTutor's editor can turn it into blocks), and the page's **conversations** (title, last words, answering…, when; open one, or delete it: its chat goes to DeepTutor's recycle bin). The page, its conversations and suggestions are read again whenever you come back to it.
+- **Ask Dito** (`/learn/notes/ask?id=`): your first message starts a chat that carries the page (so Dito can read it and suggest edits; nothing changes until you accept), tied to the page's first line as DeepTutor ties conversations, then it carries on as an ordinary chat.
+- **In a conversation about a page**: a bar names the page (tap to open it), and every message carries the page again, as DeepTutor's own page does.
+- **Accepting Markdown suggestions**: Dito usually suggests in Markdown only, which DeepTutor needs as blocks. The app turns paragraphs, headings, bullet, numbered and check lists (nested), quotes, code, rules, bold, italic, strikethrough, code and safe links into blocks itself; anything else (tables, images, HTML, maths) is reviewed on the web.
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --dito`)
+
+- A conversation is an ordinary chat whose every turn carries `note_document_id` (kept as `preferences.note_document_id`); Dito then has `note_read` and `note_suggest`, and a chat about a line names it. After the first turn, `POST /api/documents/{id}/threads {session_id, block_id, quote, origin}` ties it to a line (`block_id` is required, so a page needs a block); `GET …/threads` lists them (`status`, `last_message`, `message_count`); `DELETE …/threads/{session}` deletes the conversation and sends its chat to the recycle bin.
+- `GET …/suggestions` (every status); `POST …/suggestions/{sid} {accept, blocks?}` answers with the page: `comment` changes nothing, `delete` removes the line and what's under it, `replace` keeps the line's id on the first new block, `insert` goes after it. A Markdown-only suggestion needs `blocks` to be accepted (400 otherwise); 409 when the line changed since. On our server Dito's suggestions came as Markdown only, and blocks made by the app's converter were accepted.
+
 ## M1.5 checklist
 
 | | Item |

@@ -1,4 +1,5 @@
 import type { DtClient } from './http';
+import { blocksFromMarkdown } from './noteBlocks';
 
 /*
  * Co-Writer (DeepTutor 1.7.1), the "Learning notebook": pages of blocks (BlockNote's), nested
@@ -237,15 +238,24 @@ export async function listNoteSuggestions(client: DtClient, pageId: string): Pro
   });
 }
 
+/** The blocks to accept a suggestion with: its own, else its Markdown turned into blocks (null when only DeepTutor's editor can). */
+function suggestedBlocks(suggestion: DtNoteSuggestion): Tree[] | null {
+  return suggestion.blocks ?? blocksFromMarkdown(suggestion.markdown);
+}
+
 /**
- * Whether the app can accept a suggestion itself: one that removes or only comments, or comes as
- * blocks. One in Markdown only needs turning into blocks first, which DeepTutor's page does.
+ * Whether the app can accept a suggestion itself: one that removes or only comments, comes as
+ * blocks, or is Markdown the app can turn into blocks. Others are accepted on DeepTutor's page.
  */
-export const acceptableHere = (suggestion: DtNoteSuggestion): boolean => suggestion.operation === 'comment' || suggestion.operation === 'delete' || suggestion.blocks !== null;
+export const acceptableHere = (suggestion: DtNoteSuggestion): boolean => suggestion.operation === 'comment' || suggestion.operation === 'delete' || suggestedBlocks(suggestion) !== null;
 
 /** Accepts (the page changes) or dismisses a suggestion; answers with the page as it is now. 409: the line changed since. */
 export async function reviewNoteSuggestion(client: DtClient, pageId: string, suggestion: DtNoteSuggestion, accept: boolean): Promise<DtNotePage> {
   const body: Tree = { accept };
-  if (accept && suggestion.blocks) body.blocks = suggestion.blocks;
+  if (accept && (suggestion.operation === 'insert' || suggestion.operation === 'replace')) {
+    const blocks = suggestedBlocks(suggestion);
+    if (!blocks) throw new Error('This suggestion needs DeepTutor’s editor to accept it.');
+    body.blocks = blocks;
+  }
   return pageOf(await client.post<unknown>(`${pagePath(pageId)}/suggestions/${encodeURIComponent(suggestion.id)}`, body));
 }

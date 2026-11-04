@@ -1,4 +1,5 @@
 import { childPages, coverColor, noteTitle, pageTrail } from '@maviechat/deeptutor-protocol';
+import { useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useRef } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -6,11 +7,12 @@ import { Button } from '@/components/Button';
 import type { MenuItem } from '@/components/Menu';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { editOnWeb, useNoteActions } from '@/features/deeptutor/notes/actions';
+import { DitoSection } from '@/features/deeptutor/notes/DitoSection';
 import { NoteRow } from '@/features/deeptutor/notes/NoteRow';
 import { useNoteBacklinks, useNotePage, useNotePages, useNotesRefresh } from '@/features/deeptutor/notes/queries';
 import { describeError } from '@/lib/errors';
 import { Markdown } from '@/markdown/Markdown';
-import { useDtAuthed } from '@/session/DeepTutorProvider';
+import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
 
 const one = (value: string | string[] | undefined) => (Array.isArray(value) ? (value[0] ?? '') : (value ?? ''));
@@ -30,14 +32,16 @@ export default function NotePageScreen() {
   const refresh = useNotesRefresh();
   const actions = useNoteActions();
   const editing = useRef(false);
+  const queryClient = useQueryClient();
+  const shownOnce = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      // Back from DeepTutor's editor: the page may have changed (or been turned into blocks).
-      if (editing.current) {
-        editing.current = false;
-        refresh();
-      }
-    }, [refresh]),
+      // Back on the page (from DeepTutor's editor, or a conversation with Dito): it, its
+      // conversations and Dito's suggestions may have changed.
+      if (shownOnce.current || editing.current) void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'notes'] });
+      shownOnce.current = true;
+      editing.current = false;
+    }, [queryClient, session.baseUrl]),
   );
   const data = page.data;
   const all = pages.data ?? [];
@@ -85,6 +89,7 @@ export default function NotePageScreen() {
             {data.blocks === null ? <Text style={[styles.note, { color: palette.textFaint }]}>An older page, in Markdown: DeepTutor’s editor turns it into blocks when you open it there.</Text> : null}
             {data.content.trim() ? <Markdown text={data.content} baseUrl={session.baseUrl} token={session.token ?? undefined} /> : <Text style={[styles.note, { color: palette.textFaint }]}>An empty page.</Text>}
             <Button label="Edit on the Web" variant="secondary" onPress={edit} />
+            <DitoSection page={data} />
             {subpages.length ? <Text style={[styles.section, { color: palette.textMuted }]}>Subpages</Text> : null}
             {subpages.map((child) => (
               <NoteRow key={child.id} page={child} subpages={childPages(all, child.id).length} onPress={() => router.push({ pathname: '/learn/notes/[id]', params: { id: child.id } })} />

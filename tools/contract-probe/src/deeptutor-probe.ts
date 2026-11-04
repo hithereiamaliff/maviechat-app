@@ -51,6 +51,7 @@
  * `--services` checks MCP Services and CLI Apps (src/deeptutor-services-probe.ts) without reaching any MCP server.
  * `--imports` checks imported conversations (src/deeptutor-imports-probe.ts) with one made-up ChatGPT conversation.
  * `--notes` checks Co-Writer's notebook (src/deeptutor-notes-probe.ts) on scratch pages; no model calls.
+ * `--dito` checks a conversation with Dito about a scratch page (src/deeptutor-dito-probe.ts): one reply.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -154,6 +155,7 @@ import {
 import { probeBooks } from './deeptutor-books-probe';
 import { probePartners } from './deeptutor-partners-probe';
 import { probeChatPicks } from './deeptutor-chat-picks-probe';
+import { probeDito } from './deeptutor-dito-probe';
 import { probeImports } from './deeptutor-imports-probe';
 import { probeMemory } from './deeptutor-memory-probe';
 import { probeNotes } from './deeptutor-notes-probe';
@@ -191,6 +193,7 @@ const { values: args } = parseArgs({
     services: { type: 'boolean' },
     imports: { type: 'boolean' },
     notes: { type: 'boolean' },
+    dito: { type: 'boolean' },
   },
 });
 
@@ -469,6 +472,14 @@ async function main() {
     await step('notes: a Co-Writer page saved, refused when stale, pinned, a subpage, a flashcard graded, Anki and Word exports, a Word import, all deleted', async () => {
       const outcome = await probeNotes(client);
       fixtures.notes = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.dito) {
+    await step('dito: one conversation about a scratch page, a suggestion filed and reviewed as the app reviews it, all deleted (one reply)', async () => {
+      const outcome = await probeDito(baseUrl, session.token as string, client);
+      fixtures.dito = outcome.fixture;
       return { value: true, note: outcome.note };
     });
   }

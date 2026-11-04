@@ -16,6 +16,7 @@ export * from './markdown';
 export * from './mastery';
 export * from './mcp';
 export * from './memory';
+export * from './noteBlocks';
 export * from './notebooks';
 export * from './notes';
 export * from './organize';
