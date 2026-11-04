@@ -116,6 +116,7 @@ export default function DeepTutorHome() {
       knowledgeBases={choice.knowledgeBases}
       selectedKnowledgeBases={choice.selectedKnowledgeBases}
       onKnowledgeBasesChange={choice.setSelectedKnowledgeBases}
+      personal={choice.personal}
     />
   );
 

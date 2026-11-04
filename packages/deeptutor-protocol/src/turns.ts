@@ -207,6 +207,14 @@ export interface DtTurnRequest {
   readingMaterialId?: string;
   readingMaterialRevision?: number;
   readingViewport?: Record<string, unknown>;
+  /** The voice to answer in: a persona's name, or '' for the default voice. Absent keeps the chat's. */
+  persona?: string;
+  /** The skills the chat may use (within what its workspace allows); [] for all of them. Absent keeps the chat's. */
+  skills?: string[];
+  /** The MCP servers the chat may use (`deployment:<name>`, `account:<name>`); [] for all. Absent keeps the chat's. */
+  mcp?: string[];
+  /** Draws on your memory's big picture for this message (any of them sends all four sheets). */
+  memoryReferences?: string[];
 }
 
 export type DtCommand = Record<string, unknown> & { protocol_version: string; type: string };
@@ -241,6 +249,11 @@ export function startTurnCommand(request: DtTurnRequest): DtCommand {
   if (request.readingMaterialId) command.reading_material_id = request.readingMaterialId;
   if (request.readingMaterialRevision) command.reading_material_revision = request.readingMaterialRevision;
   if (request.readingViewport && Object.keys(request.readingViewport).length) command.reading_viewport = request.readingViewport;
+  // Kept by the chat once sent; restated each turn, as DeepTutor's own composer does.
+  if (request.persona !== undefined) command.persona = request.persona;
+  if (request.skills !== undefined) command.skills = request.skills;
+  if (request.mcp !== undefined) command.mcp = request.mcp;
+  if (request.memoryReferences?.length) command.memory_references = request.memoryReferences;
   return command;
 }
 

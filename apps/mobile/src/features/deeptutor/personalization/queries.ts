@@ -8,10 +8,10 @@ function usePersonalizationKey() {
   return (...rest: string[]) => [DT_QUERY_ROOT, session.baseUrl, 'personalization', ...rest];
 }
 
-export function usePersonas() {
+export function usePersonas(enabled = true) {
   const { client } = useDtAuthed();
   const key = usePersonalizationKey();
-  return useQuery({ queryKey: key('personas'), queryFn: () => listPersonas(client), staleTime: 30_000 });
+  return useQuery({ queryKey: key('personas'), queryFn: () => listPersonas(client), enabled, staleTime: 30_000 });
 }
 
 export function usePersonaFile(name: string | null) {

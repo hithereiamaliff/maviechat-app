@@ -1,0 +1,23 @@
+{
+  "resources": {
+    "skills": [
+      "docx",
+      "pdf",
+      "pptx",
+      "skill-creator",
+      "xlsx"
+    ],
+    "mcp": 0
+  },
+  "kept": {
+    "persona": "peer",
+    "skills": [
+      "skill-creator"
+    ],
+    "mcp": null
+  },
+  "cleared": {
+    "persona": "",
+    "skills": []
+  }
+}

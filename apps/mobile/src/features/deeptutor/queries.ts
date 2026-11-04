@@ -41,6 +41,7 @@ import {
   getUiSettings,
   getServerVersion,
   getSession,
+  listChatResources,
   listChatTools,
   listKbFiles,
   listKnowledgeBases,
@@ -102,6 +103,12 @@ export function useDtModes() {
 }
 
 /** Knowledge bases a turn can search. */
+/** The skills and MCP servers a chat may be narrowed to; not for learner accounts, which DeepTutor refuses. */
+export function useDtChatResources(enabled: boolean) {
+  const { client, session } = useDtAuthed();
+  return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'chat-resources'], queryFn: () => listChatResources(client), enabled, staleTime: 60_000 });
+}
+
 export function useDtKnowledgeBases() {
   const { client, session } = useDtAuthed();
   return useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'knowledge-bases'], queryFn: () => listKnowledgeBases(client), staleTime: 60_000 });

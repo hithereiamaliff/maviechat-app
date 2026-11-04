@@ -14,6 +14,18 @@ export interface DtToolStep {
   done: boolean;
   /** The tool's output, in Markdown. */
   result: string;
+  /** For an MCP server's or a CLI app's tool: which one (DeepTutor's own tools have none). */
+  provider?: { source: 'mcp' | 'cli'; name: string };
+  /** The latest line of progress while it runs, and how far along (0–1) when the tool says. */
+  progress?: string;
+  fraction?: number;
+}
+
+/** Which MCP server or CLI app a tool event belongs to. */
+function providerOf(meta: Record<string, unknown>): DtToolStep['provider'] {
+  const source = meta.tool_source;
+  const name = typeof meta.tool_provider === 'string' ? meta.tool_provider : '';
+  return (source === 'mcp' || source === 'cli') && name ? { source, name } : undefined;
 }
 
 /** Reasoning from one model call (DeepTutor's agent loop makes one per round). */
@@ -443,6 +455,7 @@ export function applyTurnEvent(reply: DtReply, event: DtStreamEvent): DtReply {
     case 'tool_call': {
       const args = record(meta.args);
       if ((text(meta.tool_name) || event.content) === 'ask_user') next.ask = askOf(args) ?? next.ask;
+      const provider = providerOf(meta);
       next.tools = [
         ...next.tools,
         {
@@ -452,6 +465,7 @@ export function applyTurnEvent(reply: DtReply, event: DtStreamEvent): DtReply {
           offset: count(meta.assistant_content_offset) ?? next.answer.length,
           done: false,
           result: '',
+          ...(provider ? { provider } : {}),
         },
       ];
       next.activity = text(meta.tool_name) || event.content || next.activity;
@@ -469,11 +483,12 @@ export function applyTurnEvent(reply: DtReply, event: DtStreamEvent): DtReply {
         next.activity = null;
       }
       const index = next.tools.findIndex((tool) => tool.id === id && !tool.done);
+      const provider = providerOf(meta);
       if (index >= 0) {
-        next.tools = next.tools.map((tool, i) => (i === index ? { ...tool, done: true, result: event.content } : tool));
+        next.tools = next.tools.map((tool, i) => (i === index ? { ...tool, done: true, result: event.content, progress: undefined, fraction: undefined, ...(provider && !tool.provider ? { provider } : {}) } : tool));
       } else {
         const name = text(meta.tool_name) || text(meta.tool) || 'tool';
-        next.tools = [...next.tools, { id: id || `tool-${next.tools.length}`, name, args: {}, offset: next.answer.length, done: true, result: event.content }];
+        next.tools = [...next.tools, { id: id || `tool-${next.tools.length}`, name, args: {}, offset: next.answer.length, done: true, result: event.content, ...(provider ? { provider } : {}) }];
       }
       break;
     }
@@ -490,6 +505,13 @@ export function applyTurnEvent(reply: DtReply, event: DtStreamEvent): DtReply {
       } else if (text(meta.trace_kind) === 'ask_user_draft') {
         // The questions as the model writes them; the tool result settles them.
         if (next.status !== 'waiting') next.ask = askOf(meta.ask_user_draft) ?? next.ask;
+      } else if (text(meta.trace_kind) === 'tool_progress') {
+        // An MCP server's or CLI app's tool saying how it's going, under its call's id.
+        const id = text(meta.call_id);
+        const index = next.tools.findIndex((tool) => !tool.done && (id ? tool.id === id : Boolean(tool.provider)));
+        const fraction = typeof meta.progress_fraction === 'number' ? Math.min(1, Math.max(0, meta.progress_fraction)) : undefined;
+        if (index >= 0) next.tools = next.tools.map((tool, i) => (i === index ? { ...tool, progress: event.content || tool.progress, fraction: fraction ?? tool.fraction } : tool));
+        if (event.content) next.activity = event.content;
       } else if (text(meta.call_state) === 'running') next.activity = event.content || text(meta.label) || next.activity;
       break;
     case 'stage_start':

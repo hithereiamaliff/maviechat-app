@@ -11,6 +11,7 @@ import { fonts, radius, usePalette } from '@/theme';
 import { capabilityName, modeInfo } from './capabilities';
 import { DtExtrasStrip, DtPickSheet, type ExtraChip, type PickItem } from './DtExtrasViews';
 import { clearExtras, hasExtras, useDtAttach, type DtExtras } from './extras';
+import type { DtPersonalChoice } from './useDtChoice';
 
 /** Our names for DeepTutor's switchable chat tools; others show their id, made readable. */
 const TOOL_INFO: Record<string, { label: string; icon: IconName }> = {
@@ -65,6 +66,8 @@ interface DtComposerProps {
   onKnowledgeBasesChange: (names: string[]) => void;
   /** The chat's knowledge bases are set elsewhere (a book page's chat uses the book's): no picker. */
   knowledgeFixed?: boolean;
+  /** Its voice, skills, MCP servers and memory; left out where a chat can't choose them. */
+  personal?: DtPersonalChoice;
   /** Kept out of the "earlier chat" list. */
   sessionId?: string;
   placeholder?: string;
@@ -106,6 +109,7 @@ export function DtComposer({
   selectedKnowledgeBases,
   onKnowledgeBasesChange,
   knowledgeFixed = false,
+  personal,
   sessionId,
   placeholder,
   autoFocus = false,
@@ -118,7 +122,7 @@ export function DtComposer({
   const text = useDraftText(draftKey);
   const field = useGrowingInput(text, (value) => updateDraft(draftKey, (draft) => ({ ...draft, text: value })));
   const [sending, setSending] = useState(false);
-  const [sheet, setSheet] = useState<'mode' | 'tools' | 'model' | 'notebook' | 'chat' | 'knowledge' | null>(null);
+  const [sheet, setSheet] = useState<'mode' | 'tools' | 'model' | 'notebook' | 'chat' | 'knowledge' | 'persona' | 'skills' | 'mcp' | null>(null);
   const info = modeInfo(mode);
   const limits = useDtAttachmentLimits();
   const attach = useDtAttach(draftKey, limits.data ?? { maxFileBytes: 20 * 1024 * 1024, maxTotalBytes: 25 * 1024 * 1024 });
@@ -133,6 +137,16 @@ export function DtComposer({
     { key: 'notebook', label: 'Notebook', icon: 'book-open', onPress: () => setSheet('notebook') },
     { key: 'chat', label: 'Earlier Chat', icon: 'chat-bubble-left', onPress: () => setSheet('chat') },
     ...(knowledgeFixed ? [] : [{ key: 'knowledge', label: 'Knowledge Bases', icon: 'archive-box' as const, onPress: () => setSheet('knowledge') }]),
+    ...(personal
+      ? [
+          { key: 'persona', label: personal.persona ? `Voice: ${personal.persona}` : 'Voice', icon: 'identification' as const, onPress: () => setSheet('persona') },
+          { key: 'skills', label: 'Skills', icon: 'sparkles' as const, onPress: () => setSheet('skills') },
+          ...(personal.mcp?.length ? [{ key: 'mcp', label: 'MCP Servers', icon: 'puzzle-piece' as const, onPress: () => setSheet('mcp') }] : []),
+          ...(personal.memory
+            ? [{ key: 'memory', label: personal.useMemory ? 'Stop Using My Memory' : 'Use My Memory', icon: 'light-bulb' as const, onPress: () => personal.setUseMemory(!personal.useMemory) }]
+            : []),
+        ]
+      : []),
   ];
   const { ref: plusRef, open: openPlus, menu: plusMenu } = useAnchoredMenu(plusItems);
   const chips: ExtraChip[] = [
@@ -161,6 +175,20 @@ export function DtComposer({
       label: name,
       onRemove: () => onKnowledgeBasesChange(selectedKnowledgeBases.filter((other) => other !== name)),
     })),
+    ...(personal?.persona ? [{ key: 'persona', icon: 'identification' as const, label: personal.persona, onRemove: () => personal.setPersona('') }] : []),
+    ...(personal?.selectedSkills ?? []).map((id) => ({
+      key: `s${id}`,
+      icon: 'sparkles' as const,
+      label: personal?.skills?.find((skill) => skill.id === id)?.name ?? id,
+      onRemove: () => personal?.setSkills(personal.selectedSkills.filter((other) => other !== id)),
+    })),
+    ...(personal?.selectedMcp ?? []).map((id) => ({
+      key: `m${id}`,
+      icon: 'puzzle-piece' as const,
+      label: personal?.mcp?.find((server) => server.id === id)?.name ?? id,
+      onRemove: () => personal?.setMcp(personal.selectedMcp.filter((other) => other !== id)),
+    })),
+    ...(personal?.useMemory ? [{ key: 'memory', icon: 'light-bulb' as const, label: 'My memory', onRemove: () => personal.setUseMemory(false) }] : []),
   ];
   const toggle = <T extends { id: string }>(list: T[], item: T) => (list.some((other) => other.id === item.id) ? list.filter((other) => other.id !== item.id) : [...list, item]);
   const chatItems: PickItem[] = (chats.data ?? []).filter((chat) => chat.id !== sessionId).map((chat) => ({ id: chat.id, label: sessionTitle(chat) }));
@@ -299,6 +327,46 @@ export function DtComposer({
         onToggle={(item) => setExtras({ ...extras, chats: toggle(extras.chats, { id: item.id, title: item.label }) })}
         onClose={() => setSheet(null)}
       />
+      {personal ? (
+        <>
+          <DtPickSheet
+            visible={sheet === 'persona'}
+            title="Voice"
+            note="The voice this chat answers in, until you change it. Write your own in Personas."
+            items={[{ id: '', label: 'Default voice' }, ...(personal.personas ?? []).map((persona) => ({ id: persona.name, label: persona.name, hint: persona.description || (persona.preset ? 'Preset' : undefined) }))]}
+            selected={[personal.persona]}
+            loading={personal.personas === undefined}
+            empty="No personas yet."
+            onToggle={(item) => {
+              personal.setPersona(item.id);
+              setSheet(null);
+            }}
+            onClose={() => setSheet(null)}
+          />
+          <DtPickSheet
+            visible={sheet === 'skills'}
+            title="Skills"
+            note="This chat may use only the skills you pick; with none picked, it may use them all."
+            items={(personal.skills ?? []).map((skill) => ({ id: skill.id, label: skill.name, hint: skill.description || undefined }))}
+            selected={personal.selectedSkills}
+            loading={personal.skills === undefined}
+            empty="No skills yet."
+            onToggle={(item) => personal.setSkills(personal.selectedSkills.includes(item.id) ? personal.selectedSkills.filter((id) => id !== item.id) : [...personal.selectedSkills, item.id])}
+            onClose={() => setSheet(null)}
+          />
+          <DtPickSheet
+            visible={sheet === 'mcp'}
+            title="MCP Servers"
+            note="This chat may use tools from only the servers you pick; with none picked, from all of them."
+            items={(personal.mcp ?? []).map((server) => ({ id: server.id, label: server.name, hint: server.available ? undefined : 'Not connected' }))}
+            selected={personal.selectedMcp}
+            loading={personal.mcp === undefined}
+            empty="No MCP servers."
+            onToggle={(item) => personal.setMcp(personal.selectedMcp.includes(item.id) ? personal.selectedMcp.filter((id) => id !== item.id) : [...personal.selectedMcp, item.id])}
+            onClose={() => setSheet(null)}
+          />
+        </>
+      ) : null}
       <DtPickSheet
         visible={sheet === 'knowledge'}
         title="Knowledge Bases"

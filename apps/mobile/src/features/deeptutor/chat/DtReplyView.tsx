@@ -55,6 +55,10 @@ const STEP_NAMES: Record<string, string> = {
   mastery_explained: 'Noted your explanation',
   mastery_defer: 'Set a point aside for now',
   mastery_paths: 'Looked at your paths',
+  load_tools: 'Got tools ready',
+  read_memory: 'Read your memory',
+  write_memory: 'Saved a preference',
+  consult_subagent: 'Asked an agent',
 };
 
 /** Steps the reply shows in their own way (the question card, the drawing). */
@@ -68,8 +72,25 @@ function hostOf(url: string): string {
   return url.replace(/^[a-z]+:\/\//i, '').split('/')[0] ?? url;
 }
 
+/** An MCP server's or CLI app's tool: the server or app, then the tool (or the app's arguments). */
+function providerTitle(tool: DtToolStep & { provider: NonNullable<DtToolStep['provider']> }): string {
+  const { source, name } = tool.provider;
+  let detail: string;
+  if (source === 'cli') detail = Array.isArray(tool.args.args) ? tool.args.args.map(String).join(' ') : text(tool.args.args);
+  else {
+    // `mcp_<server>_<tool>`, the server's name with other characters made `_`.
+    const prefix = `mcp_${name.replace(/[^A-Za-z0-9_]/g, '_')}_`;
+    detail = tool.name.startsWith(prefix) ? tool.name.slice(prefix.length) : tool.name;
+  }
+  const title = detail ? `${name}: ${detail}` : name;
+  if (tool.done) return title;
+  return tool.progress ? `${title}… ${tool.progress}` : `${title}…`;
+}
+
 function stepTitle(tool: DtToolStep): string {
+  if (tool.provider) return providerTitle({ ...tool, provider: tool.provider });
   const name = STEP_NAMES[tool.name] ?? toolLabel(tool.name);
+  if (tool.name === 'write_memory' && text(tool.args.text)) return tool.done ? `${name}: ${text(tool.args.text)}` : `${name}…`;
   if (!tool.done) return `${name}…`;
   if (tool.name === 'solve_plan' || tool.name === 'solve_replan') {
     const steps = Array.isArray(tool.args.steps) ? tool.args.steps.length : 0;
@@ -95,7 +116,7 @@ function ToolStepView({ tool }: { tool: DtToolStep }) {
   const palette = usePalette();
   const body = stepBody(tool);
   return (
-    <Disclosure icon={toolIcon(tool.name)} label={stepTitle(tool)} busy={!tool.done}>
+    <Disclosure icon={tool.provider ? (tool.provider.source === 'mcp' ? 'puzzle-piece' : 'command-line') : tool.name === 'read_memory' || tool.name === 'write_memory' ? 'light-bulb' : toolIcon(tool.name)} label={stepTitle(tool)} busy={!tool.done}>
       {body.trim() ? <Markdown text={body} muted /> : <Text style={[styles.faint, { color: palette.textFaint }]}>No output yet.</Text>}
     </Disclosure>
   );

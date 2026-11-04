@@ -47,6 +47,7 @@
  * `--personalization` checks Personas, Skills (and their tags), that a connected agent stays out of
  * the knowledge-base lists, and CLI apps (src/deeptutor-personalization-probe.ts); no model calls.
  * `--memory` checks Memory (src/deeptutor-memory-probe.ts) in the test account's own sheets; no model calls.
+ * `--picks` checks a chat's voice, skills and memory (src/deeptutor-chat-picks-probe.ts): two short replies.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -149,6 +150,7 @@ import {
 } from '@maviechat/deeptutor-protocol';
 import { probeBooks } from './deeptutor-books-probe';
 import { probePartners } from './deeptutor-partners-probe';
+import { probeChatPicks } from './deeptutor-chat-picks-probe';
 import { probeMemory } from './deeptutor-memory-probe';
 import { probePersonalization } from './deeptutor-personalization-probe';
 import { probeLearning } from './deeptutor-learning-probe';
@@ -179,6 +181,7 @@ const { values: args } = parseArgs({
     partners: { type: 'boolean' },
     personalization: { type: 'boolean' },
     memory: { type: 'boolean' },
+    picks: { type: 'boolean' },
   },
 });
 
@@ -425,6 +428,14 @@ async function main() {
     await step('memory: every sheet read and parsed; a fact added, reworded and deleted; a merge run (no model) followed and undone', async () => {
       const outcome = await probeMemory(client);
       fixtures.memory = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.picks) {
+    await step('chat picks: a voice, a skill and memory kept by a chat, then put back (two short replies)', async () => {
+      const outcome = await probeChatPicks(baseUrl, session.token as string, client);
+      fixtures.picks = outcome.fixture;
       return { value: true, note: outcome.note };
     });
   }

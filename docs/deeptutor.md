@@ -553,6 +553,18 @@ A partner is a companion DeepTutor hosts: a soul (a persona in Markdown, in ever
 - Runs: `POST /runs/start {layer, key, mode, language, budget?, iterations?}` → a handle (`id`, `status` queued, running, cancelled, done or error, `event_count`, `undo_count`); `GET /runs/{id}`; `POST /runs/{id}/cancel`; `POST /runs/{id}/undo` (409 when nothing is left to undo). `merge` uses no model. One run per sheet across all accounts (409). DeepTutor doesn't limit a run's size, so the app keeps it to 1–200 calls and 1–20 passes.
 - **Two flaws in 1.7.1, for the owner:** `GET /runs` lists every account's runs, and anyone's run can be streamed (its prompts carry that person's memory and chats), stopped or undone; and `PUT /settings` changes one file shared by every account, open to any account. The app follows only runs it started and never writes the settings.
 
+## Voice, skills, MCP and memory in a chat (B7.3, 2026-11-04)
+
+- **In the composer's + menu** (ordinary chats, not learner accounts): **Voice** (the default voice, or one of your personas or the presets; the chat keeps it), **Skills** (the chat may use only those picked; none picked means all its workspace allows), **MCP Servers** (the same, shown when there are any) and **Use My Memory** (when the server has memory on: each message draws on your memory's big picture until you switch it off). What's picked shows as chips above the text, each removable.
+- What a chat already has (its saved voice, skills and servers, as the web set them too) is read when it opens and restated with each message, as DeepTutor's own composer does; a chat that has none sends none, so it keeps DeepTutor's defaults.
+- **Tool rows**: tools from an MCP server or a CLI app are titled by the server or app, then the tool (or the app's arguments), with their live progress line while they run. Our names for "Got tools ready" (`load_tools`), "Read your memory", "Saved a preference" (with what it saved) and "Asked an agent".
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --picks`)
+
+- Turn fields: `persona` (a name, or `""` for the default voice), `skills` and `mcp` (ids; `[]` for all the workspace allows) are kept by the chat (`preferences.persona`, `.skills`, `.mcp`); absent keeps the chat's. `memory_references` (any of `summary`, `profile`…) brings all four big-picture sheets into that one turn.
+- `GET /api/settings/workspace/resources?workspace_id=` → the `skills` (`id`, `name`, `description`, `source`) and `mcp` servers (`id` `deployment:<name>` or `account:<name>`, `available`) a chat in that workspace may use; on our server five skills and no MCP servers.
+- Provider tools carry `tool_source` (`mcp` or `cli`) and `tool_provider` on their `tool_call` and `tool_result`; an MCP tool is named `mcp_<server>_<tool>` (other characters in the server's name become `_`). Their progress comes as `progress` events with `trace_kind: tool_progress`, the tool's `call_id`, and `progress_fraction` (MCP) or `elapsed_s` (CLI).
+
 ## M1.5 checklist
 
 | | Item |

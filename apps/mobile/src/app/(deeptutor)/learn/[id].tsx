@@ -517,6 +517,7 @@ export default function DeepTutorChat() {
             selectedKnowledgeBases={page || reading ? [] : choice.selectedKnowledgeBases}
             onKnowledgeBasesChange={choice.setSelectedKnowledgeBases}
             knowledgeFixed={Boolean(page || reading)}
+            personal={path || page || reading ? undefined : choice.personal}
             sessionId={id}
           />
         ) : (

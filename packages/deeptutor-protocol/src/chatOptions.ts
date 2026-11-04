@@ -106,6 +106,23 @@ export async function listKnowledgeBases(client: DtClient): Promise<DtKnowledgeB
   });
 }
 
+/** Skills and MCP servers a chat may be narrowed to (those its workspace allows). */
+export interface DtChatResources {
+  skills: { id: string; name: string; description: string }[];
+  mcp: { id: string; name: string; available: boolean }[];
+}
+
+/** `GET /api/settings/workspace/resources` for the chats the app makes (no workspace: the general one). */
+export async function listChatResources(client: DtClient): Promise<DtChatResources> {
+  const body = (await client.get<unknown>('/api/settings/workspace/resources', { query: { workspace_id: '' } })) as Record<string, unknown> | null;
+  const rows = (value: unknown) => (Array.isArray(value) ? value : []).map((row) => (typeof row === 'object' && row !== null ? (row as Record<string, unknown>) : {}));
+  const str = (value: unknown) => (typeof value === 'string' ? value : '');
+  return {
+    skills: rows(body?.skills).flatMap((row) => (str(row.id) ? [{ id: str(row.id), name: str(row.name) || str(row.id), description: str(row.description) }] : [])),
+    mcp: rows(body?.mcp).flatMap((row) => (str(row.id) ? [{ id: str(row.id), name: str(row.name) || str(row.id), available: row.available !== false }] : [])),
+  };
+}
+
 export interface DtAttachmentLimits {
   maxFileBytes: number;
   maxTotalBytes: number;
