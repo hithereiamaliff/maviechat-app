@@ -42,3 +42,4 @@ export * from './workspaceModelEditor';
 export * from './workspaceModels';
 export * from './workspacePrompts';
 export * from './workspaceSkills';
+export * from './workspaceTools';

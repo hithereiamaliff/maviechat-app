@@ -3,12 +3,14 @@ import {
   getWorkspaceModel,
   getWorkspacePrompt,
   getWorkspaceSkill,
+  getWorkspaceTool,
   listKnowledgeFiles,
   listPromptVersions,
   listWorkspaceKnowledge,
   listWorkspaceModels,
   listWorkspacePrompts,
   listWorkspaceSkills,
+  listWorkspaceTools,
   pendingKnowledgeFiles,
   workspaceModelTags,
   workspacePromptTags,
@@ -70,6 +72,17 @@ export function usePendingKnowledgeFiles(id: string, watching: boolean) {
     refetchInterval: (query) => (watching || (query.state.data?.length ?? 0) > 0 ? 4000 : false),
     staleTime: 0,
   });
+}
+
+/** Every tool you can read (the server sends the whole list). */
+export function useWorkspaceTools() {
+  const { client } = useAuthed();
+  return useQuery({ queryKey: ['workspace', 'tools'], queryFn: () => listWorkspaceTools(client), staleTime: 15_000 });
+}
+
+export function useWorkspaceTool(id: string | null) {
+  const { client } = useAuthed();
+  return useQuery({ queryKey: ['workspace', 'tool', id ?? ''], queryFn: () => getWorkspaceTool(client, id ?? ''), enabled: Boolean(id), staleTime: 0 });
 }
 
 export function useWorkspaceModelTags() {

@@ -1,12 +1,12 @@
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Button } from '@/components/Button';
 import { ChatHeader } from '@/features/chat/ChatHeader';
 import { KnowledgeTab } from '@/features/workspace/KnowledgeTab';
 import { ModelsTab } from '@/features/workspace/ModelsTab';
 import { PromptsTab } from '@/features/workspace/PromptsTab';
 import { SkillsTab } from '@/features/workspace/SkillsTab';
+import { ToolsTab } from '@/features/workspace/ToolsTab';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, usePalette } from '@/theme';
 
@@ -21,8 +21,7 @@ const AREAS: { key: Area; label: string }[] = [
 
 /**
  * Open WebUI's Workspace: the areas this account may use, as tabs over each area's list (its
- * count on the open one). Models, Knowledge, Prompts and Skills are here; Tools opens on the web
- * until its slice lands.
+ * count on the open one). Tools' code is written on the web (saving a tool runs it on the server).
  */
 export default function Workspace() {
   const palette = usePalette();
@@ -59,11 +58,7 @@ export default function Workspace() {
       ) : area === 'skills' ? (
         <SkillsTab tabs={tabs} />
       ) : (
-        <View style={[styles.pad, styles.web]}>
-          {tabs()}
-          <Text style={[styles.note, { color: palette.textMuted }]}>{`${AREAS.find((item) => item.key === area)?.label ?? 'This'} opens on the web for now.`}</Text>
-          <Button label="Open on the Web" variant="secondary" onPress={openWeb} />
-        </View>
+        <ToolsTab tabs={tabs} />
       )}
     </View>
   );
@@ -72,7 +67,6 @@ export default function Workspace() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   pad: { padding: 16, gap: 12 },
-  web: { paddingTop: 16 },
   tabs: { gap: 4 },
   tab: { paddingHorizontal: 8, paddingVertical: 8, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabText: { fontFamily: fonts.medium, fontSize: 14 },

@@ -148,7 +148,8 @@ function ValvesFields({ owner, id, fields, initial }: { owner: ValvesOwner; id: 
   );
 }
 
-function ValveRow({ field, value, onChange }: { field: ValveField; value: unknown; onChange: (value: unknown) => void }) {
+/** One valve: Default (or None) until switched to Custom, then the input its kind needs (secrets hidden). */
+export function ValveRow({ field, value, onChange }: { field: ValveField; value: unknown; onChange: (value: unknown) => void }) {
   const palette = usePalette();
   const custom = value !== null && value !== undefined;
   const input = [styles.input, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }];
