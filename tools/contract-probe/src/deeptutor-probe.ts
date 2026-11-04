@@ -50,6 +50,7 @@
  * `--picks` checks a chat's voice, skills and memory (src/deeptutor-chat-picks-probe.ts): two short replies.
  * `--services` checks MCP Services and CLI Apps (src/deeptutor-services-probe.ts) without reaching any MCP server.
  * `--imports` checks imported conversations (src/deeptutor-imports-probe.ts) with one made-up ChatGPT conversation.
+ * `--notes` checks Co-Writer's notebook (src/deeptutor-notes-probe.ts) on scratch pages; no model calls.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -155,6 +156,7 @@ import { probePartners } from './deeptutor-partners-probe';
 import { probeChatPicks } from './deeptutor-chat-picks-probe';
 import { probeImports } from './deeptutor-imports-probe';
 import { probeMemory } from './deeptutor-memory-probe';
+import { probeNotes } from './deeptutor-notes-probe';
 import { probePersonalization } from './deeptutor-personalization-probe';
 import { probeServices } from './deeptutor-services-probe';
 import { probeLearning } from './deeptutor-learning-probe';
@@ -188,6 +190,7 @@ const { values: args } = parseArgs({
     picks: { type: 'boolean' },
     services: { type: 'boolean' },
     imports: { type: 'boolean' },
+    notes: { type: 'boolean' },
   },
 });
 
@@ -458,6 +461,14 @@ async function main() {
     await step('imports: a ChatGPT conversation imported, opened, imported again without a copy, kept out of the history, deleted', async () => {
       const outcome = await probeImports(client);
       fixtures.imports = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.notes) {
+    await step('notes: a Co-Writer page saved, refused when stale, pinned, a subpage, a flashcard graded, Anki and Word exports, a Word import, all deleted', async () => {
+      const outcome = await probeNotes(client);
+      fixtures.notes = outcome.fixture;
       return { value: true, note: outcome.note };
     });
   }

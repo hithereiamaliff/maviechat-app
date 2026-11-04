@@ -109,7 +109,24 @@ export class DtClient {
 
   /** Sends a request and keeps the response headers (sign-in reads its cookie from them). */
   async send<T>(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: string, options: DtRequestOptions = {}): Promise<{ data: T; headers: Headers }> {
-    const headers: Record<string, string> = { Accept: 'application/json' };
+    const response = await this.request(method, path, options, 'application/json');
+    const data = parseBody(await response.text());
+    if (!response.ok) throw new DtHttpError(response.status, detailOf(data), path, codeOf(data), data);
+    return { data: data as T, headers: response.headers };
+  }
+
+  /** An answer that is a file (a Word export), as its bytes. */
+  async sendBytes(method: 'GET' | 'POST', path: string, options: DtRequestOptions = {}): Promise<{ bytes: Uint8Array; headers: Headers }> {
+    const response = await this.request(method, path, options, '*/*');
+    if (!response.ok) {
+      const data = parseBody(await response.text());
+      throw new DtHttpError(response.status, detailOf(data), path, codeOf(data), data);
+    }
+    return { bytes: new Uint8Array(await response.arrayBuffer()), headers: response.headers };
+  }
+
+  private async request(method: string, path: string, options: DtRequestOptions, accept: string): Promise<Response> {
+    const headers: Record<string, string> = { Accept: accept };
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
     let body: string | FormData | undefined;
     if (typeof FormData !== 'undefined' && options.body instanceof FormData) {
@@ -129,26 +146,23 @@ export class DtClient {
     const forwardAbort = () => controller.abort();
     options.signal?.addEventListener('abort', forwardAbort);
 
-    let response: Response;
     try {
       // `include`: on iOS the sign-in cookie then lands in the shared cookie store, where the web view finds it.
-      response = await this.fetchImpl(this.url(path, options.query), { method, headers, body, signal: controller.signal, credentials: 'include' });
+      return await this.fetchImpl(this.url(path, options.query), { method, headers, body, signal: controller.signal, credentials: 'include' });
     } catch (error) {
       throw new DtNetworkError(path, error, timedOut);
     } finally {
       clearTimeout(timer);
       options.signal?.removeEventListener('abort', forwardAbort);
     }
+  }
+}
 
-    const text = await response.text();
-    let data: unknown;
-    try {
-      data = text ? JSON.parse(text) : undefined;
-    } catch {
-      data = text;
-    }
-    if (!response.ok) throw new DtHttpError(response.status, detailOf(data), path, codeOf(data), data);
-    return { data: data as T, headers: response.headers };
+function parseBody(text: string): unknown {
+  try {
+    return text ? JSON.parse(text) : undefined;
+  } catch {
+    return text;
   }
 }
 

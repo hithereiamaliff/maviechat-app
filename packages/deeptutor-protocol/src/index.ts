@@ -17,6 +17,7 @@ export * from './mastery';
 export * from './mcp';
 export * from './memory';
 export * from './notebooks';
+export * from './notes';
 export * from './organize';
 export * from './partnerChannels';
 export * from './partnerChat';

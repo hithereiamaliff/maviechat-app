@@ -215,6 +215,8 @@ export interface DtTurnRequest {
   mcp?: string[];
   /** Draws on your memory's big picture for this message (any of them sends all four sheets). */
   memoryReferences?: string[];
+  /** A Co-Writer page this chat talks about (Dito's conversations): sent on every turn, so it can read and suggest edits. */
+  noteDocumentId?: string;
 }
 
 export type DtCommand = Record<string, unknown> & { protocol_version: string; type: string };
@@ -254,6 +256,7 @@ export function startTurnCommand(request: DtTurnRequest): DtCommand {
   if (request.skills !== undefined) command.skills = request.skills;
   if (request.mcp !== undefined) command.mcp = request.mcp;
   if (request.memoryReferences?.length) command.memory_references = request.memoryReferences;
+  if (request.noteDocumentId) command.note_document_id = request.noteDocumentId;
   return command;
 }
 

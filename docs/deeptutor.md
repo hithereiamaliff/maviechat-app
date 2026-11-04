@@ -592,6 +592,21 @@ A partner is a companion DeepTutor hosts: a soul (a persona in Markdown, in ever
 - `POST /api/imports/chat-history {source: chatgpt|claude_code|codex, agent_id?, agent_name?, sessions: [{external_id, title, source_cwd, created_at, updated_at, messages: [{role user|assistant, content, created_at?}]}]}` → `{imported, skipped, sessions}`; at most 1,000 conversations a call (413). The chat's id is `imported_<source>_<external id with other characters made ->`, so importing again only skips. Deleting is `DELETE /api/sessions/{id}`.
 - Connections: `GET /api/subagents/connections` and `DELETE /api/subagents/connections/{name}` (B7.1's facts).
 
+## Co-Writer: the Learning notebook (B8.1, 2026-11-04)
+
+DeepTutor 1.7.1's Co-Writer is a notebook of pages made of blocks (BlockNote's: 26 kinds, nested pages, icons and covers), with an AI companion, Dito. Writing blocks stays in DeepTutor's editor (in the app's web view); the app reads, keeps in order, reviews and exports.
+
+- **Library** (`/learn/notes`, the sidebar's Co-Writer): New Page (made blank, then opened in DeepTutor's editor), Review N Cards when flashcards are due, a search over every page (naming each one's parent), Pinned, then Recently edited (top-level pages). Each page shows its cover's colour, icon, title, first words, when it changed and how many subpages it has; Pin to Top or Unpin, Delete (its subpages move up a level). Menu: Import Word (a .docx up to 20 MB becomes a new page), Export Flashcards for Anki, Open on the Web.
+- **A page** (`/learn/notes/[id]`): the pages above it (tappable), cover, icon, title, then the page itself from DeepTutor's own Markdown copy of its blocks (maths, diagrams, tables, code, checklists, images with the sign-in), its subpages and the pages linking to it. An older Markdown-only page says DeepTutor's editor turns it into blocks when opened there. Menu: Edit on the Web (the page is read again on coming back), New Subpage, Pin, Export Markdown, Export Word, Export Flashcards for Anki, Delete.
+- **Flashcards** (`/learn/notes/review`): the cards due across every page, one at a time: Show Answer, then Again (back in ten minutes) or Remembered (the gap roughly doubles, up to 180 days); "All caught up"; Open its page.
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --notes`)
+
+- Under `/api/documents` when the `co-writer` module is on; learners get 403. Pages are per account and per workspace (the app uses the default). `GET /api/documents` lists every page (`id`, `title`, `preview`, `parent_id`, `icon`, `cover`, `pinned`, `revision`, times in seconds); `GET /{id}` adds `content` (DeepTutor's Markdown copy of the blocks) and `blocks` (null for an older, Markdown-only page).
+- `PUT /{id}` changes only the fields sent and needs `expected_revision` for blocks: a stale one is 409 "This page changed elsewhere. Reload before saving."; blocks without it 409 "Block pages require expected_revision." Every change, pinning included, bumps `revision`. `POST /api/documents {title, parent_id, content, blocks: []}` makes a blank page; `DELETE` moves its subpages up. `GET /{id}/backlinks`.
+- Flashcards are `learning` blocks of kind `flashcards` (`props.data` is JSON text with `cards [{front, back}]`): `GET /api/documents/review/due` (a new card is due at once), `POST /{id}/review {card_id, remembered}` → `{interval_days, due_at}`; `GET /api/documents/flashcards/export` and `/{id}/flashcards/export` → Anki's tab-separated import file.
+- `POST /api/documents/export/docx {title, content}` → a .docx (the client gets bytes: `DtClient.sendBytes`); `POST /api/documents/import/docx` (multipart `file`) → a new Markdown-only page titled by the file's name.
+
 ## M1.5 checklist
 
 | | Item |

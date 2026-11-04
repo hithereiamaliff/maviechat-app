@@ -1,0 +1,20 @@
+{
+  "module": {
+    "enabled": true,
+    "ready": true
+  },
+  "before": 4,
+  "stale": "409 This page changed elsewhere. Reload before saving.",
+  "markdownOnly": "409 Block pages require expected_revision.",
+  "pinRevisions": [
+    1,
+    2,
+    3
+  ],
+  "backlinks": 0,
+  "threads": 0,
+  "suggestions": 0,
+  "withCardsRevision": 4,
+  "wordBytes": "over 1 KB",
+  "importedTitle": "the file’s name"
+}

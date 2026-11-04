@@ -27,7 +27,8 @@ export interface DtPage {
     | '/learn/memory'
     | '/learn/mcp'
     | '/learn/cli-apps'
-    | '/learn/agents';
+    | '/learn/agents'
+    | '/learn/notes';
   /** Hidden from learner accounts, which DeepTutor limits to chat and some learning. */
   notForLearners?: boolean;
 }
@@ -55,7 +56,7 @@ export const DT_SHELVES: DtShelf[] = [
         pages: [
           { key: 'calendar', label: 'Calendar', icon: 'calendar', path: '/calendar', route: '/learn/calendar' },
           { key: 'kanban', label: 'Task Board', icon: 'view-columns', path: '/kanban', route: '/learn/tasks' },
-          { key: 'co-writer', label: 'Co-Writer', icon: 'pencil', path: '/co-writer', notForLearners: true },
+          { key: 'co-writer', label: 'Co-Writer', icon: 'pencil', path: '/co-writer', route: '/learn/notes', notForLearners: true },
         ],
       },
     ],
