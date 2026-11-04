@@ -1,7 +1,8 @@
 /*
  * OpenCode answers some routes with more than the phone should ever hold: its provider list
- * carries each provider's API key (`key`, `options.apiKey`), and its event stream carries every
- * kind of event the server has. What the gateway forwards keeps only what the app shows.
+ * carries each provider's API key (`key`, `options.apiKey`), its config carries MCP servers'
+ * keys and headers, and its event stream carries every kind of event the server has. What the
+ * gateway forwards keeps only what the app shows.
  */
 
 type Tree = Record<string, unknown>;
@@ -36,6 +37,17 @@ export function cleanProviders(body: unknown): unknown {
     : [];
   const defaults = record(value.default);
   return { providers, default: Object.fromEntries(Object.entries(defaults).filter(([, model]) => typeof model === 'string')) };
+}
+
+/** A model as OpenCode's config names it (`provider/model`), or null for anything else. */
+const modelRef = (value: unknown): string | null => (typeof value === 'string' && value.length <= 200 && /^[^/\s]+\/\S+$/.test(value) ? value : null);
+
+/**
+ * `GET /config`: the default model and nothing else. MCP servers (with their keys and headers),
+ * provider options, permissions and plugins stay on the machine.
+ */
+export function cleanConfig(body: unknown): unknown {
+  return { model: modelRef(record(body).model) };
 }
 
 /** `GET /agent`: each agent's name and kind, without its prompt, options or permissions. */

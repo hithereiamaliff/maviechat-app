@@ -111,6 +111,16 @@ export const answerQuestion = (client: OcClient, directory: string, requestID: s
 export const rejectQuestion = (client: OcClient, directory: string, requestID: string) => client.oc<boolean>('POST', `/question/${encodeURIComponent(requestID)}/reject`, { query: { directory } });
 
 export const getProviders = (client: OcClient, directory: string) => client.oc<Providers>('GET', '/config/providers', { query: { directory } });
+
+/** A model named `provider/model` as its two ids; the model part may hold more slashes. */
+export function parseModelRef(ref: unknown): { providerID: string; modelID: string } | null {
+  if (typeof ref !== 'string') return null;
+  const slash = ref.indexOf('/');
+  return slash > 0 && slash < ref.length - 1 ? { providerID: ref.slice(0, slash), modelID: ref.slice(slash + 1) } : null;
+}
+
+/** The model a project uses when none is picked: its config's `model`, the one setting the gateway passes on. */
+export const getDefaultModel = async (client: OcClient, directory: string) => parseModelRef((await client.oc<{ model?: unknown }>('GET', '/config', { query: { directory } })).model);
 export const listAgents = (client: OcClient, directory: string) => client.oc<Agent[]>('GET', '/agent', { query: { directory } });
 export const listProjects = (client: OcClient, directory: string) => client.oc<Project[]>('GET', '/project', { query: { directory } });
 

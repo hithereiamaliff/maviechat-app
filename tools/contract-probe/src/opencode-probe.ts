@@ -95,10 +95,18 @@ async function main(): Promise<void> {
     await step('refusals: other folders, paths outside a project, closed routes', async () => {
       const outside = await statusOf(() => listSessions(client, '/etc'));
       const escape = await statusOf(() => listFiles(client, folder, '../../etc'));
-      const closed = await statusOf(() => client.oc('GET', '/config', { query: { directory: folder } }));
+      // Refused by the gateway itself: neither request reaches OpenCode.
+      const closed = await statusOf(() => client.oc('PATCH', '/config', { query: { directory: folder }, body: {} }));
       const contents = await statusOf(() => client.oc('GET', '/file/content', { query: { directory: folder, path: 'README.md' } }));
       if (outside !== 403 || escape !== 403 || closed !== 404 || contents !== 404) throw new Error(`answered ${outside}, ${escape}, ${closed}, ${contents}`);
-      return 'outside folder 403, path escape 403, closed routes 404 (config, file contents)';
+      return 'outside folder 403, path escape 403, closed routes 404 (config changes, file contents)';
+    });
+
+    await step('config: only the default model comes back', async () => {
+      const settings = await client.oc<Record<string, unknown>>('GET', '/config', { query: { directory: folder } });
+      const keys = Object.keys(settings);
+      if (keys.length !== 1 || keys[0] !== 'model') throw new Error(`answered with ${keys.length} keys`);
+      return `only "model": ${typeof settings.model === 'string' ? settings.model : 'not set'}`;
     });
 
     await step('sessions: listed for an allowed folder', async () => `${(await listSessions(client, folder)).length} sessions in the first folder (titles not shown)`);

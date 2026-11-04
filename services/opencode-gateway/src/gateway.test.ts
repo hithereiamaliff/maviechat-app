@@ -53,6 +53,11 @@ beforeEach(async () => {
         return;
       }
       if (request.method === 'POST' && request.url?.startsWith('/session?')) return response.writeHead(200, { 'Content-Type': 'application/json' }).end(body);
+      if (request.url?.startsWith('/config?')) {
+        if (request.url.includes('broken')) return response.writeHead(500, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'mcp exa: x-api-key sk-mcp-secret rejected' }));
+        const settings = { model: 'opencode-go/glm-5.2', small_model: 'opencode-go/glm-5.2', mcp: { exa: { type: 'remote', url: 'https://mcp.example.com', headers: { 'x-api-key': 'sk-mcp-secret' } } }, provider: { openai: { options: { apiKey: 'sk-mcp-secret' } } } };
+        return response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(settings));
+      }
       if (request.url?.startsWith('/config/providers')) {
         return response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ providers: [{ id: 'p', name: 'P', key: 'sk-live-secret', options: { apiKey: 'sk-live-secret' }, models: {} }], default: {} }));
       }
@@ -175,6 +180,16 @@ describe('opencode gateway', () => {
     const text = await (await fetch(`${base}/v1/oc/root/config/providers?directory=/home/dev/work/app`, authed(token))).text();
     expect(text).not.toContain('sk-live-secret');
     expect(JSON.parse(text)).toEqual({ providers: [{ id: 'p', name: 'P', models: {} }], default: {} });
+  });
+
+  it('passes on only the default model from the config, even when OpenCode fails', async () => {
+    const token = await pair();
+    const text = await (await fetch(`${base}/v1/oc/root/config?directory=/home/dev/work/app`, authed(token))).text();
+    expect(text).not.toContain('sk-mcp-secret');
+    expect(JSON.parse(text)).toEqual({ model: 'opencode-go/glm-5.2' });
+    const failed = await fetch(`${base}/v1/oc/root/config?directory=/home/dev/work/broken`, authed(token));
+    expect(failed.status).toBe(500);
+    expect(await failed.text()).not.toContain('sk-mcp-secret');
   });
 
   it('unpairs a phone: its token stops working', async () => {

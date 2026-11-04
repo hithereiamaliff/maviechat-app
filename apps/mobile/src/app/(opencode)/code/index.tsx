@@ -36,6 +36,9 @@ export default function OpenCodeHome() {
   const [agent, setAgent] = useState<string | null>(null);
   const [approvals, setApprovals] = useState(true);
   const offline = machine.data?.logins.some((login) => !login.online) ?? false;
+  // What OpenCode uses when nothing is picked: the agent's own model, else the machine's default.
+  const agentInfo = agents.data?.find((item) => item.name === (agent ?? agents.data?.[0]?.name));
+  const defaultModel = agentInfo?.model ?? models.data?.defaultModel ?? null;
 
   const send = async (text: string): Promise<boolean> => {
     if (!directory) {
@@ -79,6 +82,7 @@ export default function OpenCodeHome() {
               working={false}
               models={models.data?.models ?? []}
               model={model}
+              defaultModel={defaultModel}
               onModel={setModel}
               agents={agents.data ?? []}
               agent={agent ?? agents.data?.[0]?.name ?? null}

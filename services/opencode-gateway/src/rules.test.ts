@@ -25,6 +25,8 @@ describe('requests', () => {
     expect(checkRequest('GET', '/session', query({ directory: '/home/dev/work/app' }), folders)).toEqual({ ok: true, label: '/session' });
     expect(checkRequest('POST', '/session/ses_123/prompt_async', query({ directory: '/home/dev/work/app' }), folders)).toMatchObject({ ok: true, label: '/session/:id/prompt_async' });
     expect(checkRequest('GET', '/global/health', query({}), folders)).toMatchObject({ ok: true });
+    expect(checkRequest('GET', '/config', query({ directory: '/home/dev/work/app' }), folders)).toEqual({ ok: true, label: '/config' });
+    expect(checkRequest('GET', '/config', query({ directory: '/etc' }), folders)).toMatchObject({ ok: false, status: 403 });
     expect(checkRequest('GET', '/session', query({}), folders)).toMatchObject({ ok: false, status: 403 });
     expect(checkRequest('GET', '/session', query({ directory: '/etc' }), folders)).toMatchObject({ ok: false, status: 403 });
     expect(checkRequest('GET', '/session', query({ directory: '/home/dev/work/app', workspace: 'w1' }), folders)).toMatchObject({ ok: false, status: 403 });
@@ -33,7 +35,8 @@ describe('requests', () => {
       ['POST', '/session/ses_1/shell'],
       ['PUT', '/auth/anthropic'],
       ['POST', '/session/ses_1/command'],
-      ['GET', '/config'],
+      ['PATCH', '/config'],
+      ['GET', '/config/raw'],
       ['POST', '/pty'],
       ['GET', '/experimental/session'],
     ] as const) {

@@ -39,6 +39,8 @@ export default function OpenCodeSession() {
   const lastUser = [...live.messages].reverse().find((entry) => entry.info.role === 'user')?.info as UserMessage | undefined;
   const chosenModel = model ?? (lastUser?.model ? { providerID: lastUser.model.providerID, modelID: lastUser.model.modelID } : null);
   const chosenAgent = agent ?? lastUser?.agent ?? agents.data?.[0]?.name ?? null;
+  // A session with no model yet uses the agent's own, else the machine's default.
+  const defaultModel = agents.data?.find((item) => item.name === chosenAgent)?.model ?? models.data?.defaultModel ?? null;
   const working = isWorking(live);
   const title = session.data?.title || 'Session';
 
@@ -163,6 +165,7 @@ export default function OpenCodeSession() {
             working={working}
             models={models.data?.models ?? []}
             model={chosenModel}
+            defaultModel={defaultModel}
             onModel={setModel}
             agents={agents.data ?? []}
             agent={chosenAgent}

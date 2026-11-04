@@ -17,9 +17,21 @@ const sameModel = (a: ModelPick | null, b: ModelPick) => a?.providerID === b.pro
 
 /**
  * Every model OpenCode can use, under its provider (providers and models A to Z), with a search
- * that keeps what it finds under the provider too. The one in use is ticked.
+ * that keeps what it finds under the provider too. The one in use is ticked, the default marked.
  */
-function ModelSheet({ models, value, onPick, onClose }: { models: ModelChoice[]; value: ModelPick | null; onPick: (model: ModelPick) => void; onClose: () => void }) {
+function ModelSheet({
+  models,
+  value,
+  defaultModel,
+  onPick,
+  onClose,
+}: {
+  models: ModelChoice[];
+  value: ModelPick | null;
+  defaultModel: ModelPick | null;
+  onPick: (model: ModelPick) => void;
+  onClose: () => void;
+}) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
@@ -61,10 +73,11 @@ function ModelSheet({ models, value, onPick, onClose }: { models: ModelChoice[];
         )}
         renderItem={({ item }) => {
           const selected = sameModel(value, item);
+          const isDefault = sameModel(defaultModel, item);
           return (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`${item.name}, ${item.provider}`}
+              accessibilityLabel={`${item.name}, ${item.provider}${isDefault ? ', the default' : ''}`}
               accessibilityState={{ selected }}
               onPress={() => {
                 onPick({ providerID: item.providerID, modelID: item.modelID });
@@ -74,6 +87,7 @@ function ModelSheet({ models, value, onPick, onClose }: { models: ModelChoice[];
               <Text style={[styles.modelName, { color: palette.text }]} numberOfLines={1}>
                 {item.name}
               </Text>
+              {isDefault ? <Text style={[styles.tag, { color: palette.textFaint }]}>default</Text> : null}
               {selected ? <Icon name="check" size={18} color={palette.text} strokeWidth={2} /> : null}
             </Pressable>
           );
@@ -91,12 +105,14 @@ function ModelSheet({ models, value, onPick, onClose }: { models: ModelChoice[];
 
 /**
  * Where you write to OpenCode: the text, which model and agent answer, and send, or stop while
- * it works. `onSend` resolves true when the prompt went out, which clears the text.
+ * it works. `onSend` resolves true when the prompt went out, which clears the text. Until a
+ * model is picked, the chip names `defaultModel`, the one OpenCode will use.
  */
 export function OcComposer({
   working,
   models,
   model,
+  defaultModel = null,
   onModel,
   agents,
   agent,
@@ -109,6 +125,7 @@ export function OcComposer({
   working: boolean;
   models: ModelChoice[];
   model: ModelPick | null;
+  defaultModel?: ModelPick | null;
   onModel: (model: ModelPick) => void;
   agents: Agent[];
   agent: string | null;
@@ -122,7 +139,9 @@ export function OcComposer({
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [picking, setPicking] = useState(false);
-  const current = models.find((item) => model && sameModel(model, item));
+  const shown = model ?? defaultModel;
+  const current = models.find((item) => sameModel(shown, item));
+  const modelLabel = current?.name ?? shown?.modelID ?? 'Default model';
 
   const send = async () => {
     const value = text.trim();
@@ -156,10 +175,10 @@ export function OcComposer({
             </View>
           </MenuTrigger>
         ) : null}
-        <Pressable accessibilityRole="button" accessibilityLabel={`Model: ${current?.name ?? 'default'}`} onPress={() => setPicking(true)} style={[styles.chip, styles.modelChip, { borderColor: palette.border }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Model: ${modelLabel}${model ? '' : ', the default'}`} onPress={() => setPicking(true)} style={[styles.chip, styles.modelChip, { borderColor: palette.border }]}>
           <Icon name="cpu-chip" size={14} color={palette.textMuted} />
           <Text style={[styles.chipText, { color: palette.text }]} numberOfLines={1}>
-            {current?.name ?? 'Default model'}
+            {modelLabel}
           </Text>
         </Pressable>
         <View style={styles.flex} />
@@ -179,7 +198,7 @@ export function OcComposer({
         )}
       </View>
       <Modal visible={picking} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPicking(false)}>
-        {picking ? <ModelSheet models={models} value={model} onPick={onModel} onClose={() => setPicking(false)} /> : null}
+        {picking ? <ModelSheet models={models} value={shown} defaultModel={defaultModel} onPick={onModel} onClose={() => setPicking(false)} /> : null}
       </Modal>
     </View>
   );
@@ -208,5 +227,6 @@ const styles = StyleSheet.create({
   count: { fontFamily: fonts.regular, fontSize: 12 },
   modelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 11, borderRadius: radius.md },
   modelName: { flex: 1, fontFamily: fonts.regular, fontSize: 15 },
+  tag: { fontFamily: fonts.regular, fontSize: 12 },
   empty: { fontFamily: fonts.regular, fontSize: 14, textAlign: 'center', marginTop: 24 },
 });

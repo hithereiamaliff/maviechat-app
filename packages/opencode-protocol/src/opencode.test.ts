@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createSession, pairDevice, parsePairingLink, pickableAgents, sendPrompt } from './api';
+import { createSession, pairDevice, parseModelRef, parsePairingLink, pickableAgents, sendPrompt } from './api';
 import { parseEvent, readEvents, SseParser } from './events';
 import { OcClient, OcHttpError } from './http';
 import { applyEvent, emptyLive, errorText, isWorking, liveFromHistory, type SessionLive } from './live';
@@ -133,5 +133,13 @@ describe('client', () => {
         { name: 'title', mode: 'primary', hidden: true },
       ]).map((agent) => agent.name),
     ).toEqual(['build', 'plan']);
+  });
+});
+
+describe('model names', () => {
+  it('splits provider/model at the first slash', () => {
+    expect(parseModelRef('opencode-go/glm-5.2')).toEqual({ providerID: 'opencode-go', modelID: 'glm-5.2' });
+    expect(parseModelRef('openrouter/anthropic/claude-x')).toEqual({ providerID: 'openrouter', modelID: 'anthropic/claude-x' });
+    for (const ref of [null, undefined, '', 'glm', '/glm', 'opencode-go/', 42]) expect(parseModelRef(ref)).toBeNull();
   });
 });

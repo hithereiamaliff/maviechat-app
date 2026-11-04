@@ -1,4 +1,4 @@
-import { getMachine, getProviders, listAgents, listFiles, listProjects, listSessions, pickableAgents, type Model } from '@maviechat/opencode-protocol';
+import { getDefaultModel, getMachine, getProviders, listAgents, listFiles, listProjects, listSessions, pickableAgents, type Model } from '@maviechat/opencode-protocol';
 import { useQuery } from '@tanstack/react-query';
 import { useOcAuthed } from '@/session/OpenCodeProvider';
 import { OC_QUERY_ROOT } from '@/session/queryRoots';
@@ -47,19 +47,23 @@ export function useSubfolders(root: string | null) {
   });
 }
 
-/** Every model this OpenCode can use. Until one is picked, OpenCode uses its own default. */
+/** Every model this OpenCode can use, and the machine's default: what it uses until one is picked. */
 export function useOcModels(directory: string | null) {
   const { client, accountId } = useOcAuthed();
   return useQuery({
     queryKey: ocKey(accountId, 'models', directory),
     queryFn: async () => {
-      const result = await getProviders(client, directory ?? '');
+      const [result, defaultModel] = await Promise.all([
+        getProviders(client, directory ?? ''),
+        // A gateway from before 2026-11-04 doesn't pass the config on; the composer then says "Default model".
+        getDefaultModel(client, directory ?? '').catch(() => null),
+      ]);
       const models: ModelChoice[] = result.providers.flatMap((provider) =>
         Object.values(provider.models)
           .filter((model: Model) => model.status !== 'deprecated')
           .map((model: Model) => ({ providerID: provider.id, modelID: model.id, name: model.name || model.id, provider: provider.name })),
       );
-      return { models };
+      return { models, defaultModel };
     },
     enabled: Boolean(directory),
     staleTime: 5 * 60_000,

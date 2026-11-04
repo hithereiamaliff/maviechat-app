@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { cleanAgents, cleanProviders, eventAllowed, eventFilter } from './sanitize.ts';
+import { cleanAgents, cleanConfig, cleanProviders, eventAllowed, eventFilter } from './sanitize.ts';
+
+describe('the config', () => {
+  it('keeps only a well-formed default model', () => {
+    expect(cleanConfig({ model: 'opencode-go/glm-5.2', mcp: { exa: { headers: { 'x-api-key': 'sk-secret' } } }, provider: { a: { options: { apiKey: 'sk-secret' } } } })).toEqual({ model: 'opencode-go/glm-5.2' });
+    expect(cleanConfig({ model: 'openrouter/anthropic/claude-x' })).toEqual({ model: 'openrouter/anthropic/claude-x' });
+    for (const model of [undefined, 42, { id: 'x' }, 'no-slash', 'a b/c', '/x', 'p/', 'p/'.padEnd(300, 'x')]) expect(cleanConfig({ model })).toEqual({ model: null });
+    expect(cleanConfig(null)).toEqual({ model: null });
+  });
+});
 
 describe('what the gateway forwards', () => {
   it('strips API keys and settings from the provider list', () => {

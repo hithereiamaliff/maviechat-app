@@ -2,8 +2,15 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Readable } from 'node:stream';
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { checkRequest, withApprovals } from './rules.ts';
-import { cleanAgents, cleanProviders, eventFilter } from './sanitize.ts';
+import { cleanAgents, cleanConfig, cleanProviders, eventFilter } from './sanitize.ts';
 import type { DeviceStore } from './store.ts';
+
+/** Answers cut down before they reach the phone: provider API keys, agent prompts, the config but its default model. */
+const CLEANERS = new Map<string, (body: unknown) => unknown>([
+  ['/config/providers', cleanProviders],
+  ['/config', cleanConfig],
+  ['/agent', cleanAgents],
+]);
 
 /** An OpenCode server on this machine, as one login the app can pick. */
 export interface Login {
@@ -222,10 +229,15 @@ export function createGateway(config: GatewayConfig, store: DeviceStore, fetchIm
       return reply(502, { error: `OpenCode (${login.name}) isn't answering on this machine.` });
     }
 
-    // Answers that carry more than the phone should hold are cut down here (provider API keys, agent prompts).
-    const clean = method === 'GET' && upstream.ok ? (forwarded[2] === '/config/providers' ? cleanProviders : forwarded[2] === '/agent' ? cleanAgents : null) : null;
-    if (clean) {
+    // Answers that carry more than the phone should hold are cut down here. Not even an error
+    // from the config route is passed on as it came.
+    const clean = method === 'GET' ? CLEANERS.get(forwarded[2]) : undefined;
+    if (clean && (upstream.ok || forwarded[2] === '/config')) {
       if (timer) clearTimeout(timer);
+      if (!upstream.ok) {
+        await upstream.body?.cancel().catch(() => undefined);
+        return reply(upstream.status, { error: `OpenCode (${login.name}) couldn't read its settings.` });
+      }
       let body: unknown;
       try {
         body = clean(await upstream.json());
