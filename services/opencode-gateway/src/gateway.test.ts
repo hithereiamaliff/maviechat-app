@@ -53,6 +53,11 @@ beforeEach(async () => {
         return;
       }
       if (request.method === 'POST' && request.url?.startsWith('/session?')) return response.writeHead(200, { 'Content-Type': 'application/json' }).end(body);
+      if (request.method === 'PATCH' && request.url?.startsWith('/global/config')) {
+        if (body.includes('broken')) return response.writeHead(500, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'write failed near sk-mcp-secret' }));
+        const saved = { ...(JSON.parse(body) as object), mcp: { exa: { type: 'remote', headers: { 'x-api-key': 'sk-mcp-secret' } } } };
+        return response.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(saved));
+      }
       if (request.url?.startsWith('/config?')) {
         if (request.url.includes('broken')) return response.writeHead(500, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: 'mcp exa: x-api-key sk-mcp-secret rejected' }));
         const settings = { model: 'opencode-go/glm-5.2', small_model: 'opencode-go/glm-5.2', mcp: { exa: { type: 'remote', url: 'https://mcp.example.com', headers: { 'x-api-key': 'sk-mcp-secret' } } }, provider: { openai: { options: { apiKey: 'sk-mcp-secret' } } } };
@@ -190,6 +195,27 @@ describe('opencode gateway', () => {
     const failed = await fetch(`${base}/v1/oc/root/config?directory=/home/dev/work/broken`, authed(token));
     expect(failed.status).toBe(500);
     expect(await failed.text()).not.toContain('sk-mcp-secret');
+  });
+
+  it('changes only the default model in OpenCode’s settings, and answers with only that', async () => {
+    const token = await pair();
+    const patch = (body: unknown) => fetch(`${base}/v1/oc/root/global/config`, authed(token, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+    const patches = () => seen.filter((item) => item.method === 'PATCH');
+    const answer = await patch({ model: 'opencode-go/deepseek-v4.1-flash', mcp: { evil: { type: 'local', command: ['sh', '-c', 'id'] } } });
+    const text = await answer.text();
+    expect(answer.status).toBe(200);
+    expect(text).not.toContain('sk-mcp-secret');
+    expect(JSON.parse(text)).toEqual({ model: 'opencode-go/deepseek-v4.1-flash' });
+    expect(JSON.parse(patches().at(-1)?.body ?? '')).toEqual({ model: 'opencode-go/deepseek-v4.1-flash' });
+    // Anything but a plain model name is refused before OpenCode sees it.
+    const count = patches().length;
+    expect((await patch({ model: 'not a model' })).status).toBe(400);
+    expect((await patch({ mcp: { evil: {} } })).status).toBe(400);
+    expect(patches().length).toBe(count);
+    const failed = await patch({ model: 'opencode-go/broken' });
+    expect(failed.status).toBe(500);
+    expect(await failed.text()).not.toContain('sk-mcp-secret');
+    expect((await fetch(`${base}/v1/oc/root/global/config`, authed(token))).status).toBe(404);
   });
 
   it('unpairs a phone: its token stops working', async () => {

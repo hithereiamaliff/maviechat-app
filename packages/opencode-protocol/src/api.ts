@@ -121,6 +121,13 @@ export function parseModelRef(ref: unknown): { providerID: string; modelID: stri
 
 /** The model a project uses when none is picked: its config's `model`, the one setting the gateway passes on. */
 export const getDefaultModel = async (client: OcClient, directory: string) => parseModelRef((await client.oc<{ model?: unknown }>('GET', '/config', { query: { directory } })).model);
+
+/**
+ * Makes a model the machine's default. OpenCode writes it to its global settings and reloads its
+ * projects, so a reply running then stops. Answers with the default as it now stands.
+ */
+export const setDefaultModel = async (client: OcClient, model: { providerID: string; modelID: string }) =>
+  parseModelRef((await client.oc<{ model?: unknown }>('PATCH', '/global/config', { body: { model: `${model.providerID}/${model.modelID}` } })).model);
 export const listAgents = (client: OcClient, directory: string) => client.oc<Agent[]>('GET', '/agent', { query: { directory } });
 export const listProjects = (client: OcClient, directory: string) => client.oc<Project[]>('GET', '/project', { query: { directory } });
 

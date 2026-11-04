@@ -1,12 +1,16 @@
-import type { Agent } from '@maviechat/opencode-protocol';
+import { OcHttpError, type Agent } from '@maviechat/opencode-protocol';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { MenuTrigger } from '@/components/Menu';
+import { useToast } from '@/components/Toast';
 import { fonts, radius, usePalette } from '@/theme';
+import { describeOcError } from './errors';
 import { modelSections, type ModelChoice } from './models';
+import { useSetDefaultModel } from './queries';
 
 export interface ModelPick {
   providerID: string;
@@ -17,7 +21,8 @@ const sameModel = (a: ModelPick | null, b: ModelPick) => a?.providerID === b.pro
 
 /**
  * Every model OpenCode can use, under its provider (providers and models A to Z), with a search
- * that keeps what it finds under the provider too. The one in use is ticked, the default marked.
+ * that keeps what it finds under the provider too. The one in use is ticked, the default marked,
+ * and Set as Default makes the ticked one the machine's default (after a warning).
  */
 function ModelSheet({
   models,
@@ -37,6 +42,38 @@ function ModelSheet({
   const [query, setQuery] = useState('');
   const sections = useMemo(() => modelSections(models, query), [models, query]);
   const typed = query.trim();
+  const toast = useToast();
+  const setDefault = useSetDefaultModel();
+  const [saving, setSaving] = useState(false);
+  // The ticked model can become the machine's default, when it isn't already.
+  const chosen = value ? models.find((item) => sameModel(value, item)) : undefined;
+  const offerDefault = Boolean(chosen && !sameModel(defaultModel, chosen));
+
+  const save = async (model: ModelChoice) => {
+    setSaving(true);
+    try {
+      await setDefault({ providerID: model.providerID, modelID: model.modelID });
+      toast(`${model.name} is now the default`, 'success');
+      onClose();
+    } catch (error) {
+      toast(error instanceof OcHttpError && error.status === 404 ? 'This machine’s gateway can’t change the default yet. Update it, then try again.' : describeOcError(error), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmDefault = () => {
+    if (!chosen) return;
+    Alert.alert(
+      `Make ${chosen.name} the default?`,
+      'New sessions on this machine will use it, here and in OpenCode in the terminal. OpenCode reloads its projects, so a reply that’s running on this machine stops.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Set as Default', onPress: () => void save(chosen) },
+      ],
+    );
+  };
+
   return (
     <View style={[styles.sheet, { backgroundColor: palette.background }]}>
       <View style={styles.sheetHeader}>
@@ -96,9 +133,14 @@ function ModelSheet({
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         automaticallyAdjustKeyboardInsets
-        contentContainerStyle={[styles.modelList, { paddingBottom: insets.bottom + 12 }]}
+        contentContainerStyle={[styles.modelList, { paddingBottom: offerDefault ? 12 : insets.bottom + 12 }]}
         ListEmptyComponent={<Text style={[styles.empty, { color: palette.textMuted }]}>{typed ? `No models match “${typed}”.` : 'No models found.'}</Text>}
       />
+      {offerDefault && chosen ? (
+        <View style={[styles.sheetFooter, { borderTopColor: palette.border, paddingBottom: insets.bottom + 12 }]}>
+          <Button label={`Set ${chosen.name} as Default`} variant="secondary" loading={saving} onPress={confirmDefault} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -229,4 +271,5 @@ const styles = StyleSheet.create({
   modelName: { flex: 1, fontFamily: fonts.regular, fontSize: 15 },
   tag: { fontFamily: fonts.regular, fontSize: 12 },
   empty: { fontFamily: fonts.regular, fontSize: 14, textAlign: 'center', marginTop: 24 },
+  sheetFooter: { paddingHorizontal: 16, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
 });

@@ -2,15 +2,19 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Readable } from 'node:stream';
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { checkRequest, withApprovals } from './rules.ts';
-import { cleanAgents, cleanConfig, cleanProviders, eventFilter } from './sanitize.ts';
+import { cleanAgents, cleanConfig, cleanProviders, defaultModelPatch, eventFilter } from './sanitize.ts';
 import type { DeviceStore } from './store.ts';
 
 /** Answers cut down before they reach the phone: provider API keys, agent prompts, the config but its default model. */
 const CLEANERS = new Map<string, (body: unknown) => unknown>([
   ['/config/providers', cleanProviders],
   ['/config', cleanConfig],
+  ['/global/config', cleanConfig],
   ['/agent', cleanAgents],
 ]);
+
+/** OpenCode's settings: their answers and errors never reach the phone as they came. */
+const SETTINGS = new Set(['/config', '/global/config']);
 
 /** An OpenCode server on this machine, as one login the app can pick. */
 export interface Login {
@@ -206,6 +210,12 @@ export function createGateway(config: GatewayConfig, store: DeviceStore, fetchIm
         const approvals = String(request.headers['x-maviechat-approvals'] ?? '') || undefined;
         body = Buffer.from(JSON.stringify(withApprovals(body.length ? parseJson(body) : {}, approvals)));
       }
+      // The phone may change one setting, the default model: nothing else in the body goes on.
+      if (method === 'PATCH' && forwarded[2] === '/global/config') {
+        const patch = defaultModelPatch(parseJson(body));
+        if (!patch) return reply(400, { error: 'That isn’t a model name (provider/model).' });
+        body = Buffer.from(JSON.stringify(patch));
+      }
     }
 
     const streaming = forwarded[2] === '/event';
@@ -230,13 +240,14 @@ export function createGateway(config: GatewayConfig, store: DeviceStore, fetchIm
     }
 
     // Answers that carry more than the phone should hold are cut down here. Not even an error
-    // from the config route is passed on as it came.
-    const clean = method === 'GET' ? CLEANERS.get(forwarded[2]) : undefined;
-    if (clean && (upstream.ok || forwarded[2] === '/config')) {
+    // from the settings routes is passed on as it came.
+    const settings = SETTINGS.has(forwarded[2]);
+    const clean = method === 'GET' || settings ? CLEANERS.get(forwarded[2]) : undefined;
+    if (clean && (upstream.ok || settings)) {
       if (timer) clearTimeout(timer);
       if (!upstream.ok) {
         await upstream.body?.cancel().catch(() => undefined);
-        return reply(upstream.status, { error: `OpenCode (${login.name}) couldn't read its settings.` });
+        return reply(upstream.status, { error: `OpenCode (${login.name}) couldn't ${method === 'GET' ? 'read' : 'change'} its settings.` });
       }
       let body: unknown;
       try {

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { cleanAgents, cleanConfig, cleanProviders, eventAllowed, eventFilter } from './sanitize.ts';
+import { cleanAgents, cleanConfig, cleanProviders, defaultModelPatch, eventAllowed, eventFilter } from './sanitize.ts';
+
+describe('changing the default model', () => {
+  it('lets only a plain model name through', () => {
+    expect(defaultModelPatch({ model: 'opencode-go/deepseek-v4.1-flash', mcp: { evil: { type: 'local', command: ['sh', '-c', 'id'] } }, plugin: ['x'] })).toEqual({ model: 'opencode-go/deepseek-v4.1-flash' });
+    expect(defaultModelPatch({ model: 'openrouter/anthropic/claude-x@2025:1' })).toEqual({ model: 'openrouter/anthropic/claude-x@2025:1' });
+    for (const model of [undefined, 7, 'glm', 'a b/c', 'p/"x"', 'p/x}', '/x', 'p/', `p/${'x'.repeat(250)}`]) expect(defaultModelPatch({ model })).toBeNull();
+    expect(defaultModelPatch(null)).toBeNull();
+  });
+});
 
 describe('the config', () => {
   it('keeps only a well-formed default model', () => {

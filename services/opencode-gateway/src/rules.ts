@@ -52,6 +52,8 @@ export const ROUTES: readonly Route[] = [
   route('GET', '/config/providers', '/config/providers'),
   // Only the default model comes back (sanitize.ts): the config also holds MCP servers' keys.
   route('GET', '/config', '/config'),
+  // Setting the machine's default model: only a checked `model` goes on, and only it comes back (gateway.ts).
+  route('PATCH', '/global/config', '/global/config', { project: false }),
   route('GET', '/agent', '/agent'),
   route('GET', '/session', '/session'),
   route('POST', '/session', '/session'),

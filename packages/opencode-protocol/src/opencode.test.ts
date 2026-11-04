@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createSession, pairDevice, parseModelRef, parsePairingLink, pickableAgents, sendPrompt } from './api';
+import { createSession, pairDevice, parseModelRef, parsePairingLink, pickableAgents, sendPrompt, setDefaultModel } from './api';
 import { parseEvent, readEvents, SseParser } from './events';
 import { OcClient, OcHttpError } from './http';
 import { applyEvent, emptyLive, errorText, isWorking, liveFromHistory, type SessionLive } from './live';
@@ -141,5 +141,17 @@ describe('model names', () => {
     expect(parseModelRef('opencode-go/glm-5.2')).toEqual({ providerID: 'opencode-go', modelID: 'glm-5.2' });
     expect(parseModelRef('openrouter/anthropic/claude-x')).toEqual({ providerID: 'openrouter', modelID: 'anthropic/claude-x' });
     for (const ref of [null, undefined, '', 'glm', '/glm', 'opencode-go/', 42]) expect(parseModelRef(ref)).toBeNull();
+  });
+});
+
+describe('the default model', () => {
+  it('is set with only the model name in the body', async () => {
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ model: 'opencode-go/deepseek-v4.1-flash' }), { status: 200 }));
+    const client = new OcClient({ gatewayUrl: 'https://g', token: 't', login: 'root', fetch });
+    await expect(setDefaultModel(client, { providerID: 'opencode-go', modelID: 'deepseek-v4.1-flash' })).resolves.toEqual({ providerID: 'opencode-go', modelID: 'deepseek-v4.1-flash' });
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://g/v1/oc/root/global/config');
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(String(init.body))).toEqual({ model: 'opencode-go/deepseek-v4.1-flash' });
   });
 });

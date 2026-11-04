@@ -1,5 +1,5 @@
-import { getDefaultModel, getMachine, getProviders, listAgents, listFiles, listProjects, listSessions, pickableAgents, type Model } from '@maviechat/opencode-protocol';
-import { useQuery } from '@tanstack/react-query';
+import { getDefaultModel, getMachine, getProviders, listAgents, setDefaultModel, listFiles, listProjects, listSessions, pickableAgents, type Model } from '@maviechat/opencode-protocol';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useOcAuthed } from '@/session/OpenCodeProvider';
 import { OC_QUERY_ROOT } from '@/session/queryRoots';
 import type { ModelChoice } from './models';
@@ -68,6 +68,17 @@ export function useOcModels(directory: string | null) {
     enabled: Boolean(directory),
     staleTime: 5 * 60_000,
   });
+}
+
+/** Makes a model this machine's default; every project's default is then read again. */
+export function useSetDefaultModel() {
+  const { client, accountId } = useOcAuthed();
+  const queryClient = useQueryClient();
+  return async (model: { providerID: string; modelID: string }) => {
+    const saved = await setDefaultModel(client, model);
+    await queryClient.invalidateQueries({ queryKey: ocKey(accountId, 'models') });
+    return saved;
+  };
 }
 
 export function useOcAgents(directory: string | null) {

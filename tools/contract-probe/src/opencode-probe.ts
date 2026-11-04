@@ -109,6 +109,14 @@ async function main(): Promise<void> {
       return `only "model": ${typeof settings.model === 'string' ? settings.model : 'not set'}`;
     });
 
+    await step('default model: a bad name is refused, and global settings stay unreadable', async () => {
+      // Never a real change: a bad name stops at the gateway, so nothing is written or reloaded.
+      const bad = await statusOf(() => client.oc('PATCH', '/global/config', { body: { model: 'not a model' } }));
+      const read = await statusOf(() => client.oc('GET', '/global/config'));
+      if (bad !== 400 || read !== 404) throw new Error(`answered ${bad}, ${read}`);
+      return 'bad name 400 (not forwarded), reading global settings 404';
+    });
+
     await step('sessions: listed for an allowed folder', async () => `${(await listSessions(client, folder)).length} sessions in the first folder (titles not shown)`);
 
     if (withPrompts) {

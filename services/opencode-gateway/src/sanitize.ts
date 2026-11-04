@@ -50,6 +50,15 @@ export function cleanConfig(body: unknown): unknown {
   return { model: modelRef(record(body).model) };
 }
 
+/**
+ * The one change the phone may make to OpenCode's settings: its default model, a plain
+ * `provider/model` name. Anything else in the body (MCP servers, plugins, permissions) is dropped.
+ */
+export function defaultModelPatch(body: unknown): { model: string } | null {
+  const model = record(body).model;
+  return typeof model === 'string' && model.length <= 200 && /^[A-Za-z0-9][\w.-]*\/[\w.:@+/-]+$/.test(model) ? { model } : null;
+}
+
 /** `GET /agent`: each agent's name and kind, without its prompt, options or permissions. */
 export function cleanAgents(body: unknown): unknown {
   return Array.isArray(body)

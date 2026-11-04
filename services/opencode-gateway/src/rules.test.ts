@@ -27,6 +27,7 @@ describe('requests', () => {
     expect(checkRequest('GET', '/global/health', query({}), folders)).toMatchObject({ ok: true });
     expect(checkRequest('GET', '/config', query({ directory: '/home/dev/work/app' }), folders)).toEqual({ ok: true, label: '/config' });
     expect(checkRequest('GET', '/config', query({ directory: '/etc' }), folders)).toMatchObject({ ok: false, status: 403 });
+    expect(checkRequest('PATCH', '/global/config', query({}), folders)).toEqual({ ok: true, label: '/global/config' });
     expect(checkRequest('GET', '/session', query({}), folders)).toMatchObject({ ok: false, status: 403 });
     expect(checkRequest('GET', '/session', query({ directory: '/etc' }), folders)).toMatchObject({ ok: false, status: 403 });
     expect(checkRequest('GET', '/session', query({ directory: '/home/dev/work/app', workspace: 'w1' }), folders)).toMatchObject({ ok: false, status: 403 });
@@ -37,6 +38,8 @@ describe('requests', () => {
       ['POST', '/session/ses_1/command'],
       ['PATCH', '/config'],
       ['GET', '/config/raw'],
+      ['GET', '/global/config'],
+      ['POST', '/global/dispose'],
       ['POST', '/pty'],
       ['GET', '/experimental/session'],
     ] as const) {
