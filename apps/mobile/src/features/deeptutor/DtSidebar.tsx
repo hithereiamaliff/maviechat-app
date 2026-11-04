@@ -11,13 +11,14 @@ import { SidebarAction, SidebarChatRow, SidebarHeading, SidebarNote, SidebarPane
 import { useSidebar } from '@/features/sidebar/SidebarContext';
 import { useDebounced } from '@/lib/useDebounced';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
+import { useOpenCode } from '@/session/OpenCodeProvider';
 import { useSession } from '@/session/SessionProvider';
 import { radius, usePalette } from '@/theme';
 import { opensNatively } from './learning/ways';
 import { DT_ADMIN_PAGE, shelvesFor, type DtPage, type DtShelfKey } from './pages';
 import { useDtProfile, useDtTaskBoard } from './queries';
 import { buildDtSidebarRows, type DtSidebarRow } from './sidebarRows';
-import { switchToOpenWebUI } from './switch';
+import { switchToOpenCode, switchToOpenWebUI } from './switch';
 import { useDtChatActions } from './useDtChatActions';
 import { useDtSignOut } from './useDtSignOut';
 
@@ -36,6 +37,7 @@ export function DtSidebar() {
   const confirmSignOut = useDtSignOut();
   const accountsSheet = useAccountsSheet('deeptutor');
   const owuiSignedIn = useSession().state.status === 'signed-in';
+  const openCodeSignedIn = useOpenCode().state.status === 'signed-in';
   const queryClient = useQueryClient();
   const actions = useDtChatActions();
   const profile = useDtProfile();
@@ -133,6 +135,15 @@ export function DtSidebar() {
         sidebar.close();
         if (owuiSignedIn) switchToOpenWebUI();
         else router.replace('/login');
+      },
+    },
+    {
+      key: 'opencode',
+      label: openCodeSignedIn ? 'Switch to OpenCode' : 'Connect OpenCode',
+      icon: openCodeSignedIn ? 'arrows-right-left' : 'code-bracket',
+      onPress: () => {
+        sidebar.close();
+        switchToOpenCode(openCodeSignedIn);
       },
     },
     {

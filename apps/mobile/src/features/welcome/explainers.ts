@@ -6,10 +6,10 @@ export interface Explainer {
   /** Guides elsewhere (they open in the in-app browser). */
   links?: { label: string; url: string }[];
   /** The sign-in this explainer leads to. */
-  action?: { label: string; route: '/login' | '/deeptutor-login' };
+  action?: { label: string; route: '/login' | '/deeptutor-login' | '/pair' };
 }
 
-export type ExplainerKey = 'owui' | 'deeptutor' | 'no-server';
+export type ExplainerKey = 'owui' | 'deeptutor' | 'opencode' | 'no-server';
 
 /** Our own words about each product, for people choosing on a first launch. */
 export const EXPLAINERS: Record<ExplainerKey, Explainer> = {
@@ -61,6 +61,27 @@ export const EXPLAINERS: Record<ExplainerKey, Explainer> = {
       },
     ],
     action: { label: 'Sign In to DeepTutor', route: '/deeptutor-login' },
+  },
+  opencode: {
+    title: 'What is OpenCode?',
+    intro:
+      'OpenCode is a free, open-source coding agent. It runs on a computer or server where your code lives, reads your projects, and edits files and runs commands there when you ask it to.',
+    sections: [
+      {
+        heading: 'Good for',
+        bullets: [
+          'Fixing bugs and adding features in your projects from your phone',
+          'Seeing every command it runs and every file it changes as it works',
+          'Approving or refusing each change before it happens',
+          'Picking up sessions you started at the computer, and the other way round',
+        ],
+      },
+      {
+        heading: 'What you need',
+        text: 'A machine running OpenCode and the MavieChat gateway, which pairs this iPhone once with a link and only reaches the project folders you allow.',
+      },
+    ],
+    action: { label: 'Pair a Machine', route: '/pair' },
   },
   'no-server': {
     title: 'No server yet?',

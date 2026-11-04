@@ -12,3 +12,9 @@ export function switchToOpenWebUI(): void {
   void saveSpace('owui');
   router.replace('/');
 }
+
+/** Opens the OpenCode space (or pairing a machine) and makes it the one a launch returns to. */
+export function switchToOpenCode(signedIn: boolean): void {
+  if (signedIn) void saveSpace('opencode');
+  router.replace(signedIn ? '/code' : '/pair');
+}

@@ -90,10 +90,11 @@ export function loadLastDtServerUrl(): Promise<string | null> {
 }
 
 /** Which app was open last, so a launch returns there. */
-export type Space = 'owui' | 'deeptutor';
+export type Space = 'owui' | 'deeptutor' | 'opencode';
 
 export async function loadSpace(): Promise<Space> {
-  return (await SecureStore.getItemAsync(SPACE_KEY, options)) === 'deeptutor' ? 'deeptutor' : 'owui';
+  const saved = await SecureStore.getItemAsync(SPACE_KEY, options);
+  return saved === 'deeptutor' || saved === 'opencode' ? saved : 'owui';
 }
 
 export async function saveSpace(space: Space): Promise<void> {

@@ -5,7 +5,7 @@
  */
 
 /** Which space an account belongs to. */
-export type AccountSpace = 'owui' | 'deeptutor';
+export type AccountSpace = 'owui' | 'deeptutor' | 'opencode';
 
 export interface AccountEntry {
   id: string;
@@ -13,9 +13,9 @@ export interface AccountEntry {
   baseUrl: string;
   /** The server's id for the user. */
   userId: string;
-  /** Shown first: the person's name in Open WebUI, the username in DeepTutor. */
+  /** Shown first: the person's name in Open WebUI, the username in DeepTutor, the machine in OpenCode. */
   name: string;
-  /** What you sign in with (Open WebUI's email, DeepTutor's username), to fill in the sign-in form again. */
+  /** What you sign in with (Open WebUI's email, DeepTutor's username, OpenCode's login on the machine), to fill in the sign-in form again. */
   login: string;
   /** Unix seconds when the sign-in stops working; null when it doesn't expire or can't be read. */
   expiresAt: number | null;
@@ -39,7 +39,7 @@ export const MAX_ACCOUNTS_PER_SPACE = 20;
 
 export const emptyIndex = (): AccountIndex => ({ version: 1, accounts: [], active: {}, migrated: [] });
 
-const SPACES: AccountSpace[] = ['owui', 'deeptutor'];
+const SPACES: AccountSpace[] = ['owui', 'deeptutor', 'opencode'];
 const isSpace = (value: unknown): value is AccountSpace => SPACES.includes(value as AccountSpace);
 
 function parseEntry(value: unknown): AccountEntry | null {
@@ -94,7 +94,7 @@ export function activeAccount(index: AccountIndex, space: AccountSpace): Account
 }
 
 /** Addresses written differently (case, a trailing slash) still name the same server. */
-const sameServer = (a: string, b: string) => a.trim().replace(/\/+$/, '').toLowerCase() === b.trim().replace(/\/+$/, '').toLowerCase();
+export const sameServer = (a: string, b: string) => a.trim().replace(/\/+$/, '').toLowerCase() === b.trim().replace(/\/+$/, '').toLowerCase();
 
 export type AccountFields = Omit<AccountEntry, 'id' | 'addedAt'>;
 

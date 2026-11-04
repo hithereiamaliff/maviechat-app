@@ -9,6 +9,7 @@ import { signOutWebView } from '@/features/deeptutor/webSignIn';
 import { leaveRelay } from '@/features/notifications/push';
 import { serverHost, type AccountEntry, type AccountSpace } from '@/session/accounts';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
+import { useOpenCode } from '@/session/OpenCodeProvider';
 import { useSession } from '@/session/SessionProvider';
 import { saveSpace } from '@/session/storage';
 import { fonts, radius, usePalette } from '@/theme';
@@ -16,6 +17,7 @@ import { fonts, radius, usePalette } from '@/theme';
 const SPACES = {
   owui: { title: 'Open WebUI Accounts', home: '/', signIn: '/login' },
   deeptutor: { title: 'DeepTutor Accounts', home: '/learn', signIn: '/deeptutor-login' },
+  opencode: { title: 'OpenCode Machines', home: '/code', signIn: '/pair' },
 } as const;
 
 /**
@@ -48,8 +50,9 @@ function AccountsList({ space, onClose }: { space: AccountSpace; onClose: () => 
   const toast = useToast();
   const owui = useSession();
   const deepTutor = useDeepTutor();
+  const openCode = useOpenCode();
   const owuiSignOut = useOwuiAccountSignOut();
-  const source = space === 'owui' ? owui : deepTutor;
+  const source = space === 'owui' ? owui : space === 'deeptutor' ? deepTutor : openCode;
   const activeId = source.state.status === 'signed-in' ? source.state.accountId : null;
   const where = SPACES[space];
   const [busy, setBusy] = useState<string | null>(null);
@@ -81,7 +84,12 @@ function AccountsList({ space, onClose }: { space: AccountSpace; onClose: () => 
   };
 
   const signOutOf = (entry: AccountEntry) =>
-    Alert.alert(`Sign out of ${entry.login}?`, 'MavieChat forgets this account on this iPhone. You can add it again later.', [
+    Alert.alert(
+      space === 'opencode' ? `Remove ${entry.name}?` : `Sign out of ${entry.login}?`,
+      space === 'opencode'
+        ? 'MavieChat forgets it on this iPhone, and the machine unpairs this iPhone once none of its accounts are left.'
+        : 'MavieChat forgets this account on this iPhone. You can add it again later.',
+      [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign Out',
@@ -92,20 +100,21 @@ function AccountsList({ space, onClose }: { space: AccountSpace; onClose: () => 
             setBusy(entry.id);
             try {
               if (space === 'deeptutor' && wasActive) signOutWebView();
-              const stillIn = space === 'owui' ? await owuiSignOut(entry.id) : await deepTutor.removeAccount(entry.id);
+              const stillIn = space === 'owui' ? await owuiSignOut(entry.id) : space === 'deeptutor' ? await deepTutor.removeAccount(entry.id) : await openCode.removeAccount(entry.id);
               if (!wasActive) return;
               onClose();
               if (stillIn) goTo(where.home);
-              // No DeepTutor account left: back to Open WebUI, or the welcome screen.
-              else if (space === 'deeptutor') goTo(owui.state.status === 'signed-in' ? '/' : '/welcome');
+              // No DeepTutor or OpenCode account left: back to Open WebUI, or the welcome screen.
+              else if (space !== 'owui') goTo(owui.state.status === 'signed-in' ? '/' : '/welcome');
             } catch {
               toast("Couldn't sign out. Try again.", 'error');
             } finally {
               setBusy(null);
             }
           })(),
-      },
-    ]);
+        },
+      ],
+    );
 
   const add = () => {
     onClose();
@@ -147,7 +156,7 @@ function AccountsList({ space, onClose }: { space: AccountSpace; onClose: () => 
                 </View>
                 {busy === entry.id ? <ActivityIndicator color={palette.textMuted} /> : active ? <Icon name="check" size={20} color={palette.link} strokeWidth={2} /> : null}
               </Pressable>
-              <IconButton icon="arrow-right-start-on-rectangle" label={`Sign out of ${entry.login}`} onPress={() => signOutOf(entry)} />
+              <IconButton icon="arrow-right-start-on-rectangle" label={space === 'opencode' ? `Remove ${entry.name}` : `Sign out of ${entry.login}`} onPress={() => signOutOf(entry)} />
             </View>
           );
         })}
@@ -158,7 +167,9 @@ function AccountsList({ space, onClose }: { space: AccountSpace; onClose: () => 
         <Text style={[styles.note, { color: palette.textFaint }]}>
           {space === 'owui'
             ? 'Each account keeps its own chats and settings. Accounts on servers run by TechMavie Digital all get notifications.'
-            : 'Each account keeps its own sessions and settings.'}
+            : space === 'opencode'
+              ? 'Each machine and OpenCode login keeps its own projects and sessions. Add Account pairs another machine.'
+              : 'Each account keeps its own sessions and settings.'}
         </Text>
       </ScrollView>
     </View>

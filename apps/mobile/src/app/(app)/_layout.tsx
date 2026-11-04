@@ -7,6 +7,7 @@ import { Sidebar } from '@/features/sidebar/Sidebar';
 import { SpaceDrawer } from '@/features/sidebar/SpaceDrawer';
 import { signedOutRoute } from '@/features/welcome/entry';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
+import { useOpenCode } from '@/session/OpenCodeProvider';
 import { useSession } from '@/session/SessionProvider';
 import { saveSpace } from '@/session/storage';
 import { usePalette } from '@/theme';
@@ -18,7 +19,8 @@ export default function AppLayout() {
   const pathname = usePathname();
   const currentChatId = pathname.startsWith('/c/') ? decodeURIComponent(pathname.slice(3)) : null;
   const deepTutor = useDeepTutor().state.status;
-  const launch = useLaunchTarget(deepTutor);
+  const openCode = useOpenCode().state.status;
+  const launch = useLaunchTarget(deepTutor, openCode);
   const showing = launch === 'here' && state.status === 'signed-in';
 
   // The app reopens in the space you were in, however you got here.
@@ -28,10 +30,11 @@ export default function AppLayout() {
 
   if (launch === 'pending') return null;
   if (launch === 'deeptutor') return <Redirect href="/learn" />;
+  if (launch === 'opencode') return <Redirect href="/code" />;
   if (state.status === 'loading') return null;
   if (state.status !== 'signed-in') {
     // DeepTutor if it's signed in, else the welcome screen (or this sign-in, when it just expired).
-    const route = signedOutRoute(deepTutor, Boolean(state.notice));
+    const route = signedOutRoute(deepTutor, Boolean(state.notice), openCode);
     return route ? <Redirect href={route} /> : null;
   }
 

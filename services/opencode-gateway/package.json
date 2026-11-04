@@ -1,0 +1,14 @@
+{
+  "name": "@maviechat/opencode-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lets MavieChat reach OpenCode servers on a machine over HTTPS: paired devices only, allowed folders only, approvals by default. No npm packages.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.ts",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

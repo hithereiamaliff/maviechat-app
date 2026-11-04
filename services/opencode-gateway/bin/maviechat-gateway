@@ -1,0 +1,3 @@
+#!/bin/sh
+# Pairing and devices, inside the container: docker exec -it maviechat-gateway maviechat-gateway pair
+exec node /app/src/cli.ts "$@"

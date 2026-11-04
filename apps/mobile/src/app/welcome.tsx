@@ -7,6 +7,7 @@ import { IconButton } from '@/components/IconButton';
 import { ExplainerSheet } from '@/features/welcome/ExplainerSheet';
 import { EXPLAINERS, type ExplainerKey } from '@/features/welcome/explainers';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
+import { useOpenCode } from '@/session/OpenCodeProvider';
 import { useSession } from '@/session/SessionProvider';
 import { fonts, radius, usePalette } from '@/theme';
 
@@ -15,7 +16,7 @@ interface Choice {
   name: string;
   description: string;
   icon: IconName;
-  route: '/login' | '/deeptutor-login';
+  route: '/login' | '/deeptutor-login' | '/pair';
 }
 
 const CHOICES: Choice[] = [
@@ -33,6 +34,13 @@ const CHOICES: Choice[] = [
     icon: 'academic-cap',
     route: '/deeptutor-login',
   },
+  {
+    key: 'opencode',
+    name: 'OpenCode',
+    description: 'Work on your code with the OpenCode agent on your own machine: see each change, approve it, from anywhere.',
+    icon: 'code-bracket',
+    route: '/pair',
+  },
 ];
 
 /**
@@ -46,11 +54,13 @@ export default function Welcome() {
   const insets = useSafeAreaInsets();
   const owui = useSession().state.status;
   const deepTutor = useDeepTutor().state.status;
+  const openCode = useOpenCode().state.status;
   const [explaining, setExplaining] = useState<ExplainerKey | null>(null);
 
   // Signed in on either side already (back here by a stray link): go there.
   if (owui === 'signed-in') return <Redirect href="/" />;
   if (deepTutor === 'signed-in') return <Redirect href="/learn" />;
+  if (openCode === 'signed-in') return <Redirect href="/code" />;
 
   return (
     <ScrollView

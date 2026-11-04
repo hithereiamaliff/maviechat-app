@@ -18,6 +18,7 @@ import { prepareLaunchSpace } from '@/features/deeptutor/launch';
 import { NotificationRoot } from '@/features/notifications/NotificationRoot';
 import { UpdatePrompt } from '@/features/updates/UpdatePrompt';
 import { DeepTutorProvider } from '@/session/DeepTutorProvider';
+import { OpenCodeProvider } from '@/session/OpenCodeProvider';
 import { SessionProvider } from '@/session/SessionProvider';
 import { usePalette } from '@/theme';
 import { loadThemePreference } from '@/theme/preference';
@@ -59,10 +60,12 @@ export default function RootLayout() {
             <ToastProvider>
               <SessionProvider>
                 <DeepTutorProvider>
-                  <StatusBar style="auto" />
-                  <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.background } }} />
-                  <NotificationRoot />
-                  <UpdatePrompt />
+                  <OpenCodeProvider>
+                    <StatusBar style="auto" />
+                    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.background } }} />
+                    <NotificationRoot />
+                    <UpdatePrompt />
+                  </OpenCodeProvider>
                 </DeepTutorProvider>
               </SessionProvider>
             </ToastProvider>

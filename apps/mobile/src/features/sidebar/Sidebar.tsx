@@ -25,10 +25,11 @@ import { useFolderPicker } from '@/features/chats/FolderPicker';
 import { useShareSheet } from '@/features/chats/ShareSheet';
 import { useTagsSheet } from '@/features/chats/TagsSheet';
 import { useChatActions } from '@/features/chats/useChatActions';
-import { switchToDeepTutor } from '@/features/deeptutor/switch';
+import { switchToDeepTutor, switchToOpenCode } from '@/features/deeptutor/switch';
 import { useAuthed, useCapabilities, useServerConfig, useSessionUser, useUserSettings } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
+import { useOpenCode } from '@/session/OpenCodeProvider';
 import { useSession } from '@/session/SessionProvider';
 import { fonts, radius, usePalette } from '@/theme';
 import { SidebarAction, SidebarChatRow, SidebarHeading, SidebarNote, SidebarPanel, SidebarSearch, SidebarUser, sidebarStyles } from './parts';
@@ -53,6 +54,7 @@ export function Sidebar() {
   const signOutOf = useOwuiAccountSignOut();
   const accountsSheet = useAccountsSheet('owui');
   const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
+  const openCodeSignedIn = useOpenCode().state.status === 'signed-in';
   const queryClient = useQueryClient();
   const capabilities = useCapabilities();
   // Your name and picture as they are now (Settings → Account can change them).
@@ -188,6 +190,15 @@ export function Sidebar() {
       onPress: () => {
         sidebar.close();
         switchToDeepTutor(deepTutorSignedIn);
+      },
+    },
+    {
+      key: 'opencode',
+      label: openCodeSignedIn ? 'Switch to OpenCode' : 'Connect OpenCode',
+      icon: openCodeSignedIn ? 'arrows-right-left' : 'code-bracket',
+      onPress: () => {
+        sidebar.close();
+        switchToOpenCode(openCodeSignedIn);
       },
     },
     {
