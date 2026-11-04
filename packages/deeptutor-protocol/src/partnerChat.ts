@@ -1,4 +1,4 @@
-import { PARTNER_SOCKET_CLOSE, parsePartnerFrame, partnerAttach, partnerMessage, partnerStop, type DtPartnerFrame } from './partners';
+import { PARTNER_SOCKET_CLOSE, parsePartnerFrame, partnerAttach, partnerMessage, partnerStop, type DtPartnerAttachment, type DtPartnerFrame } from './partners';
 import type { DtSocketFactory, DtSocketHandle, DtTimers } from './turnConnection';
 import { applyTurnEvent, emptyReply, type DtReply } from './turnReply';
 
@@ -9,6 +9,8 @@ export interface DtPartnerTurn {
   sessionKey: string;
   /** Your message: the one this connection sent, or DeepTutor's echo of it when following a reply again. */
   prompt: string | null;
+  /** Names of the files sent with it. */
+  files: string[];
   /** DeepTutor has stored your message: a later failure doesn't lose it. */
   accepted: boolean;
   reply: DtReply;
@@ -79,11 +81,14 @@ export class DtPartnerChat {
     if (!this.socket) this.connect();
   }
 
-  /** Sends a message in the current conversation; false when it can't go now (not connected, or a reply is running). */
-  send(content: string): boolean {
-    if (this.state !== 'ready' || !this.socket || this.turn) return false;
-    this.setTurn({ sessionKey: this.sessionKey, prompt: content, accepted: false, reply: { ...emptyReply(), status: 'running' } });
-    this.socket.send(partnerMessage(this.sessionKey, content));
+  /**
+   * Sends a message (and any files: then the words may be empty, and DeepTutor asks the partner to
+   * look at them) in the current conversation; false when it can't go now (not connected, or a reply is running).
+   */
+  send(content: string, attachments: DtPartnerAttachment[] = []): boolean {
+    if (this.state !== 'ready' || !this.socket || this.turn || (!content.trim() && !attachments.length)) return false;
+    this.setTurn({ sessionKey: this.sessionKey, prompt: content, files: attachments.map((file) => file.filename), accepted: false, reply: { ...emptyReply(), status: 'running' } });
+    this.socket.send(partnerMessage(this.sessionKey, content, attachments));
     return true;
   }
 
@@ -182,7 +187,7 @@ export class DtPartnerChat {
         return;
       case 'resuming':
         this.following = false;
-        this.setTurn({ sessionKey: this.sessionKey, prompt: this.turn?.prompt ?? null, accepted: true, reply: this.turn?.reply ?? { ...emptyReply(), status: 'running' } });
+        this.setTurn({ sessionKey: this.sessionKey, prompt: this.turn?.prompt ?? null, files: this.turn?.files ?? [], accepted: true, reply: this.turn?.reply ?? { ...emptyReply(), status: 'running' } });
         return;
       case 'user_echo':
         if (this.turn) this.setTurn({ ...this.turn, prompt: frame.content });

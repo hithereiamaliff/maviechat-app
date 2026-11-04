@@ -53,9 +53,19 @@ export interface DtPartner {
   /** The chat apps it's connected to (names). */
   channels: string[];
   llmSelection: DtLlmSelection | null;
+  /** Tried once when the main model fails outright. */
+  backupLlmSelection: DtLlmSelection | null;
+  /** Bound to one of your workspaces (shared resources), or "" for a private library. */
+  workspaceId: string;
+  /** Tools it may use: null = all you may use; [] = none (MCP tools default to none). */
+  enabledTools: string[] | null;
+  builtinTools: string[] | null;
+  mcpTools: string[] | null;
   /** Set when its chat-app listeners failed to restart. */
   lastReloadError: string;
 }
+
+const names = (value: unknown): string[] | null => (Array.isArray(value) ? value.map(text).filter(Boolean) : null);
 
 /** Names DeepTutor keeps in `channels` that aren't chat apps (older settings). */
 const NOT_CHANNELS = new Set(['send_progress', 'send_tool_hints']);
@@ -75,6 +85,11 @@ export function partnerOf(raw: unknown): DtPartner {
     canManage: row.can_manage === true,
     channels: channels.filter((name) => name && !NOT_CHANNELS.has(name)),
     llmSelection: selectionOf(row.llm_selection),
+    backupLlmSelection: selectionOf(row.backup_llm_selection),
+    workspaceId: text(row.workspace_id),
+    enabledTools: names(row.enabled_tools),
+    builtinTools: names(row.builtin_tools),
+    mcpTools: 'mcp_tools' in row ? names(row.mcp_tools) : [],
     lastReloadError: text(row.last_reload_error),
   };
 }
@@ -152,6 +167,8 @@ export interface DtNewPartner {
   description?: string;
   emoji?: string;
   color?: string;
+  /** A `data:image/…` picture (up to 200,000 characters), which wins over the emoji. */
+  avatar?: string;
   language?: string;
   /** From the library, or written here. */
   soul: { source: 'library'; id: string } | { source: 'custom'; content: string };
@@ -181,6 +198,7 @@ export async function createPartner(client: DtClient, input: DtNewPartner): Prom
   if (input.description?.trim()) body.description = input.description.trim();
   if (input.emoji) body.emoji = input.emoji;
   if (input.color) body.color = input.color;
+  if (input.avatar) body.avatar = input.avatar;
   if (input.language) body.language = input.language;
   const raw = await client.post<unknown>('/api/partners', body, { timeoutMs: 120_000 });
   return { partner: partnerOf(raw), startError: isTree(raw) ? text(raw.start_error) : '' };
@@ -368,6 +386,234 @@ export function recordReply(record: DtPartnerRecord): DtReply {
   return { ...reply, answer: record.content || reply.answer, status: 'completed' };
 }
 
+// ── Setting a partner up (yours) ─────────────────────────────────────────────
+
+export interface DtPartnerChange {
+  name?: string;
+  description?: string;
+  emoji?: string;
+  color?: string;
+  /** A `data:image/…` picture (DeepTutor keeps up to 200,000 characters), or "" for none. */
+  avatar?: string;
+  language?: string;
+  /** null: DeepTutor's default model. */
+  llmSelection?: DtLlmSelection | null;
+  /** null: no backup. */
+  backupLlmSelection?: DtLlmSelection | null;
+  /** null: every tool you may use; a list: only those. */
+  enabledTools?: string[] | null;
+  builtinTools?: string[] | null;
+  /** null: every MCP tool; [] none. */
+  mcpTools?: string[] | null;
+  /** "": its private library. */
+  workspaceId?: string;
+}
+
+/**
+ * Changes some of a partner's settings: only what `change` names is sent. Models and tools apply
+ * from its next message; chat apps aren't touched (DeepTutor replaces those whole).
+ */
+export async function updatePartner(client: DtClient, id: string, change: DtPartnerChange): Promise<DtPartner> {
+  const body: Tree = {};
+  const keys: [keyof DtPartnerChange, string][] = [
+    ['name', 'name'],
+    ['description', 'description'],
+    ['emoji', 'emoji'],
+    ['color', 'color'],
+    ['avatar', 'avatar'],
+    ['language', 'language'],
+    ['llmSelection', 'llm_selection'],
+    ['backupLlmSelection', 'backup_llm_selection'],
+    ['enabledTools', 'enabled_tools'],
+    ['builtinTools', 'builtin_tools'],
+    ['mcpTools', 'mcp_tools'],
+    ['workspaceId', 'workspace_id'],
+  ];
+  for (const [ours, theirs] of keys) if (ours in change) body[theirs] = change[ours] ?? null;
+  const raw = await client.send<unknown>('PATCH', partnerPath(id), { body });
+  return partnerOf(raw.data);
+}
+
+/** Its soul as Markdown. */
+export async function getPartnerSoul(client: DtClient, id: string): Promise<string> {
+  const raw = await client.get<unknown>(`${partnerPath(id)}/soul`);
+  return isTree(raw) ? text(raw.content) : '';
+}
+
+/** Saves its soul; it applies from the next message. */
+export async function savePartnerSoul(client: DtClient, id: string, content: string): Promise<void> {
+  await client.send<unknown>('PUT', `${partnerPath(id)}/soul`, { body: { content } });
+}
+
+export interface DtPartnerTool {
+  name: string;
+  description: string;
+  /** MCP tools: the service it comes from. */
+  server?: string;
+}
+
+/** The tools you may give a partner: DeepTutor's switchable ones, its built-in ones, and MCP services'. */
+export async function getPartnerToolOptions(client: DtClient): Promise<{ tools: DtPartnerTool[]; builtin: DtPartnerTool[]; mcp: DtPartnerTool[] }> {
+  const raw = await client.get<unknown>('/api/partners/tool-options');
+  const row = isTree(raw) ? raw : {};
+  const tools = (value: unknown) =>
+    list(value)
+      .filter(isTree)
+      .map((tool) => {
+        const english = isTree(tool.description_i18n) ? text(tool.description_i18n.en) : '';
+        return { name: text(tool.name), description: english || text(tool.description), ...(text(tool.server) ? { server: text(tool.server) } : {}) };
+      })
+      .filter((tool) => tool.name);
+  return { tools: tools(row.tools), builtin: tools(row.builtin_tools), mcp: tools(row.mcp_tools) };
+}
+
+export interface DtPartnerWorkspace {
+  id: string;
+  name: string;
+}
+
+/** The workspaces of its owner it can be bound to (ready, not archived, not DeepTutor's own). */
+export async function listPartnerWorkspaces(client: DtClient, id: string): Promise<DtPartnerWorkspace[]> {
+  const raw = await client.get<unknown>(`${partnerPath(id)}/workspaces`);
+  return list(isTree(raw) ? raw.workspaces : [])
+    .filter(isTree)
+    .filter((row) => row.kind !== 'system' && row.archived !== true && (row.status === undefined || row.status === 'ready'))
+    .map((row) => ({ id: text(row.workspace_id), name: text(row.display_name) || text(row.workspace_id) }))
+    .filter((workspace) => workspace.id);
+}
+
+export interface DtPartnerAssets {
+  knowledgeBases: { name: string; documents: number }[];
+  skills: string[];
+  notebooks: { id: string; name: string; records: number }[];
+}
+
+function assetsOf(raw: unknown): DtPartnerAssets {
+  const row = isTree(raw) ? raw : {};
+  return {
+    knowledgeBases: list(row.knowledge_bases)
+      .filter(isTree)
+      .map((kb) => ({ name: text(kb.name), documents: typeof kb.documents === 'number' ? kb.documents : 0 }))
+      .filter((kb) => kb.name),
+    skills: list(row.skills)
+      .map((skill) => (isTree(skill) ? text(skill.name) : text(skill)))
+      .filter(Boolean),
+    notebooks: list(row.notebooks)
+      .filter(isTree)
+      .map((notebook) => ({ id: text(notebook.id), name: text(notebook.name) || text(notebook.id), records: typeof notebook.record_count === 'number' ? notebook.record_count : 0 }))
+      .filter((notebook) => notebook.id),
+  };
+}
+
+/** What's in its private library: copies of knowledge bases, skills and notebooks. */
+export async function getPartnerAssets(client: DtClient, id: string): Promise<DtPartnerAssets> {
+  return assetsOf(await client.get<unknown>(`${partnerPath(id)}/assets`));
+}
+
+/**
+ * Copies knowledge bases (names), skills (names) and notebooks (ids) into its library. Each one
+ * that can't be copied is reported, not fatal. 400 while it's bound to a workspace.
+ */
+export async function addPartnerAssets(client: DtClient, id: string, assets: { knowledgeBases?: string[]; skills?: string[]; notebooks?: string[] }): Promise<{ assets: DtPartnerAssets; errors: string[] }> {
+  const raw = await client.post<unknown>(`${partnerPath(id)}/assets`, { knowledge_bases: assets.knowledgeBases ?? [], skills: assets.skills ?? [], notebooks: assets.notebooks ?? [] }, { timeoutMs: 120_000 });
+  const row = isTree(raw) ? raw : {};
+  const errors = list(row.errors)
+    .filter(isTree)
+    .map((error) => `${text(error.name) || text(error.type)}: ${text(error.error) || 'not copied'}`);
+  return { assets: assetsOf(row.assets), errors };
+}
+
+export type DtPartnerAssetType = 'knowledge_base' | 'skill' | 'notebook';
+
+/** Removes one from its library (a notebook by its id). */
+export async function removePartnerAsset(client: DtClient, id: string, type: DtPartnerAssetType, name: string): Promise<DtPartnerAssets> {
+  const raw = await client.delete<unknown>(`${partnerPath(id)}/assets/${type}/${encodeURIComponent(name)}`);
+  return assetsOf(isTree(raw) ? raw.assets : {});
+}
+
+// ── Linking a chat-app account ───────────────────────────────────────────────
+
+export interface DtLinkCode {
+  code: string;
+  /** What to send the partner in a direct message: `/link CODE`. */
+  command: string;
+  /** Milliseconds; codes last 15 minutes and work once. */
+  expiresAt: number | null;
+}
+
+/**
+ * A code that ties a chat-app account to your DeepTutor account: send `/link CODE` to the partner
+ * in a direct message there. Its replies there then use your history, library and memory.
+ */
+export async function createLinkCode(client: DtClient, id: string): Promise<DtLinkCode> {
+  const raw = await client.post<unknown>(`${partnerPath(id)}/links/code`);
+  const row = isTree(raw) ? raw : {};
+  const code = text(row.code);
+  return { code, command: text(row.command) || `/link ${code}`, expiresAt: partnerTime(row.expires_at) };
+}
+
+export interface DtPartnerLink {
+  /** `channel:sender`, to unlink with. */
+  key: string;
+  channel: string;
+  senderId: string;
+  linkedAt: number | null;
+}
+
+/** Your chat-app accounts linked through this partner. */
+export async function listPartnerLinks(client: DtClient, id: string): Promise<DtPartnerLink[]> {
+  const raw = await client.get<unknown>(`${partnerPath(id)}/links`);
+  return list(isTree(raw) ? raw.links : [])
+    .filter(isTree)
+    .map((row) => ({ key: text(row.key), channel: text(row.channel), senderId: text(row.sender_id), linkedAt: partnerTime(row.linked_at) }))
+    .filter((link) => link.key);
+}
+
+export async function removePartnerLink(client: DtClient, id: string, key: string): Promise<void> {
+  await client.delete<unknown>(`${partnerPath(id)}/links/${encodeURIComponent(key)}`);
+}
+
+// ── More on conversations ────────────────────────────────────────────────────
+
+/** Copies a conversation into a new one (`newKey`) and archives the original. 409 while it replies. */
+export async function branchPartnerSession(client: DtClient, id: string, sourceKey: string, newKey: string): Promise<void> {
+  await client.post<unknown>(`${partnerPath(id)}/sessions/branch`, { source_key: sourceKey, new_key: newKey });
+}
+
+export interface DtPartnerCommand {
+  /** With its slash: `/help`. */
+  command: string;
+  description: string;
+  /** What follows it, like `<session ID>`. */
+  argHint: string;
+}
+
+/** The slash commands partners understand. */
+export async function listPartnerCommands(client: DtClient): Promise<DtPartnerCommand[]> {
+  const raw = await client.get<unknown>('/api/partners/commands/palette');
+  return list(isTree(raw) ? raw.commands : [])
+    .filter(isTree)
+    .map((row) => ({ command: text(row.command), description: text(row.description), argHint: text(row.arg_hint) }))
+    .filter((row) => row.command.startsWith('/'));
+}
+
+/** Commands the app carries out itself (as the web does), rather than sending them. */
+export const CLIENT_PARTNER_COMMANDS = new Set(['/new', '/clear', '/branch', '/resume', '/delete', '/sessions', '/stop']);
+
+/**
+ * Commands the app doesn't offer: `/link` (you're signed in already), and for a partner shared
+ * with you `/model` and `/tool`, which change its settings (DeepTutor doesn't check who asks for `/tool`).
+ */
+export function offeredPartnerCommands(commands: DtPartnerCommand[], canManage: boolean): DtPartnerCommand[] {
+  return commands.filter((row) => row.command !== '/link' && (canManage || (row.command !== '/model' && row.command !== '/tool')));
+}
+
+/** A typed command: `/resume web-1` → `{command: '/resume', argument: 'web-1'}`; null for ordinary text. */
+export function parseSlashCommand(input: string): { command: string; argument: string } | null {
+  const match = /^(\/[a-z][a-z_-]*)(?:\s+([\s\S]*))?$/i.exec(input.trim());
+  return match ? { command: (match[1] as string).toLowerCase(), argument: (match[2] ?? '').trim() } : null;
+}
+
 // ── The partner socket ───────────────────────────────────────────────────────
 
 /** `/ws/partners/{id}` behind a DeepTutor web address. Signed in with the cookie header, never the address. */
@@ -436,9 +682,21 @@ export function parsePartnerFrame(raw: unknown): DtPartnerFrame | null {
   }
 }
 
-/** A message to the partner, in the conversation `sessionKey`. */
-export function partnerMessage(sessionKey: string, content: string): string {
-  return JSON.stringify({ content, session_key: sessionKey });
+/** A file sent with a message: a picture, or a document DeepTutor reads (its contents in base64). */
+export interface DtPartnerAttachment {
+  type: 'image' | 'file';
+  filename: string;
+  mimeType: string;
+  base64: string;
+}
+
+/** A message to the partner, in the conversation `sessionKey`, with any files. */
+export function partnerMessage(sessionKey: string, content: string, attachments: DtPartnerAttachment[] = []): string {
+  return JSON.stringify({
+    content,
+    session_key: sessionKey,
+    ...(attachments.length ? { attachments: attachments.map((file) => ({ type: file.type, filename: file.filename, mime_type: file.mimeType, base64: file.base64 })) } : {}),
+  });
 }
 
 /** Follows the conversation's reply in progress, if there is one (`include_activity: false`: not other apps'). */

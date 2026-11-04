@@ -88,6 +88,16 @@ describe('partner chat', () => {
     expect(ended[0]?.reply).toMatchObject({ answer: 'Hi there! (final)', status: 'completed' });
   });
 
+  it('sends files with a message, the words optional', () => {
+    const { chat, latest, frame, live } = setup();
+    chat.open('web-1');
+    frame({ type: 'ready' });
+    expect(chat.send('   ')).toBe(false);
+    expect(chat.send('', [{ type: 'file', filename: 'notes.txt', mimeType: 'text/plain', base64: 'aGk=' }])).toBe(true);
+    expect(latest().sent.at(-1)).toEqual({ content: '', session_key: 'web-1', attachments: [{ type: 'file', filename: 'notes.txt', mime_type: 'text/plain', base64: 'aGk=' }] });
+    expect(live()).toMatchObject({ prompt: '', files: ['notes.txt'] });
+  });
+
   it('gives the words back when DeepTutor didn’t take the message', () => {
     const { chat, frame, refused, live } = setup();
     chat.open('web-1');

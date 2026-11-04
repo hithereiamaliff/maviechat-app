@@ -1,4 +1,4 @@
-import { DtPartnerChat, partnerHistoryPage, partnerSocketUrl, type DtPartnerChatState, type DtPartnerRecord, type DtPartnerTurn } from '@maviechat/deeptutor-protocol';
+import { DtPartnerChat, partnerHistoryPage, partnerSocketUrl, type DtPartnerAttachment, type DtPartnerChatState, type DtPartnerRecord, type DtPartnerTurn } from '@maviechat/deeptutor-protocol';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
@@ -96,7 +96,7 @@ export function usePartnerChat(partnerId: string, sessionKey: string | null, eve
       if (history.hasNextPage && !history.isFetchingNextPage) void history.fetchNextPage();
     },
     reload: () => void history.refetch(),
-    send: (text: string) => chat.current?.send(text) ?? false,
+    send: (text: string, attachments: DtPartnerAttachment[] = []) => chat.current?.send(text, attachments) ?? false,
     stop: () => chat.current?.stop(),
     /** After Start or Stop: the socket follows the partner's new runtime. */
     reconnect: () => chat.current?.reconnect(),

@@ -173,6 +173,7 @@ function PartnerCard({ partner, onPress }: { partner: DtPartner; onPress: () => 
             partner.running
               ? { key: 'stop', label: 'Stop', icon: 'stop-circle', onPress: () => void run(() => stopPartner(client, partner.id), `${partner.name} stopped`) }
               : { key: 'start', label: 'Start', icon: 'play', onPress: () => void run(() => startPartner(client, partner.id), `${partner.name} started`) },
+            { key: 'settings', label: 'Settings', icon: 'cog-6-tooth', onPress: () => router.push({ pathname: '/learn/partners/edit', params: { id: partner.id } }) },
             { key: 'delete', label: 'Delete', icon: 'trash', destructive: true, onPress: remove },
           ]}
         />

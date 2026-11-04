@@ -16,17 +16,22 @@
   "partner": {
     "shape": {
       "avatar": "string",
+      "backupLlmSelection": "null",
+      "builtinTools": "null",
       "canManage": "boolean",
       "channels": [],
       "color": "string",
       "description": "string",
       "emoji": "string",
+      "enabledTools": "null",
       "id": "string",
       "language": "string",
       "lastReloadError": "string",
       "llmSelection": "null",
+      "mcpTools": [],
       "name": "string",
-      "running": "boolean"
+      "running": "boolean",
+      "workspaceId": "string"
     }
   },
   "history": {
@@ -63,5 +68,32 @@
       "title": "string",
       "updatedAt": "number"
     }
+  },
+  "setup": {
+    "tools": {
+      "tools": 8,
+      "builtin": 26,
+      "mcp": 0
+    },
+    "library": {
+      "workspaces": 1,
+      "knowledgeBases": 0,
+      "skills": 5,
+      "notebooks": 0
+    },
+    "commands": [
+      "/help",
+      "/new",
+      "/branch",
+      "/stop",
+      "/sessions",
+      "/resume",
+      "/delete",
+      "/status",
+      "/model",
+      "/history",
+      "/tool",
+      "/link"
+    ]
   }
 }

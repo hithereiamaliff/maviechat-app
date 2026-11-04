@@ -7,17 +7,15 @@ import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
-import { PartnerFace } from '@/features/deeptutor/partners/PartnerFace';
+import { FacePicker, PARTNER_EMOJIS } from '@/features/deeptutor/partners/FacePicker';
 import { useDtSkillNames, useDtSouls, usePartnersRefresh } from '@/features/deeptutor/partners/queries';
 import { useDtLlmOptions } from '@/features/deeptutor/queries';
 import { describeError } from '@/lib/errors';
 import { useDtAuthed } from '@/session/DeepTutorProvider';
 import { fonts, radius, usePalette } from '@/theme';
 
-const EMOJIS = ['🦉', '🧠', '📚', '🧪', '🧮', '🗺️', '🎨', '🎓', '🌱', '🦊', '🐼', '🐙', '🤖', '✨', '💬', '🧭'];
-
 /**
- * A new partner, in one page: its face (an emoji on a colour), name, what it's for and reply
+ * A new partner, in one page: its face (a photo, or an emoji on a colour), name, what it's for and reply
  * language; its soul, from DeepTutor's library or in your own words; and its model. It gets every
  * tool you may use and your skills, as DeepTutor's own form gives it; the rest is set later.
  */
@@ -31,8 +29,9 @@ export default function NewPartner() {
   const models = useDtLlmOptions();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [emoji, setEmoji] = useState(EMOJIS[0] as string);
+  const [emoji, setEmoji] = useState(PARTNER_EMOJIS[0] as string);
   const [color, setColor] = useState<string>(PARTNER_COLORS[3]);
+  const [avatar, setAvatar] = useState('');
   const [language, setLanguage] = useState('');
   const [soulMode, setSoulMode] = useState<'library' | 'custom'>('library');
   const [soulId, setSoulId] = useState<string | null>(null);
@@ -59,6 +58,7 @@ export default function NewPartner() {
         description,
         emoji,
         color,
+        avatar,
         language,
         soul: soulMode === 'library' && chosenSoul ? { source: 'library', id: chosenSoul.id } : { source: 'custom', content: custom },
         llmSelection: model,
@@ -78,39 +78,17 @@ export default function NewPartner() {
       <DtHeader title="New Partner" />
       <KeyboardAvoidingView behavior="padding" style={styles.screen}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View style={styles.preview}>
-            <PartnerFace face={{ name: name || 'Partner', emoji, color }} size={72} />
-            <Text style={[styles.previewName, { color: name ? palette.text : palette.textFaint }]} numberOfLines={1}>
-              {name || 'Your partner'}
-            </Text>
-          </View>
-
-          <Text style={[styles.label, { color: palette.textMuted }]}>Face</Text>
-          <View style={styles.emojis}>
-            {EMOJIS.map((item) => (
-              <Pressable
-                key={item}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: item === emoji }}
-                accessibilityLabel={item}
-                onPress={() => setEmoji(item)}
-                style={[styles.emoji, { borderColor: item === emoji ? palette.text : 'transparent' }]}>
-                <Text style={styles.emojiText}>{item}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <View style={styles.colors}>
-            {PARTNER_COLORS.map((item) => (
-              <Pressable
-                key={item}
-                accessibilityRole="radio"
-                accessibilityState={{ selected: item === color }}
-                accessibilityLabel={`Colour ${item}`}
-                onPress={() => setColor(item)}
-                style={[styles.swatch, { backgroundColor: item, borderColor: item === color ? palette.text : palette.background }]}
-              />
-            ))}
-          </View>
+          <FacePicker
+            name={name}
+            emoji={emoji}
+            color={color}
+            avatar={avatar}
+            onChange={(face) => {
+              if (face.emoji !== undefined) setEmoji(face.emoji);
+              if (face.color !== undefined) setColor(face.color);
+              if (face.avatar !== undefined) setAvatar(face.avatar);
+            }}
+          />
 
           <Text style={[styles.label, { color: palette.textMuted }]}>Name</Text>
           <TextInput
@@ -233,7 +211,7 @@ export default function NewPartner() {
             })}
           </View>
           <Text style={[styles.hint, { color: palette.textFaint }]}>
-            It gets every tool you may use and your skills, as DeepTutor’s own form gives it. Chat apps, tools and its library are set up on DeepTutor’s web page for now.
+            It gets every tool you may use and your skills, as DeepTutor’s own form gives it. Change its tools and library in its settings afterwards; chat apps are set up on DeepTutor’s web page.
           </Text>
 
           <View style={styles.create}>
@@ -248,15 +226,8 @@ export default function NewPartner() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { padding: 16, gap: 8, paddingBottom: 48 },
-  preview: { alignItems: 'center', gap: 8, marginVertical: 8 },
-  previewName: { fontFamily: fonts.semibold, fontSize: 18 },
   label: { fontFamily: fonts.medium, fontSize: 13, marginTop: 12, marginLeft: 4 },
   hint: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 16, marginHorizontal: 4 },
-  emojis: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  emoji: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  emojiText: { fontSize: 22 },
-  colors: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 },
-  swatch: { width: 30, height: 30, borderRadius: 15, borderWidth: 3 },
   input: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, fontFamily: fonts.regular, fontSize: 15 },
   short: { minHeight: 64, lineHeight: 21 },
   long: { minHeight: 180, lineHeight: 21 },

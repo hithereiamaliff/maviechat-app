@@ -472,6 +472,24 @@ A partner is a companion DeepTutor hosts: a soul (a persona in Markdown, in ever
 - `POST /api/partners` takes `{name, soul {source library|custom|persona|default}, llm_selection, enabled_tools, builtin_tools, mcp_tools, assets, workspace_id, start, emoji, color, language, description}`; 409 when a partner already has the name (its id is the name made into a slug). Stop answers 404 when it wasn't running; Delete removes its conversations, library and links.
 - Nothing in Partners sends push notifications (a reply finishing while the app is closed isn't announced).
 
+## Partners: set-up, files, commands and links (B6.2, 2026-11-04)
+
+- **Partner Settings** (a partner's menu, or its card's, for its owner; `/learn/partners/edit?id=`), as the web's Configure tab: **Identity** (a photo, cropped square and made 128 × 128 on the phone like the Account picture, or an emoji on a colour; name, what it's for, reply language; Save); **Soul** (read first, so a failed read is never saved as empty; Start from the Library; Undo Changes; Save Soul; applies from the next reply); **Model** and **Backup** (saved as you pick, from the models you're allowed); **Tools** (DeepTutor's, built-in and MCP, each with All and None; "all" is saved as all, so tools added later are on too; MCP tools are always named; memory tools are always on); **Library** (its own copies of knowledge bases, skills and notebooks, removed one by one or added from yours; or one of your workspaces as it is, its own library kept for switching back); **Chat Apps** (the ones it's in; set up on DeepTutor's web page, B6.4).
+- New Partner takes a photo too.
+- **Files in the chat**: the composer's + menu (Photos, Take Photo, Files), in DeepTutor's limits and at most 10 MB a file (a partner skips bigger files without a word). With files and no words, DeepTutor asks the partner to look at them.
+- **Slash commands**: typing `/` lists the partner's commands (`/link` left out, and `/model` and `/tool` for a partner shared with you, since they change its settings and DeepTutor doesn't check who asks for `/tool`). As on the web, `/new`, `/clear`, `/branch`, `/resume <id>`, `/delete <id>`, `/sessions` (opens Conversations) and `/stop` run in the app; the rest (`/help`, `/status`, `/history`, `/model`, `/tool`) go to DeepTutor, which answers them itself.
+- **Branch Conversation** (menu, or `/branch`): a copy to carry on in; the original is archived.
+- **Link a Chat App** (menu, and Partner Settings): a code to send the partner in a direct message there (`/link CODE`, once, for 15 minutes), and your linked accounts, each with Unlink.
+
+### Server facts (1.7.1, checked with `npm run probe:deeptutor -- --partners`)
+
+- `PATCH /api/partners/{id}` changes only the fields sent; for the models, tool lists and workspace, sending a key (even null) applies it. A picture must be a `data:image/…` URL of at most 200,000 characters (else 422).
+- `GET|PUT …/soul {content}`; `GET /api/partners/tool-options` → `{tools, builtin_tools, mcp_tools}` with English descriptions in `description_i18n.en`; `GET …/workspaces` (the owner's: the app hides DeepTutor's own, archived and broken ones); `GET|POST …/assets`, `DELETE …/assets/{knowledge_base|skill|notebook}/{name or notebook id}`; a bound partner refuses assets (400) and unbinding brings its library back.
+- A link code is 6 characters from A–Z and 2–9 without look-alikes, with `command: "/link CODE"`; unlinking an unknown account is 404; redeeming needs a chat app's direct message.
+- Files go in the socket message as `attachments: [{type: image|file, filename, mime_type, base64}]`; the stored message keeps their names (no download for your own uploads).
+- A command DeepTutor answers itself comes as `accepted` → `content` → `done`, with no reply events.
+- `POST …/sessions/branch {source_key, new_key}` copies every message and archives the source.
+
 ## M1.5 checklist
 
 | | Item |

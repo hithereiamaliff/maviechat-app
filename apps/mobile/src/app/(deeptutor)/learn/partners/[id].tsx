@@ -1,11 +1,16 @@
 import {
   archivePartnerSession,
+  branchPartnerSession,
+  CLIENT_PARTNER_COMMANDS,
   currentWebSession,
   deletePartner,
   deletePartnerSession,
   DtHttpError,
+  listPartnerCommands,
   listPartnerSessions,
   newPartnerSessionKey,
+  offeredPartnerCommands,
+  parseSlashCommand,
   recordReply,
   resumePartnerSession,
   sessionChannel,
@@ -18,15 +23,19 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'rea
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import type { ExtraChip } from '@/features/deeptutor/chat/DtExtrasViews';
 import type { DtListItem } from '@/features/deeptutor/chat/DtMessageList';
+import { clearExtras, useDtAttach } from '@/features/deeptutor/chat/extras';
 import { DtMessageList } from '@/features/deeptutor/chat/DtMessageList';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { ConversationsSheet } from '@/features/deeptutor/partners/ConversationsSheet';
 import { channelLabel } from '@/features/deeptutor/partners/labels';
+import { LinkSheet } from '@/features/deeptutor/partners/LinkSheet';
 import { PartnerComposer } from '@/features/deeptutor/partners/PartnerComposer';
 import { PartnerFace } from '@/features/deeptutor/partners/PartnerFace';
 import { useDtPartner, usePartnersRefresh } from '@/features/deeptutor/partners/queries';
 import { usePartnerChat } from '@/features/deeptutor/partners/usePartnerChat';
+import { useDtAttachmentLimits } from '@/features/deeptutor/queries';
 import { describeError } from '@/lib/errors';
 import { DT_EXPIRED_NOTICE, DT_QUERY_ROOT, useDeepTutor, useDtAuthed } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
@@ -36,7 +45,8 @@ const one = (value: string | string[] | undefined) => (Array.isArray(value) ? (v
 /**
  * A chat with a partner: its replies stream in as in DeepTutor's own chat (reasoning, tools and
  * sources folded away), you can stop one, and a reply that kept going while the app was away is
- * picked up again. New Conversation archives this one; Conversations lists them all.
+ * picked up again. Photos and files go with a message; `/` lists its commands (the web's own,
+ * like /new and /branch, run here). New Conversation archives this one; Conversations lists them all.
  */
 export default function PartnerChat() {
   const palette = usePalette();
@@ -69,6 +79,13 @@ export default function PartnerChat() {
   }, [asked, openKey, queryClient]);
   const [draft, setDraft] = useState('');
   const [listing, setListing] = useState(false);
+  const [linking, setLinking] = useState(false);
+  // Photos and files for the next message. A partner reads files up to 10 MB (bigger ones are
+  // skipped without a word), within DeepTutor's own limits.
+  const limits = useDtAttachmentLimits();
+  const draftKey = `partner:${partnerId}`;
+  const attach = useDtAttach(draftKey, { maxFileBytes: Math.min(limits.data?.maxFileBytes ?? 10 * 1024 * 1024, 10 * 1024 * 1024), maxTotalBytes: limits.data?.maxTotalBytes ?? 25 * 1024 * 1024 });
+  const commands = useQuery({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'partners', 'commands'], queryFn: () => listPartnerCommands(client), staleTime: 30 * 60_000 });
 
   const chat = usePartnerChat(partnerId, key, {
     onRefused: (prompt, message) => {
@@ -103,7 +120,7 @@ export default function PartnerChat() {
       const lastUser = [...chat.records].reverse().find((record) => record.role === 'user');
       // Following a reply again repeats your message, which the conversation already holds.
       const repeated = turn.accepted && lastUser?.content === turn.prompt && chat.records[chat.records.length - 1]?.role === 'user';
-      if (turn.prompt !== null && !repeated) out.push({ key: 'live-user', kind: 'user', text: turn.prompt });
+      if (turn.prompt !== null && !repeated) out.push({ key: 'live-user', kind: 'user', text: turn.prompt, references: turn.files.map((file, at) => ({ key: `live-${at}`, icon: 'paper-clip' as const, label: file })) });
       out.push({ key: 'live-reply', kind: 'reply', reply: turn.reply, last: true });
     } else {
       const lastReply = out.map((item) => item.kind).lastIndexOf('reply');
@@ -114,9 +131,59 @@ export default function PartnerChat() {
 
   const send = () => {
     const text = draft.trim();
-    if (!text) return;
-    if (chat.send(text)) setDraft('');
-    else toast(chat.running ? 'Wait for the reply to finish.' : 'Not connected yet. Try again in a moment.');
+    const files = attach.extras.attachments;
+    if (!text && !files.length) return;
+    // The web's own commands (a new conversation, a branch…) are carried out here, not sent.
+    const command = files.length ? null : parseSlashCommand(text);
+    if (command && CLIENT_PARTNER_COMMANDS.has(command.command)) {
+      setDraft('');
+      void runCommand(command.command, command.argument);
+      return;
+    }
+    if (chat.send(text, files.map((file) => ({ type: file.type, filename: file.filename, mimeType: file.mimeType, base64: file.base64 })))) {
+      setDraft('');
+      clearExtras(draftKey);
+    } else toast(chat.running ? 'Wait for the reply to finish.' : 'Not connected yet. Try again in a moment.');
+  };
+
+  const branch = async () => {
+    if (chat.running) return toast('Wait for the reply to finish, or stop it.');
+    if (!key || !chat.records.length || readOnly) return toast('There’s nothing to branch yet.');
+    const next = newPartnerSessionKey();
+    try {
+      await branchPartnerSession(client, partnerId, key, next);
+      choose(next);
+      refresh();
+      toast('Branched: the original is in Conversations, archived.');
+    } catch (error) {
+      toast(`Couldn’t branch it: ${describeError(error)}`, 'error');
+    }
+  };
+
+  const runCommand = async (command: string, argument: string) => {
+    if (command === '/new' || command === '/clear') return newConversation();
+    if (command === '/branch') return branch();
+    if (command === '/stop') return chat.stop();
+    if (command === '/sessions') return setListing(true);
+    if (!argument) return toast(`${command} needs a conversation’s ID: open Conversations to pick one.`);
+    if (command === '/resume') {
+      try {
+        await resumePartnerSession(client, partnerId, argument);
+        choose(argument);
+        refresh();
+      } catch (error) {
+        toast(`Couldn’t bring it back: ${describeError(error)}`, 'error');
+      }
+    } else if (command === '/delete') {
+      try {
+        await deletePartnerSession(client, partnerId, argument);
+        if (argument === key) choose(newPartnerSessionKey());
+        refresh();
+        toast('Conversation deleted');
+      } catch (error) {
+        toast(`Couldn’t delete it: ${describeError(error)}`, 'error');
+      }
+    }
   };
 
   const newConversation = async () => {
@@ -174,8 +241,26 @@ export default function PartnerChat() {
   const menu: MenuItem[] = [
     { key: 'new', label: 'New Conversation', icon: 'pencil-square', onPress: () => void newConversation() },
     { key: 'list', label: 'Conversations', icon: 'clock', onPress: () => setListing(true) },
-    { key: 'web', label: 'Set Up on the Web', icon: 'arrow-top-right-on-square', onPress: () => router.push({ pathname: '/learn/web', params: { path: `/partners/${encodeURIComponent(partnerId)}`, title: name } }) },
-    ...(partner.data?.canManage ? [{ key: 'delete', label: 'Delete Partner', icon: 'trash' as const, destructive: true, onPress: removePartner }] : []),
+    { key: 'branch', label: 'Branch Conversation', icon: 'arrows-right-left', onPress: () => void branch() },
+    { key: 'link', label: 'Link a Chat App', icon: 'link', onPress: () => setLinking(true) },
+    ...(partner.data?.canManage
+      ? [
+          { key: 'settings', label: 'Partner Settings', icon: 'cog-6-tooth' as const, onPress: () => router.push({ pathname: '/learn/partners/edit', params: { id: partnerId } }) },
+          { key: 'delete', label: 'Delete Partner', icon: 'trash' as const, destructive: true, onPress: removePartner },
+        ]
+      : []),
+  ];
+  const chips: ExtraChip[] = attach.extras.attachments.map((item) => ({
+    key: item.id,
+    icon: 'document-text',
+    label: item.filename,
+    image: item.preview,
+    onRemove: () => attach.setExtras({ ...attach.extras, attachments: attach.extras.attachments.filter((other) => other.id !== item.id) }),
+  }));
+  const attachMenu: MenuItem[] = [
+    { key: 'photos', label: 'Photos', icon: 'photo', onPress: () => void attach.pickPhotos() },
+    { key: 'camera', label: 'Take Photo', icon: 'camera', onPress: () => void attach.takePhoto() },
+    { key: 'files', label: 'Files', icon: 'paper-clip', onPress: () => void attach.pickFiles() },
   ];
 
   const note =
@@ -247,10 +332,14 @@ export default function PartnerChat() {
             ready={chat.state === 'ready'}
             note={note}
             placeholder={`Message ${name}`}
+            chips={chips}
+            attach={attachMenu}
+            commands={offeredPartnerCommands(commands.data ?? [], partner.data?.canManage ?? false)}
           />
         )}
       </KeyboardAvoidingView>
       <ConversationsSheet partnerId={partnerId} visible={listing} current={key} onOpen={(picked) => void openSession(picked)} onDelete={removeSession} onClose={() => setListing(false)} />
+      <LinkSheet visible={linking} partnerId={partnerId} name={name} channels={partner.data?.canManage ? partner.data.channels : null} onClose={() => setLinking(false)} />
     </View>
   );
 }
