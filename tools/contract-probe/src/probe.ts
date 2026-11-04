@@ -15,7 +15,8 @@
  * model, else the first answers twice). `--a5` has the model ask a question with its `ask_user`
  * tool and answers it as the app does (src/a5-probe.ts). `--a6` tags, shares, clones and forks a
  * probe chat made without a model, and builds the downloads (src/a6-probe.ts).
- * `--a8` saves settings the app's way and puts them back exactly (src/a8-probe.ts).
+ * `--a8` saves settings the app's way and puts them back exactly (src/a8-probe.ts), then tries
+ * memories, the profile, your variables, a refused password change and an API key (src/a8-account-probe.ts).
  *
  * It never prints or stores tokens, passwords, emails or message text: fixtures
  * hold response shapes, counts and feature flags only (fixtures/<server version>/).
@@ -49,6 +50,7 @@ import { probeA3 } from './a3-probe';
 import { probeA4 } from './a4-probe';
 import { probeA5 } from './a5-probe';
 import { probeA6 } from './a6-probe';
+import { probeA8Account } from './a8-account-probe';
 import { probeA8 } from './a8-probe';
 import { probeChatActions } from './write-probe';
 
@@ -138,6 +140,7 @@ async function main() {
     if (session) {
       const client = anonymous.withToken(session.token);
       let capabilities: Capabilities | undefined;
+      let serverConfig: ServerConfig | undefined;
 
       const user = await step('GET /api/v1/auths/', async () => {
         const value = await getSessionUser(client);
@@ -147,6 +150,7 @@ async function main() {
 
       await step('GET /api/config (signed in)', async () => {
         const value = await getConfig(client);
+        serverConfig = value;
         capabilities = buildCapabilities({ config: value, user: user ?? session, version: version?.version });
         const features = Object.fromEntries(
           (Object.keys(FEATURES) as FeatureId[]).map((id) => [id, capabilities?.feature(id) ?? false]),
@@ -304,6 +308,9 @@ async function main() {
         const a8 = await probeA8({ client, capabilities });
         for (const result of a8.steps) results.push({ ...result, name: `A8: ${result.name}` });
         fixtures['write.a8'] = a8.fixture;
+        const account = await probeA8Account({ client, capabilities, config: serverConfig });
+        for (const result of account.steps) results.push({ ...result, name: `A8: ${result.name}` });
+        fixtures['write.a8-account'] = account.fixture;
       }
 
       if (args.write) {

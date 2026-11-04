@@ -1,3 +1,4 @@
+export * from './account';
 export * from './auth';
 export * from './capabilities';
 export * from './chats';
@@ -10,6 +11,7 @@ export * from './http';
 export * from './input';
 export * from './interactions';
 export * from './knowledge';
+export * from './memories';
 export * from './ids';
 export * from './models';
 export * from './multi';

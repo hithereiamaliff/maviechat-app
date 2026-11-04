@@ -1,0 +1,23 @@
+{
+  "memories": {
+    "count": 0,
+    "shape": null
+  },
+  "memory": {
+    "shape": {
+      "content": "string",
+      "created_at": "number",
+      "id": "string",
+      "meta": {
+        "created_by": "string"
+      },
+      "path": "string",
+      "type": "string",
+      "updated_at": "number",
+      "user_id": "string"
+    }
+  },
+  "variables": {
+    "count": 0
+  }
+}

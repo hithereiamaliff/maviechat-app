@@ -8,12 +8,14 @@ import {
   mergeResponses,
   modelActions,
   newestLeaf,
+  outputText,
   OwuiHttpError,
   pendingAskUser,
   plainText,
   resolveToolCall,
   saveMessage,
   selectBranch,
+  speechRate,
   updateChatControls,
   uuidv4,
   type ChatRecord,
@@ -26,7 +28,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
@@ -50,8 +52,9 @@ import { useSendMessage } from '@/features/chat/useSendMessage';
 import { useChatActions } from '@/features/chats/useChatActions';
 import { sendChatToDeepTutor } from '@/features/deeptutor/crossReference';
 import { useLive } from '@/features/live/LiveProvider';
+import { useAutoReadAloud } from '@/lib/autoReadAloud';
 import { describeError } from '@/lib/errors';
-import { useAuthed, useModels } from '@/lib/server';
+import { useAuthed, useCapabilities, useModels, useUserSettings } from '@/lib/server';
 import { useInterface } from '@/lib/uiSettings';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
@@ -185,6 +188,30 @@ export default function ChatScreen() {
     wasWriting.current = streaming;
   }, [streaming, autoCopy, lastReply]);
 
+  // Audio's "Read replies when they finish", in your voice and speed (Read Aloud allowed). Not a
+  // reply you stopped: the web reads only replies that finish.
+  const settings = useUserSettings();
+  const capabilities = useCapabilities();
+  const reply = lastReply?.role === 'assistant' ? lastReply : undefined;
+  const stoppedByYou = useRef(false);
+  const stopReply = (id: string) => {
+    stoppedByYou.current = true;
+    return stop(id);
+  };
+  useEffect(() => {
+    if (streaming) stoppedByYou.current = false;
+  }, [streaming]);
+  const wasStopped = useCallback(() => stoppedByYou.current, []);
+  useAutoReadAloud({
+    id: reply?.id ?? '',
+    writing: streaming,
+    finished: Boolean(reply) && reply?.done !== false && !reply?.error,
+    markdown: reply ? outputText(reply.output) || reply.content || '' : '',
+    enabled: settings.data?.ui?.responseAutoPlayback === true && (capabilities?.can('chat.tts', true) ?? false),
+    rate: speechRate(settings.data?.ui),
+    skip: wasStopped,
+  });
+
   // A model picked with `@` answers alone, until it's taken off (as on the web).
   const targets = (atModelId?: string | null) => {
     const at = atModelId ? models.data?.find((item) => item.id === atModelId) : undefined;
@@ -223,7 +250,7 @@ export default function ChatScreen() {
         updateDraft(chatId, (draft) => ({ ...draft, queue: [...draft.queue, { id: uuidv4(), prompt: message.text, files: message.files }] }));
         return true;
       }
-      await stop(chatId);
+      await stopReply(chatId);
     }
     return deliver(message, lastId);
   };
@@ -265,7 +292,7 @@ export default function ChatScreen() {
     updateDraft(chatId, (draft) => ({ ...draft, queue: draft.queue.filter((entry) => entry.id !== id) }));
     stalled.current = false;
     try {
-      if (streaming) await stop(chatId);
+      if (streaming) await stopReply(chatId);
       const { toggles, toolIds, atModel } = getDraft(chatId);
       const sent = await deliver({ text: item.prompt, files: item.files, toggles, toolIds, atModelId: atModel ?? undefined }, lastId);
       if (!sent) {
@@ -460,7 +487,7 @@ export default function ChatScreen() {
             modelLabel={choice.label}
             onPickModel={() => setPickerOpen(true)}
             onSend={onSend}
-            onStop={() => void stop(chatId)}
+            onStop={() => void stopReply(chatId)}
             onSendQueued={(id) => void sendQueuedNow(id)}
             streaming={streaming}
             temporary={temporary}

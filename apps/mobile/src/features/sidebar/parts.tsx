@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { MenuButton, MenuTrigger, type MenuItem } from '@/components/Menu';
+import { UserAvatar } from '@/components/UserAvatar';
 import { fonts, radius, usePalette } from '@/theme';
 import { useSidebar } from './SidebarContext';
 
@@ -125,17 +126,15 @@ export function SidebarChatRow({
   );
 }
 
-/** You, at the bottom: your initials and name, opening the account menu. */
-export function SidebarUser({ name, menu }: { name: string; menu: MenuItem[] }) {
+/** You, at the bottom: your picture (else initials) and name, opening the account menu. */
+export function SidebarUser({ name, picture, menu }: { name: string; picture?: string | null; menu: MenuItem[] }) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.footer, { borderTopColor: palette.border, paddingBottom: insets.bottom + 6 }]}>
       <MenuTrigger label="Account" items={menu}>
         <View style={styles.user}>
-          <View style={[styles.avatar, { backgroundColor: palette.surfaceStrong }]}>
-            <Text style={[styles.avatarText, { color: palette.text }]}>{initials(name)}</Text>
-          </View>
+          <UserAvatar name={name} picture={picture} size={30} />
           <Text style={[styles.userName, { color: palette.text }]} numberOfLines={1}>
             {name}
           </Text>
@@ -145,10 +144,7 @@ export function SidebarUser({ name, menu }: { name: string; menu: MenuItem[] }) 
   );
 }
 
-export function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '')).toUpperCase() || '?';
-}
+export { initials } from '@/components/UserAvatar';
 
 export const sidebarStyles = StyleSheet.create({
   list: { flex: 1, marginTop: 6 },
@@ -182,7 +178,5 @@ const styles = StyleSheet.create({
   mark: { width: 8, height: 8, borderRadius: 2 },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 6 },
   user: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8 },
-  avatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontFamily: fonts.semibold, fontSize: 12 },
   userName: { flex: 1, fontFamily: fonts.medium, fontSize: 15 },
 });

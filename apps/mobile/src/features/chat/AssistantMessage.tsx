@@ -10,6 +10,7 @@ import {
   outputText,
   pendingApprovals,
   plainText,
+  speechRate,
   type FileItem,
   type HistoryMessage,
   type ModelAction,
@@ -98,7 +99,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   const settings = useUserSettings();
   // Read Aloud follows the `chat.tts` permission (allowed unless denied) and your speed setting.
   const canSpeak = capabilities?.can('chat.tts', true) ?? false;
-  const ttsRate = (settings.data?.ui as { audio?: { tts?: { playbackRate?: unknown } } } | undefined)?.audio?.tts?.playbackRate;
+  const ttsRate = speechRate(settings.data?.ui);
   const ui = useInterface();
   const [revealed, setRevealed] = useState(false);
   // Kept by message (the list reuses rows as you scroll).
@@ -241,7 +242,7 @@ export const AssistantMessage = memo(function AssistantMessage({
             color={palette.textMuted}
             onPress={() => void copyReply(plainText(blocks), ui('copyFormatted')).then(() => toast('Copied to clipboard'))}
           />
-          {canSpeak ? <ReadAloudButton id={message.id} markdown={outputText(message.output) || message.content || ''} rate={typeof ttsRate === 'number' ? ttsRate : undefined} /> : null}
+          {canSpeak ? <ReadAloudButton id={message.id} markdown={outputText(message.output) || message.content || ''} rate={ttsRate} /> : null}
           {usage ? (
             <IconButton
               icon="information-circle"

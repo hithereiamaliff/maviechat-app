@@ -26,7 +26,7 @@ import { useTagsSheet } from '@/features/chats/TagsSheet';
 import { useChatActions } from '@/features/chats/useChatActions';
 import { switchToDeepTutor } from '@/features/deeptutor/switch';
 import { leaveRelay } from '@/features/notifications/push';
-import { useAuthed, useCapabilities, useServerConfig, useUserSettings } from '@/lib/server';
+import { useAuthed, useCapabilities, useServerConfig, useSessionUser, useUserSettings } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
@@ -53,6 +53,8 @@ export function Sidebar() {
   const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
   const queryClient = useQueryClient();
   const capabilities = useCapabilities();
+  // Your name and picture as they are now (Settings → Account can change them).
+  const you = useSessionUser();
   const config = useServerConfig();
   const settings = useUserSettings();
   const actions = useChatActions();
@@ -310,7 +312,7 @@ export function Sidebar() {
         />
       </View>
 
-      <SidebarUser name={session.user.name} menu={userMenu} />
+      <SidebarUser name={you.data?.name ?? session.user.name} picture={you.data?.profile_image_url} menu={userMenu} />
       {picker.element}
       {shareSheet.element}
       {tagsSheet.element}

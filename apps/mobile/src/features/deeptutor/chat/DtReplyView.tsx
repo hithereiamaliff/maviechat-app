@@ -17,6 +17,8 @@ import { IconButton } from '@/components/IconButton';
 import { ReadAloudButton } from '@/components/ReadAloudButton';
 import { useToast } from '@/components/Toast';
 import { Disclosure } from '@/features/chat/Steps';
+import { useAutoReadAloud } from '@/lib/autoReadAloud';
+import { useDevicePrefs } from '@/lib/devicePrefs';
 import { openLink } from '@/lib/links';
 import { Markdown } from '@/markdown/Markdown';
 import { fonts, radius, usePalette } from '@/theme';
@@ -166,6 +168,10 @@ export const DtReplyView = memo(function DtReplyView({ reply, baseUrl, stateKey,
   const thinking = reply.thoughts.map((thought) => thought.text.trim()).filter(Boolean).join('\n\n');
   const stillThinking = running && !reply.answer && reply.tools.length === 0;
   const turnId = reply.turnId;
+  // Read Aloud in your voice at DeepTutor's speed (Settings → Audio); the newest reply is read when it's done, if you asked.
+  const prefs = useDevicePrefs();
+  const readId = `dt-${reply.turnId ?? reply.assistantMessageId ?? ''}`;
+  useAutoReadAloud({ id: readId, writing: running || waiting, finished: reply.status === 'completed', markdown: reply.answer, enabled: last && prefs.deepTutorAutoPlay, rate: prefs.deepTutorRate });
 
   return (
     <View style={styles.wrap}>
@@ -253,7 +259,7 @@ export const DtReplyView = memo(function DtReplyView({ reply, baseUrl, stateKey,
               onPress={() => void Clipboard.setStringAsync(reply.answer).then(() => toast('Copied to clipboard'))}
             />
           ) : null}
-          {reply.answer.trim() ? <ReadAloudButton id={`dt-${reply.assistantMessageId ?? reply.turnId ?? ''}`} markdown={reply.answer} /> : null}
+          {reply.answer.trim() ? <ReadAloudButton id={readId} markdown={reply.answer} rate={prefs.deepTutorRate} /> : null}
           {last && onRegenerate ? <IconButton icon="arrow-path" label="Regenerate" size={18} color={palette.textMuted} onPress={onRegenerate} /> : null}
         </View>
       ) : null}

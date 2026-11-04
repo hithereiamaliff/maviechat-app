@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { escapeHtml, markdownToHtml } from './html';
-import { speakableText, speechLanguage } from './speech';
+import { speakableText, speechLanguage, voiceFits } from './speech';
 
 describe('speakableText', () => {
   it('reads the words and leaves out what a voice shouldn’t say', () => {
@@ -47,5 +47,16 @@ describe('markdownToHtml', () => {
     expect(html).not.toContain('javascript:');
     expect(html).toContain('href="https://a.example"');
     expect(escapeHtml('<a & "b">')).toBe('&lt;a &amp; &quot;b&quot;&gt;');
+  });
+});
+
+describe('voiceFits', () => {
+  it('keeps a chosen voice to text in its language', () => {
+    expect(voiceFits('en-GB', 'Hello there, how are you?')).toBe(true);
+    expect(voiceFits('ms-MY', 'Apa khabar?')).toBe(true);
+    expect(voiceFits('en-US', '你好，世界')).toBe(false);
+    expect(voiceFits('zh-TW', '你好，世界')).toBe(true);
+    expect(voiceFits('zh-CN', 'Hello there')).toBe(false);
+    expect(voiceFits('ja_JP', 'こんにちは')).toBe(true);
   });
 });

@@ -1,10 +1,13 @@
-import { speakableText, speechLanguage } from '@maviechat/owui-markdown';
+import { speakableText, speechLanguage, voiceFits } from '@maviechat/owui-markdown';
 import * as Speech from 'expo-speech';
 import { useSyncExternalStore } from 'react';
+import { devicePrefs, type ChosenVoice } from './devicePrefs';
 
 /*
  * Read Aloud, in the phone's own voice (as Open WebUI's web app uses the browser's when the server
  * has no speech engine): one reply at a time. Starting another stops the first; tapping again stops.
+ * The voice you chose (Settings → Audio) reads the text in its language; other languages get the
+ * phone's voice for theirs.
  */
 
 let reading: string | null = null;
@@ -41,8 +44,17 @@ function pieces(paragraph: string): string[] {
 }
 
 /** Reads a reply's Markdown aloud under `id`; false when it has nothing to say. */
-export function readAloud(id: string, markdown: string, options: { rate?: number } = {}): boolean {
-  const paragraphs = speakableText(markdown).flatMap(pieces);
+export function readAloud(id: string, markdown: string, options: { rate?: number; voice?: ChosenVoice | null } = {}): boolean {
+  return speakParagraphs(id, speakableText(markdown).flatMap(pieces), options);
+}
+
+/** Says a line of plain text under `id`; `force` uses the voice whatever the line's language (a voice's sample). */
+export function speakText(id: string, text: string, options: { rate?: number; voice?: ChosenVoice | null; force?: boolean } = {}): boolean {
+  return speakParagraphs(id, [text], options);
+}
+
+function speakParagraphs(id: string, paragraphs: string[], options: { rate?: number; voice?: ChosenVoice | null; force?: boolean }): boolean {
+  const voice = options.voice === undefined ? devicePrefs().voice : options.voice;
   session += 1;
   const mine = session;
   void Speech.stop();
@@ -53,9 +65,11 @@ export function readAloud(id: string, markdown: string, options: { rate?: number
   reading = id;
   emit();
   paragraphs.forEach((text, index) => {
+    const own = voice && (options.force || voiceFits(voice.language, text)) ? voice : null;
     Speech.speak(text, {
       rate: options.rate ?? 1,
-      language: speechLanguage(text),
+      language: own ? own.language : speechLanguage(text),
+      voice: own?.identifier,
       // The system manages its own audio session: other audio is lowered while it speaks.
       useApplicationAudioSession: false,
       onDone: index === paragraphs.length - 1 ? () => finish(mine) : undefined,

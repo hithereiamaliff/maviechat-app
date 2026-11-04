@@ -111,3 +111,25 @@ export function interfaceChange(key: InterfaceKey, on: boolean): Record<string, 
   const setting: InterfaceSetting = INTERFACE_SETTINGS[key];
   return { [setting.path]: stored(setting, on) };
 }
+
+// ── Audio ────────────────────────────────────────────────────────────────────
+
+/** Read Aloud's speed (`audio.tts.playbackRate`): 1 is normal, and the default. */
+export function speechRate(ui: Tree | null | undefined): number {
+  const rate = Number(uiValue(ui, 'audio.tts.playbackRate'));
+  return Number.isFinite(rate) && rate > 0 ? rate : 1;
+}
+
+/** The speeds the app steps through, slowest first. The web takes any number; one set there is kept until you step. */
+export const SPEECH_RATES = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] as const;
+
+/** The next speed up or down from `rate`, or `rate` itself at either end. */
+export function stepSpeechRate(rate: number, direction: 1 | -1): number {
+  if (direction > 0) return SPEECH_RATES.find((step) => step > rate + 1e-9) ?? rate;
+  return [...SPEECH_RATES].reverse().find((step) => step < rate - 1e-9) ?? rate;
+}
+
+/** A speed as the app shows it: "1×", "1.25×". */
+export function speechRateLabel(rate: number): string {
+  return `${Number(rate.toFixed(2))}×`;
+}

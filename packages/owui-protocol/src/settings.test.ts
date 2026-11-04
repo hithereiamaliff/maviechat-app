@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OwuiClient, type FetchLike } from './http';
-import { interfaceChange, interfaceOn, saveUiSettings, uiValue, withUiChanges } from './settings';
+import { interfaceChange, interfaceOn, saveUiSettings, speechRate, speechRateLabel, stepSpeechRate, uiValue, withUiChanges } from './settings';
 
 describe('your settings', () => {
   it('reads and changes them by path, copying what it changes and dropping what is put back', () => {
@@ -39,5 +39,25 @@ describe('your settings', () => {
     expect(interfaceChange('webSearch', false)).toEqual({ webSearch: null });
     expect(interfaceChange('defaultUploadContext', true)).toEqual({ defaultUploadContext: 'full' });
     expect(withUiChanges({ title: { auto: true, prompt: 'x' } }, interfaceChange('titleAuto', false))).toEqual({ title: { auto: false, prompt: 'x' } });
+  });
+});
+
+describe('Read Aloud speed', () => {
+  it('reads the saved speed, else normal', () => {
+    expect(speechRate({ audio: { tts: { playbackRate: 1.5 } } })).toBe(1.5);
+    expect(speechRate({ audio: { tts: { playbackRate: '1.25' } } })).toBe(1.25);
+    expect(speechRate({ audio: { tts: { playbackRate: 0 } } })).toBe(1);
+    expect(speechRate(null)).toBe(1);
+  });
+
+  it('steps through the offered speeds, from a speed set on the web too', () => {
+    expect(stepSpeechRate(1, 1)).toBe(1.25);
+    expect(stepSpeechRate(1, -1)).toBe(0.75);
+    expect(stepSpeechRate(2, 1)).toBe(2);
+    expect(stepSpeechRate(0.5, -1)).toBe(0.5);
+    expect(stepSpeechRate(1.1, 1)).toBe(1.25);
+    expect(stepSpeechRate(1.1, -1)).toBe(1);
+    expect(speechRateLabel(1)).toBe('1×');
+    expect(speechRateLabel(1.25)).toBe('1.25×');
   });
 });

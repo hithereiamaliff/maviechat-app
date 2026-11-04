@@ -9,6 +9,7 @@ import {
   effectiveToggles,
   interfaceOn,
   isTemporaryChatId,
+  memoryOn,
   OwuiHttpError,
   requestFiles,
   requestParams,
@@ -157,7 +158,7 @@ export function useSendMessage() {
       // A saved chat sends the documents it keeps (`chat.files`, see Controls); a temporary one everything shown.
       const chatFiles = job.temporary ? undefined : ((record?.chat?.files as unknown[] | undefined) ?? (job.chatId ? [] : undefined));
       const files = requestFiles(parentId ? branchPath(turn.history, parentId) : [], turn.userMessage, chatFiles);
-      const memory = (ui.memory as boolean | undefined) ?? config.data?.features?.enable_memories === true;
+      const memory = memoryOn(ui, config.data);
       const body = buildCompletionRequest({
         turn,
         chatId: job.temporary ? temporaryChatId(sessionId) : routeId,

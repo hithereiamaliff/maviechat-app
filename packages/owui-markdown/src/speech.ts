@@ -102,3 +102,16 @@ export function speechLanguage(text: string): string | undefined {
   if (/[ऀ-ॿ]/.test(text)) return 'hi-IN';
   return undefined;
 }
+
+/** The languages `speechLanguage` tells by their script. */
+const SCRIPT_LANGUAGES = new Set(['ja', 'ko', 'zh', 'ar', 'ru', 'th', 'ta', 'hi']);
+const primary = (tag: string) => tag.split(/[-_]/)[0]?.toLowerCase() ?? '';
+
+/**
+ * Whether a voice you chose (by its language tag) suits a passage: one in a script-told language
+ * needs a voice in that language; any other (Latin-script) text suits a voice that isn't one of those.
+ */
+export function voiceFits(voiceLanguage: string, text: string): boolean {
+  const passage = speechLanguage(text);
+  return passage ? primary(passage) === primary(voiceLanguage) : !SCRIPT_LANGUAGES.has(primary(voiceLanguage));
+}

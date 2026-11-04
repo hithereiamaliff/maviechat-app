@@ -3,6 +3,7 @@ import {
   interfaceChange,
   interfaceOn,
   saveUiSettings,
+  speechRate,
   updateUserSettings,
   uiValue,
   type Capabilities,
@@ -92,6 +93,23 @@ export async function probeA8(input: A8Input): Promise<{ steps: WriteStep[]; fix
       await saveUiSettings(client, { system: undefined });
       if ('system' in ((await rawSettings(client)).ui ?? {})) throw new Error('an emptied system prompt stayed');
       return 'saved and read back (stop as a list); an emptied prompt removed';
+    });
+
+    await check('Personalization and Audio: the Memory switch, auto-playback and speed, audio neighbours kept', async () => {
+      const current = await getUserSettings(client);
+      const memory = typeof current.ui?.memory === 'boolean' ? current.ui.memory : true;
+      const autoPlay = current.ui?.responseAutoPlayback === true;
+      const rate = speechRate(current.ui);
+      const nextRate = rate === 1.25 ? 1.5 : 1.25;
+      await saveUiSettings(client, { 'audio.tts.probeNeighbour': 'kept', 'audio.stt.language': 'ms' });
+      await saveUiSettings(client, { memory: !memory, responseAutoPlayback: !autoPlay, 'audio.tts.playbackRate': nextRate });
+      // Merged with the admin's defaults: a value equal to one of them is stored as "the default".
+      const after = await getUserSettings(client);
+      if (after.ui?.memory !== !memory) throw new Error('the Memory switch did not change');
+      if ((after.ui?.responseAutoPlayback === true) === autoPlay) throw new Error('auto-playback did not change');
+      if (speechRate(after.ui) !== nextRate) throw new Error(`the speed came back as ${String(uiValue(after.ui, 'audio.tts.playbackRate'))}`);
+      if (uiValue(after.ui, 'audio.tts.probeNeighbour') !== 'kept' || uiValue(after.ui, 'audio.stt.language') !== 'ms') throw new Error('the speed lost its audio neighbours');
+      return `memory ${!memory ? 'on' : 'off'}, auto-playback ${!autoPlay ? 'on' : 'off'}, speed ${nextRate}; other audio settings kept`;
     });
   } finally {
     // Exactly as it was (the raw settings, written whole).
