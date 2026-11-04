@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { ChatHeader } from '@/features/chat/ChatHeader';
+import { KnowledgeTab } from '@/features/workspace/KnowledgeTab';
 import { ModelsTab } from '@/features/workspace/ModelsTab';
 import { PromptsTab } from '@/features/workspace/PromptsTab';
 import { SkillsTab } from '@/features/workspace/SkillsTab';
@@ -20,8 +21,8 @@ const AREAS: { key: Area; label: string }[] = [
 
 /**
  * Open WebUI's Workspace: the areas this account may use, as tabs over each area's list (its
- * count on the open one). Models, Prompts and Skills are here; Knowledge and Tools open on the
- * web until their slices land.
+ * count on the open one). Models, Knowledge, Prompts and Skills are here; Tools opens on the web
+ * until its slice lands.
  */
 export default function Workspace() {
   const palette = usePalette();
@@ -51,6 +52,8 @@ export default function Workspace() {
         <Text style={[styles.note, styles.center, styles.pad, { color: palette.textMuted }]}>Your account has no Workspace areas. An admin gives them.</Text>
       ) : area === 'models' ? (
         <ModelsTab tabs={tabs} />
+      ) : area === 'knowledge' ? (
+        <KnowledgeTab tabs={tabs} />
       ) : area === 'prompts' ? (
         <PromptsTab tabs={tabs} />
       ) : area === 'skills' ? (

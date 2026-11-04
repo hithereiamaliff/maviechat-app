@@ -1,13 +1,18 @@
 import {
+  getWorkspaceKnowledge,
   getWorkspaceModel,
   getWorkspacePrompt,
   getWorkspaceSkill,
+  listKnowledgeFiles,
   listPromptVersions,
+  listWorkspaceKnowledge,
   listWorkspaceModels,
   listWorkspacePrompts,
   listWorkspaceSkills,
+  pendingKnowledgeFiles,
   workspaceModelTags,
   workspacePromptTags,
+  type KnowledgeFilesQuery,
   type OwuiClient,
   type WorkspaceListQuery,
 } from '@maviechat/owui-protocol';
@@ -34,6 +39,38 @@ export const useWorkspaceModels = (query: Omit<WorkspaceListQuery, 'page'>) => u
 export const useWorkspacePrompts = (query: Omit<WorkspaceListQuery, 'page'>) => usePagedList('prompts', query, listWorkspacePrompts);
 /** Workspace skills you can read (they have no tags to filter by). */
 export const useWorkspaceSkills = (query: Omit<WorkspaceListQuery, 'page' | 'tag'>) => usePagedList('skills', query, listWorkspaceSkills);
+/** Knowledge collections you can read (no tags either). */
+export const useWorkspaceKnowledgeList = (query: Omit<WorkspaceListQuery, 'page' | 'tag'>) => usePagedList('knowledge', query, listWorkspaceKnowledge);
+
+export function useWorkspaceKnowledge(id: string) {
+  const { client } = useAuthed();
+  return useQuery({ queryKey: ['workspace', 'knowledge-base', id], queryFn: () => getWorkspaceKnowledge(client, id), enabled: Boolean(id), staleTime: 15_000 });
+}
+
+/** One folder of a collection: its files, 30 a page; its folders and the way down come with every page. */
+export function useKnowledgeFiles(id: string, query: Omit<KnowledgeFilesQuery, 'page'>) {
+  const { client } = useAuthed();
+  return useInfiniteQuery({
+    queryKey: ['workspace', 'knowledge-files', id, query],
+    queryFn: ({ pageParam }) => listKnowledgeFiles(client, id, { ...query, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (last, pages) => (pages.reduce((sum, page) => sum + page.files.length, 0) < last.total && last.files.length ? pages.length + 1 : undefined),
+    enabled: Boolean(id),
+    staleTime: 10_000,
+  });
+}
+
+/** Uploads the server is still reading for a collection, checked every few seconds while there are any (or while asked to). */
+export function usePendingKnowledgeFiles(id: string, watching: boolean) {
+  const { client } = useAuthed();
+  return useQuery({
+    queryKey: ['workspace', 'knowledge-pending', id],
+    queryFn: () => pendingKnowledgeFiles(client, id),
+    enabled: Boolean(id),
+    refetchInterval: (query) => (watching || (query.state.data?.length ?? 0) > 0 ? 4000 : false),
+    staleTime: 0,
+  });
+}
 
 export function useWorkspaceModelTags() {
   const { client } = useAuthed();

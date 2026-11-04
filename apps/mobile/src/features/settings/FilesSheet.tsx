@@ -1,13 +1,13 @@
-import { deleteFile, fileContentUrl, fileSizeLabel, FILES_PAGE_SIZE, searchFiles, type StoredFile } from '@maviechat/owui-protocol';
+import { deleteFile, fileSizeLabel, FILES_PAGE_SIZE, searchFiles, type StoredFile } from '@maviechat/owui-protocol';
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { File, Paths } from 'expo-file-system';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { useToast } from '@/components/Toast';
 import { describeError } from '@/lib/errors';
+import { openServerFile } from '@/lib/openServerFile';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
 import { fonts, radius, usePalette } from '@/theme';
@@ -16,7 +16,6 @@ const SORTS = ['Newest', 'Name'] as const;
 
 const day = (seconds: number) => (seconds ? new Date(seconds * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 /** A name any file system takes, keeping the extension (Quick Look reads the type from it). */
-const safeName = (name: string) => name.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '_').slice(-120) || 'file';
 
 /** Your files on the server in a sheet, as the web's Manage Files: search, sort, open one, or delete it. */
 export function FilesSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -52,10 +51,7 @@ function Files({ onClose }: { onClose: () => void }) {
   const open = async (item: StoredFile) => {
     setOpening(item.id);
     try {
-      const file = new File(Paths.cache, `${item.id.slice(0, 8)}-${safeName(item.filename)}`);
-      await File.downloadFileAsync(fileContentUrl(session.baseUrl, item.id), file, { headers: { Authorization: `Bearer ${session.token}` }, idempotent: true });
-      if (await File.canPreview(file).catch(() => false)) await File.preview(file);
-      else await Share.share({ url: file.uri, title: item.filename });
+      await openServerFile(session, item.id, item.filename);
     } catch (error) {
       toast(`Couldn’t open the file: ${describeError(error)}`, 'error');
     } finally {

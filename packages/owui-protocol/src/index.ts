@@ -37,6 +37,7 @@ export * from './tools';
 export * from './valves';
 export * from './variables';
 export * from './version';
+export * from './workspaceKnowledge';
 export * from './workspaceModelEditor';
 export * from './workspaceModels';
 export * from './workspacePrompts';

@@ -22,3 +22,8 @@ export const PHONE_UPLOAD_MAX_BYTES = 100 * 1024 * 1024;
 export function uploadPart(file: PickedUpload): Blob {
   return { name: file.name, type: file.type, bytes: () => new File(file.uri).bytes() } as unknown as Blob;
 }
+
+/** Text made on the phone (a web page's, or typed in) as an upload part: a plain-text file. */
+export function textPart(name: string, text: string): Blob {
+  return { name, type: 'text/plain', bytes: async () => new TextEncoder().encode(text) } as unknown as Blob;
+}

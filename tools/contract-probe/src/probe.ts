@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--a8] [--m3] [--m3text]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--a8] [--m3] [--m3text] [--m3kb]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -54,6 +54,7 @@ import { probeA6 } from './a6-probe';
 import { probeA8Account } from './a8-account-probe';
 import { probeA8Data } from './a8-data-probe';
 import { probeA8 } from './a8-probe';
+import { probeM3Knowledge } from './m3-knowledge-probe';
 import { probeM3Models } from './m3-models-probe';
 import { probeM3Text } from './m3-text-probe';
 import { probeChatActions } from './write-probe';
@@ -72,6 +73,7 @@ const { values: args } = parseArgs({
     a8: { type: 'boolean' },
     m3: { type: 'boolean' },
     m3text: { type: 'boolean' },
+    m3kb: { type: 'boolean' },
   },
 });
 
@@ -332,6 +334,12 @@ async function main() {
         const m3text = await probeM3Text({ client, capabilities });
         for (const result of m3text.steps) results.push({ ...result, name: `M3: ${result.name}` });
         fixtures['write.m3-text'] = m3text.fixture;
+      }
+
+      if (args.m3kb && capabilities) {
+        const m3kb = await probeM3Knowledge({ client, capabilities });
+        for (const result of m3kb.steps) results.push({ ...result, name: `M3: ${result.name}` });
+        fixtures['write.m3-knowledge'] = m3kb.fixture;
       }
 
       if (args.write) {
