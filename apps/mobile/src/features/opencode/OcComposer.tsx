@@ -1,12 +1,12 @@
 import type { Agent } from '@maviechat/opencode-protocol';
-import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { MenuTrigger } from '@/components/Menu';
-import { fonts, usePalette } from '@/theme';
-import type { ModelChoice } from './queries';
+import { fonts, radius, usePalette } from '@/theme';
+import { modelSections, type ModelChoice } from './models';
 
 export interface ModelPick {
   providerID: string;
@@ -15,42 +15,76 @@ export interface ModelPick {
 
 const sameModel = (a: ModelPick | null, b: ModelPick) => a?.providerID === b.providerID && a.modelID === b.modelID;
 
-/** Every model OpenCode can use here, by provider; the one in use ticked. */
+/**
+ * Every model OpenCode can use, under its provider (providers and models A to Z), with a search
+ * that keeps what it finds under the provider too. The one in use is ticked.
+ */
 function ModelSheet({ models, value, onPick, onClose }: { models: ModelChoice[]; value: ModelPick | null; onPick: (model: ModelPick) => void; onClose: () => void }) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
-  const providers = [...new Set(models.map((model) => model.provider))];
+  const [query, setQuery] = useState('');
+  const sections = useMemo(() => modelSections(models, query), [models, query]);
+  const typed = query.trim();
   return (
-    <View style={[styles.sheet, { backgroundColor: palette.background, paddingBottom: insets.bottom + 12 }]}>
-      <View style={[styles.sheetHeader, { borderBottomColor: palette.border }]}>
+    <View style={[styles.sheet, { backgroundColor: palette.background }]}>
+      <View style={styles.sheetHeader}>
         <Text style={[styles.sheetTitle, { color: palette.text }]}>Model</Text>
-        <IconButton icon="x-mark" label="Close" onPress={onClose} />
+        <Pressable accessibilityRole="button" onPress={onClose} hitSlop={10}>
+          <Text style={[styles.done, { color: palette.link }]}>Done</Text>
+        </Pressable>
       </View>
-      <ScrollView>
-        {providers.map((provider) => (
-          <View key={provider}>
-            <Text style={[styles.section, { color: palette.textMuted }]}>{provider}</Text>
-            {models
-              .filter((model) => model.provider === provider)
-              .map((model) => (
-                <Pressable
-                  key={`${model.providerID}/${model.modelID}`}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: sameModel(value, model) }}
-                  onPress={() => {
-                    onPick({ providerID: model.providerID, modelID: model.modelID });
-                    onClose();
-                  }}
-                  style={({ pressed }) => [styles.modelRow, { borderBottomColor: palette.border }, pressed && { backgroundColor: palette.surface }]}>
-                  <Text style={[styles.modelName, { color: palette.text }]} numberOfLines={1}>
-                    {model.name}
-                  </Text>
-                  {sameModel(value, model) ? <Icon name="check" size={18} color={palette.link} strokeWidth={2} /> : null}
-                </Pressable>
-              ))}
+      <View style={[styles.search, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+        <Icon name="magnifying-glass" size={16} color={palette.textMuted} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search models or providers"
+          placeholderTextColor={palette.textFaint}
+          autoCorrect={false}
+          autoCapitalize="none"
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+          accessibilityLabel="Search models"
+          style={[styles.searchInput, { color: palette.text }]}
+        />
+      </View>
+      <SectionList
+        sections={sections}
+        keyExtractor={(model) => `${model.providerID}/${model.modelID}`}
+        renderSectionHeader={({ section }) => (
+          <View style={[styles.sectionRow, { backgroundColor: palette.background }]}>
+            <Text style={[styles.section, { color: palette.textMuted }]} numberOfLines={1}>
+              {section.title}
+            </Text>
+            <Text style={[styles.count, { color: palette.textFaint }]}>{section.data.length}</Text>
           </View>
-        ))}
-      </ScrollView>
+        )}
+        renderItem={({ item }) => {
+          const selected = sameModel(value, item);
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${item.name}, ${item.provider}`}
+              accessibilityState={{ selected }}
+              onPress={() => {
+                onPick({ providerID: item.providerID, modelID: item.modelID });
+                onClose();
+              }}
+              style={({ pressed }) => [styles.modelRow, (pressed || selected) && { backgroundColor: palette.surface }]}>
+              <Text style={[styles.modelName, { color: palette.text }]} numberOfLines={1}>
+                {item.name}
+              </Text>
+              {selected ? <Icon name="check" size={18} color={palette.text} strokeWidth={2} /> : null}
+            </Pressable>
+          );
+        }}
+        stickySectionHeadersEnabled
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets
+        contentContainerStyle={[styles.modelList, { paddingBottom: insets.bottom + 12 }]}
+        ListEmptyComponent={<Text style={[styles.empty, { color: palette.textMuted }]}>{typed ? `No models match “${typed}”.` : 'No models found.'}</Text>}
+      />
     </View>
   );
 }
@@ -161,10 +195,18 @@ const styles = StyleSheet.create({
   modelChip: { flexShrink: 1 },
   chipText: { fontFamily: fonts.medium, fontSize: 13 },
   send: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  sheet: { flex: 1 },
-  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
-  sheetTitle: { fontFamily: fonts.semibold, fontSize: 17 },
-  section: { fontFamily: fonts.medium, fontSize: 13, marginTop: 16, marginBottom: 4, marginHorizontal: 16 },
-  modelRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: StyleSheet.hairlineWidth, gap: 8 },
+  // The model sheet, laid out like Open WebUI's model picker.
+  sheet: { flex: 1, paddingTop: 12 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 8 },
+  sheetTitle: { fontFamily: fonts.semibold, fontSize: 18 },
+  done: { fontFamily: fonts.semibold, fontSize: 16 },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, height: 40, marginHorizontal: 16, marginVertical: 8, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth },
+  searchInput: { flex: 1, fontFamily: fonts.regular, fontSize: 15, paddingVertical: 0 },
+  modelList: { paddingHorizontal: 8 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 14, paddingBottom: 6 },
+  section: { flex: 1, fontFamily: fonts.semibold, fontSize: 13 },
+  count: { fontFamily: fonts.regular, fontSize: 12 },
+  modelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 11, borderRadius: radius.md },
   modelName: { flex: 1, fontFamily: fonts.regular, fontSize: 15 },
+  empty: { fontFamily: fonts.regular, fontSize: 14, textAlign: 'center', marginTop: 24 },
 });

@@ -2,6 +2,7 @@ import { getMachine, getProviders, listAgents, listFiles, listProjects, listSess
 import { useQuery } from '@tanstack/react-query';
 import { useOcAuthed } from '@/session/OpenCodeProvider';
 import { OC_QUERY_ROOT } from '@/session/queryRoots';
+import type { ModelChoice } from './models';
 
 /** Every OpenCode query key: the space's root, then the account, then what it is. */
 export const ocKey = (accountId: string, ...rest: unknown[]) => [OC_QUERY_ROOT, accountId, ...rest];
@@ -44,13 +45,6 @@ export function useSubfolders(root: string | null) {
     enabled: Boolean(root),
     staleTime: 60_000,
   });
-}
-
-export interface ModelChoice {
-  providerID: string;
-  modelID: string;
-  name: string;
-  provider: string;
 }
 
 /** Every model this OpenCode can use. Until one is picked, OpenCode uses its own default. */
