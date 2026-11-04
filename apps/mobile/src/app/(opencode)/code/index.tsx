@@ -4,21 +4,24 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
 import { describeOcError } from '@/features/opencode/errors';
 import { OcComposer, type ModelPick } from '@/features/opencode/OcComposer';
 import { OcHeader } from '@/features/opencode/OcHeader';
 import { useOcProject, useProjectPicker } from '@/features/opencode/project';
-import { folderName, ocKey, useMachine, useOcAgents, useOcModels } from '@/features/opencode/queries';
+import { folderName, ocKey, useMachine, useOcAgents, useOcModels, useOcSessions } from '@/features/opencode/queries';
 import { useOcAuthed } from '@/session/OpenCodeProvider';
 import { fonts, radius, usePalette } from '@/theme';
 
-/** A new OpenCode session: which project, whether it asks before changes, and the first prompt. */
+const RECENT = 3;
+
+/**
+ * A new OpenCode session, laid out like Open WebUI's new chat: the machine, the composer in the
+ * middle, and under it the project, whether to ask before changes, and recent sessions there.
+ */
 export default function OpenCodeHome() {
   const palette = usePalette();
-  const insets = useSafeAreaInsets();
   const toast = useToast();
   const queryClient = useQueryClient();
   const { client, accountId } = useOcAuthed();
@@ -28,11 +31,11 @@ export default function OpenCodeHome() {
   const directory = project.directory;
   const models = useOcModels(directory);
   const agents = useOcAgents(directory);
+  const recent = useOcSessions(directory);
   const [model, setModel] = useState<ModelPick | null>(null);
   const [agent, setAgent] = useState<string | null>(null);
   const [approvals, setApprovals] = useState(true);
-  // Unless you pick one, OpenCode uses its own default model.
-  const chosenModel = model;
+  const offline = machine.data?.logins.some((login) => !login.online) ?? false;
 
   const send = async (text: string): Promise<boolean> => {
     if (!directory) {
@@ -40,13 +43,14 @@ export default function OpenCodeHome() {
       return false;
     }
     try {
+      // Unless you pick a model, OpenCode uses its own default.
       const session = await createSession(
         client,
         directory,
-        { ...(agent ? { agent } : {}), ...(chosenModel ? { model: { id: chosenModel.modelID, providerID: chosenModel.providerID } } : {}) },
+        { ...(agent ? { agent } : {}), ...(model ? { model: { id: model.modelID, providerID: model.providerID } } : {}) },
         approvals,
       );
-      await sendPrompt(client, directory, session.id, { text, model: chosenModel ?? undefined, agent: agent ?? undefined });
+      await sendPrompt(client, directory, session.id, { text, model: model ?? undefined, agent: agent ?? undefined });
       void queryClient.invalidateQueries({ queryKey: ocKey(accountId, 'sessions') });
       router.replace({ pathname: '/code/s/[id]', params: { id: session.id, dir: directory } });
       return true;
@@ -57,45 +61,78 @@ export default function OpenCodeHome() {
   };
 
   return (
-    <View style={[styles.screen, { backgroundColor: palette.background, paddingTop: insets.top }]}>
+    <View style={[styles.screen, { backgroundColor: palette.background }]}>
       <OcHeader title="New Session" />
-      <KeyboardAvoidingView behavior="padding" style={styles.flex} keyboardVerticalOffset={insets.top}>
+      <KeyboardAvoidingView behavior="padding" style={styles.screen}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={[styles.title, { color: palette.text }]}>{machine.data?.name ?? 'OpenCode'}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel={`Project: ${directory ?? 'none chosen'}. Change`} onPress={picker.open} style={[styles.project, { borderColor: palette.border, backgroundColor: palette.surface }]}>
-            <Icon name="folder" size={20} color={palette.textMuted} />
-            <View style={styles.projectText}>
-              <Text style={[styles.projectName, { color: palette.text }]} numberOfLines={1}>
-                {directory ? folderName(directory) : 'Choose a Project'}
-              </Text>
-              <Text style={[styles.projectPath, { color: palette.textMuted }]} numberOfLines={1}>
-                {directory ?? 'OpenCode works inside a project folder'}
-              </Text>
-            </View>
-            <Icon name="chevron-right" size={16} color={palette.textFaint} />
-          </Pressable>
-          <View style={[styles.switchRow, { borderColor: palette.border }]}>
-            <View style={styles.projectText}>
-              <Text style={[styles.projectName, { color: palette.text }]}>Ask Before Changes</Text>
-              <Text style={[styles.projectPath, { color: palette.textMuted }]}>OpenCode asks you here before it edits files or runs commands in this session.</Text>
-            </View>
-            <Switch value={approvals} onValueChange={setApprovals} accessibilityLabel="Ask before changes" />
+          <View style={styles.greeting}>
+            <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
+              {machine.data?.name ?? 'OpenCode'}
+            </Text>
+            <Text style={[styles.subtitle, { color: palette.textMuted }]}>
+              {offline ? 'OpenCode isn’t answering on this machine right now.' : directory ? `What should OpenCode do in ${folderName(directory)}?` : 'Choose a project to start.'}
+            </Text>
           </View>
-          {machine.data?.logins.some((login) => !login.online) ? <Text style={[styles.warning, { color: palette.danger }]}>OpenCode isn’t answering on this machine right now.</Text> : null}
+
+          <View style={styles.composer}>
+            <OcComposer
+              working={false}
+              models={models.data?.models ?? []}
+              model={model}
+              onModel={setModel}
+              agents={agents.data ?? []}
+              agent={agent ?? agents.data?.[0]?.name ?? null}
+              onAgent={setAgent}
+              onSend={send}
+              placeholder={directory ? 'Ask OpenCode' : 'Choose a project first'}
+            />
+          </View>
+
+          <View style={styles.options}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Project: ${directory ?? 'none chosen'}. Change`}
+              onPress={picker.open}
+              style={({ pressed }) => [styles.option, { borderColor: palette.border }, pressed && { backgroundColor: palette.surface }]}>
+              <Icon name="folder" size={18} color={palette.textMuted} />
+              <View style={styles.optionText}>
+                <Text style={[styles.optionLabel, { color: palette.text }]} numberOfLines={1}>
+                  {directory ? folderName(directory) : 'Choose a Project'}
+                </Text>
+                <Text style={[styles.optionDetail, { color: palette.textMuted }]} numberOfLines={1}>
+                  {directory ?? 'OpenCode works inside a project folder'}
+                </Text>
+              </View>
+              <Icon name="chevron-right" size={16} color={palette.textFaint} />
+            </Pressable>
+            <View style={[styles.option, { borderColor: palette.border }]}>
+              <Icon name="shield-check" size={18} color={palette.textMuted} />
+              <View style={styles.optionText}>
+                <Text style={[styles.optionLabel, { color: palette.text }]}>Ask Before Changes</Text>
+                <Text style={[styles.optionDetail, { color: palette.textMuted }]}>Before edits and commands, in this session</Text>
+              </View>
+              <Switch value={approvals} onValueChange={setApprovals} accessibilityLabel="Ask before changes" />
+            </View>
+          </View>
+
+          {directory && (recent.data?.length ?? 0) > 0 ? (
+            <View style={styles.recent}>
+              <Text style={[styles.section, { color: palette.textMuted }]}>Recent in {folderName(directory)}</Text>
+              {(recent.data ?? []).slice(0, RECENT).map((item) => (
+                <Pressable
+                  key={item.id}
+                  accessibilityRole="button"
+                  onPress={() => router.replace({ pathname: '/code/s/[id]', params: { id: item.id, dir: item.directory } })}
+                  style={({ pressed }) => [styles.recentRow, pressed && { backgroundColor: palette.surface }]}>
+                  <Icon name="clock" size={16} color={palette.textFaint} />
+                  <Text style={[styles.recentTitle, { color: palette.text }]} numberOfLines={1}>
+                    {item.title || 'Untitled'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
         </ScrollView>
-        <View style={[styles.composer, { paddingBottom: insets.bottom + 8 }]}>
-          <OcComposer
-            working={false}
-            models={models.data?.models ?? []}
-            model={chosenModel}
-            onModel={setModel}
-            agents={agents.data ?? []}
-            agent={agent ?? agents.data?.[0]?.name ?? null}
-            onAgent={setAgent}
-            onSend={send}
-            placeholder={directory ? `Ask OpenCode in ${folderName(directory)}` : 'Choose a project first'}
-          />
-        </View>
       </KeyboardAvoidingView>
       {picker.element}
     </View>
@@ -104,14 +141,18 @@ export default function OpenCodeHome() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  flex: { flex: 1 },
-  content: { flexGrow: 1, justifyContent: 'center', padding: 20, gap: 14 },
-  title: { fontFamily: fonts.semibold, fontSize: 24, textAlign: 'center', marginBottom: 6 },
-  project: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 12 },
-  projectText: { flex: 1, gap: 2 },
-  projectName: { fontFamily: fonts.medium, fontSize: 15 },
-  projectPath: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18 },
-  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 12 },
-  warning: { fontFamily: fonts.regular, fontSize: 14, textAlign: 'center' },
-  composer: { paddingHorizontal: 12, paddingTop: 6 },
+  content: { flexGrow: 1, justifyContent: 'center', paddingBottom: 48, gap: 16 },
+  greeting: { paddingHorizontal: 24, gap: 6, alignItems: 'center' },
+  title: { fontFamily: fonts.semibold, fontSize: 24 },
+  subtitle: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 21, textAlign: 'center' },
+  composer: { paddingHorizontal: 12 },
+  options: { paddingHorizontal: 16, gap: 8 },
+  option: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 8 },
+  optionText: { flex: 1, gap: 1 },
+  optionLabel: { fontFamily: fonts.medium, fontSize: 15 },
+  optionDetail: { fontFamily: fonts.regular, fontSize: 13 },
+  recent: { paddingHorizontal: 16, gap: 2 },
+  section: { fontFamily: fonts.medium, fontSize: 13, marginLeft: 4, marginBottom: 4 },
+  recentRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 40, paddingHorizontal: 4, borderRadius: radius.md },
+  recentTitle: { flex: 1, fontFamily: fonts.regular, fontSize: 15 },
 });

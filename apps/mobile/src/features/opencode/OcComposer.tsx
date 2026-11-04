@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { MenuTrigger } from '@/components/Menu';
-import { fonts, radius, usePalette } from '@/theme';
+import { fonts, usePalette } from '@/theme';
 import type { ModelChoice } from './queries';
 
 export interface ModelPick {
@@ -152,8 +152,9 @@ export function OcComposer({
 }
 
 const styles = StyleSheet.create({
-  wrap: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.xl, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 8, gap: 6 },
-  input: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 22, maxHeight: 180, minHeight: 24 },
+  // The same box as Open WebUI's composer.
+  wrap: { borderWidth: 1, borderRadius: 26, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 8, gap: 6 },
+  input: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 22, maxHeight: 160, minHeight: 26, paddingTop: 2, paddingBottom: 2 },
   bar: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   flex: { flex: 1 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: StyleSheet.hairlineWidth, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },

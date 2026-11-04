@@ -129,12 +129,12 @@ export default function OpenCodeSession() {
   );
 
   return (
-    <View style={[styles.screen, { backgroundColor: palette.background, paddingTop: insets.top }]}>
+    <View style={[styles.screen, { backgroundColor: palette.background }]}>
       <OcHeader title={title} menu={menu} />
       <Text style={[styles.folder, { color: palette.textFaint }]} numberOfLines={1}>
         {folderName(directory)}
       </Text>
-      <KeyboardAvoidingView behavior="padding" style={styles.flex} keyboardVerticalOffset={insets.top}>
+      <KeyboardAvoidingView behavior="padding" style={styles.flex}>
         {!loaded ? <ActivityIndicator style={styles.loading} color={palette.textMuted} /> : null}
         {problem && live.messages.length === 0 ? <Text style={[styles.note, styles.problem, { color: palette.danger }]}>{describeOcError(problem)}</Text> : null}
         <FlashList
@@ -158,7 +158,7 @@ export default function OpenCodeSession() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.list}
         />
-        <View style={[styles.composer, { paddingBottom: insets.bottom + 8 }]}>
+        <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
           <OcComposer
             working={working}
             models={models.data?.models ?? []}
@@ -179,7 +179,7 @@ export default function OpenCodeSession() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   flex: { flex: 1 },
-  folder: { fontFamily: fonts.regular, fontSize: 12, textAlign: 'center', marginTop: -4, marginBottom: 4 },
+  folder: { fontFamily: fonts.regular, fontSize: 12, textAlign: 'center', marginTop: -6, marginBottom: 2 },
   list: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 },
   item: { paddingVertical: 8 },
   footer: { gap: 12, paddingTop: 8 },
