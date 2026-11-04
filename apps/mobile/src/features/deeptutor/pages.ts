@@ -23,7 +23,8 @@ export interface DtPage {
     | '/learn/partners/groups/new'
     | '/learn/personalization'
     | '/learn/personas'
-    | '/learn/skills';
+    | '/learn/skills'
+    | '/learn/memory';
   /** Hidden from learner accounts, which DeepTutor limits to chat and some learning. */
   notForLearners?: boolean;
 }
@@ -118,7 +119,7 @@ export const DT_SHELVES: DtShelf[] = [
           { key: 'skills', label: 'Skills', icon: 'sparkles', path: '/space/skills', route: '/learn/skills' },
           { key: 'mcp', label: 'MCP Services', icon: 'puzzle-piece', path: '/space/mcp' },
           { key: 'cli-apps', label: 'CLI Apps', icon: 'command-line', path: '/space/cli-apps' },
-          { key: 'memory', label: 'Memory', icon: 'light-bulb', path: '/memory' },
+          { key: 'memory', label: 'Memory', icon: 'light-bulb', path: '/memory', route: '/learn/memory' },
         ],
       },
     ],

@@ -1,0 +1,87 @@
+{
+  "module": {
+    "enabled": true,
+    "ready": true
+  },
+  "overview": {
+    "docs": [
+      "L2/chat",
+      "L2/notebook",
+      "L2/quiz",
+      "L2/kb",
+      "L2/book",
+      "L2/partner",
+      "L2/cowriter",
+      "L3/recent",
+      "L3/profile",
+      "L3/scope",
+      "L3/preferences"
+    ],
+    "archived": false
+  },
+  "sheets": {
+    "L2/chat": {
+      "entries": 0,
+      "parsed": 0
+    },
+    "L2/notebook": {
+      "entries": 0,
+      "parsed": 0
+    },
+    "L2/quiz": {
+      "entries": 0,
+      "parsed": 0
+    },
+    "L2/kb": {
+      "entries": 0,
+      "parsed": 0
+    },
+    "L2/book": {
+      "entries": 0,
+      "parsed": 0
+    },
+    "L2/partner": {
+      "entries": 0,
+      "parsed": 0
+    },
+    "L2/cowriter": {
+      "entries": 0,
+      "parsed": 0
+    },
+    "L3/recent": {
+      "entries": 0,
+      "parsed": 0
+    },
+    "L3/profile": {
+      "entries": 0,
+      "parsed": 0
+    },
+    "L3/scope": {
+      "entries": 0,
+      "parsed": 0
+    },
+    "L3/preferences": {
+      "entries": 1,
+      "parsed": 1
+    }
+  },
+  "resolveBad": 400,
+  "resolveUnknown": 404,
+  "limits": {
+    "update": {
+      "L2": 20,
+      "L3": 10
+    },
+    "audit": {
+      "L2": 20,
+      "L3": 10
+    },
+    "dedupIterations": 3
+  },
+  "mergeRun": {
+    "status": "done",
+    "events": true
+  },
+  "undo": 409,
+  "reset": true
+}

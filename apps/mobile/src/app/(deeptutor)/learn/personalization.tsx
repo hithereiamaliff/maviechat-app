@@ -19,7 +19,7 @@ interface Tile {
 
 /**
  * All Personalization, as DeepTutor's hub: what's yours in every workspace, each with how many
- * there are. Personas and Skills open here; the rest open DeepTutor's own pages for now.
+ * there are. Personas, Skills and Memory open here; the rest open DeepTutor's own pages for now.
  */
 export default function Personalization() {
   const palette = usePalette();
@@ -37,7 +37,7 @@ export default function Personalization() {
     // No count: reading the list makes DeepTutor connect to every server in it.
     { key: 'mcp', title: 'MCP Services', blurb: 'Outside tools a chat can use, through MCP servers.', icon: 'puzzle-piece', web: '/space/mcp' },
     { key: 'cli-apps', title: 'CLI Apps', blurb: 'Command-line programs on the server a chat can run.', icon: 'command-line', web: '/space/cli-apps', count: cli.data ? plural(usableCliApps(cli.data).length, 'app', 'apps') : undefined },
-    { key: 'memory', title: 'Memory', blurb: 'What DeepTutor has learned about you and your work.', icon: 'light-bulb', web: '/memory' },
+    { key: 'memory', title: 'Memory', blurb: 'What DeepTutor has learned about you and your work.', icon: 'light-bulb', route: '/learn/memory' },
   ];
 
   const open = (tile: Tile) => {
