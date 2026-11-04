@@ -176,12 +176,12 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 
 | | Item |
 |---|---|
-| [ ] | Models list: search, sort, enable/hide, import/export JSON, "Try in chat"; menu Edit/Clone/Share/Copy link/Export/Hide/Delete |
-| [ ] | Model editor: avatar, name, ID, description, base model, tags, system prompt, params, model controls, suggested prompts, capabilities, default features, built-in tools, knowledge/tools/skills/filters/actions, access, versions |
-| [ ] | Knowledge: list, create, collection page with folders, add content (files, webpage, text), file viewer, test query |
+| [~] | Models list: search, sort, enable/hide, import/export JSON, "Try in chat"; menu Edit/Clone/Share/Copy link/Export/Hide/Delete. M3.1 (2026-11-04): search, whose (all, yours, shared with you), tag, order, more on scroll; on/off (writers; off leaves everyone's picker), hide/show, Try in Chat, Copy Link, Clone, Export (with `models_export`), Delete; read-only ones open to view. Not yet: import JSON, bulk show/hide (admin), Pin in sidebar (the app's sidebar has no pinned models) |
+| [~] | Model editor: avatar, name, ID, description, base model, tags, system prompt, params, suggested prompts, capabilities, default features, built-in tools, knowledge/tools/skills/filters/actions, access. M3.1: picture (photo, camera, default; 250 × 250), name, id (from the name until edited; fixed once made), base model, description, tags, system prompt with the chat and user variables it asks for; everything else kept; new models private. (0.11.3 has no model versions or "model controls": 0.12-era, see M5) |
+| [ ] | Knowledge: list, create, collection page with folders, add content (files, webpage, text), file viewer (0.11.3 has no test query for local knowledge bases) |
 | [ ] | Prompts: name, `/command`, content with variables, versions, access |
-| [ ] | Skills: import (.skill/ZIP/JSON), edit, files, versions, export |
-| [ ] | Tools: create, import from URL, code editor (CodeMirror WebView), valves, history |
+| [ ] | Skills: import (.md, JSON), edit, export (0.11.3 has no .skill/ZIP packages, files or versions) |
+| [ ] | Tools: create, import from URL, code editor (CodeMirror WebView), valves (0.11.3 has no tool history). Saving a tool runs its Python on the server: tool writes are probed on the scratch instance only |
 
 ## 12. Admin (M4) — the admin tabs live inside the settings modal, as on the web
 

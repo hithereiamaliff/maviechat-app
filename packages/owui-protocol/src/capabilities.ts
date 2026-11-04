@@ -21,6 +21,8 @@ export const FEATURES = {
   calendar: { flag: 'enable_calendar', permission: 'features.calendar' },
   userWebhooks: { flag: 'enable_user_webhooks', permission: 'features.webhooks' },
   messageRating: { flag: 'enable_message_rating', permission: 'chat.rate_response' },
+  /** Tools and functions (the Workspace's Tools tab needs it too). */
+  plugins: { flag: 'enable_plugins', permission: null },
 } as const satisfies Record<string, { flag: string; permission: string | null }>;
 
 export type FeatureId = keyof typeof FEATURES;

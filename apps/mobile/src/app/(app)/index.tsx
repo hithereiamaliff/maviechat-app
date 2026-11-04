@@ -1,5 +1,5 @@
 import { filesPending, modelAuthor, promptSuggestions } from '@maviechat/owui-protocol';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -30,7 +30,9 @@ export default function NewChat() {
   const config = useServerConfig();
   const user = useSessionUser();
   const capabilities = useCapabilities();
-  const choice = useModelChoice(undefined);
+  // `?model=` (Workspace's "Try in Chat") starts with that model.
+  const asked = useLocalSearchParams<{ model?: string }>().model;
+  const choice = useModelChoice(undefined, typeof asked === 'string' && asked ? [asked] : []);
   const { send } = useSendMessage();
   const typed = useDraftText(NEW_CHAT);
   const composer = useRef<ComposerHandle>(null);

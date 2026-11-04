@@ -7,7 +7,7 @@ import { useCapabilities, useModels, useServerConfig, useUserSettings } from '@/
  * this chat, else the chat's own models, else your defaults (user settings, then the server's
  * defaults, then the first model).
  */
-export function useModelChoice(chat: ChatRecord | undefined) {
+export function useModelChoice(chat: ChatRecord | undefined, preferred: string[] = []) {
   const models = useModels();
   const settings = useUserSettings();
   const config = useServerConfig();
@@ -21,7 +21,8 @@ export function useModelChoice(chat: ChatRecord | undefined) {
   const lastModel = [...messages].reverse().find((message) => message.role === 'assistant' && message.model)?.model;
   const visible = (ids: (string | undefined)[]) => ids.filter((id): id is string => Boolean(id) && list.some((model) => model.id === id));
   const chatIds = visible(chat?.chat?.models ?? []);
-  const candidates = [picked?.key === key ? visible(picked.ids) : [], chatIds.length ? chatIds : visible([lastModel]), defaultIds];
+  // Yours first; then a model asked for (Workspace's "Try in Chat"), the chat's own, or the defaults.
+  const candidates = [picked?.key === key ? visible(picked.ids) : [], visible(preferred), chatIds.length ? chatIds : visible([lastModel]), defaultIds];
   const ids = candidates.find((group) => group.length > 0) ?? [];
   // As on the web, only admins and accounts allowed to compare get more than one model.
   const compareAllowed = capabilities?.can('chat.multiple_models', true) ?? false;

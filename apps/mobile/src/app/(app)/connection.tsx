@@ -17,6 +17,7 @@ const FEATURE_LABELS: Record<FeatureId, string> = {
   calendar: 'Calendar',
   userWebhooks: 'Notification webhooks',
   messageRating: 'Message rating',
+  plugins: 'Tools and functions',
 };
 
 type LiveState = { status: SocketStatus | 'idle'; detail?: string; joinedAs?: string };

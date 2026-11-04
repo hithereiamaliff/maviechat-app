@@ -36,7 +36,7 @@ import { SearchFilters } from './SearchFilters';
 import { buildSidebarRows, isUnread, type SidebarRow } from './rows';
 import { useSidebar } from './SidebarContext';
 
-/** The pages the web can pin under Search. They open on the web until the app has them (Workspace in M3). */
+/** The pages the web can pin under Search: Workspace opens here; the rest open on the web. */
 const SHORTCUTS: Record<ShortcutId, { label: string; icon: IconName; path: string }> = {
   notes: { label: 'Notes', icon: 'document-text', path: '/notes' },
   workspace: { label: 'Workspace', icon: 'squares-2x2', path: '/workspace' },
@@ -144,6 +144,10 @@ export function Sidebar() {
     sidebar.close();
     void WebBrowser.openBrowserAsync(`${session.baseUrl}${path}`);
   };
+  const openWorkspace = () => {
+    sidebar.close();
+    router.push('/workspace');
+  };
   // The user's own order, once their settings have loaded (so a customised list never flashes the defaults).
   const shortcuts =
     capabilities && !settings.isPending
@@ -151,7 +155,7 @@ export function Sidebar() {
       : [];
   const userMenu: MenuItem[] = [
     ...(capabilities && canUseWorkspace(capabilities)
-      ? [{ key: 'workspace', label: 'Workspace', icon: 'squares-2x2' as const, onPress: () => openOnWeb('/workspace') }]
+      ? [{ key: 'workspace', label: 'Workspace', icon: 'squares-2x2' as const, onPress: openWorkspace }]
       : []),
     ...(capabilities?.isAdmin ? [{ key: 'admin', label: 'Admin Panel', icon: 'wrench-screwdriver' as const, onPress: () => openOnWeb('/admin') }] : []),
     {
@@ -288,8 +292,8 @@ export function Sidebar() {
               key={id}
               icon={SHORTCUTS[id].icon}
               label={SHORTCUTS[id].label}
-              hint="Opens on the web"
-              onPress={() => openOnWeb(SHORTCUTS[id].path)}
+              hint={id === 'workspace' ? undefined : 'Opens on the web'}
+              onPress={() => (id === 'workspace' ? openWorkspace() : openOnWeb(SHORTCUTS[id].path))}
             />
           ))
         : null}

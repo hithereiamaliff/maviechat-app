@@ -1,0 +1,64 @@
+{
+  "list": {
+    "total": 2,
+    "item": {
+      "access_grants": [
+        {
+          "created_at": "number",
+          "id": "string",
+          "permission": "string",
+          "principal_id": "string",
+          "principal_type": "string",
+          "resource_id": "string",
+          "resource_type": "string"
+        }
+      ],
+      "base_model_id": "string",
+      "created_at": "number",
+      "id": "string",
+      "is_active": "boolean",
+      "meta": {
+        "capabilities": {
+          "builtin_tools": "boolean",
+          "citations": "boolean",
+          "code_interpreter": "boolean",
+          "file_context": "boolean",
+          "file_upload": "boolean",
+          "image_generation": "boolean",
+          "status_updates": "boolean",
+          "terminal": "boolean",
+          "vision": "boolean",
+          "web_search": "boolean"
+        },
+        "defaultFeatureIds": [
+          "string"
+        ],
+        "description": "null",
+        "filterIds": [
+          "string"
+        ],
+        "knowledge": "null",
+        "suggestion_prompts": "null",
+        "tags": [],
+        "toolIds": [
+          "string"
+        ]
+      },
+      "name": "string",
+      "params": {},
+      "updated_at": "number",
+      "user": {
+        "email": "string",
+        "id": "string",
+        "name": "string",
+        "role": "string"
+      },
+      "user_id": "string",
+      "write_access": "boolean"
+    },
+    "tags": 0
+  },
+  "hiddenInPicker": "listed, marked hidden",
+  "export": 401,
+  "afterDelete": 404
+}

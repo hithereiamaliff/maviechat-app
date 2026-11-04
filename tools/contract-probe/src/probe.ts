@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--a8]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--a8] [--m3]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -54,6 +54,7 @@ import { probeA6 } from './a6-probe';
 import { probeA8Account } from './a8-account-probe';
 import { probeA8Data } from './a8-data-probe';
 import { probeA8 } from './a8-probe';
+import { probeM3Models } from './m3-models-probe';
 import { probeChatActions } from './write-probe';
 
 const { values: args } = parseArgs({
@@ -68,6 +69,7 @@ const { values: args } = parseArgs({
     a5: { type: 'boolean' },
     a6: { type: 'boolean' },
     a8: { type: 'boolean' },
+    m3: { type: 'boolean' },
   },
 });
 
@@ -316,6 +318,12 @@ async function main() {
         const data = await probeA8Data({ client, capabilities });
         for (const result of data.steps) results.push({ ...result, name: `A8: ${result.name}` });
         fixtures['write.a8-data'] = data.fixture;
+      }
+
+      if (args.m3 && capabilities) {
+        const m3 = await probeM3Models({ client, capabilities });
+        for (const result of m3.steps) results.push({ ...result, name: `M3: ${result.name}` });
+        fixtures['write.m3-models'] = m3.fixture;
       }
 
       if (args.write) {
