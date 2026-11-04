@@ -4,7 +4,7 @@ import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { useSyncExternalStore } from 'react';
 import type { StoredSession } from '@/session/stored-session';
-import { legacyTargetId, registerWithRelay, testThroughRelay, unregisterFromRelay, type RelayAnswer } from './relay';
+import { isRelayServer, legacyTargetId, registerWithRelay, testThroughRelay, unregisterFromRelay, type RelayAnswer } from './relay';
 
 /** What this phone did about notifications, kept on the device. */
 export interface PushState {
@@ -63,12 +63,16 @@ export function usePushState(): PushState | null {
 }
 
 /**
- * True when finished replies reach this iPhone as push notifications: switched on here, and
- * Open WebUI's server-wide webhook has reported to the relay.
+ * True when finished replies reach this iPhone as push notifications: switched on here, the
+ * phone has a place in the relay under the Open WebUI account, and Open WebUI's server-wide
+ * webhook has reported to the relay.
  */
 export function pushAnnouncesReplies(): boolean {
-  return Boolean(state?.enabled && state.lastEventAt != null);
+  return Boolean(state?.enabled && state.userId && state.lastEventAt != null);
 }
+
+/** The Open WebUI account, when the relay serves its server (other servers' sign-ins never go to the relay). */
+const relayAccount = (owui: OwuiAccount | null): OwuiAccount | null => (owui && isRelayServer('owui', owui.session.baseUrl) ? owui : null);
 
 let freshToken: Promise<string | null> | null = null;
 
@@ -97,11 +101,13 @@ export interface OwuiAccount {
 
 /**
  * Switches notifications on for this phone: iOS permission (asked once) and the Expo push token.
- * With an Open WebUI account, the phone also takes a place in MavieChat's relay under it, and
- * Open WebUI's server-wide webhook then reports every finished or failed reply. DeepTutor needs
- * nothing more: each of its replies is handed to the relay as it starts, with this token. Safe to repeat.
+ * With an Open WebUI account on a server the relay serves, the phone also takes a place in the
+ * relay under it, and Open WebUI's server-wide webhook then reports every finished or failed
+ * reply. DeepTutor needs nothing more: each of its replies is handed to the relay as it starts,
+ * with this token. Safe to repeat.
  */
-export async function enablePush(owui: OwuiAccount | null, { ask }: { ask: boolean }): Promise<PushStatus> {
+export async function enablePush(owuiAccount: OwuiAccount | null, { ask }: { ask: boolean }): Promise<PushStatus> {
+  const owui = relayAccount(owuiAccount);
   const current = await loadState();
   let permission = await Notifications.getPermissionsAsync();
   if (!permission.granted && ask && permission.canAskAgain) permission = await Notifications.requestPermissionsAsync();
@@ -111,7 +117,7 @@ export async function enablePush(owui: OwuiAccount | null, { ask }: { ask: boole
   }
   const pushToken = await expoPushToken();
   if (!owui) {
-    await saveState({ ...current, enabled: true, asked: true, pushToken });
+    await saveState({ ...current, enabled: true, asked: true, pushToken, userId: null, lastEventAt: null });
     return 'on';
   }
   const answer: RelayAnswer = await registerWithRelay(relayFetch, owui.session.token, pushToken);
@@ -131,31 +137,46 @@ export async function enablePush(owui: OwuiAccount | null, { ask }: { ask: boole
   return 'on';
 }
 
+/** Whether the relay serves this Open WebUI sign-in's server. */
+const servedSession = (session: StoredSession | null): session is StoredSession => session !== null && isRelayServer('owui', session.baseUrl);
+
 /** Switches notifications off on this phone, taking it off the relay for the Open WebUI account first. */
 export async function disablePush(owuiSession: StoredSession | null): Promise<void> {
   const current = await loadState();
-  if (owuiSession && current.enabled && current.pushToken) await unregisterFromRelay(relayFetch, owuiSession.token, current.pushToken);
+  if (servedSession(owuiSession) && current.enabled && current.pushToken) await unregisterFromRelay(relayFetch, owuiSession.token, current.pushToken);
   await saveState({ ...current, enabled: false, userId: null });
 }
 
 /** Before signing out of Open WebUI: that account's replies stop reaching this phone, while DeepTutor's carry on. */
 export async function leaveRelay(owuiSession: StoredSession): Promise<void> {
   const current = await loadState();
-  if (current.enabled && current.pushToken) await unregisterFromRelay(relayFetch, owuiSession.token, current.pushToken);
+  if (servedSession(owuiSession) && current.enabled && current.pushToken) await unregisterFromRelay(relayFetch, owuiSession.token, current.pushToken);
   await saveState({ ...current, userId: null });
 }
 
 /** A test notification straight from the relay. */
 export async function sendTestPush(session: StoredSession): Promise<RelayAnswer> {
+  if (!servedSession(session)) throw new Error('notifications work only on servers run by TechMavie Digital');
   const current = await loadState();
   const answer = await testThroughRelay(relayFetch, session.token, current.pushToken ?? (await expoPushToken()));
   await saveState({ ...current, lastEventAt: answer.lastEventAt });
   return answer;
 }
 
-/** First launch in either space: ask once and switch on. Later launches refresh the token and registration quietly. */
-export async function setUpPushOnLaunch(owui: OwuiAccount | null): Promise<void> {
-  const current = await loadState();
-  if (!current.asked) await enablePush(owui, { ask: true });
-  else if (current.enabled) await enablePush(owui, { ask: false });
+/**
+ * First launch in either space: ask once and switch on, when a signed-in server is one the relay
+ * serves (elsewhere notifications can't work, so the app doesn't ask). Later launches refresh the
+ * token and registration quietly.
+ */
+export async function setUpPushOnLaunch(owui: OwuiAccount | null, deepTutorBaseUrl: string | null): Promise<void> {
+  const served = relayAccount(owui);
+  let current = await loadState();
+  // Signed in to another server now: the phone's place under an earlier account doesn't apply here.
+  if (!served && current.userId) {
+    current = { ...current, userId: null, lastEventAt: null };
+    await saveState(current);
+  }
+  if (!served && !(deepTutorBaseUrl && isRelayServer('deeptutor', deepTutorBaseUrl))) return;
+  if (!current.asked) await enablePush(served, { ask: true });
+  else if (current.enabled) await enablePush(served, { ask: false });
 }

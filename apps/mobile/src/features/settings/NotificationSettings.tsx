@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Linking, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { deliveryProblem } from '@/features/notifications/iosDelivery';
 import { disablePush, enablePush, sendTestPush, usePushState } from '@/features/notifications/push';
-import { describePushError } from '@/features/notifications/relay';
+import { describePushError, isRelayServer } from '@/features/notifications/relay';
 import { watchForTest, type TestWatch } from '@/features/notifications/testWatch';
+import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
 import { fonts, radius, usePalette } from '@/theme';
 
@@ -16,6 +17,11 @@ export function NotificationSettings() {
   const owui = useSession();
   const session = owui.state.status === 'signed-in' ? owui.state.session : null;
   const account = session && owui.client ? { client: owui.client, session } : null;
+  const deepTutor = useDeepTutor().state;
+  const deepTutorBaseUrl = deepTutor.status === 'signed-in' ? deepTutor.session.baseUrl : null;
+  // The notification service serves TechMavie Digital's two servers only.
+  const owuiServed = session !== null && isRelayServer('owui', session.baseUrl);
+  const deepTutorServed = deepTutorBaseUrl !== null && isRelayServer('deeptutor', deepTutorBaseUrl);
   const push = usePushState();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -77,10 +83,21 @@ export function NotificationSettings() {
 
   const enabled = push?.enabled ?? false;
   // The relay hears about Open WebUI's replies only once an admin adds its webhook there.
-  const waitingForServer = enabled && session !== null && push?.lastEventAt === null;
+  const waitingForServer = enabled && owuiServed && push?.lastEventAt === null;
   const testNote = testState ? describeTest(testState) : null;
   const testColor =
     testState?.step === 'arrived' ? palette.success : testState?.step === 'missing' || testState?.step === 'failed' ? palette.danger : palette.textMuted;
+
+  if (!owuiServed && !deepTutorServed) {
+    return (
+      <View style={styles.wrap}>
+        <Text style={[styles.section, { color: palette.textMuted }]}>Notifications</Text>
+        <Text style={[styles.note, { color: palette.textMuted }]}>
+          {"Notifications when a reply finishes come through MavieChat's notification service, which serves only TechMavie Digital's servers (chat.techmavie.digital and learn.techmavie.digital). They aren't available for the servers you're signed in to."}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.wrap}>
@@ -95,7 +112,7 @@ export function NotificationSettings() {
           )}
         </View>
         {/* The test goes through the relay, which knows this phone by its Open WebUI account. */}
-        {enabled && session ? (
+        {enabled && owuiServed ? (
           <Pressable
             accessibilityRole="button"
             onPress={() => void test()}
@@ -129,6 +146,16 @@ export function NotificationSettings() {
       <Text style={[styles.note, { color: palette.textFaint }]}>
         {"When a reply finishes or fails, MavieChat's notification service notifies this iPhone with the chat title and the start of the reply. Open WebUI tells it about every reply; DeepTutor's replies are handed to it as they start. While MavieChat is open, every chat gets a banner except the one on screen."}
       </Text>
+      {session && !owuiServed ? (
+        <Text style={[styles.note, { color: palette.textFaint }]}>
+          {"The notification service serves only TechMavie Digital's servers, so this covers DeepTutor's replies, not your Open WebUI server's."}
+        </Text>
+      ) : null}
+      {deepTutorBaseUrl && !deepTutorServed ? (
+        <Text style={[styles.note, { color: palette.textFaint }]}>
+          {"The notification service serves only TechMavie Digital's servers, so this covers Open WebUI's replies, not your DeepTutor server's."}
+        </Text>
+      ) : null}
     </View>
   );
 }

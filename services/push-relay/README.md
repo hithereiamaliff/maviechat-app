@@ -18,6 +18,8 @@ Turns Open WebUI's "chat finished" and "chat failed" events into push notificati
   - At most 200 watches at once and 10 per phone. A restart forgets them.
 - **`GET /health`**.
 
+**Which servers:** only `OWUI_URL`'s and `DT_PUBLIC_URL`'s users. The app calls the relay only when it's signed in to one of those (`isRelayServer` in the app), so other servers' sign-ins never reach it.
+
 **Stored:** `DATA_DIR/devices.json` (mode 600) holds Open WebUI user ids, push tokens and when the last event arrived. No passwords, Open WebUI tokens or chat text.
 
 **Environment:**

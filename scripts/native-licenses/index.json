@@ -1,0 +1,22 @@
+{
+  "about": "Native libraries compiled into the iOS app that aren't npm packages: CocoaPods that expo-image, expo-updates and React Native depend on (from their podspecs). Each text was fetched once from the library's repository at the tag in `source` and is kept here verbatim. Re-check this list when Expo or React Native is upgraded.",
+  "libraries": [
+    { "name": "SDWebImage", "version": "5.21", "license": "MIT", "via": "expo-image", "files": ["SDWebImage.txt"], "source": "https://github.com/SDWebImage/SDWebImage/blob/5.21.0/LICENSE" },
+    { "name": "SDWebImageAVIFCoder", "version": "0.11", "license": "MIT", "via": "expo-image", "files": ["SDWebImageAVIFCoder.txt"], "source": "https://github.com/SDWebImage/SDWebImageAVIFCoder/blob/0.11.0/LICENSE" },
+    { "name": "SDWebImageSVGCoder", "version": "1.7", "license": "MIT", "via": "expo-image", "files": ["SDWebImageSVGCoder.txt"], "source": "https://github.com/SDWebImage/SDWebImageSVGCoder/blob/1.7.0/LICENSE" },
+    { "name": "SDWebImageWebPCoder", "version": "0.14", "license": "MIT", "via": "expo-image", "files": ["SDWebImageWebPCoder.txt"], "source": "https://github.com/SDWebImage/SDWebImageWebPCoder/blob/0.14.6/LICENSE" },
+    { "name": "libwebp", "version": "1.x", "license": "BSD-3-Clause", "via": "expo-image", "files": ["libwebp.txt", "libwebp-PATENTS.txt"], "source": "https://github.com/webmproject/libwebp/blob/v1.5.0/COPYING" },
+    { "name": "libavif", "version": "1.x", "license": "BSD-2-Clause", "via": "expo-image", "files": ["libavif.txt"], "source": "https://github.com/AOMediaCodec/libavif/blob/v1.1.1/LICENSE" },
+    { "name": "dav1d", "version": "1.x", "license": "BSD-2-Clause", "via": "expo-image", "files": ["dav1d.txt"], "source": "https://github.com/videolan/dav1d/blob/1.5.1/COPYING" },
+    { "name": "Reachability.swift", "version": "5.x", "license": "MIT", "via": "expo-updates", "files": ["ReachabilitySwift.txt"], "source": "https://github.com/ashleymills/Reachability.swift/blob/v5.2.4/LICENSE" },
+    { "name": "SQLite", "version": "3", "license": "Public domain", "via": "expo-updates", "files": ["sqlite.txt"], "source": "https://www.sqlite.org/copyright.html" },
+    { "name": "Boost", "version": "1.84.0", "license": "BSL-1.0", "via": "React Native", "files": ["boost.txt"], "source": "https://github.com/boostorg/boost/blob/boost-1.84.0/LICENSE_1_0.txt" },
+    { "name": "double-conversion", "version": "1.1.6", "license": "BSD-3-Clause", "via": "React Native", "files": ["DoubleConversion.txt"], "source": "https://github.com/google/double-conversion/blob/v1.1.6/LICENSE" },
+    { "name": "glog", "version": "0.3.5", "license": "BSD-3-Clause", "via": "React Native", "files": ["glog.txt"], "source": "https://github.com/google/glog/blob/v0.3.5/COPYING" },
+    { "name": "fast_float", "version": "8.0.0", "license": "MIT", "via": "React Native", "files": ["fast_float.txt"], "source": "https://github.com/fastfloat/fast_float/blob/v8.0.0/LICENSE-MIT" },
+    { "name": "fmt", "version": "12.1.0", "license": "MIT", "via": "React Native", "files": ["fmt.txt"], "source": "https://github.com/fmtlib/fmt/blob/12.1.0/LICENSE" },
+    { "name": "Folly", "version": "2024.11.18.00", "license": "Apache-2.0", "via": "React Native", "files": ["folly.txt"], "source": "https://github.com/facebook/folly/blob/v2024.11.18.00/LICENSE" },
+    { "name": "SocketRocket", "version": "0.7.1", "license": "BSD-3-Clause", "via": "React Native", "files": ["SocketRocket.txt"], "source": "https://github.com/facebook/SocketRocket/blob/0.7.1/LICENSE" },
+    { "name": "Hermes", "version": "260318099.0.5", "license": "MIT", "via": "React Native", "files": ["hermes.txt"], "source": "https://github.com/facebook/hermes/blob/main/LICENSE" }
+  ]
+}

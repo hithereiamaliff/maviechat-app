@@ -12,7 +12,7 @@ import { createContext, useContext, useEffect, useMemo, useState, useSyncExterna
 import { AppState } from 'react-native';
 import { useToast } from '@/components/Toast';
 import { pushTokenIfOn } from '@/features/notifications/push';
-import { watchDeepTutorTurn } from '@/features/notifications/relay';
+import { isRelayServer, watchDeepTutorTurn } from '@/features/notifications/relay';
 import { DT_EXPIRED_NOTICE, DT_QUERY_ROOT, useDeepTutor, useDtAuthed } from '@/session/DeepTutorProvider';
 import { dtSocketFactory } from '@/features/deeptutor/dtSocket';
 import { LiveTurns, type LiveTurn } from './liveTurns';
@@ -53,7 +53,8 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
   const connection = useMemo(() => {
     const sessionKey = (id: string) => [DT_QUERY_ROOT, baseUrl, 'session', id];
     const watchForPush = (sessionId: string, turnId: string) => {
-      if (!pushWatch.relayServes || pushWatch.watched.has(turnId)) return;
+      // Only a DeepTutor the relay serves: another server's sign-in never goes to the relay.
+      if (!isRelayServer('deeptutor', baseUrl) || !pushWatch.relayServes || pushWatch.watched.has(turnId)) return;
       pushWatch.watched.add(turnId);
       const cached = queryClient.getQueryData<DtSession>(sessionKey(sessionId));
       const prompt = pushWatch.prompts.get(sessionId) ?? pushWatch.prompts.get('');
@@ -123,13 +124,13 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
   // (from a cold start it took about three seconds, and the reply went unnoticed).
   // iOS closes sockets in the background, so coming back opens it again (and resumes any reply).
   useEffect(() => {
-    void pushTokenIfOn();
+    if (isRelayServer('deeptutor', baseUrl)) void pushTokenIfOn();
     connection.connect();
     const subscription = AppState.addEventListener('change', (next) => {
       if (next === 'active') connection.connect();
     });
     return () => subscription.remove();
-  }, [connection]);
+  }, [connection, baseUrl]);
 
   useEffect(() => () => turns.clear(), [turns, connection]);
 

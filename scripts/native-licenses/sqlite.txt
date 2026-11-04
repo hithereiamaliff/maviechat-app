@@ -1,0 +1,1 @@
+The SQLite source code is in the public domain: https://www.sqlite.org/copyright.html

@@ -1,5 +1,30 @@
 import { describe, expect, it, vi } from 'vitest';
-import { describePushError, legacyTargetId, registerWithRelay, testThroughRelay, unregisterFromRelay } from './relay';
+import { describePushError, isRelayServer, legacyTargetId, registerWithRelay, testThroughRelay, unregisterFromRelay } from './relay';
+
+describe('which servers the relay serves', () => {
+  it('knows TechMavie Digital’s two servers, however the address is written', () => {
+    for (const url of ['https://chat.techmavie.digital', 'https://Chat.TechMavie.Digital/', 'https://chat.techmavie.digital:443', ' https://chat.techmavie.digital/c/abc?x=1 ']) {
+      expect(isRelayServer('owui', url)).toBe(true);
+    }
+    expect(isRelayServer('deeptutor', 'https://learn.techmavie.digital/')).toBe(true);
+  });
+
+  it('refuses every other server, look-alikes included', () => {
+    for (const url of [
+      'http://chat.techmavie.digital',
+      'https://chat.techmavie.digital:8443',
+      'https://chat.techmavie.digital.example.com',
+      'https://chat.techmavie.digital@example.com',
+      'https://example.com/https://chat.techmavie.digital',
+      'https://learn.techmavie.digital',
+      'chat.techmavie.digital',
+      '',
+    ]) {
+      expect(isRelayServer('owui', url)).toBe(false);
+    }
+    expect(isRelayServer('deeptutor', 'https://chat.techmavie.digital')).toBe(false);
+  });
+});
 
 const answer = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
 

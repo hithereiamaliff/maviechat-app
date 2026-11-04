@@ -3,6 +3,21 @@ import { OwuiHttpError } from '@maviechat/owui-protocol';
 /** MavieChat's push relay (services/push-relay): turns Open WebUI's events into notifications. */
 export const PUSH_RELAY_URL = 'https://push.techmavie.digital';
 
+/**
+ * The servers the relay serves (its OWUI_URL and DT_PUBLIC_URL): TechMavie Digital's own Open
+ * WebUI and DeepTutor. A sign-in for any other server never goes to the relay.
+ */
+export const RELAY_SERVERS = { owui: 'https://chat.techmavie.digital', deeptutor: 'https://learn.techmavie.digital' } as const;
+
+/** Whether the relay serves this server: the same scheme and host, whatever the case, a default port or a path. */
+export function isRelayServer(kind: keyof typeof RELAY_SERVERS, baseUrl: string): boolean {
+  const match = /^(https?):\/\/([^/?#]*)(?:[/?#]|$)/i.exec(baseUrl.trim());
+  const scheme = match?.[1]?.toLowerCase();
+  const authority = match?.[2]?.toLowerCase();
+  if (!scheme || !authority || authority.includes('@')) return false;
+  return `${scheme}://${authority.replace(scheme === 'https' ? /:443$/ : /:80$/, '')}` === RELAY_SERVERS[kind];
+}
+
 /** The name of the per-phone Open WebUI target earlier app versions saved (removed now). */
 export function legacyTargetId(deviceId: string): string {
   return `maviechat-${deviceId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 12).toLowerCase()}`;
