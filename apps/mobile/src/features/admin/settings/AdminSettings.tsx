@@ -7,12 +7,13 @@ import { ActionRow, Group, Note, SectionTitle } from '@/features/settings/rows';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, usePalette } from '@/theme';
 import { AdminConfigPage, BannersEditor } from './AdminConfigPage';
+import { ConnectionsPage } from './ConnectionsPage';
 
-type Page = 'general' | 'authentication';
+type Page = 'general' | 'authentication' | 'connections';
 
 /** The web's admin settings tabs, in its groups; those not in the app yet open on the web, signed in. */
 const WEB_PAGES: { group: string; pages: { key: string; label: string }[] }[] = [
-  { group: 'AI', pages: [{ key: 'connections', label: 'Connections' }, { key: 'models', label: 'Models' }] },
+  { group: 'AI', pages: [{ key: 'models', label: 'Models' }] },
   { group: 'Quality', pages: [{ key: 'evaluations', label: 'Evaluations' }] },
   {
     group: 'Tools',
@@ -36,9 +37,9 @@ const WEB_PAGES: { group: string; pages: { key: string; label: string }[] }[] = 
 ];
 
 /**
- * The settings modal's Admin tab (admins only): the server's own settings. General and
- * Authentication are here; each saves only what changed, after listing it. The rest open on the
- * web until their slices land.
+ * The settings modal's Admin tab (admins only): the server's own settings. General,
+ * Authentication and Connections are here; each saves only what changed, after listing it. The
+ * rest open on the web until their slices land.
  */
 export function AdminSettings() {
   const palette = usePalette();
@@ -59,10 +60,12 @@ export function AdminSettings() {
               <BannersEditor />
               <Note>Webhooks, and the settings new users start with, are on the web for now.</Note>
             </AdminConfigPage>
-          ) : (
+          ) : page === 'authentication' ? (
             <AdminConfigPage sections={AUTHENTICATION_SECTIONS}>
               <Note>LDAP and OAuth sign-in are set on the web.</Note>
             </AdminConfigPage>
+          ) : (
+            <ConnectionsPage />
           )}
         </>
       ) : (
@@ -73,6 +76,12 @@ export function AdminSettings() {
             <Group>
               <ActionRow label="General" hint="Features, banners, this server’s address" onPress={() => setPage('general')} />
               <ActionRow label="Authentication" hint="Sign-ups, new accounts, sessions, API keys" onPress={() => setPage('authentication')} />
+            </Group>
+          </View>
+          <View style={styles.section}>
+            <SectionTitle title="AI" />
+            <Group>
+              <ActionRow label="Connections" hint="OpenAI-compatible and Ollama servers, their keys and models" onPress={() => setPage('connections')} />
             </Group>
           </View>
           {WEB_PAGES.map((group) => (

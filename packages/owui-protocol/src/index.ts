@@ -1,5 +1,6 @@
 export * from './access';
 export * from './account';
+export * from './adminConnections';
 export * from './adminGroups';
 export * from './adminSettings';
 export * from './adminUsers';
