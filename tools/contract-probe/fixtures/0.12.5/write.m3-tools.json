@@ -1,0 +1,10 @@
+{
+  "count": 0,
+  "export": 401,
+  "valveKinds": {
+    "api_key": "password",
+    "limit": "integer",
+    "tags": "list"
+  },
+  "resetDropsNulls": true
+}

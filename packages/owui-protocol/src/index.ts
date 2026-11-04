@@ -23,6 +23,7 @@ export * from './input';
 export * from './interactions';
 export * from './knowledge';
 export * from './memories';
+export * from './mfa';
 export * from './models';
 export * from './multi';
 export * from './notifications';

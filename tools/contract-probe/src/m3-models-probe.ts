@@ -24,6 +24,7 @@ import {
   workspaceModelTags,
   type Capabilities,
   type OwuiClient,
+  type AccessGrant,
 } from '@maviechat/owui-protocol';
 import { shapeOf } from './shape';
 import type { WriteStep } from './write-probe';
@@ -120,16 +121,22 @@ export async function probeM3Models({ client, capabilities }: { client: OwuiClie
       const me = (await getSessionUser(client)).id;
       const rights = accessRights(capabilities, 'models');
       fixture.rights = rights;
-      const everyone = [{ principal_type: 'user' as const, principal_id: '*', permission: 'read' as const }];
-      const keptEveryone = await updateAccess(client, 'models', id, everyone);
-      const everyoneDropped = droppedGrants(everyone, keptEveryone).length > 0;
-      if (everyoneDropped === rights.everyone) throw new Error(`"everyone" was ${everyoneDropped ? 'dropped' : 'kept'}, though this account ${rights.everyone ? 'may' : 'may not'} grant it`);
-      const self = [{ principal_type: 'user' as const, principal_id: me, permission: 'read' as const }];
-      const keptSelf = await updateAccess(client, 'models', id, self);
-      fixture.personKept = droppedGrants(self, keptSelf).length === 0;
+      // 0.11 keeps what the account may grant and drops the rest; 0.12 refuses the lot (403, nothing changed).
+      const share = async (grants: AccessGrant[]): Promise<'kept' | 'dropped' | 'refused'> => {
+        try {
+          return droppedGrants(grants, await updateAccess(client, 'models', id, grants)).length ? 'dropped' : 'kept';
+        } catch (error) {
+          if (error instanceof OwuiHttpError && error.status === 403) return 'refused';
+          throw error;
+        }
+      };
+      const everyone = await share([{ principal_type: 'user', principal_id: '*', permission: 'read' }]);
+      if ((everyone === 'kept') !== rights.everyone) throw new Error(`"everyone" was ${everyone}, though this account ${rights.everyone ? 'may' : 'may not'} grant it`);
+      const person = await share([{ principal_type: 'user', principal_id: me, permission: 'read' }]);
+      fixture.personKept = person === 'kept';
       const cleared = await updateAccess(client, 'models', id, []);
       if (cleared.length) throw new Error('making it private again kept grants');
-      return `everyone ${everyoneDropped ? 'dropped' : 'kept'} (sharing.public_models ${rights.everyone}); a person ${fixture.personKept ? 'kept' : 'dropped'} (allow_users ${rights.people}, sharing.models ${rights.list}); private again`;
+      return `everyone ${everyone} (sharing.public_models ${rights.everyone}); a person ${person} (allow_users ${rights.people}, sharing.models ${rights.list}); private again`;
     });
     await step('workspace models: export needs its permission', async () => {
       const status = await statusOf(() => exportWorkspaceModels(client));

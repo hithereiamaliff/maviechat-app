@@ -1,0 +1,9 @@
+{
+  "steps": {
+    "mark as unread brings the dot back": true,
+    "reading over the socket clears it": true,
+    "archived list finds it, unarchive brings it back": true,
+    "move to a folder and back": true,
+    "generate a title": true
+  }
+}

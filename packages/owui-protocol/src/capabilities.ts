@@ -23,7 +23,11 @@ export const FEATURES = {
   messageRating: { flag: 'enable_message_rating', permission: 'chat.rate_response' },
   /** Tools and functions (the Workspace's Tools tab needs it too). */
   plugins: { flag: 'enable_plugins', permission: null },
-} as const satisfies Record<string, { flag: string; permission: string | null }>;
+  /** Workspace tools: 0.12 switches them on their own (under plugins); 0.11 has only plugins. */
+  tools: { flag: 'enable_tools', permission: null, orFlag: 'enable_plugins' },
+  /** Admin functions: 0.12 switches them on their own (under plugins); 0.11 has only plugins. */
+  functions: { flag: 'enable_functions', permission: null, orFlag: 'enable_plugins' },
+} as const satisfies Record<string, { flag: string; permission: string | null; orFlag?: string }>;
 
 export type FeatureId = keyof typeof FEATURES;
 
@@ -71,8 +75,11 @@ export function buildCapabilities({ config, user, version }: CapabilityInput): C
     isAdmin,
     isPending: user.role === 'pending',
     feature: (id, fallback = false) => {
-      const { flag, permission } = FEATURES[id];
-      return featureFlag(config, flag) && (permission === null || can(permission, fallback));
+      const entry: { flag: string; permission: string | null; orFlag?: string } = FEATURES[id];
+      // A flag the server doesn't list yet (an older version) falls back to the one it does.
+      const listed = typeof config.features === 'object' && config.features !== null && entry.flag in config.features;
+      const on = listed || !entry.orFlag ? featureFlag(config, entry.flag) : featureFlag(config, entry.orFlag);
+      return on && (entry.permission === null || can(entry.permission, fallback));
     },
     can,
     hidden: () => false,

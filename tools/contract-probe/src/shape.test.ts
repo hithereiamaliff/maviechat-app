@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isIdLike, mergeShapes, shapeOf } from './shape';
+import { isIdLike, mergeShapes, shapeDiff, shapeOf } from './shape';
 
 describe('shapeOf', () => {
   it('replaces content with type names', () => {
@@ -45,5 +45,14 @@ describe('mergeShapes', () => {
     expect(mergeShapes({ a: 'string' }, { b: 'number' })).toEqual({ a: 'string', b: 'number' });
     expect(mergeShapes('string', 'null')).toBe('null|string');
     expect(mergeShapes('null|string', 'number')).toBe('null|number|string');
+  });
+});
+
+describe('shapeDiff', () => {
+  it('lists added, removed and retyped fields, ignoring empty lists', () => {
+    const before = shapeOf({ id: 'x', role: 'user', tags: [], files: [{ name: 'a' }], expires: 1 });
+    const after = shapeOf({ id: 'x', role: 'user', tags: [{ name: 't' }], files: [{ name: 'a', size: 2 }], expires: null, mfa: true });
+    expect(shapeDiff(before, after)).toEqual(['~ expires: number → null', '+ files[].size: "number"', '+ mfa: "boolean"']);
+    expect(shapeDiff(after, after)).toEqual([]);
   });
 });

@@ -106,16 +106,29 @@ export async function probeM3Tools({ client, capabilities, allowCode }: { client
       const reset = await getToolValves(client, id);
       fixture.resetDropsNulls = !('api_key' in reset) && !('tags' in reset);
       if (reset.limit !== 7 || 'api_key' in reset) throw new Error(`nulls didn’t go back to the defaults: ${Object.keys(reset).join(', ')}`);
-      const kept = await updateAccess(client, 'tools', id, [{ principal_type: 'user', principal_id: '*', permission: 'read' }]);
-      if (!kept.some((grant) => grant.principal_id === '*')) throw new Error('an admin couldn’t share it with everyone');
+      // Everyone may use it: an admin's share is kept; anyone else's is dropped (0.11) or refused (0.12, 403).
+      const everyoneAllowed = capabilities.isAdmin || capabilities.can('sharing.public_tools');
+      let shared: 'kept' | 'dropped' | 'refused';
+      try {
+        const kept = await updateAccess(client, 'tools', id, [{ principal_type: 'user', principal_id: '*', permission: 'read' }]);
+        shared = kept.some((grant) => grant.principal_id === '*') ? 'kept' : 'dropped';
+      } catch (error) {
+        if (!(error instanceof OwuiHttpError) || error.status !== 403) throw error;
+        shared = 'refused';
+      }
+      if ((shared === 'kept') !== everyoneAllowed) throw new Error(`sharing with everyone was ${shared}, though this account ${everyoneAllowed ? 'may' : 'may not'}`);
       await updateAccess(client, 'tools', id, []);
-      const exported = await exportWorkspaceTools(client);
-      const entry = exported.find((row) => typeof row === 'object' && row !== null && (row as { id?: unknown }).id === id) as { content?: unknown } | undefined;
-      if (typeof entry?.content !== 'string' || !entry.content.includes('class Tools')) throw new Error('the export lacked its code');
+      let exportNote = 'export not allowed for this account';
+      if (canExport) {
+        const exported = await exportWorkspaceTools(client);
+        const entry = exported.find((row) => typeof row === 'object' && row !== null && (row as { id?: unknown }).id === id) as { content?: unknown } | undefined;
+        if (typeof entry?.content !== 'string' || !entry.content.includes('class Tools')) throw new Error('the export lacked its code');
+        exportNote = 'exported with its code';
+      }
       await deleteWorkspaceTool(client, id);
       const gone = await statusOf(() => getWorkspaceTool(client, id));
       if (gone === 200) throw new Error('still there after deleting');
-      return `made (its header read); valves: a secret, a number and a list; set, then nulls back to defaults; shared with everyone and private again; exported with its code; deleted (${gone})`;
+      return `made (its header read); valves: a secret, a number and a list; set, then nulls back to defaults; everyone ${shared}, then private; ${exportNote}; deleted (${gone})`;
     });
   } finally {
     await deleteWorkspaceTool(client, id).catch(() => undefined);

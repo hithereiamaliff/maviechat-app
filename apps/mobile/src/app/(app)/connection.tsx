@@ -18,6 +18,8 @@ const FEATURE_LABELS: Record<FeatureId, string> = {
   userWebhooks: 'Notification webhooks',
   messageRating: 'Message rating',
   plugins: 'Tools and functions',
+  tools: 'Tools',
+  functions: 'Functions',
 };
 
 type LiveState = { status: SocketStatus | 'idle'; detail?: string; joinedAs?: string };

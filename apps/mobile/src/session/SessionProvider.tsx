@@ -5,6 +5,8 @@ import {
   OwuiHttpError,
   signIn as requestSignIn,
   signOut as requestSignOut,
+  type MfaStep,
+  type SignInResult,
 } from '@maviechat/owui-protocol';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -16,13 +18,16 @@ export type SessionState =
   | { status: 'signed-out'; lastServerUrl: string | null; notice?: string }
   | { status: 'signed-in'; session: StoredSession };
 
-export type SignInOutcome = { kind: 'signed-in' } | { kind: 'pending' } | { kind: 'mfa' };
+/** A sign-in's next step: done, waiting for approval, or (Open WebUI 0.12) a second step with its challenge. */
+export type SignInOutcome = { kind: 'signed-in' } | { kind: 'pending' } | { kind: 'mfa'; step: MfaStep; challengeToken: string; expiresIn: number | null; baseUrl: string };
 
 interface SessionContextValue {
   state: SessionState;
   /** Authenticated client while signed in, otherwise null. */
   client: OwuiClient | null;
   signIn(input: { serverUrl: string; email: string; password: string }): Promise<SignInOutcome>;
+  /** Takes a second step's answer (Open WebUI 0.12's two-step sign-in): signs in, or says what's next. */
+  finishSignIn(baseUrl: string, result: SignInResult): Promise<SignInOutcome>;
   signOut(options?: { notice?: string }): Promise<void>;
   /**
    * Call after a 401. Open WebUI also answers 401 for "not permitted", so this re-checks
@@ -66,13 +71,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [state],
   );
 
-  const signIn = useCallback<SessionContextValue['signIn']>(
-    async ({ serverUrl, email, password }) => {
-      const baseUrl = normalizeBaseUrl(serverUrl);
-      const result = await requestSignIn(new OwuiClient({ baseUrl }), email.trim(), password);
+  const finishSignIn = useCallback<SessionContextValue['finishSignIn']>(
+    async (baseUrl, result) => {
       if (result.kind === 'pending') return { kind: 'pending' };
-      if (result.kind === 'mfa') return { kind: 'mfa' };
-
+      if (result.kind === 'mfa') return { kind: 'mfa', step: result.step, challengeToken: result.challengeToken, expiresIn: result.expiresIn, baseUrl };
       const stored = toStoredSession(baseUrl, result.session);
       await saveSession(stored);
       queryClient.clear();
@@ -80,6 +82,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return { kind: 'signed-in' };
     },
     [queryClient],
+  );
+
+  const signIn = useCallback<SessionContextValue['signIn']>(
+    async ({ serverUrl, email, password }) => {
+      const baseUrl = normalizeBaseUrl(serverUrl);
+      return finishSignIn(baseUrl, await requestSignIn(new OwuiClient({ baseUrl }), email.trim(), password));
+    },
+    [finishSignIn],
   );
 
   const signOut = useCallback<SessionContextValue['signOut']>(
@@ -133,8 +143,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ state, client, signIn, signOut, verifySession }),
-    [state, client, signIn, signOut, verifySession],
+    () => ({ state, client, signIn, finishSignIn, signOut, verifySession }),
+    [state, client, signIn, finishSignIn, signOut, verifySession],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

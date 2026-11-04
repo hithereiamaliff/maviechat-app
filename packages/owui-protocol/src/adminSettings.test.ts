@@ -50,7 +50,9 @@ describe('admin settings form', () => {
   });
 
   it('checks durations and limits as the server reads them', () => {
-    expect(settingProblems(fields, STORED, { JWT_EXPIRES_IN: '1d12h' })).toEqual([]);
+    expect(settingProblems(fields, STORED, { JWT_EXPIRES_IN: '12h' })).toEqual([]);
+    // The server takes one number and unit only: a pair like this would be silently dropped.
+    expect(settingProblems(fields, STORED, { JWT_EXPIRES_IN: '1d12h' })).toHaveLength(1);
     expect(settingProblems(fields, STORED, { JWT_EXPIRES_IN: '-1' })).toEqual([]);
     expect(settingProblems(fields, STORED, { JWT_EXPIRES_IN: 'forever' })).toHaveLength(1);
     expect(settingProblems(fields, STORED, { FOLDER_MAX_FILE_COUNT: '2.5' })).toHaveLength(1);

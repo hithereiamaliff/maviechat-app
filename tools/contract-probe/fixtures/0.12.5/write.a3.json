@@ -1,0 +1,14 @@
+{
+  "unstreamedEvents": [
+    "chat:active",
+    "chat:completion",
+    "chat:list",
+    "chat:title",
+    "response:completion",
+    "status"
+  ],
+  "valves": {
+    "checked": 1,
+    "withUserValves": 0
+  }
+}

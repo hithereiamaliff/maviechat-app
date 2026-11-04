@@ -1,0 +1,41 @@
+{
+  "steps": {
+    "send a new chat": true,
+    "reply streams": true,
+    "reduced reply matches what the server saved": true,
+    "title arrives live": true
+  },
+  "eventCounts": {
+    "chat:active": 2,
+    "chat:completion": 2,
+    "chat:list": 1,
+    "chat:message:follow_ups": 1,
+    "chat:tags": 1,
+    "chat:title": 1,
+    "response:completion": 7
+  },
+  "chatLevelEvents": [
+    "chat:active",
+    "chat:list",
+    "chat:tags",
+    "chat:title"
+  ],
+  "replyFields": [
+    "childrenIds",
+    "content",
+    "done",
+    "followUps",
+    "id",
+    "model",
+    "modelIdx",
+    "modelName",
+    "output",
+    "parentId",
+    "role",
+    "timestamp",
+    "usage"
+  ],
+  "outputItemTypes": [
+    "message"
+  ]
+}

@@ -198,7 +198,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 |---|---|---|
 | [x] | Server URL, then email + password; errors; pending approval (M0, `app/login.tsx`) | M0/M1 |
 | [ ] | LDAP switch (when enabled) | M6 |
-| [ ] | MFA challenge: code, recovery code, first-time setup (0.12.x) | M5 |
+| [x] | MFA challenge: code, recovery code, first-time setup (0.12.x). M5 (2026-11-04): after the password, a 0.12 server's second step: a code from the authenticator (iOS offers codes from Passwords), or a recovery code; first-time setup when the admin turned it on (Add to Passwords or an Authenticator opens the `otpauth://` link the server's QR code holds; the setup key to copy; the QR for another device), then the recovery codes once (copy, save to Files); an admin's reset token leads to setting up again; an expired step says to sign in again. Admins switch it on in Settings → Admin → Authentication (0.12 only; it signs everyone out, the app included). Not yet: managing your own (new recovery codes, another authenticator) in Account (web) | M5 |
 | [ ] | SSO buttons (when the server has providers) | M6 |
 | — | Sign-up, onboarding (first admin) | — |
 

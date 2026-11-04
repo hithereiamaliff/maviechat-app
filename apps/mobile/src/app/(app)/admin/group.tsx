@@ -194,7 +194,7 @@ function GroupPermissions({ group }: { group: AdminGroup }) {
           <Button label="Save" onPress={save} disabled={!changes.length} loading={busy} />
         </View>
       </View>
-      {defaults.data ? <PermissionsEditor tree={tree} defaults={defaults.data} onChange={(path, on) => setEdits({ ...edits, [path]: on })} plugins={capabilities?.feature('plugins') ?? false} /> : <ActivityIndicator color={palette.textMuted} />}
+      {defaults.data ? <PermissionsEditor tree={tree} defaults={defaults.data} onChange={(path, on) => setEdits({ ...edits, [path]: on })} plugins={capabilities?.feature('tools') ?? false} /> : <ActivityIndicator color={palette.textMuted} />}
     </View>
   );
 }

@@ -1,4 +1,5 @@
 import {
+  OwuiHttpError,
   addChatTag,
   chatJson,
   chatPlainText,
@@ -121,8 +122,15 @@ export async function probeA6(input: A6Input): Promise<{ steps: WriteStep[]; fix
         await setShareAccess(client, id, withSharedWith(start, 'user', input.userId, true));
         const named = await getShareAccess(client, id);
         if (!named.some((grant) => grant.principal_type === 'user' && grant.principal_id === input.userId)) throw new Error('the named person was not kept');
-        await setShareAccess(client, id, withShareVisibility(named, 'public'));
         const publicAllowed = capabilities.can('sharing.public_chats');
+        let refused = false;
+        try {
+          await setShareAccess(client, id, withShareVisibility(named, 'public'));
+        } catch (error) {
+          // 0.12 refuses an audience the account may not use (403, nothing changed); 0.11 dropped it.
+          if (publicAllowed || !(error instanceof OwuiHttpError) || error.status !== 403) throw error;
+          refused = true;
+        }
         const afterPublic = shareVisibility(await getShareAccess(client, id));
         if (afterPublic !== (publicAllowed ? 'public' : 'private')) throw new Error(`a public link came back ${afterPublic} (allowed: ${publicAllowed})`);
         const again = await shareChat(client, id);
@@ -138,7 +146,7 @@ export async function probeA6(input: A6Input): Promise<{ steps: WriteStep[]; fix
         if (!gone) throw new Error('the deleted link still opens');
         if ((await getChat(client, id)).share_id) throw new Error('the chat still has its share_id');
         fixture.share = { url: url.replace(input.baseUrl.replace(/\/+$/, ''), '').replace(shareId, '{share_id}'), access: shapeOf(named), publicAllowed, openAllowed: capabilities.can('sharing.open_chats') };
-        return `link opened; private by default; person kept; public ${publicAllowed ? 'kept' : 'refused (not allowed)'}; updated in place; cloned from the link; deleted`;
+        return `link opened; private by default; person kept; public ${publicAllowed ? 'kept' : refused ? 'refused with 403 (not allowed; 0.12)' : 'dropped (not allowed; 0.11)'}; updated in place; cloned from the link; deleted`;
       });
     } else {
       steps.push({ name: 'share', ok: true, note: 'skipped: the account may not share chats' });

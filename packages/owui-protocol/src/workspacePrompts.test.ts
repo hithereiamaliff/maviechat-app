@@ -82,4 +82,13 @@ describe('workspace imports', () => {
     expect(skipped).toBe(1);
     expect(skills).toEqual([{ id: 'essay-feedback', name: 'Essay feedback', description: '', content: '# Steps', tags: ['school'], isActive: false, meta: { tags: ['school'], extra: 1 } }]);
   });
+
+  it('reads a 0.12 export’s files, and sends a package’s other files along', async () => {
+    const { skills } = skillsFromImport([{ id: 'grader', name: 'Grader', files: [{ path: 'SKILL.md', content: '# Grade' }, { path: 'rubric.md', content: 'A–F' }], meta: {}, is_active: true }]);
+    expect(skills[0]).toMatchObject({ content: '# Grade', files: [{ path: 'SKILL.md', content: '# Grade' }, { path: 'rubric.md', content: 'A–F' }] });
+    const { client, calls } = recordingClient({ id: 'grader', name: 'Grader' });
+    await createWorkspaceSkill(client, { ...(skills[0] as NonNullable<(typeof skills)[0]>), content: '# Grade v2' });
+    expect((calls[0]?.body as { files?: unknown }).files).toEqual([{ path: 'rubric.md', content: 'A–F' }, { path: 'SKILL.md', content: '# Grade v2' }]);
+    expect(skillsFromImport([{ id: 'only', name: 'Only', files: [{ path: 'SKILL.md', content: '# One' }] }]).skills[0]).not.toHaveProperty('files');
+  });
 });

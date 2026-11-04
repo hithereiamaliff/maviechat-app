@@ -136,7 +136,7 @@ function DefaultsForm({ saved }: { saved: PermissionTree }) {
           <Button label="Save" onPress={save} disabled={!changes.length} loading={busy} />
         </View>
       </View>
-      <PermissionsEditor tree={tree} onChange={(path, on) => setEdits({ ...edits, [path]: on })} plugins={capabilities?.feature('plugins') ?? false} />
+      <PermissionsEditor tree={tree} onChange={(path, on) => setEdits({ ...edits, [path]: on })} plugins={capabilities?.feature('tools') ?? false} />
     </View>
   );
 }

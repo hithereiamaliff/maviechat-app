@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -40,7 +40,7 @@ import {
   type FeatureId,
   type ServerConfig,
 } from '@maviechat/owui-protocol';
-import { DEFAULT_ENV_FILE, loadEnvFile } from './env';
+import { DEFAULT_ENV_FILE, expandHome, loadEnvFile } from './env';
 import { shapeOf } from './shape';
 import { summarizeTree } from './tree-summary';
 import { probeSend } from './send-probe';
@@ -65,7 +65,14 @@ import { probeM4Functions } from './m4-functions-probe';
 import { probeM4Models } from './m4-models-probe';
 import { probeM4Settings } from './m4-settings-probe';
 import { probeM4Users } from './m4-users-probe';
+import { probeM5Mfa } from './m5-mfa-probe';
 import { probeChatActions } from './write-probe';
+
+/**
+ * The owner-approved scratch servers (Open WebUI 0.11.3 on 3013, 0.12.5 on 3014): the only ones
+ * probes write admin settings to, or save code on (tools and functions run when saved).
+ */
+const SCRATCH_URLS = new Set(['http://127.0.0.1:3013', 'http://127.0.0.1:3014']);
 
 const { values: args } = parseArgs({
   options: {
@@ -90,6 +97,7 @@ const { values: args } = parseArgs({
     m4forms: { type: 'boolean' },
     m4functions: { type: 'boolean' },
     m4evaluations: { type: 'boolean' },
+    m5mfa: { type: 'boolean' },
   },
 });
 
@@ -360,56 +368,56 @@ async function main() {
 
       if (args.m3tools && capabilities) {
         // Saving a tool runs its code on the server: only ever on the scratch instance's port.
-        const m3tools = await probeM3Tools({ client, capabilities, allowCode: baseUrl === 'http://127.0.0.1:3013' });
+        const m3tools = await probeM3Tools({ client, capabilities, allowCode: SCRATCH_URLS.has(baseUrl) });
         for (const result of m3tools.steps) results.push({ ...result, name: `M3: ${result.name}` });
         fixtures['write.m3-tools'] = m3tools.fixture;
       }
 
       if (args.m4users && capabilities) {
         // Admin writes only ever on the scratch instance's port.
-        const m4users = await probeM4Users({ client, capabilities, allowWrites: baseUrl === 'http://127.0.0.1:3013' });
+        const m4users = await probeM4Users({ client, capabilities, allowWrites: SCRATCH_URLS.has(baseUrl) });
         for (const result of m4users.steps) results.push({ ...result, name: `M4: ${result.name}` });
         fixtures['write.m4-users'] = m4users.fixture;
       }
 
       if (args.m4settings && capabilities) {
         // Admin writes only ever on the scratch instance's port.
-        const m4settings = await probeM4Settings({ client, capabilities, allowWrites: baseUrl === 'http://127.0.0.1:3013' });
+        const m4settings = await probeM4Settings({ client, capabilities, allowWrites: SCRATCH_URLS.has(baseUrl) });
         for (const result of m4settings.steps) results.push({ ...result, name: `M4: ${result.name}` });
         fixtures['write.m4-settings'] = m4settings.fixture;
       }
 
       if (args.m4connections && capabilities) {
         // Admin writes only ever on the scratch instance's port.
-        const m4connections = await probeM4Connections({ client, capabilities, allowWrites: baseUrl === 'http://127.0.0.1:3013' });
+        const m4connections = await probeM4Connections({ client, capabilities, allowWrites: SCRATCH_URLS.has(baseUrl) });
         for (const result of m4connections.steps) results.push({ ...result, name: `M4: ${result.name}` });
         fixtures['write.m4-connections'] = m4connections.fixture;
       }
 
       if (args.m4models && capabilities) {
         // Admin writes only ever on the scratch instance's port.
-        const m4models = await probeM4Models({ client, capabilities, allowWrites: baseUrl === 'http://127.0.0.1:3013' });
+        const m4models = await probeM4Models({ client, capabilities, allowWrites: SCRATCH_URLS.has(baseUrl) });
         for (const result of m4models.steps) results.push({ ...result, name: `M4: ${result.name}` });
         fixtures['write.m4-models'] = m4models.fixture;
       }
 
       if (args.m4forms && capabilities) {
         // Admin writes only ever on the scratch instance's port.
-        const m4forms = await probeM4Forms({ client, capabilities, allowWrites: baseUrl === 'http://127.0.0.1:3013' });
+        const m4forms = await probeM4Forms({ client, capabilities, allowWrites: SCRATCH_URLS.has(baseUrl) });
         for (const result of m4forms.steps) results.push({ ...result, name: `M4: ${result.name}` });
         fixtures['write.m4-forms'] = m4forms.fixture;
       }
 
       if (args.m4functions && capabilities) {
         // Saving a function runs its code on the server: only ever on the scratch instance's port.
-        const m4functions = await probeM4Functions({ client, capabilities, allowCode: baseUrl === 'http://127.0.0.1:3013' });
+        const m4functions = await probeM4Functions({ client, capabilities, allowCode: SCRATCH_URLS.has(baseUrl) });
         for (const result of m4functions.steps) results.push({ ...result, name: `M4: ${result.name}` });
         fixtures['write.m4-functions'] = m4functions.fixture;
       }
 
       if (args.m4evaluations && capabilities) {
         // Admin writes only ever on the scratch instance's port.
-        const m4evaluations = await probeM4Evaluations({ client, capabilities, allowWrites: baseUrl === 'http://127.0.0.1:3013' });
+        const m4evaluations = await probeM4Evaluations({ client, capabilities, allowWrites: SCRATCH_URLS.has(baseUrl) });
         for (const result of m4evaluations.steps) results.push({ ...result, name: `M4: ${result.name}` });
         fixtures['write.m4-evaluations'] = m4evaluations.fixture;
       }
@@ -465,6 +473,17 @@ async function main() {
         await signOut(client);
         return { value: true, note: 'probe token revoked' };
       });
+    }
+  }
+
+  // Last, after the probe's own session is gone: switching two-step sign-in signs everyone out.
+  if (args.m5mfa) {
+    if (!SCRATCH_URLS.has(baseUrl) || !env.OWUI_EMAIL || !env.OWUI_PASSWORD) {
+      results.push({ name: 'M5: two-step sign-in', ok: false, note: 'only on a scratch server, as its admin' });
+    } else {
+      const m5 = await probeM5Mfa({ baseUrl, version: version?.version, admin: { email: env.OWUI_EMAIL, password: env.OWUI_PASSWORD, mfaSecret: env.OWUI_MFA_SECRET }, envFile: expandHome(envFile) });
+      for (const result of m5.steps) results.push({ ...result, name: `M5: ${result.name}` });
+      fixtures['write.m5-mfa'] = m5.fixture;
     }
   }
 

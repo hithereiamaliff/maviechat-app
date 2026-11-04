@@ -73,3 +73,26 @@ function label(shape: Shape): string {
   if (typeof shape === 'string') return shape;
   return Array.isArray(shape) ? 'array' : 'object';
 }
+
+/**
+ * What changed between two shapes, as lines: `+ path: shape` (only in the second), `- path`
+ * (only in the first), `~ path: a → b` (a different type). An empty list on either side says
+ * nothing about its items, so it isn't counted as a change.
+ */
+export function shapeDiff(a: Shape, b: Shape, path = ''): string[] {
+  if (isObjectShape(a) && isObjectShape(b)) {
+    const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
+    return keys.flatMap((key) => {
+      const at = path ? `${path}.${key}` : key;
+      if (!(key in b)) return [`- ${at}`];
+      if (!(key in a)) return [`+ ${at}: ${JSON.stringify(b[key])}`];
+      return shapeDiff(a[key] as Shape, b[key] as Shape, at);
+    });
+  }
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (!a.length || !b.length) return [];
+    return shapeDiff(a[0] as Shape, b[0] as Shape, `${path}[]`);
+  }
+  if (JSON.stringify(a) === JSON.stringify(b)) return [];
+  return [`~ ${path || '(top)'}: ${label(a)} → ${label(b)}`];
+}

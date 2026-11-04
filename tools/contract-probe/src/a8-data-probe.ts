@@ -105,7 +105,12 @@ export async function probeA8Data(input: DataInput): Promise<{ steps: WriteStep[
     fixture.export = { count: all.count, archived: archived.count, shape: first ? shapeOf(first) : null };
     if (archivedList.some((chat) => !allIds.has(chat.id))) throw new Error('an archived chat is missing from the full export');
     if (archivedList.some((chat) => chat.archived !== true)) throw new Error('the archived export has a chat that is not archived');
-    if (!all.count) throw new Error('the export is empty');
+    if (!all.count) {
+      // An account whose chats the probes deleted (it may delete, unlike production's) has nothing to export.
+      const left = await client.get<unknown[]>('/api/v1/chats/', { query: { page: 1 } });
+      if (Array.isArray(left) && left.length) throw new Error('the export is empty');
+      return 'nothing to export: this account has no chats left';
+    }
     return `${all.count} chats, ${archived.count} of them archived (all in the full export)`;
   });
 

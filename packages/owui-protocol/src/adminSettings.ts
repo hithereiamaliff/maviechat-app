@@ -34,6 +34,8 @@ export interface SettingField {
   check?: (value: unknown) => string | null;
   /** Something to confirm before saving this value. */
   confirm?: (value: unknown) => string | null;
+  /** Only on servers that have it (a newer version's setting): hidden when the server doesn't list it. */
+  optional?: boolean;
 }
 
 export interface SettingSection {
@@ -79,6 +81,7 @@ export function storedValue(field: SettingField, value: string | boolean, origin
 
 /** Whether a field shows, given the page's values (stored, with edits laid over). */
 export function settingShown(field: SettingField, values: Tree): boolean {
+  if (field.optional && !(field.key in values)) return false;
   return (field.needs ?? []).every((need) => {
     const at = need.indexOf('=');
     return at < 0 ? values[need] === true : String(values[need.slice(0, at)] ?? '') === need.slice(at + 1);
@@ -154,8 +157,11 @@ export async function saveAdminConfig(client: OwuiClient, config: Tree): Promise
   return record(await client.post<unknown>('/api/v1/auths/admin/config', config));
 }
 
-/** As the server reads durations: -1 or 0, or number-and-unit pairs (`4w`, `1d12h`). */
-const JWT = /^(-1|0|(\d+(\.\d+)?(ms|s|m|h|d|w))+)$/;
+/** Changing two-step sign-in signs everyone out at once, as the server does it. */
+const MFA_WARNING = 'Changing two-step sign-in signs everyone out now, you too.';
+
+/** The server's own rule (0.11 and 0.12): -1 or 0, or one number with its unit (`4w`, `12h`); anything else is silently not saved. */
+const JWT = /^(-1|0|-?\d+(\.\d+)?(ms|s|m|h|d|w))$/;
 
 export const GENERAL_SECTIONS: SettingSection[] = [
   {
@@ -224,9 +230,18 @@ export const AUTHENTICATION_SECTIONS: SettingSection[] = [
     ],
   },
   {
+    title: 'Two-step sign-in',
+    note: 'Open WebUI 0.12 and later.',
+    fields: [
+      { key: 'ENABLE_MFA', label: 'Two-step sign-in for everyone', hint: 'A code from an authenticator app after the password; each person sets one up next time they sign in.', kind: 'switch', optional: true, confirm: () => MFA_WARNING },
+      { key: 'MFA_ALLOW_OAUTH_BYPASS', label: 'Not for sign-ins through OAuth', kind: 'switch', optional: true, needs: ['ENABLE_MFA'], confirm: () => MFA_WARNING },
+      { key: 'MFA_ALLOW_TRUSTED_HEADER_BYPASS', label: 'Not for sign-ins through a trusted header', kind: 'switch', optional: true, needs: ['ENABLE_MFA'], confirm: () => MFA_WARNING },
+    ],
+  },
+  {
     title: 'Sessions and API keys',
     fields: [
-      { key: 'JWT_EXPIRES_IN', label: 'Sign-ins last', hint: 'Like 4w, 7d, 12h; -1 never expires. New sign-ins only.', kind: 'text', check: (value) => (typeof value === 'string' && JWT.test(value.trim()) ? null : 'a number with ms, s, m, h, d or w; or -1, or 0') },
+      { key: 'JWT_EXPIRES_IN', label: 'Sign-ins last', hint: 'One number and its unit, like 4w, 7d, 12h; -1 never expires. New sign-ins only.', kind: 'text', check: (value) => (typeof value === 'string' && JWT.test(value.trim()) ? null : 'one number with ms, s, m, h, d or w (like 4w); or -1, or 0') },
       { key: 'ENABLE_API_KEYS', label: 'API keys', kind: 'switch' },
       { key: 'ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS', label: 'Limit what API keys can reach', kind: 'switch', needs: ['ENABLE_API_KEYS'] },
       { key: 'API_KEYS_ALLOWED_ENDPOINTS', label: 'Allowed paths', hint: 'Separated by commas, like /api/v1/messages, /api/v1/channels', kind: 'text', needs: ['ENABLE_API_KEYS', 'ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS'] },

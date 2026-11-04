@@ -171,6 +171,8 @@ export async function probeA5(input: A5Input): Promise<{ steps: WriteStep[]; fix
         return 'the question came live over the socket; answered "Teal", and the reply named it';
       }
       fixture.path = 'none';
+      // The scratch servers' echo model can't call tools: it only says back what it was sent.
+      if (textOf(current).startsWith('Echo:')) return 'skipped: the scratch echo model can’t ask (a real model is needed)';
       throw new Error(`the model asked nothing (it replied "${textOf(current).slice(0, 40)}")`);
     });
     return { steps, fixture };

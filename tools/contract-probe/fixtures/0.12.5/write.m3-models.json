@@ -1,0 +1,35 @@
+{
+  "list": {
+    "total": 0,
+    "item": "undefined",
+    "tags": 0
+  },
+  "hiddenInPicker": "listed, marked hidden",
+  "savedMeta": {
+    "capabilities": 12,
+    "builtinTools": {
+      "calendar": false
+    },
+    "toolIds": 0,
+    "suggestions": 1
+  },
+  "savedParams": {
+    "stop": [
+      "</s>",
+      "END"
+    ],
+    "custom": {
+      "mc_probe_param": "{\"x\":1}"
+    },
+    "temperature": 0.3
+  },
+  "rights": {
+    "list": false,
+    "everyone": false,
+    "people": true,
+    "groups": true
+  },
+  "personKept": false,
+  "export": 401,
+  "afterDelete": 404
+}

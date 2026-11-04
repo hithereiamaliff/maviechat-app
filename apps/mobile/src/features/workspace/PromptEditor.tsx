@@ -4,6 +4,7 @@ import {
   createWorkspacePrompt,
   deletePromptVersion,
   inputVariables,
+  isAtLeast,
   makePromptVersionLive,
   saveWorkspacePromptVersion,
   updateWorkspacePromptMeta,
@@ -17,7 +18,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
 import { describeError } from '@/lib/errors';
-import { useAuthed } from '@/lib/server';
+import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
 import { editorStyles as styles, Field, SheetHeader, SheetLoading, TagsField } from './EditorParts';
 import { usePromptVersions, useWorkspacePrompt, useWorkspaceRefresh } from './queries';
@@ -57,6 +58,9 @@ function Form({ target, prompt, onClose }: { target: PromptEditorTarget; prompt:
   const toast = useToast();
   const { client } = useAuthed();
   const refresh = useWorkspaceRefresh();
+  const capabilities = useCapabilities();
+  // 0.11 wrote a not-live version's text into the prompt anyway; 0.12 keeps the live one.
+  const oldServer = !isAtLeast(capabilities?.version, '0.12.0');
   const editing = target.kind === 'edit';
   const cloning = target.kind === 'clone';
   const readOnly = editing && prompt !== null && !prompt.writeAccess;
@@ -203,7 +207,11 @@ function Form({ target, prompt, onClose }: { target: PromptEditorTarget; prompt:
               <Text style={[styles.label, styles.flex, { color: palette.text }]}>Make it the live version</Text>
               <Switch accessibilityLabel="Make it the live version" value={live} onValueChange={setLive} />
             </View>
-            {!live ? <Text style={[styles.note, { color: palette.textMuted }]}>This Open WebUI version still puts the new text in when you type its command; only the live mark stays on the version before.</Text> : null}
+            {!live ? (
+              <Text style={[styles.note, { color: palette.textMuted }]}>
+                {oldServer ? 'This Open WebUI version still puts the new text in when you type its command; only the live mark stays on the version before.' : 'The version before stays the one its command puts in; this one is kept aside.'}
+              </Text>
+            ) : null}
           </View>
         ) : null}
         <Text style={[styles.note, { color: palette.textFaint }]}>{saved ? 'Its sharing stays as it is.' : 'New prompts are private: only you (and admins) can use them.'}</Text>

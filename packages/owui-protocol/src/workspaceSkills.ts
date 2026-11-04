@@ -16,6 +16,12 @@ const ms = (value: unknown): number => (typeof value === 'number' ? (value < 1e1
 const base = '/api/v1/skills';
 const idPath = (id: string) => `${base}/id/${encodeURIComponent(id)}`;
 
+/** One file of a skill package (Open WebUI 0.12): its main text is `SKILL.md`. */
+export interface SkillFile {
+  path: string;
+  content: string;
+}
+
 export interface WorkspaceSkill {
   id: string;
   name: string;
@@ -29,6 +35,8 @@ export interface WorkspaceSkill {
   ownerName: string;
   writeAccess: boolean;
   updatedAt: number;
+  /** A 0.12 package's files (`data.files`, `SKILL.md` among them), when read one by one. */
+  files: SkillFile[];
 }
 
 function skillOf(raw: unknown): WorkspaceSkill | null {
@@ -49,6 +57,10 @@ function skillOf(raw: unknown): WorkspaceSkill | null {
     ownerName: text(user.name) || text(user.email),
     writeAccess: row.write_access === true,
     updatedAt: ms(row.updated_at),
+    files: list(record(row.data).files).flatMap((item) => {
+      const file = record(item);
+      return text(file.path) ? [{ path: text(file.path), content: text(file.content) }] : [];
+    }),
   };
 }
 
@@ -97,12 +109,16 @@ export interface SkillInput {
   isActive: boolean;
   meta?: Tree;
   accessGrants?: AccessGrant[];
+  /** A 0.12 package's files, `SKILL.md` among them (0.11 servers ignore them). */
+  files?: SkillFile[];
 }
 
 function skillBody(input: SkillInput): Tree {
   // Skills keep their tags as plain strings (0.11.3 refuses `{name}` objects here, unlike models).
   const body: Tree = { id: input.id, name: input.name.trim(), description: input.description.trim(), content: input.content, meta: { ...(input.meta ?? {}), tags: input.tags }, is_active: input.isActive };
   if (input.accessGrants !== undefined) body.access_grants = input.accessGrants;
+  // A package's other files go along, its SKILL.md being the text given (0.11 ignores them).
+  if (input.files?.some((file) => file.path !== 'SKILL.md')) body.files = [...input.files.filter((file) => file.path !== 'SKILL.md'), { path: 'SKILL.md', content: input.content }];
   return body;
 }
 
@@ -155,13 +171,18 @@ export function skillsFromImport(json: unknown): { skills: SkillInput[]; skipped
     const row = record(raw);
     const name = text(row.name).trim();
     const id = skillIdFromName(text(row.id) || name);
-    const content = text(row.content);
+    // 0.12 exports a package's files instead of `content`; its text is SKILL.md.
+    const files = list(row.files).flatMap((item) => {
+      const file = record(item);
+      return text(file.path) ? [{ path: text(file.path), content: text(file.content) }] : [];
+    });
+    const content = text(row.content) || files.find((file) => file.path === 'SKILL.md')?.content || '';
     if (!name || skillIdProblem(id) || !content.trim()) {
       skipped += 1;
       return [];
     }
     const meta = record(row.meta);
-    return [{ id, name, description: text(row.description), content, tags: tagNames(meta.tags), isActive: row.is_active !== false, meta }];
+    return [{ id, name, description: text(row.description), content, tags: tagNames(meta.tags), isActive: row.is_active !== false, meta, ...(files.length > 1 ? { files } : {}) }];
   });
   return { skills, skipped };
 }

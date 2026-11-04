@@ -1,0 +1,14 @@
+{
+  "feedback": [
+    "created_at",
+    "data",
+    "id",
+    "meta",
+    "snapshot",
+    "type",
+    "updated_at",
+    "user_id",
+    "version"
+  ],
+  "actions": 0
+}

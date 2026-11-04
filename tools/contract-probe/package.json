@@ -7,7 +7,10 @@
   "scripts": {
     "probe": "tsx src/probe.ts",
     "probe:deeptutor": "tsx src/deeptutor-probe.ts",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "compare": "tsx src/compare.ts",
+    "scratch:setup": "tsx src/scratch-setup.ts",
+    "bench:chat": "tsx src/bench-long-chat.ts"
   },
   "dependencies": {
     "@maviechat/deeptutor-protocol": "*",

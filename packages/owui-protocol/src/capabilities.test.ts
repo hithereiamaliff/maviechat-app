@@ -84,3 +84,17 @@ describe('buildCapabilities', () => {
     expect(caps.support).toBe('unknown');
   });
 });
+
+describe('tools and functions flags', () => {
+  const user = { role: 'user' as const, permissions: {} };
+  it('reads 0.12’s own switches, and falls back to plugins on 0.11', () => {
+    const old = buildCapabilities({ config: { features: { enable_plugins: true } } as never, user, version: '0.11.3' });
+    expect(old.feature('tools')).toBe(true);
+    expect(old.feature('functions')).toBe(true);
+    const split = buildCapabilities({ config: { features: { enable_plugins: true, enable_tools: false, enable_functions: true } } as never, user, version: '0.12.5' });
+    expect(split.feature('tools')).toBe(false);
+    expect(split.feature('functions')).toBe(true);
+    const off = buildCapabilities({ config: { features: { enable_plugins: false } } as never, user, version: '0.11.3' });
+    expect(off.feature('tools')).toBe(false);
+  });
+});

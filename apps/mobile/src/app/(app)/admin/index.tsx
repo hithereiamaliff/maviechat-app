@@ -27,7 +27,7 @@ export default function AdminPanel() {
   const capabilities = useCapabilities();
   const [tab, setTab] = useState<Tab>('users');
   // Functions only where the server has plugins on, as on the web.
-  const shownTabs = capabilities?.feature('plugins') ? [...TABS, { key: 'functions' as const, label: 'Functions' }] : TABS;
+  const shownTabs = capabilities?.feature('functions') ? [...TABS, { key: 'functions' as const, label: 'Functions' }] : TABS;
   const tabs = (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} accessibilityRole="tablist">
       {shownTabs.map((item) => {
@@ -57,7 +57,7 @@ export default function AdminPanel() {
         <GroupsTab tabs={tabs} />
       ) : tab === 'evaluations' ? (
         <EvaluationsTab tabs={tabs} />
-      ) : tab === 'functions' && capabilities.feature('plugins') ? (
+      ) : tab === 'functions' && capabilities.feature('functions') ? (
         <FunctionsTab tabs={tabs} />
       ) : (
         <DefaultsTab tabs={tabs} />

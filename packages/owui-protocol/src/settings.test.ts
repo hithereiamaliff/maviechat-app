@@ -27,6 +27,9 @@ describe('your settings', () => {
     const client = new OwuiClient({ baseUrl: 'https://x.test', token: 't', fetch });
     await saveUiSettings(client, { system: 'Be brief.' });
     expect(sent).toEqual([{ ui: { models: ['a'], unknownKey: 1, system: 'Be brief.' }, other: { x: true } }]);
+    // Taking a setting away sends null for it: 0.12 keeps a key that's left out.
+    await saveUiSettings(client, { unknownKey: undefined });
+    expect(sent[1]).toEqual({ ui: { models: ['a'], unknownKey: null }, other: { x: true } });
   });
 
   it('reads the Interface settings with the web’s defaults, and stores them as the web does', () => {

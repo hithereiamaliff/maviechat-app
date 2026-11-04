@@ -29,6 +29,7 @@ import { Note, SectionTitle } from '@/features/settings/rows';
 import { Chip } from '@/features/workspace/ListControls';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useModels } from '@/lib/server';
+import { useSession } from '@/session/SessionProvider';
 import { fonts, radius, usePalette } from '@/theme';
 import { SettingsForm } from './SettingsForm';
 
@@ -70,6 +71,7 @@ export function SettingsEndpointPage({ name, read: readConfig, save: saveConfig,
   const palette = usePalette();
   const toast = useToast();
   const { client } = useAuthed();
+  const { signOut } = useSession();
   const refresh = useSettingsRefresh();
   const config = useQuery({ queryKey: ['admin', 'endpoint', name], queryFn: () => readConfig(client), staleTime: 0 });
   const groups = useAdminGroups();
@@ -90,8 +92,13 @@ export function SettingsEndpointPage({ name, read: readConfig, save: saveConfig,
     try {
       const fresh = await readConfig(client);
       const send = async () => {
-        await saveConfig(client, settingsPayload(fields, fresh, read, edits));
+        const answer = await saveConfig(client, settingsPayload(fields, fresh, read, edits));
         setEdits({});
+        // A two-step sign-in change signs everyone out (0.12): this session is gone too.
+        if ((answer as Tree | undefined)?.sessions_revoked === true) {
+          await signOut({ notice: 'Two-step sign-in changed, so everyone was signed out. Sign in again.' });
+          return;
+        }
         refresh();
         toast('Saved for this server');
       };

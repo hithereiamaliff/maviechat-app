@@ -1,0 +1,99 @@
+{
+  "shape": {
+    "bio": "null",
+    "date_of_birth": "null",
+    "email": "string",
+    "expires_at": "number",
+    "gender": "null",
+    "id": "string",
+    "name": "string",
+    "permissions": {
+      "access_grants": {
+        "allow_groups": "boolean",
+        "allow_users": "boolean"
+      },
+      "chat": {
+        "call": "boolean",
+        "continue_response": "boolean",
+        "controls": "boolean",
+        "delete": "boolean",
+        "delete_message": "boolean",
+        "edit": "boolean",
+        "export": "boolean",
+        "file_upload": "boolean",
+        "import": "boolean",
+        "multiple_models": "boolean",
+        "params": "boolean",
+        "rate_response": "boolean",
+        "regenerate_response": "boolean",
+        "share": "boolean",
+        "stt": "boolean",
+        "system_prompt": "boolean",
+        "temporary": "boolean",
+        "temporary_enforced": "boolean",
+        "tts": "boolean",
+        "valves": "boolean",
+        "web_upload": "boolean"
+      },
+      "features": {
+        "api_keys": "boolean",
+        "automations": "boolean",
+        "calendar": "boolean",
+        "channels": "boolean",
+        "code_interpreter": "boolean",
+        "direct_tool_servers": "boolean",
+        "encrypted_channels": "boolean",
+        "folders": "boolean",
+        "image_generation": "boolean",
+        "memories": "boolean",
+        "notes": "boolean",
+        "web_search": "boolean",
+        "webhooks": "boolean"
+      },
+      "settings": {
+        "interface": "boolean"
+      },
+      "sharing": {
+        "folders": "boolean",
+        "knowledge": "boolean",
+        "models": "boolean",
+        "notes": "boolean",
+        "open_chats": "boolean",
+        "prompts": "boolean",
+        "public_calendars": "boolean",
+        "public_chats": "boolean",
+        "public_knowledge": "boolean",
+        "public_models": "boolean",
+        "public_notes": "boolean",
+        "public_prompts": "boolean",
+        "public_skills": "boolean",
+        "public_tools": "boolean",
+        "skills": "boolean",
+        "tools": "boolean"
+      },
+      "workspace": {
+        "knowledge": "boolean",
+        "models": "boolean",
+        "models_export": "boolean",
+        "models_hidden": "boolean",
+        "models_import": "boolean",
+        "prompts": "boolean",
+        "prompts_export": "boolean",
+        "prompts_import": "boolean",
+        "skills": "boolean",
+        "skills_export": "boolean",
+        "skills_import": "boolean",
+        "tools": "boolean",
+        "tools_export": "boolean",
+        "tools_import": "boolean"
+      }
+    },
+    "profile_image_url": "string",
+    "role": "string",
+    "status_emoji": "null",
+    "status_expires_at": "null",
+    "status_message": "null",
+    "token": "string",
+    "token_type": "string"
+  }
+}

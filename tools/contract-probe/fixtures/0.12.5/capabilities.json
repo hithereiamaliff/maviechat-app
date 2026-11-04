@@ -1,0 +1,24 @@
+{
+  "support": "newer-than-validated",
+  "isAdmin": false,
+  "websocketOnly": true,
+  "heartbeatIntervalSec": 30,
+  "features": {
+    "webSearch": false,
+    "imageGeneration": false,
+    "codeInterpreter": true,
+    "codeExecution": true,
+    "folders": true,
+    "notes": true,
+    "channels": false,
+    "memories": true,
+    "apiKeys": false,
+    "automations": false,
+    "calendar": true,
+    "userWebhooks": false,
+    "messageRating": true,
+    "plugins": true,
+    "tools": true,
+    "functions": true
+  }
+}

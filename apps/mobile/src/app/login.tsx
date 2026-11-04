@@ -5,10 +5,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { IconButton } from '@/components/IconButton';
 import { TextField } from '@/components/TextField';
+import { TwoStepSignIn } from '@/features/auth/TwoStepSignIn';
 import { switchToDeepTutor } from '@/features/deeptutor/switch';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { describeSignInError } from '@/session/errors';
-import { useSession } from '@/session/SessionProvider';
+import { useSession, type SignInOutcome } from '@/session/SessionProvider';
 import { fonts, usePalette } from '@/theme';
 
 type Message = { tone: 'error' | 'info'; text: string };
@@ -24,6 +25,8 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  // Open WebUI 0.12's second step, after the password.
+  const [twoStep, setTwoStep] = useState<Extract<SignInOutcome, { kind: 'mfa' }> | null>(null);
   const [message, setMessage] = useState<Message | null>(() =>
     state.status === 'signed-out' && state.notice ? { tone: 'info', text: state.notice } : null,
   );
@@ -43,13 +46,12 @@ export default function Login() {
         router.replace('/');
         return;
       }
-      setMessage({
-        tone: 'info',
-        text:
-          outcome.kind === 'pending'
-            ? 'Your account is waiting for an administrator to approve it. Try again once it has been approved.'
-            : 'This server asks for a two-step sign-in code, which MavieChat does not support yet. Use an account without two-step sign-in for now.',
-      });
+      if (outcome.kind === 'mfa') {
+        setPassword('');
+        setTwoStep(outcome);
+        return;
+      }
+      setMessage({ tone: 'info', text: 'Your account is waiting for an administrator to approve it. Try again once it has been approved.' });
     } catch (error) {
       setMessage({ tone: 'error', text: describeSignInError(error) });
     } finally {
@@ -68,6 +70,16 @@ export default function Login() {
           <Text style={[styles.subtitle, { color: palette.textMuted }]}>Sign in to your Open WebUI server.</Text>
         </View>
 
+        {twoStep ? (
+          <TwoStepSignIn
+            challenge={twoStep}
+            email={email.trim()}
+            onBack={(text) => {
+              setTwoStep(null);
+              setMessage(text ? { tone: 'info', text } : null);
+            }}
+          />
+        ) : (
         <View style={styles.form}>
           <TextField
             label="Server address"
@@ -123,6 +135,7 @@ export default function Login() {
             <Text style={[styles.otherText, { color: palette.link }]}>{deepTutorSignedIn ? 'Back to DeepTutor' : 'Sign in to DeepTutor instead'}</Text>
           </Pressable>
         </View>
+        )}
 
         <Text style={[styles.footer, { color: palette.textMuted }]}>
           MavieChat is an independent app for Open WebUI and DeepTutor servers and is not affiliated with either.

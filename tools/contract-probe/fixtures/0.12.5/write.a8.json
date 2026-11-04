@@ -1,0 +1,33 @@
+{
+  "settings": {
+    "shape": {
+      "ui": {
+        "audio": {
+          "stt": {
+            "language": "string"
+          },
+          "tts": {
+            "playbackRate": "number",
+            "probeNeighbour": "string"
+          }
+        },
+        "enableMessageQueue": "boolean",
+        "keepFollowUpPrompts": "boolean",
+        "memory": "boolean",
+        "params": {
+          "probe_unknown": "string",
+          "stop": [
+            "string"
+          ],
+          "temperature": "number"
+        },
+        "responseAutoPlayback": "boolean",
+        "system": "string",
+        "title": {
+          "auto": "boolean",
+          "probeNeighbour": "string"
+        }
+      }
+    }
+  }
+}

@@ -27,7 +27,7 @@ export default function Workspace() {
   const palette = usePalette();
   const { session } = useAuthed();
   const capabilities = useCapabilities();
-  const allowed = AREAS.filter((area) => (capabilities?.isAdmin || capabilities?.can(`workspace.${area.key}`)) && (area.key !== 'tools' || capabilities?.feature('plugins')));
+  const allowed = AREAS.filter((area) => (capabilities?.isAdmin || capabilities?.can(`workspace.${area.key}`)) && (area.key !== 'tools' || capabilities?.feature('tools')));
   const [picked, setPicked] = useState<Area | null>(null);
   const area = allowed.find((item) => item.key === picked)?.key ?? allowed[0]?.key ?? null;
   const tabs = (count?: number) => (

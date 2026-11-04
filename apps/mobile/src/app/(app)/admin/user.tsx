@@ -153,7 +153,7 @@ export default function AdminUserScreen() {
                 </Pressable>
                 {showPermissions
                   ? PERMISSION_SECTIONS.map((section) => {
-                      const on = section.items.filter((item) => (!item.plugins || capabilities?.feature('plugins')) && effective[section.key]?.[item.key] === true);
+                      const on = section.items.filter((item) => (!item.plugins || capabilities?.feature('tools')) && effective[section.key]?.[item.key] === true);
                       return (
                         <Text key={section.key} style={[styles.body, { color: palette.text }]}>
                           <Text style={styles.strong}>{`${section.label}: `}</Text>

@@ -79,8 +79,8 @@ function Form({ target, skill, onClose }: { target: SkillEditorTarget; skill: Wo
       toast(editing ? 'Skill saved' : 'Skill made (private)');
       onClose();
     } catch (error) {
-      // Names are unique on the server too, but a clash comes back as a plain 400.
-      setProblem(`${describeError(error)}${error instanceof OwuiHttpError && error.status === 400 ? ' Every skill on this server needs its own name and id: another may have this one.' : ''}`);
+      // Names are unique on the server too; a clash is a plain 400 on 0.11, a 409 on 0.12.
+      setProblem(`${describeError(error)}${error instanceof OwuiHttpError && (error.status === 400 || error.status === 409) ? ' Every skill on this server needs its own name and id: another may have this one.' : ''}`);
     } finally {
       setBusy(false);
     }

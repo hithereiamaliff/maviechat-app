@@ -1,0 +1,52 @@
+{
+  "count": 1,
+  "shape": {
+    "data": [
+      {
+        "actions": [],
+        "created": "number",
+        "filters": [],
+        "has_user_valves": "boolean",
+        "id": "string",
+        "info": {
+          "access_grants": [
+            {
+              "created_at": "number",
+              "id": "string",
+              "permission": "string",
+              "principal_id": "string",
+              "principal_type": "string",
+              "resource_id": "string",
+              "resource_type": "string"
+            }
+          ],
+          "base_model_id": "null",
+          "created_at": "number",
+          "id": "string",
+          "is_active": "boolean",
+          "meta": {
+            "background_image_url": "null",
+            "capabilities": "null",
+            "description": "null",
+            "i18n": "null",
+            "knowledge": "null",
+            "voice": "null",
+            "voice_avatar": "null"
+          },
+          "name": "string",
+          "params": {},
+          "updated_at": "number",
+          "user_id": "string",
+          "version_id": "string"
+        },
+        "name": "string",
+        "object": "string",
+        "owned_by": "string",
+        "pipe": {
+          "type": "string"
+        },
+        "tags": []
+      }
+    ]
+  }
+}

@@ -9,6 +9,7 @@ import {
   type Capabilities,
   type OwuiClient,
   type UserSettings,
+  uiPatch,
 } from '@maviechat/owui-protocol';
 import { shapeOf } from './shape';
 import type { WriteStep } from './write-probe';
@@ -116,7 +117,8 @@ export async function probeA8(input: A8Input): Promise<{ steps: WriteStep[]; fix
     if (original) {
       await check('settings put back as they were', async () => {
         const saved = original as UserSettings;
-        await updateUserSettings(client, { ...saved, ui: saved.ui ?? {} });
+        // Keys the probe added go with null: 0.12 keeps a key that's left out.
+        await updateUserSettings(client, { ...saved, ui: uiPatch((await rawSettings(client)).ui, saved.ui ?? {}) });
         const now = await rawSettings(client);
         if (JSON.stringify(now.ui ?? {}) !== JSON.stringify((original as UserSettings).ui ?? {})) throw new Error('the settings differ from before');
         return 'identical';

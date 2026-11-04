@@ -1,0 +1,9 @@
+{
+  "tidy up earlier probe chats": true,
+  "create probe chat with two branches": true,
+  "rename keeps the history": true,
+  "switching branches keeps every message": true,
+  "pin and unpin": true,
+  "archive and unarchive": true,
+  "delete": true
+}

@@ -1,0 +1,57 @@
+{
+  "tags": {
+    "shape": [
+      {
+        "id": "string",
+        "name": "string"
+      }
+    ]
+  },
+  "share": {
+    "url": "/s/{share_id}",
+    "access": [
+      {
+        "permission": "string",
+        "principal_id": "string",
+        "principal_type": "string"
+      }
+    ],
+    "publicAllowed": false,
+    "openAllowed": false
+  },
+  "clone": {
+    "shape": {
+      "archived": "boolean",
+      "chat": {
+        "branchPointMessageId": "string",
+        "history": "object",
+        "messages": [],
+        "models": [],
+        "originalChatId": "string",
+        "tags": [],
+        "timestamp": "number",
+        "title": "string"
+      },
+      "context_usage": "null",
+      "created_at": "number",
+      "current_message_id": "string",
+      "folder_id": "null",
+      "id": "string",
+      "meta": {
+        "tags": []
+      },
+      "pinned": "boolean",
+      "share_id": "null",
+      "summary": "null",
+      "tasks": "null",
+      "title": "string",
+      "updated_at": "number",
+      "user_id": "string",
+      "variables": {}
+    }
+  },
+  "directory": {
+    "people": true,
+    "groups": 0
+  }
+}

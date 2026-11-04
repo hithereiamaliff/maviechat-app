@@ -58,10 +58,11 @@ export async function probeM4Settings({ client, capabilities, allowWrites }: { c
   const before = await getAdminConfig(client);
   fixture.keys = Object.keys(before).sort();
   await step('admin settings: every field the app shows is in the config', async () => {
-    const missing = FIELDS.filter((field) => !(field.key in before)).map((field) => field.key);
+    const missing = FIELDS.filter((field) => !field.optional && !(field.key in before)).map((field) => field.key);
     if (missing.length) throw new Error(`not in this server’s config: ${missing.join(', ')}`);
     if (settingChanges(FIELDS, before, {}).length) throw new Error('no edits still found changes');
-    return `${FIELDS.length} fields, all there; no edits, no request`;
+    const newer = FIELDS.filter((field) => field.optional && field.key in before).length;
+    return `${FIELDS.length} fields, all there (${newer} of them newer ones this version has); no edits, no request`;
   });
 
   if (!allowWrites) return { steps, fixture };

@@ -1,0 +1,33 @@
+{
+  "shape": {
+    "default_locale": "string",
+    "features": {
+      "auth": "boolean",
+      "auth_trusted_header": "boolean",
+      "enable_ldap": "boolean",
+      "enable_login_form": "boolean",
+      "enable_signup": "boolean",
+      "enable_signup_password_confirmation": "boolean",
+      "enable_websocket": "boolean",
+      "slim": "boolean"
+    },
+    "i18n": {},
+    "name": "string",
+    "oauth": {
+      "auto_redirect": "boolean",
+      "providers": {}
+    },
+    "status": "boolean",
+    "version": "string"
+  },
+  "features": {
+    "auth": true,
+    "auth_trusted_header": false,
+    "enable_ldap": false,
+    "enable_login_form": true,
+    "enable_signup": false,
+    "enable_signup_password_confirmation": false,
+    "enable_websocket": true,
+    "slim": false
+  }
+}

@@ -42,10 +42,21 @@ export function withUiChanges(ui: Tree | null | undefined, changes: Record<strin
   return root;
 }
 
+/**
+ * `ui` as sent: the new values, and null for each top-level key taken away. Open WebUI 0.12
+ * saves `ui` key by key (a key left out is kept; null removes it); 0.11 replaces it whole and
+ * drops nulls. Either way, a setting taken away goes.
+ */
+export function uiPatch(before: Tree | null | undefined, after: Tree): Tree {
+  const patch: Tree = { ...after };
+  for (const key of Object.keys(before ?? {})) if (!(key in after)) patch[key] = null;
+  return patch;
+}
+
 /** Saves a few of your settings (dotted paths), keeping every other one; answers with what the server kept. */
 export async function saveUiSettings(client: OwuiClient, changes: Record<string, unknown>): Promise<UserSettings> {
   const current = await getUserSettings(client);
-  return updateUserSettings(client, { ...current, ui: withUiChanges(current.ui, changes) });
+  return updateUserSettings(client, { ...current, ui: uiPatch(current.ui, withUiChanges(current.ui, changes)) });
 }
 
 // ── Interface ────────────────────────────────────────────────────────────────

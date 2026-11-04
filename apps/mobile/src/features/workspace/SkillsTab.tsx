@@ -14,7 +14,7 @@ import { useWorkspaceRefresh, useWorkspaceSkills } from './queries';
 import { SkillEditor, type SkillEditorTarget } from './SkillEditor';
 import { ListState, listStyles, rowFacts, useWorkspaceRun, WorkspaceList, WorkspaceRow } from './WorkspaceList';
 
-const skillJson = (skill: WorkspaceSkill) => ({ id: skill.id, name: skill.name, description: skill.description, content: skill.content ?? '', meta: skill.meta, is_active: skill.isActive });
+const skillJson = (skill: WorkspaceSkill) => ({ id: skill.id, name: skill.name, description: skill.description, content: skill.content ?? '', meta: skill.meta, is_active: skill.isActive, ...(skill.files.length > 1 ? { files: skill.files } : {}) });
 
 /** Workspace skills: search, whose, order; each with its id, what it's for, and what you may do. */
 export function SkillsTab({ tabs }: { tabs: (count?: number) => ReactNode }) {
