@@ -40,6 +40,9 @@
  * message about a passage, then the collection, its chat and the materials deleted.
  * `--video` checks Reading's videos (no model calls): a short YouTube video imported, its
  * transcript with start times, a place and a note at a time, then deletion.
+ * `--partners` checks Partners (src/deeptutor-partners-probe.ts): a partner made from a library
+ * soul, a reply over `/ws/partners/{id}` read back from history, a reply followed again after a
+ * dropped socket, the conversation archived, brought back and deleted, then the partner deleted.
  * Signs in as the test account (DT_URL, DT_USERNAME, DT_PASSWORD), checks that sign-in is
  * enforced and self-registration closed, reads sessions, writes one "APP PROBE:" notebook
  * with a chat record and deletes it again, checks the web pages want the sign-in cookie,
@@ -141,6 +144,7 @@ import {
   TOKEN_COOKIE,
 } from '@maviechat/deeptutor-protocol';
 import { probeBooks } from './deeptutor-books-probe';
+import { probePartners } from './deeptutor-partners-probe';
 import { probeLearning } from './deeptutor-learning-probe';
 import { probeReading, probeVideo } from './deeptutor-reading-probe';
 import { loadEnvFile } from './env';
@@ -166,6 +170,7 @@ const { values: args } = parseArgs({
     books: { type: 'boolean' },
     reading: { type: 'boolean' },
     video: { type: 'boolean' },
+    partners: { type: 'boolean' },
   },
 });
 
@@ -388,6 +393,14 @@ async function main() {
     await step('video: a YouTube link imported, its transcript, a place and a note at a time, delete', async () => {
       const outcome = await probeVideo(client);
       fixtures.video = outcome.fixture;
+      return { value: true, note: outcome.note };
+    });
+  }
+
+  if (args.partners) {
+    await step('partners: one made from a library soul, a reply over /ws/partners, a reply followed again, conversations, stop, delete', async () => {
+      const outcome = await probePartners(baseUrl, session.token as string, client);
+      fixtures.partners = outcome.fixture;
       return { value: true, note: outcome.note };
     });
   }

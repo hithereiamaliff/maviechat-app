@@ -12,6 +12,8 @@ export * from './mastery';
 export * from './markdown';
 export * from './notebooks';
 export * from './organize';
+export * from './partnerChat';
+export * from './partners';
 export * from './practice';
 export * from './reading';
 export * from './sessions';

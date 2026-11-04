@@ -10,7 +10,7 @@ import {
   type DtToolStep,
 } from '@maviechat/deeptutor-protocol';
 import * as Clipboard from 'expo-clipboard';
-import { memo, useMemo } from 'react';
+import { memo, useMemo, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
@@ -139,6 +139,8 @@ export interface DtReplyActions {
   onOpenWeb?: () => void;
   /** A mastery path's chat: its question cards and their rulings across the conversation. */
   mastery?: DtMasteryContext;
+  /** Who answers, when it isn't DeepTutor itself (a partner): a name, and a face beside it. */
+  speaker?: { name: string; face?: ReactNode };
 }
 
 export interface DtMasteryContext {
@@ -159,7 +161,7 @@ interface DtReplyViewProps extends DtReplyActions {
 }
 
 /** A DeepTutor reply: its stages and reasoning, the answer with each step in its place, the mode's own result, sources and actions. */
-export const DtReplyView = memo(function DtReplyView({ reply, baseUrl, stateKey, last, onRegenerate, onStartResearch, onAnswer, onSaveQuiz, onOpenWeb, mastery }: DtReplyViewProps) {
+export const DtReplyView = memo(function DtReplyView({ reply, baseUrl, stateKey, last, onRegenerate, onStartResearch, onAnswer, onSaveQuiz, onOpenWeb, mastery, speaker }: DtReplyViewProps) {
   const palette = usePalette();
   const toast = useToast();
   const segments = useMemo(() => replySegments({ answer: reply.answer, tools: reply.tools.filter((tool) => !SHOWN_ELSEWHERE.has(tool.name)) }), [reply]);
@@ -175,7 +177,16 @@ export const DtReplyView = memo(function DtReplyView({ reply, baseUrl, stateKey,
 
   return (
     <View style={styles.wrap}>
-      <Text style={[styles.speaker, { color: palette.text }]}>DeepTutor</Text>
+      {speaker?.face ? (
+        <View style={styles.speakerRow}>
+          {speaker.face}
+          <Text style={[styles.speaker, styles.speakerName, { color: palette.text }]} numberOfLines={1}>
+            {speaker.name}
+          </Text>
+        </View>
+      ) : (
+        <Text style={[styles.speaker, { color: palette.text }]}>{speaker?.name ?? 'DeepTutor'}</Text>
+      )}
       <DtStages stages={reply.stages} running={running} />
       {thinking ? (
         <Disclosure icon="light-bulb" label={stillThinking ? 'Thinking…' : 'Thought'} busy={stillThinking}>
@@ -295,6 +306,8 @@ export function DtUserBubble({
 const styles = StyleSheet.create({
   wrap: { marginTop: 18 },
   speaker: { fontFamily: fonts.semibold, fontSize: 15, marginBottom: 4 },
+  speakerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  speakerName: { flexShrink: 1, marginBottom: 0 },
   activity: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 6 },
   activityText: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 14 },
   faint: { fontFamily: fonts.regular, fontSize: 13, marginVertical: 4 },

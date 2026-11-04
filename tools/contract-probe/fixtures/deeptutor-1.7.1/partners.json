@@ -1,0 +1,67 @@
+{
+  "before": {
+    "partners": 0,
+    "groups": 0,
+    "recent": 0,
+    "souls": [
+      "companion",
+      "math-tutor",
+      "coding-assistant",
+      "research-helper",
+      "language-tutor"
+    ],
+    "models": 2,
+    "skills": 5
+  },
+  "partner": {
+    "shape": {
+      "avatar": "string",
+      "canManage": "boolean",
+      "channels": [],
+      "color": "string",
+      "description": "string",
+      "emoji": "string",
+      "id": "string",
+      "language": "string",
+      "lastReloadError": "string",
+      "llmSelection": "null",
+      "name": "string",
+      "running": "boolean"
+    }
+  },
+  "history": {
+    "total": 2,
+    "shape": {
+      "at": "number",
+      "attachments": [],
+      "channel": "string",
+      "content": "string",
+      "events": [
+        {
+          "content": "string",
+          "metadata": {},
+          "seq": "number",
+          "session_id": "string",
+          "source": "string",
+          "stage": "string",
+          "timestamp": "number",
+          "turn_id": "string",
+          "type": "string"
+        }
+      ],
+      "index": "number",
+      "role": "string"
+    }
+  },
+  "sessions": {
+    "shape": {
+      "archived": "boolean",
+      "channel": "string",
+      "key": "string",
+      "lastMessage": "string",
+      "messageCount": "number",
+      "title": "string",
+      "updatedAt": "number"
+    }
+  }
+}

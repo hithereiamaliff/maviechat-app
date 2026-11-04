@@ -1,6 +1,6 @@
 import type { DtReply } from '@maviechat/deeptutor-protocol';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
 import { usePalette } from '@/theme';
@@ -23,12 +23,14 @@ interface DtMessageListProps {
   actions: DtReplyActions;
   /** Changes when a new turn starts; the list then scrolls to the bottom. */
   pinToBottomKey?: string;
+  /** Above the first message (a button for earlier ones, say). */
+  header?: ReactNode;
 }
 
 const NEAR_BOTTOM = 120;
 
 /** A DeepTutor chat, opened at the newest message; follows a streaming reply while you're at the bottom. */
-export function DtMessageList({ ref, items, baseUrl, actions, pinToBottomKey }: DtMessageListProps) {
+export function DtMessageList({ ref, items, baseUrl, actions, pinToBottomKey, header }: DtMessageListProps) {
   const palette = usePalette();
   const list = useRef<FlashListRef<DtListItem>>(null);
   const following = useRef(true);
@@ -61,6 +63,7 @@ export function DtMessageList({ ref, items, baseUrl, actions, pinToBottomKey }: 
         keyExtractor={(item) => item.key}
         getItemType={(item) => item.kind}
         contentContainerStyle={styles.content}
+        ListHeaderComponent={header ? <>{header}</> : undefined}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"
         maintainVisibleContentPosition={{ startRenderingFromBottom: true, autoscrollToBottomThreshold: 0.2 }}
