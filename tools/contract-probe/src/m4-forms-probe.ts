@@ -5,15 +5,18 @@ import {
   getCodeExecutionConfig,
   getSubagentsConfig,
   getTaskConfig,
+  getWebConfig,
   OwuiHttpError,
   saveChatConfig,
   saveCodeExecutionConfig,
   saveSubagentsConfig,
   saveTaskConfig,
+  saveWebConfig,
   settingChanges,
   settingsPayload,
   SUBAGENT_SECTIONS,
   TASK_SECTIONS,
+  WEB_SEARCH_SECTIONS,
   type Capabilities,
   type OwuiClient,
   type SettingEdits,
@@ -48,11 +51,12 @@ const PAGES: Page[] = [
   { name: 'background tasks', sections: TASK_SECTIONS, read: getTaskConfig, save: saveTaskConfig, edit: (stored) => ({ key: 'TITLE_GENERATION_PROMPT_TEMPLATE', to: 'APP PROBE title prompt', back: String(stored.TITLE_GENERATION_PROMPT_TEMPLATE ?? '') }) },
   { name: 'chat', sections: CHAT_SECTIONS, read: getChatConfig, save: saveChatConfig, edit: (stored) => ({ key: 'CONTEXT_COMPACTION_RETENTION_PERCENTAGE', to: stored.CONTEXT_COMPACTION_RETENTION_PERCENTAGE === 41 ? '42' : '41', back: String(stored.CONTEXT_COMPACTION_RETENTION_PERCENTAGE ?? '') }) },
   { name: 'sub-agents', sections: SUBAGENT_SECTIONS, read: getSubagentsConfig, save: saveSubagentsConfig, edit: (stored) => ({ key: 'SUBAGENTS_MAX_OUTPUT', to: String(Number(stored.SUBAGENTS_MAX_OUTPUT ?? 30000) + 1), back: String(stored.SUBAGENTS_MAX_OUTPUT ?? '') }) },
+  { name: 'web search', sections: WEB_SEARCH_SECTIONS, read: getWebConfig, save: saveWebConfig, edit: (stored) => ({ key: 'WEB_SEARCH_RESULT_COUNT', to: String(Number(stored.WEB_SEARCH_RESULT_COUNT ?? 3) + 1), back: String(stored.WEB_SEARCH_RESULT_COUNT ?? '') }) },
   { name: 'code execution', sections: CODE_EXECUTION_SECTIONS, read: getCodeExecutionConfig, save: saveCodeExecutionConfig, edit: (stored) => ({ key: 'CODE_EXECUTION_JUPYTER_TIMEOUT', to: String(Number(stored.CODE_EXECUTION_JUPYTER_TIMEOUT ?? 60) + 1), back: stored.CODE_EXECUTION_JUPYTER_TIMEOUT === null ? '' : String(stored.CODE_EXECUTION_JUPYTER_TIMEOUT ?? '') }) },
 ];
 
 /**
- * M4.5: the Interface, Sub-agents and Code Execution pages. A non-admin is refused. On every
+ * M4.5 and M4.8: the Interface, Sub-agents, Web Search and Code Execution pages. A non-admin is refused. On every
  * server: each page's fields are all in its endpoint's answer, and no edits make no request. Only
  * on the scratch instance: one harmless edit per endpoint, laid over a fresh read, changes that
  * key (other keys the server rewrites on any save are reported), and putting it back restores it.

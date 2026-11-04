@@ -11,7 +11,7 @@ import type { OwuiClient } from './http';
 type Tree = Record<string, unknown>;
 const record = (value: unknown): Tree => (typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Tree) : {});
 
-export type SettingKind = 'switch' | 'text' | 'multiline' | 'number' | 'select' | 'secret';
+export type SettingKind = 'switch' | 'text' | 'multiline' | 'number' | 'select' | 'secret' | 'list';
 
 export interface SettingOption {
   value: string;
@@ -45,9 +45,10 @@ export interface SettingSection {
 /** What the form edits: the text or switch the admin sees, per key. */
 export type SettingEdits = Record<string, string | boolean>;
 
-/** A stored value as the form shows it. */
+/** A stored value as the form shows it (a list as text, separated by commas). */
 export function formValue(field: SettingField, stored: unknown): string | boolean {
   if (field.kind === 'switch') return stored === true;
+  if (field.kind === 'list') return Array.isArray(stored) ? stored.map(String).join(', ') : typeof stored === 'string' ? stored : '';
   if (stored === null || stored === undefined) return '';
   return typeof stored === 'string' ? stored : String(stored);
 }
@@ -59,6 +60,13 @@ export function formValue(field: SettingField, stored: unknown): string | boolea
 export function storedValue(field: SettingField, value: string | boolean, original: unknown): unknown {
   if (field.kind === 'switch') return value === true;
   const text = typeof value === 'string' ? value : String(value);
+  if (field.kind === 'list') {
+    const items = text
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    return !items.length && (original === null || original === undefined) ? original : items;
+  }
   if (field.kind === 'number') {
     const trimmed = text.trim();
     if (!trimmed) return original === null || original === undefined ? original : '';
@@ -84,18 +92,25 @@ export function settingValues(fields: SettingField[], stored: Tree, edits: Setti
   return values;
 }
 
-const same = (a: unknown, b: unknown) => a === b || (typeof a === 'number' && typeof b === 'string' && String(a) === b.trim()) || (typeof b === 'number' && typeof a === 'string' && String(b) === a.trim());
+const same = (a: unknown, b: unknown) =>
+  a === b ||
+  (typeof a === 'number' && typeof b === 'string' && String(a) === b.trim()) ||
+  (typeof b === 'number' && typeof a === 'string' && String(b) === a.trim()) ||
+  (typeof a === 'object' && typeof b === 'object' && a !== null && b !== null && JSON.stringify(a) === JSON.stringify(b));
 
-/** The keys an admin changed (their stored form differs from what's stored). */
+/** The keys an admin changed (their stored form differs from what's stored), each once. */
 export function settingChanges(fields: SettingField[], stored: Tree, edits: SettingEdits): string[] {
-  return fields.filter((field) => field.key in edits && !same(storedValue(field, edits[field.key] as string | boolean, stored[field.key]), stored[field.key])).map((field) => field.key);
+  const keys = fields.filter((field) => field.key in edits && !same(storedValue(field, edits[field.key] as string | boolean, stored[field.key]), stored[field.key])).map((field) => field.key);
+  return [...new Set(keys)];
 }
 
 /** Problems that stop a save: each changed field's own check. */
 export function settingProblems(fields: SettingField[], stored: Tree, edits: SettingEdits): string[] {
   const changed = new Set(settingChanges(fields, stored, edits));
+  const checked = new Set<string>();
   return fields.flatMap((field) => {
-    if (!changed.has(field.key) || !field.check) return [];
+    if (!changed.has(field.key) || !field.check || checked.has(field.key)) return [];
+    checked.add(field.key);
     const problem = field.check(storedValue(field, edits[field.key] as string | boolean, stored[field.key]));
     return problem ? [`${field.label}: ${problem}`] : [];
   });
@@ -377,6 +392,143 @@ export const CODE_EXECUTION_SECTIONS: SettingSection[] = [
       { key: 'CODE_INTERPRETER_ENGINE', label: 'Runs', kind: 'select', options: ENGINES, needs: ['ENABLE_CODE_INTERPRETER'] },
       { key: 'CODE_INTERPRETER_PROMPT_TEMPLATE', label: 'Its prompt', hint: templateHint, kind: 'multiline', needs: ['ENABLE_CODE_INTERPRETER'] },
       ...jupyterFields('CODE_INTERPRETER', 'ENABLE_CODE_INTERPRETER'),
+    ],
+  },
+];
+
+// --- Web Search: the retrieval settings' `web` part, sent whole (a field left out is nulled). ---
+
+/** The web search and page-reading settings, as the server keeps them. */
+export async function getWebConfig(client: OwuiClient): Promise<Tree> {
+  return record(record(await client.get<unknown>('/api/v1/retrieval/config')).web);
+}
+
+/** Saves only `web` (the other retrieval settings, left out, stay as they are). With hybrid search on, the server reloads its reranker. */
+export async function saveWebConfig(client: OwuiClient, web: Tree): Promise<Tree> {
+  return record(await client.post<unknown>('/api/v1/retrieval/config/update', { web }, { timeoutMs: 120_000 }));
+}
+
+const ENGINE_OPTIONS: SettingOption[] = [
+  ['searxng', 'SearXNG'],
+  ['brave', 'Brave'],
+  ['brave_llm_context', 'Brave (LLM context)'],
+  ['tavily', 'Tavily'],
+  ['duckduckgo', 'DuckDuckGo'],
+  ['google_pse', 'Google PSE'],
+  ['perplexity', 'Perplexity'],
+  ['perplexity_search', 'Perplexity Search'],
+  ['exa', 'Exa'],
+  ['jina', 'Jina'],
+  ['kagi', 'Kagi'],
+  ['mojeek', 'Mojeek'],
+  ['bocha', 'Bocha'],
+  ['serpstack', 'Serpstack'],
+  ['serper', 'Serper'],
+  ['serply', 'Serply'],
+  ['serphouse', 'SerpHouse'],
+  ['searchapi', 'SearchApi'],
+  ['serpapi', 'SerpApi'],
+  ['firecrawl', 'Firecrawl'],
+  ['linkup', 'Linkup'],
+  ['youcom', 'You.com'],
+  ['yandex', 'Yandex'],
+  ['yacy', 'YaCy'],
+  ['openserp', 'OpenSERP'],
+  ['sougou', 'Sougou'],
+  ['ollama_cloud', 'Ollama Cloud'],
+  ['microsoft_web_iq', 'Microsoft Web IQ'],
+  ['bing', 'Bing'],
+  ['azure', 'Azure'],
+  ['external', 'Your own (external)'],
+].map(([value = '', label = '']) => ({ value, label }));
+
+/** Each engine's own settings (only shown for that engine). */
+const ENGINE_FIELDS: [string, SettingField[]][] = [
+  ['searxng', [{ key: 'SEARXNG_QUERY_URL', label: 'Query address', hint: 'With <query> where the words go.', kind: 'text' }, { key: 'SEARXNG_LANGUAGE', label: 'Language', kind: 'text' }]],
+  ['brave', [{ key: 'BRAVE_SEARCH_API_KEY', label: 'Brave key', kind: 'secret' }]],
+  ['brave_llm_context', [{ key: 'BRAVE_SEARCH_API_KEY', label: 'Brave key', kind: 'secret' }, { key: 'BRAVE_SEARCH_CONTEXT_TOKENS', label: 'Tokens of context', kind: 'number' }]],
+  ['tavily', [{ key: 'TAVILY_API_KEY', label: 'Tavily key', kind: 'secret' }]],
+  ['duckduckgo', [{ key: 'DDGS_BACKEND', label: 'Backend', kind: 'text' }]],
+  ['google_pse', [{ key: 'GOOGLE_PSE_API_KEY', label: 'Google key', kind: 'secret' }, { key: 'GOOGLE_PSE_ENGINE_ID', label: 'Search engine id', kind: 'text' }]],
+  ['perplexity', [{ key: 'PERPLEXITY_API_KEY', label: 'Perplexity key', kind: 'secret' }, { key: 'PERPLEXITY_MODEL', label: 'Model', kind: 'text' }, { key: 'PERPLEXITY_SEARCH_CONTEXT_USAGE', label: 'Search context size', kind: 'text' }]],
+  ['perplexity_search', [{ key: 'PERPLEXITY_API_KEY', label: 'Perplexity key', kind: 'secret' }, { key: 'PERPLEXITY_SEARCH_API_URL', label: 'API address', kind: 'text' }]],
+  ['exa', [{ key: 'EXA_API_KEY', label: 'Exa key', kind: 'secret' }]],
+  ['jina', [{ key: 'JINA_API_KEY', label: 'Jina key', kind: 'secret' }, { key: 'JINA_API_BASE_URL', label: 'API address', kind: 'text' }]],
+  ['kagi', [{ key: 'KAGI_SEARCH_API_KEY', label: 'Kagi key', kind: 'secret' }]],
+  ['mojeek', [{ key: 'MOJEEK_SEARCH_API_KEY', label: 'Mojeek key', kind: 'secret' }]],
+  ['bocha', [{ key: 'BOCHA_SEARCH_API_KEY', label: 'Bocha key', kind: 'secret' }]],
+  ['serpstack', [{ key: 'SERPSTACK_API_KEY', label: 'Serpstack key', kind: 'secret' }, { key: 'SERPSTACK_HTTPS', label: 'Use HTTPS', kind: 'switch' }]],
+  ['serper', [{ key: 'SERPER_API_KEY', label: 'Serper key', kind: 'secret' }]],
+  ['serply', [{ key: 'SERPLY_API_KEY', label: 'Serply key', kind: 'secret' }]],
+  ['serphouse', [{ key: 'SERPHOUSE_API_KEY', label: 'SerpHouse key', kind: 'secret' }, { key: 'SERPHOUSE_DOMAIN', label: 'Domain', kind: 'text' }]],
+  ['searchapi', [{ key: 'SEARCHAPI_API_KEY', label: 'SearchApi key', kind: 'secret' }, { key: 'SEARCHAPI_ENGINE', label: 'Engine', kind: 'text' }]],
+  ['serpapi', [{ key: 'SERPAPI_API_KEY', label: 'SerpApi key', kind: 'secret' }, { key: 'SERPAPI_ENGINE', label: 'Engine', kind: 'text' }]],
+  ['firecrawl', [{ key: 'FIRECRAWL_API_KEY', label: 'Firecrawl key', kind: 'secret' }, { key: 'FIRECRAWL_API_BASE_URL', label: 'API address', kind: 'text' }]],
+  ['linkup', [{ key: 'LINKUP_API_KEY', label: 'Linkup key', kind: 'secret' }]],
+  ['youcom', [{ key: 'YOUCOM_API_KEY', label: 'You.com key', kind: 'secret' }]],
+  ['yandex', [{ key: 'YANDEX_WEB_SEARCH_URL', label: 'Address', kind: 'text' }, { key: 'YANDEX_WEB_SEARCH_API_KEY', label: 'Yandex key', kind: 'secret' }, { key: 'YANDEX_WEB_SEARCH_CONFIG', label: 'Settings (JSON)', kind: 'multiline' }]],
+  ['yacy', [{ key: 'YACY_QUERY_URL', label: 'Query address', kind: 'text' }, { key: 'YACY_USERNAME', label: 'Username', kind: 'text' }, { key: 'YACY_PASSWORD', label: 'Password', kind: 'secret' }]],
+  ['openserp', [{ key: 'OPENSERP_BASE_URL', label: 'Address', kind: 'text' }]],
+  ['sougou', [{ key: 'SOUGOU_API_SID', label: 'Secret id', kind: 'secret' }, { key: 'SOUGOU_API_SK', label: 'Secret key', kind: 'secret' }]],
+  ['ollama_cloud', [{ key: 'OLLAMA_CLOUD_WEB_SEARCH_API_KEY', label: 'Ollama key', kind: 'secret' }]],
+  ['microsoft_web_iq', [{ key: 'MICROSOFT_WEB_IQ_API_BASE_URL', label: 'Address', kind: 'text' }, { key: 'MICROSOFT_WEB_IQ_API_KEY', label: 'Key', kind: 'secret' }, { key: 'MICROSOFT_WEB_IQ_LANGUAGE', label: 'Language', kind: 'text' }]],
+  ['external', [{ key: 'EXTERNAL_WEB_SEARCH_URL', label: 'Address', kind: 'text' }, { key: 'EXTERNAL_WEB_SEARCH_API_KEY', label: 'Key', kind: 'secret' }]],
+];
+
+const count = (min: number) => (value: unknown) => (value === '' || value === null || (typeof value === 'number' && Number.isInteger(value) && value >= min) ? null : `a whole number from ${min}`);
+
+export const WEB_SEARCH_SECTIONS: SettingSection[] = [
+  {
+    title: 'Web search',
+    note: 'Searching spends the engine’s credits; results are read into chats.',
+    fields: [
+      { key: 'ENABLE_WEB_SEARCH', label: 'Web search', kind: 'switch' },
+      { key: 'WEB_SEARCH_ENGINE', label: 'Engine', kind: 'select', options: ENGINE_OPTIONS, needs: ['ENABLE_WEB_SEARCH'] },
+      { key: 'WEB_SEARCH_RESULT_COUNT', label: 'Results to read', kind: 'number', needs: ['ENABLE_WEB_SEARCH'], check: count(1) },
+      { key: 'WEB_SEARCH_CONCURRENT_REQUESTS', label: 'Searches at once', kind: 'number', needs: ['ENABLE_WEB_SEARCH'], check: count(0) },
+      { key: 'WEB_SEARCH_DOMAIN_FILTER_LIST', label: 'Only these sites', hint: 'Separated by commas; ! before one leaves it out. Empty: any site.', kind: 'list', needs: ['ENABLE_WEB_SEARCH'] },
+      { key: 'ENABLE_WEB_SEARCH_CONFIRMATION', label: 'Ask before searching', kind: 'switch', needs: ['ENABLE_WEB_SEARCH'] },
+      { key: 'WEB_SEARCH_CONFIRMATION_CONTENT', label: 'What it asks', kind: 'multiline', needs: ['ENABLE_WEB_SEARCH', 'ENABLE_WEB_SEARCH_CONFIRMATION'] },
+      { key: 'BYPASS_WEB_SEARCH_EMBEDDING_AND_RETRIEVAL', label: 'Use whole pages', hint: 'Instead of the parts that match best.', kind: 'switch', needs: ['ENABLE_WEB_SEARCH'] },
+      { key: 'BYPASS_WEB_SEARCH_WEB_LOADER', label: 'Use only the search’s snippets', kind: 'switch', needs: ['ENABLE_WEB_SEARCH'] },
+      { key: 'WEB_FETCH_MAX_CONTENT_LENGTH', label: 'Characters read from a page, at most', kind: 'number', needs: ['ENABLE_WEB_SEARCH'], check: count(0) },
+      { key: 'WEB_SEARCH_TRUST_ENV', label: 'Use the server’s proxy settings', kind: 'switch', needs: ['ENABLE_WEB_SEARCH'] },
+    ],
+  },
+  ...ENGINE_FIELDS.map(([engine, fields]) => ({ title: `${ENGINE_OPTIONS.find((option) => option.value === engine)?.label ?? engine} settings`, fields: fields.map((field) => ({ ...field, needs: ['ENABLE_WEB_SEARCH', `WEB_SEARCH_ENGINE=${engine}`] })) })),
+  {
+    title: 'Reading pages',
+    fields: [
+      {
+        key: 'WEB_LOADER_ENGINE',
+        label: 'Pages are read by',
+        kind: 'select',
+        options: [
+          { value: '', label: 'The server' },
+          { value: 'playwright', label: 'Playwright' },
+          { value: 'firecrawl', label: 'Firecrawl' },
+          { value: 'tavily', label: 'Tavily' },
+          { value: 'external', label: 'Your own' },
+        ],
+      },
+      { key: 'WEB_LOADER_TIMEOUT', label: 'Seconds per page', kind: 'text' },
+      { key: 'WEB_LOADER_CONCURRENT_REQUESTS', label: 'Pages at once', kind: 'number', check: count(0) },
+      { key: 'ENABLE_WEB_LOADER_SSL_VERIFICATION', label: 'Check sites’ certificates', kind: 'switch' },
+      { key: 'PLAYWRIGHT_WS_URL', label: 'Playwright address', kind: 'text', needs: ['WEB_LOADER_ENGINE=playwright'] },
+      { key: 'PLAYWRIGHT_TIMEOUT', label: 'Playwright timeout (ms)', kind: 'number', needs: ['WEB_LOADER_ENGINE=playwright'] },
+      { key: 'FIRECRAWL_API_KEY', label: 'Firecrawl key', kind: 'secret', needs: ['WEB_LOADER_ENGINE=firecrawl'] },
+      { key: 'FIRECRAWL_API_BASE_URL', label: 'Firecrawl address', kind: 'text', needs: ['WEB_LOADER_ENGINE=firecrawl'] },
+      { key: 'TAVILY_API_KEY', label: 'Tavily key', kind: 'secret', needs: ['WEB_LOADER_ENGINE=tavily'] },
+      { key: 'TAVILY_EXTRACT_DEPTH', label: 'Tavily depth', kind: 'text', needs: ['WEB_LOADER_ENGINE=tavily'] },
+      { key: 'EXTERNAL_WEB_LOADER_URL', label: 'Address', kind: 'text', needs: ['WEB_LOADER_ENGINE=external'] },
+      { key: 'EXTERNAL_WEB_LOADER_API_KEY', label: 'Key', kind: 'secret', needs: ['WEB_LOADER_ENGINE=external'] },
+    ],
+  },
+  {
+    title: 'YouTube',
+    fields: [
+      { key: 'YOUTUBE_LOADER_LANGUAGE', label: 'Caption languages', hint: 'Separated by commas, like en, ms.', kind: 'list' },
+      { key: 'YOUTUBE_LOADER_PROXY_URL', label: 'Proxy', hint: 'YouTube may block the server without one.', kind: 'secret' },
     ],
   },
 ];

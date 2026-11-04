@@ -7,12 +7,15 @@ import {
   getCodeExecutionConfig,
   getSubagentsConfig,
   getTaskConfig,
+  getWebConfig,
   saveChatConfig,
   saveCodeExecutionConfig,
   saveSubagentsConfig,
   saveTaskConfig,
+  saveWebConfig,
   SUBAGENT_SECTIONS,
   TASK_SECTIONS,
+  WEB_SEARCH_SECTIONS,
 } from '@maviechat/owui-protocol';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
@@ -25,33 +28,32 @@ import { AdminConfigPage, BannersEditor, SettingsEndpointPage } from './AdminCon
 import { ConnectionsPage } from './ConnectionsPage';
 import { ModelsPage } from './ModelsPage';
 
-type Page = 'general' | 'authentication' | 'connections' | 'models' | 'interface' | 'subagents' | 'code-execution';
+type Page = 'general' | 'authentication' | 'connections' | 'models' | 'interface' | 'subagents' | 'code-execution' | 'web';
 
-/** The web's admin settings tabs, in its groups; those not in the app yet open on the web, signed in. */
-const WEB_PAGES: { group: string; pages: { key: string; label: string }[] }[] = [
-  { group: 'Quality', pages: [{ key: 'evaluations', label: 'Evaluations' }] },
+/** The web's admin settings tabs not in the app yet, and why each is better on the web for now. */
+const WEB_PAGES: { group: string; pages: { key: string; label: string; why: string }[] }[] = [
+  { group: 'Quality', pages: [{ key: 'evaluations', label: 'Arena Models', why: 'The models the arena picks from' }] },
   {
     group: 'Tools',
     pages: [
-      { key: 'integrations', label: 'Integrations' },
-      { key: 'documents', label: 'Documents' },
-      { key: 'web', label: 'Web Search' },
-      { key: 'pipelines', label: 'Pipelines' },
+      { key: 'integrations', label: 'Integrations', why: 'Tool and terminal servers, OAuth, outside knowledge' },
+      { key: 'documents', label: 'Documents', why: 'Saving reloads the embedding model on the server' },
+      { key: 'pipelines', label: 'Pipelines', why: 'Uploads code to a pipelines server' },
     ],
   },
   {
     group: 'Experience',
     pages: [
-      { key: 'audio', label: 'Audio' },
-      { key: 'images', label: 'Images' },
+      { key: 'audio', label: 'Audio', why: 'Saving can load a speech model on the server' },
+      { key: 'images', label: 'Images', why: 'Saving can switch Automatic1111’s model' },
     ],
   },
-  { group: 'Data', pages: [{ key: 'db', label: 'Database' }] },
+  { group: 'Data', pages: [{ key: 'db', label: 'Database', why: 'Exports hold every secret and chat' }] },
 ];
 
 /**
  * The settings modal's Admin tab (admins only): the server's own settings. General,
- * Authentication, Connections, Models, Sub-agents, Interface and Code Execution are here; each saves only what changed, after listing it. The
+ * Authentication, Connections, Models, Sub-agents, Interface, Web Search and Code Execution are here; each saves only what changed, after listing it. The
  * rest open on the web until their slices land.
  */
 export function AdminSettings() {
@@ -86,6 +88,10 @@ export function AdminSettings() {
               <SettingsEndpointPage name="tasks" read={getTaskConfig} save={saveTaskConfig} sections={TASK_SECTIONS} />
               <SettingsEndpointPage name="chats" read={getChatConfig} save={saveChatConfig} sections={CHAT_SECTIONS} />
             </>
+          ) : page === 'web' ? (
+            <SettingsEndpointPage name="web" read={getWebConfig} save={saveWebConfig} sections={WEB_SEARCH_SECTIONS}>
+              <Note>With hybrid search on (Documents), saving also reloads the server’s reranker.</Note>
+            </SettingsEndpointPage>
           ) : page === 'subagents' ? (
             <SettingsEndpointPage name="subagents" read={getSubagentsConfig} save={saveSubagentsConfig} sections={SUBAGENT_SECTIONS} />
           ) : (
@@ -114,6 +120,7 @@ export function AdminSettings() {
             <SectionTitle title="Tools and experience" />
             <Group>
               <ActionRow label="Interface" hint="Titles, tags, follow-ups, searches; long chats; tool approvals" onPress={() => setPage('interface')} />
+              <ActionRow label="Web Search" hint="The engine, its key, how pages are read" onPress={() => setPage('web')} />
               <ActionRow label="Code Execution" hint="The Run button and the code interpreter" onPress={() => setPage('code-execution')} />
             </Group>
           </View>
@@ -122,7 +129,7 @@ export function AdminSettings() {
               <SectionTitle title={group.group} />
               <Group>
                 {group.pages.map((item) => (
-                  <ActionRow key={item.key} label={item.label} value="Web" onPress={() => void WebBrowser.openBrowserAsync(`${session.baseUrl}/admin/settings/${item.key}`)} />
+                  <ActionRow key={item.key} label={item.label} hint={item.why} value="Web" onPress={() => void WebBrowser.openBrowserAsync(`${session.baseUrl}/admin/settings/${item.key}`)} />
                 ))}
               </Group>
             </View>

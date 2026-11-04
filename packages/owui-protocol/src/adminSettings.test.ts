@@ -4,6 +4,7 @@ import {
   AUTHENTICATION_SECTIONS,
   CHAT_SECTIONS,
   CODE_EXECUTION_SECTIONS,
+  WEB_SEARCH_SECTIONS,
   describeSettingChange,
   formValue,
   GENERAL_SECTIONS,
@@ -102,5 +103,27 @@ describe('more admin settings pages', () => {
     expect(settingProblems(chat, stored, { CONTEXT_COMPACTION_RETENTION_PERCENTAGE: '60' })).toHaveLength(1);
     expect(settingProblems(chat, stored, { CONTEXT_COMPACTION_RETENTION_PERCENTAGE: '25' })).toEqual([]);
     expect(settingChanges(chat, stored, { CONTEXT_COMPACTION_TOKEN_CAP: '' })).toEqual([]);
+  });
+});
+
+describe('web search settings', () => {
+  const web = WEB_SEARCH_SECTIONS.flatMap((section) => section.fields);
+  const STORED = { ENABLE_WEB_SEARCH: true, WEB_SEARCH_ENGINE: 'brave', WEB_SEARCH_DOMAIN_FILTER_LIST: ['a.test', '!b.test'], YOUTUBE_LOADER_LANGUAGE: null, BRAVE_SEARCH_API_KEY: 'k', LINKUP_SEARCH_PARAMS: { depth: 'deep' } };
+
+  it('edits lists as text and stores them as lists', () => {
+    const domains = web.find((field) => field.key === 'WEB_SEARCH_DOMAIN_FILTER_LIST') as SettingField;
+    expect(formValue(domains, STORED.WEB_SEARCH_DOMAIN_FILTER_LIST)).toBe('a.test, !b.test');
+    expect(settingChanges(web, STORED, { WEB_SEARCH_DOMAIN_FILTER_LIST: 'a.test,  !b.test' })).toEqual([]);
+    expect(settingsPayload(web, STORED, STORED, { WEB_SEARCH_DOMAIN_FILTER_LIST: 'a.test' }).WEB_SEARCH_DOMAIN_FILTER_LIST).toEqual(['a.test']);
+    expect(settingChanges(web, STORED, { YOUTUBE_LOADER_LANGUAGE: '' })).toEqual([]);
+  });
+
+  it('counts a key shared by several engines once, and shows only the chosen engine’s fields', () => {
+    expect(settingChanges(web, STORED, { BRAVE_SEARCH_API_KEY: 'k2' })).toEqual(['BRAVE_SEARCH_API_KEY']);
+    const shown = web.filter((field) => settingShown(field, STORED)).map((field) => field.key);
+    expect(shown).toContain('BRAVE_SEARCH_API_KEY');
+    expect(shown).not.toContain('TAVILY_API_KEY');
+    const payload = settingsPayload(web, STORED, STORED, { ENABLE_WEB_SEARCH: false });
+    expect(payload.LINKUP_SEARCH_PARAMS).toEqual({ depth: 'deep' });
   });
 });
