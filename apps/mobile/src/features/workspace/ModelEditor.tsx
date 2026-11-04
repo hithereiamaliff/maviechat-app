@@ -1,4 +1,25 @@
-import { createWorkspaceModel, modelFormOf, modelIdFromName, promptVariables, tagNames, updateWorkspaceModel, type ModelItem, type WorkspaceModel } from '@maviechat/owui-protocol';
+import {
+  builtinToolsMeta,
+  builtinToolsOf,
+  capabilitiesOf,
+  createWorkspaceModel,
+  customParamsOf,
+  defaultFeaturesOf,
+  getModelDefaults,
+  knowledgeMeta,
+  knowledgeRefsOf,
+  modelFormOf,
+  modelIdFromName,
+  modelParamsToSave,
+  promptVariables,
+  suggestionsMeta,
+  suggestionsOf,
+  tagNames,
+  updateWorkspaceModel,
+  type ModelItem,
+  type WorkspaceModel,
+} from '@maviechat/owui-protocol';
+import { useQuery } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { useState } from 'react';
@@ -12,6 +33,7 @@ import { usePictureMaker } from '@/features/settings/PictureMaker';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useModels } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
+import { AttachmentsSection, CapabilitiesSection, ParamsSection, SuggestionsSection } from './ModelSections';
 import { useWorkspaceModel, useWorkspaceRefresh } from './queries';
 
 /** What the editor opens on: a new model, one to change, or a copy of one. */
@@ -38,9 +60,12 @@ export function ModelEditor({ target, onClose }: { target: ModelEditorTarget | n
   const palette = usePalette();
   const id = target && target.kind !== 'new' ? target.id : null;
   const model = useWorkspaceModel(id);
+  const { client } = useAuthed();
+  // The admin's defaults for every model, which a model's own capabilities start from.
+  const defaults = useQuery({ queryKey: ['workspace', 'model-defaults'], queryFn: () => getModelDefaults(client), enabled: target !== null, staleTime: 5 * 60_000 });
   return (
     <Modal visible={target !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      {target === null ? null : id && !model.data ? (
+      {target === null ? null : (id && !model.data) || defaults.isLoading ? (
         <View style={[styles.sheet, styles.center, { backgroundColor: palette.background }]}>
           {model.isError ? <Text style={[styles.note, { color: palette.danger }]}>{`Couldn’t open it: ${describeError(model.error)}`}</Text> : <ActivityIndicator color={palette.textMuted} />}
           <Pressable accessibilityRole="button" onPress={onClose} hitSlop={10}>
@@ -48,13 +73,13 @@ export function ModelEditor({ target, onClose }: { target: ModelEditorTarget | n
           </Pressable>
         </View>
       ) : (
-        <Form key={`${target.kind}:${id ?? ''}`} target={target} model={model.data ?? null} onClose={onClose} />
+        <Form key={`${target.kind}:${id ?? ''}`} target={target} model={model.data ?? null} defaults={defaults.data ?? {}} onClose={onClose} />
       )}
     </Modal>
   );
 }
 
-function Form({ target, model, onClose }: { target: ModelEditorTarget; model: WorkspaceModel | null; onClose: () => void }) {
+function Form({ target, model, defaults, onClose }: { target: ModelEditorTarget; model: WorkspaceModel | null; defaults: Record<string, unknown>; onClose: () => void }) {
   const palette = usePalette();
   const toast = useToast();
   const { client, session } = useAuthed();
@@ -73,6 +98,24 @@ function Form({ target, model, onClose }: { target: ModelEditorTarget; model: Wo
   const [newTag, setNewTag] = useState('');
   const [system, setSystem] = useState(typeof model?.params.system === 'string' ? model.params.system : '');
   const [image, setImage] = useState<string | null>(null);
+  const meta0 = model?.meta ?? {};
+  const params0 = model?.params ?? {};
+  const [params, setParams] = useState<Record<string, unknown>>(() => {
+    const { system: _system, custom_params: _custom, ...rest } = params0;
+    return rest;
+  });
+  const [custom, setCustom] = useState(() => customParamsOf(params0));
+  const [caps, setCaps] = useState(() => capabilitiesOf(meta0, defaults));
+  const [features, setFeatures] = useState(() => defaultFeaturesOf(meta0, capabilitiesOf(meta0, defaults)));
+  const [builtin, setBuiltin] = useState(() => builtinToolsOf(meta0));
+  const [knowledge, setKnowledge] = useState(() => knowledgeRefsOf(meta0));
+  const ids = (key: string) => (Array.isArray(meta0[key]) ? (meta0[key] as unknown[]).filter((item): item is string => typeof item === 'string') : []);
+  const [toolIds, setToolIds] = useState(() => ids('toolIds'));
+  const [skillIds, setSkillIds] = useState(() => ids('skillIds'));
+  const [filterIds, setFilterIds] = useState(() => ids('filterIds'));
+  const [defaultFilterIds, setDefaultFilterIds] = useState(() => ids('defaultFilterIds'));
+  const [actionIds, setActionIds] = useState(() => ids('actionIds'));
+  const [prompts, setPrompts] = useState(() => suggestionsOf(meta0));
   const [choosingBase, setChoosingBase] = useState(false);
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
@@ -109,9 +152,24 @@ function Form({ target, model, onClose }: { target: ModelEditorTarget; model: Wo
     setProblem('');
     try {
       const start = model ? modelFormOf(model) : { id: '', baseModelId: '', name: '', meta: {}, params: {}, isActive: true };
-      const meta = { ...start.meta, description: description.trim() || null, tags: tags.map((tag) => ({ name: tag })), ...(image ? { profile_image_url: image } : {}) };
-      const params = { ...start.params, system: system.trim() ? system : null };
-      const form = { ...start, id: modelId.trim(), baseModelId: baseId, name: name.trim(), meta, params };
+      const meta = {
+        ...start.meta,
+        description: description.trim() || null,
+        tags: tags.map((tag) => ({ name: tag })),
+        ...(image ? { profile_image_url: image } : {}),
+        // Capabilities always go whole, as the web saves them; the rest only when set (empties are dropped).
+        capabilities: caps,
+        defaultFeatureIds: features.filter((key) => caps[key as keyof typeof caps]),
+        builtinTools: builtinToolsMeta(builtin),
+        knowledge: knowledgeMeta(knowledge),
+        toolIds,
+        skillIds,
+        filterIds,
+        defaultFilterIds: defaultFilterIds.filter((key) => filterIds.includes(key)),
+        actionIds,
+        suggestion_prompts: suggestionsMeta(prompts),
+      };
+      const form = { ...start, id: modelId.trim(), baseModelId: baseId, name: name.trim(), meta, params: modelParamsToSave({ ...params, system: system.trim() ? system : null }, custom) };
       if (editing) await updateWorkspaceModel(client, form);
       else await createWorkspaceModel(client, { ...form, isActive: true, accessGrants: [] });
       refresh();
@@ -252,7 +310,25 @@ function Form({ target, model, onClose }: { target: ModelEditorTarget; model: Wo
             </Text>
           ) : null}
         </View>
-        <Text style={[styles.note, { color: palette.textFaint }]}>{editing ? 'Its parameters, capabilities, knowledge, tools and sharing stay as they are.' : 'New models are private: only you (and admins) can use them.'}</Text>
+        <ParamsSection params={params} setParams={setParams} custom={custom} setCustom={setCustom} readOnly={readOnly} />
+        <CapabilitiesSection caps={caps} setCaps={setCaps} features={features} setFeatures={setFeatures} builtin={builtin} setBuiltin={setBuiltin} readOnly={readOnly} />
+        <AttachmentsSection
+          knowledge={knowledge}
+          setKnowledge={setKnowledge}
+          toolIds={toolIds}
+          setToolIds={setToolIds}
+          skillIds={skillIds}
+          setSkillIds={setSkillIds}
+          filterIds={filterIds}
+          setFilterIds={setFilterIds}
+          defaultFilterIds={defaultFilterIds}
+          setDefaultFilterIds={setDefaultFilterIds}
+          actionIds={actionIds}
+          setActionIds={setActionIds}
+          readOnly={readOnly}
+        />
+        <SuggestionsSection prompts={prompts} setPrompts={setPrompts} readOnly={readOnly} />
+        <Text style={[styles.note, { color: palette.textFaint }]}>{editing ? 'Its sharing stays as it is.' : 'New models are private: only you (and admins) can use them.'}</Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );

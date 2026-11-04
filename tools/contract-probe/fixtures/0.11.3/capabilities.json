@@ -16,6 +16,7 @@
     "automations": false,
     "calendar": false,
     "userWebhooks": false,
-    "messageRating": true
+    "messageRating": true,
+    "plugins": true
   }
 }

@@ -59,6 +59,24 @@
     "tags": 0
   },
   "hiddenInPicker": "listed, marked hidden",
+  "savedMeta": {
+    "capabilities": 12,
+    "builtinTools": {
+      "calendar": false
+    },
+    "toolIds": 1,
+    "suggestions": 1
+  },
+  "savedParams": {
+    "stop": [
+      "</s>",
+      "END"
+    ],
+    "custom": {
+      "mc_probe_param": "{\"x\":1}"
+    },
+    "temperature": 0.3
+  },
   "export": 401,
   "afterDelete": 404
 }

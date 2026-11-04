@@ -1,5 +1,12 @@
 import {
+  builtinToolsMeta,
+  builtinToolsOf,
+  capabilitiesOf,
   createWorkspaceModel,
+  getModelDefaults,
+  listTools,
+  modelParamsToSave,
+  suggestionsMeta,
   deleteWorkspaceModel,
   exportWorkspaceModels,
   getWorkspaceModel,
@@ -81,7 +88,28 @@ export async function probeM3Models({ client, capabilities }: { client: OwuiClie
       if (!model.hidden) throw new Error('hiding it didn’t take');
       model = await setWorkspaceModelHidden(client, id, false);
       if (model.hidden) throw new Error('showing it again didn’t take');
-      return `${base.id} as the base; a save while off kept it off; hidden: ${String(fixture.hiddenInPicker)}`;
+
+      // The rest of the editor, saved the app's way and read back as the web keeps it.
+      const defaults = await getModelDefaults(client);
+      const caps = { ...capabilitiesOf(model.meta, defaults), vision: false };
+      const builtin = { ...builtinToolsOf(model.meta), calendar: false };
+      const tool = (await listTools(client))[0];
+      const params = modelParamsToSave({ ...model.params, temperature: 0.3, stop: '</s>, END' }, [{ name: 'mc_probe_param', value: '{"x":1}' }]);
+      model = await updateWorkspaceModel(client, {
+        ...modelFormOf(model),
+        meta: { ...model.meta, capabilities: caps, defaultFeatureIds: ['web_search'], builtinTools: builtinToolsMeta(builtin), ...(tool ? { toolIds: [tool.id] } : {}), suggestion_prompts: suggestionsMeta([{ title: 'APP PROBE', subtitle: 'a test', content: 'APP PROBE: say hi' }]) },
+        params,
+      });
+      const back = await getWorkspaceModel(client, id);
+      const meta = back.meta as Record<string, unknown>;
+      fixture.savedMeta = { capabilities: Object.keys((meta.capabilities ?? {}) as object).length, builtinTools: meta.builtinTools, toolIds: Array.isArray(meta.toolIds) ? meta.toolIds.length : 0, suggestions: Array.isArray(meta.suggestion_prompts) ? meta.suggestion_prompts.length : 0 };
+      fixture.savedParams = { stop: back.params.stop, custom: back.params.custom_params, temperature: back.params.temperature };
+      if ((meta.capabilities as Record<string, unknown>)?.vision !== false) throw new Error('the capabilities didn’t read back');
+      if (JSON.stringify(meta.builtinTools) !== JSON.stringify({ calendar: false })) throw new Error(`the built-in tools read back as ${JSON.stringify(meta.builtinTools)}`);
+      if (JSON.stringify(back.params.stop) !== JSON.stringify(['</s>', 'END'])) throw new Error(`stop sequences read back as ${JSON.stringify(back.params.stop)}`);
+      if (back.params.custom_params === undefined) throw new Error('the custom parameter was dropped');
+      if (tool && !(meta.toolIds as unknown[] | undefined)?.includes(tool.id)) throw new Error('the tool wasn’t kept');
+      return `${base.id} as the base; a save while off kept it off; hidden: ${String(fixture.hiddenInPicker)}; capabilities, built-in tools, a tool, a suggested prompt, stop sequences (as a list) and a custom parameter read back`;
     });
     await step('workspace models: export needs its permission', async () => {
       const status = await statusOf(() => exportWorkspaceModels(client));
