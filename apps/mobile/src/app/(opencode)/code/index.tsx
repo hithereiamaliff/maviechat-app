@@ -11,7 +11,7 @@ import { describeOcError } from '@/features/opencode/errors';
 import { OcComposer, type ModelPick } from '@/features/opencode/OcComposer';
 import { OcHeader } from '@/features/opencode/OcHeader';
 import { useOcProject, useProjectPicker } from '@/features/opencode/project';
-import { folderName, ocKey, useMachine, useOcAgents, useOcModels, useOcSessions } from '@/features/opencode/queries';
+import { folderName, ocKey, useGitFolder, useMachine, useOcAgents, useOcModels, useOcSessions } from '@/features/opencode/queries';
 import { useOcAuthed } from '@/session/OpenCodeProvider';
 import { fonts, radius, usePalette } from '@/theme';
 
@@ -33,6 +33,8 @@ export default function OpenCodeHome() {
   const models = useOcModels(directory);
   const agents = useOcAgents(directory);
   const recent = useOcSessions(directory);
+  // OpenCode lists what a session changed only inside a git repository.
+  const plainFolder = useGitFolder(directory).data === false;
   const [model, setModel] = useState<ModelPick | null>(null);
   const [agent, setAgent] = useState<string | null>(null);
   const [approvals, setApprovals] = useState(true);
@@ -98,7 +100,7 @@ export default function OpenCodeHome() {
           <View style={styles.options}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Project: ${directory ?? 'none chosen'}. Change`}
+              accessibilityLabel={`Project: ${directory ?? 'none chosen'}${plainFolder ? '. Not a git repository, so changes won’t be listed' : ''}. Change`}
               onPress={picker.open}
               style={({ pressed }) => [styles.option, { borderColor: palette.border }, pressed && { backgroundColor: palette.surface }]}>
               <Icon name="folder" size={18} color={palette.textMuted} />
@@ -109,6 +111,7 @@ export default function OpenCodeHome() {
                 <Text style={[styles.optionDetail, { color: palette.textMuted }]} numberOfLines={1}>
                   {directory ?? 'OpenCode works inside a project folder'}
                 </Text>
+                {directory && plainFolder ? <Text style={[styles.optionDetail, { color: palette.warning }]}>Not a git repository, so changes won’t be listed</Text> : null}
               </View>
               <Icon name="chevron-right" size={16} color={palette.textFaint} />
             </Pressable>

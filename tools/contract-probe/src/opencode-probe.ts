@@ -4,7 +4,8 @@
  *   OC_GATEWAY=http://127.0.0.1:8092 OC_PAIR_CODE=<from maviechat-gateway pair> npm run probe:opencode -- [--prompts] [--model provider/model]
  *
  * Pairs a test device, checks the machine and what the gateway refuses (other folders, paths
- * outside a project, closed routes), and counts sessions. With --prompts it runs short turns in a
+ * outside a project, closed routes), counts sessions, and checks that OpenCode tells a git
+ * repository (where it lists changes) from a plain folder. With --prompts it runs short turns in a
  * scratch folder it creates and removes (/root/work/maviechat-opencode-scratch): an edit refused
  * at the approval, a command allowed once, and a reply stopped mid-way. It deletes the sessions it
  * made and unpairs the test device. Prints no tokens, codes or session titles.
@@ -12,6 +13,7 @@
  * With OC_PUSH_TOKEN (an Expo push token, a made-up one will do) the prompts ask the machine for
  * notifications; the gateway's log then shows a "push: <kind> sent" line for each one it sent.
  */
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import {
@@ -22,6 +24,7 @@ import {
   getMachine,
   getMessages,
   getStatuses,
+  isGitFolder,
   listSessions,
   OcClient,
   OcHttpError,
@@ -122,6 +125,25 @@ async function main(): Promise<void> {
     });
 
     await step('sessions: listed for an allowed folder', async () => `${(await listSessions(client, folder)).length} sessions in the first folder (titles not shown)`);
+
+    await step('git folders: OpenCode tells a repository from a plain folder (it lists changes only in one)', async () => {
+      const checkout = execFileSync('git', ['rev-parse', '--show-toplevel'], { encoding: 'utf8' }).trim();
+      const gitSays = (dir: string) => {
+        try {
+          execFileSync('git', ['-C', dir, 'rev-parse', '--is-inside-work-tree'], { stdio: 'ignore' });
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      const seen: string[] = [];
+      for (const [label, dir] of [['the first folder', folder], ['this checkout', checkout]] as const) {
+        const answer = await isGitFolder(client, dir);
+        if (answer !== gitSays(dir)) throw new Error(`${label}: OpenCode says ${String(answer)}, git says ${String(gitSays(dir))}`);
+        seen.push(`${label} ${answer ? 'is a repository' : 'is plain'}`);
+      }
+      return `${seen.join(', ')}; OpenCode agrees with git on both`;
+    });
 
     if (withPrompts) {
       const scratch = path.posix.resolve(SCRATCH);

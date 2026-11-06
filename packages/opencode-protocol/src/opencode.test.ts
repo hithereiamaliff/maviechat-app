@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createSession, pairDevice, parseModelRef, parsePairingLink, pickableAgents, sendPrompt, setDefaultModel } from './api';
+import { createSession, isGitFolder, pairDevice, parseModelRef, parsePairingLink, pickableAgents, sendPrompt, setDefaultModel } from './api';
 import { parseEvent, readEvents, SseParser } from './events';
 import { OcClient, OcHttpError } from './http';
 import { sessionChanges } from './changes';
@@ -154,6 +154,19 @@ describe('the default model', () => {
     expect(url).toBe('https://g/v1/oc/root/global/config');
     expect(init.method).toBe('PATCH');
     expect(JSON.parse(String(init.body))).toEqual({ model: 'opencode-go/deepseek-v4.1-flash' });
+  });
+});
+
+describe('git folders', () => {
+  it('reads whether a folder is in a git repository from the root OpenCode gives it', async () => {
+    const answers: unknown[] = [{ worktree: '/home/dev/app', directory: '/home/dev/app/src' }, { worktree: '/', directory: '/home/dev' }, {}];
+    const fetch = vi.fn(async () => new Response(JSON.stringify(answers.shift()), { status: 200 }));
+    const client = new OcClient({ gatewayUrl: 'https://g', token: 't', login: 'root', fetch });
+    await expect(isGitFolder(client, '/home/dev/app/src')).resolves.toBe(true);
+    await expect(isGitFolder(client, '/home/dev')).resolves.toBe(false);
+    await expect(isGitFolder(client, '/home/dev')).resolves.toBeNull();
+    const [url] = fetch.mock.calls[0] as unknown as [string];
+    expect(url).toBe('https://g/v1/oc/root/path?directory=%2Fhome%2Fdev%2Fapp%2Fsrc');
   });
 });
 

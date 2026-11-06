@@ -1,4 +1,4 @@
-import { getDefaultModel, getMachine, getProviders, listAgents, setDefaultModel, listFiles, listProjects, listSessions, pickableAgents, type Model } from '@maviechat/opencode-protocol';
+import { getDefaultModel, getMachine, getProviders, isGitFolder, listAgents, setDefaultModel, listFiles, listProjects, listSessions, pickableAgents, type Model } from '@maviechat/opencode-protocol';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useOcAuthed } from '@/session/OpenCodeProvider';
 import { OC_QUERY_ROOT } from '@/session/queryRoots';
@@ -44,6 +44,17 @@ export function useSubfolders(root: string | null) {
     queryFn: async () => (await listFiles(client, root ?? '', '')).filter((node) => node.type === 'directory' && !node.ignored && !node.name.startsWith('.')).sort((a, b) => a.name.localeCompare(b.name)),
     enabled: Boolean(root),
     staleTime: 60_000,
+  });
+}
+
+/** Whether a project folder is in a git repository, the only place OpenCode lists what it changed (null: not known). */
+export function useGitFolder(directory: string | null) {
+  const { client, accountId } = useOcAuthed();
+  return useQuery({
+    queryKey: ocKey(accountId, 'git', directory),
+    queryFn: () => isGitFolder(client, directory ?? ''),
+    enabled: Boolean(directory),
+    staleTime: 5 * 60_000,
   });
 }
 

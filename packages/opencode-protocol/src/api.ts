@@ -135,6 +135,16 @@ export const setDefaultModel = async (client: OcClient, model: { providerID: str
 export const listAgents = (client: OcClient, directory: string) => client.oc<Agent[]>('GET', '/agent', { query: { directory } });
 export const listProjects = (client: OcClient, directory: string) => client.oc<Project[]>('GET', '/project', { query: { directory } });
 
+/**
+ * Whether a folder lies in a git repository, the only place OpenCode keeps what each reply changed.
+ * OpenCode's `/path` names the folder's repository root as `worktree`, or "/" for a plain folder.
+ * Null when its answer doesn't say.
+ */
+export const isGitFolder = async (client: OcClient, directory: string): Promise<boolean | null> => {
+  const { worktree } = await client.oc<{ worktree?: unknown }>('GET', '/path', { query: { directory } });
+  return typeof worktree === 'string' && worktree !== '' ? worktree !== '/' : null;
+};
+
 /** A folder's contents (relative `path`, empty for the project itself). */
 export const listFiles = (client: OcClient, directory: string, path = '') => client.oc<FileNode[]>('GET', '/file', { query: { directory, path } });
 
