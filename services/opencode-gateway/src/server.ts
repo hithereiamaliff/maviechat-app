@@ -1,3 +1,4 @@
+import { chmodSync, mkdirSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import path from 'node:path';
 import { loadConfig } from './config.ts';
@@ -24,18 +25,25 @@ const server = createServer((request, response) => {
 server.requestTimeout = 0;
 server.headersTimeout = 30_000;
 
-// Only `maviechat-gateway` inside the container reaches this one.
+// Pairing and unpairing, for `maviechat-gateway` only: a socket that only the gateway's own user
+// can open, kept in the container's own files (never in a shared volume or on the network).
+const adminSocket = process.env.ADMIN_SOCKET || '/run/maviechat/admin.sock';
+mkdirSync(path.dirname(adminSocket), { recursive: true, mode: 0o700 });
+rmSync(adminSocket, { force: true });
 const adminServer = createServer((request, response) => {
   admin(request, response).catch(() => response.end());
 });
 
 const port = Number(process.env.PORT ?? 8080);
-const adminPort = Number(process.env.ADMIN_PORT ?? 8081);
-server.listen(port, () => {
-  log(`opencode gateway listening on ${port} for ${config.machineName}: ${config.logins.length} OpenCode login(s), ${config.folders.length} folder(s)`);
+// HOST=127.0.0.1 keeps the gateway to this machine when it shares the host's network behind a proxy.
+const host = process.env.HOST || undefined;
+const started = () => {
+  log(`opencode gateway listening on ${host ?? '*'}:${port} for ${config.machineName}: ${config.logins.length} OpenCode login(s), ${config.folders.length} folder(s)`);
   watcher.start();
-});
-adminServer.listen(adminPort, '127.0.0.1');
+};
+if (host) server.listen(port, host, started);
+else server.listen(port, started);
+adminServer.listen(adminSocket, () => chmodSync(adminSocket, 0o600));
 for (const signal of ['SIGTERM', 'SIGINT'] as const)
   process.on(signal, () => {
     watcher.stop();

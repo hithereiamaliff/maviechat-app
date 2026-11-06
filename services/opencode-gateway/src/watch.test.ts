@@ -5,7 +5,7 @@ import { parseGlobalEvent, readGlobalEvents, Watcher, type GlobalEvent } from '.
 const login = { id: 'root', name: 'OpenCode', url: 'http://opencode.test', username: 'opencode', password: 'pw' };
 const tokenA = 'ExponentPushToken[aaaaAAAA1111]';
 const tokenB = 'ExponentPushToken[bbbbBBBB2222]';
-const ev = (type: string, properties: Record<string, unknown>): GlobalEvent => ({ directory: '/root/work/app', payload: { type, properties } });
+const ev = (type: string, properties: Record<string, unknown>): GlobalEvent => ({ directory: '/home/dev/work/app', payload: { type, properties } });
 const status = (sessionID: string, type: string) => ev('session.status', { sessionID, status: { type } });
 
 let stops: (() => void)[] = [];
@@ -35,7 +35,7 @@ function setup() {
     },
   });
   stops.push(() => watcher.stop());
-  const watch = (sessionId: string, deviceId = 'dev1', pushToken = tokenA) => watcher.watch({ deviceId, pushToken, loginId: 'root', sessionId, directory: '/root/work/app' });
+  const watch = (sessionId: string, deviceId = 'dev1', pushToken = tokenA) => watcher.watch({ deviceId, pushToken, loginId: 'root', sessionId, directory: '/home/dev/work/app' });
   return { watcher, sent, gone, fetch, watch, advance: (ms: number) => (time += ms) };
 }
 
@@ -55,7 +55,7 @@ describe('notifications for sessions started from a phone', () => {
         to: tokenA,
         title: 'OpenCode finished',
         body: 'Fix the login bug · app',
-        data: { kind: 'opencode', machine: 'https://code.example.com', login: 'root', sessionId: 'ses_1', directory: '/root/work/app' },
+        data: { kind: 'opencode', machine: 'https://code.example.com', login: 'root', sessionId: 'ses_1', directory: '/home/dev/work/app' },
         threadId: 'ses_1',
       },
     ]);

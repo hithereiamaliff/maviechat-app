@@ -1,0 +1,32 @@
+# MavieChat gateway for OpenCode, with Caddy for HTTPS (see README.md).
+# Next to this file (saved as compose.yaml): Caddyfile, and .env made from .env.example.
+#
+# Both containers use the computer's own network: the gateway listens on 127.0.0.1:8080 only and
+# reaches OpenCode on 127.0.0.1; Caddy answers on ports 80 and 443 and gets the certificate itself.
+services:
+  gateway:
+    image: ghcr.io/hithereiamaliff/maviechat-gateway:latest
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env
+    environment:
+      HOST: 127.0.0.1
+      PORT: "8080"
+    volumes:
+      - gateway-data:/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  gateway-data:
+  caddy-data:
+  caddy-config:

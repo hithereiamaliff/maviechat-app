@@ -7,7 +7,7 @@ const query = (value: Record<string, string>) => new URLSearchParams(value);
 describe('folders', () => {
   it('allows the folders and what is inside them, nothing else', () => {
     expect(folderAllowed('/home/dev/work', folders)).toBe(true);
-    expect(folderAllowed('/home/dev/work/maviechat-app', folders)).toBe(true);
+    expect(folderAllowed('/home/dev/work/website', folders)).toBe(true);
     expect(folderAllowed('/srv/projects/a/b/', folders)).toBe(true);
     for (const outside of ['/home/dev', '/home/dev/workshop', '/home/dev/work/../.ssh', '/etc', 'home/dev/work', '', '/home/dev/work\0/x']) {
       expect(folderAllowed(outside, folders)).toBe(false);

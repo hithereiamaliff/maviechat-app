@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createAdmin, createGateway, type GatewayConfig } from './gateway.ts';
+import { callerAddress, createAdmin, createGateway, privateAddress, type GatewayConfig } from './gateway.ts';
 import { ASK_BEFORE_CHANGES } from './rules.ts';
 import { DeviceStore } from './store.ts';
 import type { Watcher } from './watch.ts';
@@ -260,5 +260,28 @@ describe('opencode gateway', () => {
     expect((await fetch(`${base}/v1/machine`, authed(token))).status).toBe(401);
     // Its notifications stop too.
     expect(forgotten).toEqual([self?.id]);
+  });
+});
+
+describe('caller address', () => {
+  it('believes X-Forwarded-For only from a proxy on this machine or a private network', () => {
+    // A proxy in Docker or on this machine: the address it saw is the last one.
+    expect(callerAddress('172.18.0.5', '198.51.100.7')).toBe('198.51.100.7');
+    expect(callerAddress('::ffff:172.18.0.5', 'made-up, 198.51.100.7')).toBe('198.51.100.7');
+    expect(callerAddress('fd00::2', ['198.51.100.7'])).toBe('198.51.100.7');
+    expect(callerAddress('127.0.0.1', undefined)).toBe('127.0.0.1');
+    // Straight from the internet the header could be made up, so the connection counts.
+    expect(callerAddress('203.0.113.9', '10.0.0.1')).toBe('203.0.113.9');
+    expect(callerAddress('2001:db8::1', '198.51.100.7')).toBe('2001:db8::1');
+    expect(callerAddress(undefined, '198.51.100.7')).toBe('unknown');
+  });
+
+  it('knows loopback and private ranges', () => {
+    for (const address of ['127.0.0.1', '10.1.2.3', '172.16.0.1', '172.31.255.255', '192.168.1.1', '::1', '::ffff:10.0.0.1', 'fc00::1', 'fd12:3456::1', 'fe80::1']) {
+      expect(privateAddress(address)).toBe(true);
+    }
+    for (const address of ['172.15.0.1', '172.32.0.1', '100.64.0.1', '8.8.8.8', '2001:db8::1', '::ffff:8.8.8.8']) {
+      expect(privateAddress(address)).toBe(false);
+    }
   });
 });

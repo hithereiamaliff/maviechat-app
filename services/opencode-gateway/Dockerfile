@@ -4,8 +4,8 @@ WORKDIR /app
 COPY package.json ./
 COPY src ./src
 COPY bin/maviechat-gateway /usr/local/bin/maviechat-gateway
-RUN chmod 755 /usr/local/bin/maviechat-gateway && mkdir -p /data && chown node:node /data
-ENV NODE_ENV=production PORT=8080 ADMIN_PORT=8081 DATA_DIR=/data
+RUN chmod 755 /usr/local/bin/maviechat-gateway && mkdir -p /data /run/maviechat && chown node:node /data /run/maviechat && chmod 700 /run/maviechat
+ENV NODE_ENV=production PORT=8080 DATA_DIR=/data
 USER node
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD wget -qO- http://127.0.0.1:8080/health > /dev/null || exit 1

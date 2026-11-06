@@ -4,13 +4,31 @@
  *   devices         the paired phones
  *   revoke <id>     unpair one
  */
-const adminUrl = `http://127.0.0.1:${process.env.ADMIN_PORT ?? 8081}`;
+import { request } from 'node:http';
+
+// The gateway's admin socket (server.ts): only its own user can open it.
+const adminSocket = process.env.ADMIN_SOCKET || '/run/maviechat/admin.sock';
 const [command, argument] = process.argv.slice(2);
 
-async function call(method: string, pathname: string): Promise<unknown> {
-  const response = await fetch(`${adminUrl}${pathname}`, { method });
-  if (!response.ok) throw new Error(`the gateway answered ${response.status}`);
-  return response.json();
+function call(method: string, pathname: string): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const asked = request({ socketPath: adminSocket, path: pathname, method }, (response) => {
+      const chunks: Buffer[] = [];
+      response.on('data', (chunk: Buffer) => chunks.push(chunk));
+      response.on('end', () => {
+        const status = response.statusCode ?? 500;
+        if (status >= 400) return reject(new Error(`the gateway answered ${status}`));
+        const text = Buffer.concat(chunks).toString('utf8');
+        try {
+          resolve(text ? JSON.parse(text) : null);
+        } catch (error) {
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
+      });
+    });
+    asked.on('error', reject);
+    asked.end();
+  });
 }
 
 async function main(): Promise<void> {

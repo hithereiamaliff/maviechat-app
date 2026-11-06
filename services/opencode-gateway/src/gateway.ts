@@ -103,6 +103,34 @@ function parseJson(buffer: Buffer): unknown {
   }
 }
 
+/** Loopback and private-network addresses: where a proxy in front of the gateway runs (Docker, a local Caddy or Traefik). */
+export function privateAddress(address: string): boolean {
+  const ip = address.toLowerCase().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/.exec(ip);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  }
+  return ip === '::1' || /^f[cd][0-9a-f]{0,2}:/.test(ip) || /^fe[89ab][0-9a-f]?:/.test(ip);
+}
+
+/**
+ * Who is calling, for the lockouts. A proxy on this machine or a private network puts the address
+ * it saw last in X-Forwarded-For. From anywhere else that header could be made up (to dodge a
+ * lockout, or to lock someone else out), so the connection's own address counts.
+ */
+export function callerAddress(peer: string | undefined, forwardedFor: string | string[] | undefined): string {
+  if (peer && privateAddress(peer)) {
+    const hops = (Array.isArray(forwardedFor) ? forwardedFor.join(',') : (forwardedFor ?? ''))
+      .split(',')
+      .map((hop) => hop.trim())
+      .filter(Boolean);
+    const last = hops.at(-1);
+    if (last) return last;
+  }
+  return peer || 'unknown';
+}
+
 /** How the gateway signs in to one of this machine's OpenCode servers. */
 export const basic = (login: Login) => `Basic ${Buffer.from(`${login.username}:${login.password}`).toString('base64')}`;
 
@@ -124,8 +152,7 @@ export function createGateway(config: GatewayConfig, store: DeviceStore, fetchIm
     const started = now();
     const url = new URL(request.url ?? '/', 'http://gateway');
     const method = request.method ?? 'GET';
-    // Traefik is the only way in, so its X-Forwarded-For names the caller.
-    const ip = String(request.headers['x-forwarded-for'] ?? '').split(',')[0]?.trim() || request.socket.remoteAddress || 'unknown';
+    const ip = callerAddress(request.socket.remoteAddress, request.headers['x-forwarded-for']);
     let label = url.pathname.startsWith('/v1/') ? '/v1/…' : url.pathname;
 
     // Never logs tokens, query strings or message text.
