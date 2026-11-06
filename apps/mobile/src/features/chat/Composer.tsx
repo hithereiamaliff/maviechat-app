@@ -1,10 +1,15 @@
 import {
+  activeTerminal,
   availableToggles,
+  canUseTerminal,
+  chatTerminals,
   saveToolApprovalMode,
   defaultToggles,
   defaultToolIds,
   effectiveToggles,
   filesPending,
+  modelTerminal,
+  terminalLabel,
   usableTools,
   type FeatureToggles,
   type FileItem,
@@ -20,7 +25,7 @@ import { useAnchoredMenu, type MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
 import { DeepTutorPicker } from '@/features/deeptutor/DeepTutorPicker';
 import { describeError } from '@/lib/errors';
-import { useAuthed, useCapabilities, useModels, useServerConfig, useTools, useUserSettings } from '@/lib/server';
+import { useAuthed, useCapabilities, useModels, useServerConfig, useTerminals, useTools, useUserSettings } from '@/lib/server';
 import { useInterface } from '@/lib/uiSettings';
 import { useGrowingInput } from '@/lib/useGrowingInput';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
@@ -32,6 +37,7 @@ import { IntegrationsSheet, TOGGLE_INFO } from './IntegrationsSheet';
 import { MentionMenu } from './MentionMenu';
 import { PromptVariablesSheet } from './PromptVariablesSheet';
 import { QueuedMessages } from './QueuedMessages';
+import { chooseTerminal, terminalAccount, useChosenTerminal } from './terminals';
 import { useAttachments } from './useAttachments';
 import { useInputMenus } from './useInputMenus';
 
@@ -133,7 +139,16 @@ export function Composer({
   const allModels = useModels();
   const atModel = draft.atModel ? allModels.data?.find((item) => item.id === draft.atModel) : undefined;
 
-  const available = capabilities ? availableToggles(capabilities, atModel ?? (models?.length ? models : model)) : NO_TOGGLES;
+  // The system the model works on (the web's terminal menu): offered while a model answering may use one.
+  const terminals = useTerminals();
+  const account = terminalAccount(session.baseUrl, session.user.id);
+  const chosenSystemId = useChosenTerminal(account);
+  const answering = atModel ? [atModel] : models?.length ? models : [model];
+  const systems = answering.some(canUseTerminal) ? chatTerminals(terminals.data ?? [], temporary) : [];
+  const system = activeTerminal(terminals.data ?? [], chosenSystemId, answering, temporary);
+  const offered = capabilities ? availableToggles(capabilities, atModel ?? (models?.length ? models : model)) : NO_TOGGLES;
+  // As on the web, a system and the code interpreter don't go together.
+  const available = system ? { ...offered, codeInterpreter: false } : offered;
   // "Always search the web" (Interface): on for every message where it's available, as on the web.
   const always: ToggleKey[] = ui('webSearch') && available.webSearch ? ['webSearch'] : [];
   const toggles = effectiveToggles(always.length ? { ...draft.toggles, webSearch: true } : draft.toggles, available);
@@ -142,7 +157,7 @@ export function Composer({
   const hasContent = draft.text.trim().length > 0 || draft.files.length > 0;
   const uploading = filesPending(draft.files);
   const canSend = hasContent && !sending && !uploading;
-  const showIntegrations = available.webSearch || available.imageGeneration || available.codeInterpreter || usable.length > 0 || approvalsOn;
+  const showIntegrations = available.webSearch || available.imageGeneration || available.codeInterpreter || usable.length > 0 || approvalsOn || systems.length > 0;
   const canExpand = draft.text.split('\n').length > 2;
   const setText = (text: string) => updateDraft(draftKey, (current) => ({ ...current, text }));
   const field = useGrowingInput(draft.text, setText);
@@ -165,11 +180,12 @@ export function Composer({
   });
 
 
-  // Like the web, a model brings its own default toggles and tools when you start with it.
+  // Like the web, a model brings its own default toggles, tools and system when you start with it.
   const settingsReady = !settings.isPending;
   const toolsReady = !tools.isPending;
+  const terminalsReady = !terminals.isPending;
   useEffect(() => {
-    if (!model || !capabilities || !settingsReady || !toolsReady || getDraft(draftKey).defaultsFor === model.id) return;
+    if (!model || !capabilities || !settingsReady || !toolsReady || !terminalsReady || getDraft(draftKey).defaultsFor === model.id) return;
     const saved = (settings.data?.ui as { tools?: unknown } | null | undefined)?.tools;
     updateDraft(draftKey, (current) => ({
       ...current,
@@ -177,7 +193,9 @@ export function Composer({
       toolIds: defaultToolIds(model, tools.data ?? [], saved),
       defaultsFor: model.id,
     }));
-  }, [draftKey, model, capabilities, settingsReady, toolsReady, settings.data, tools.data]);
+    const preset = modelTerminal(model, terminals.data ?? []);
+    if (preset) chooseTerminal(account, preset);
+  }, [draftKey, model, capabilities, settingsReady, toolsReady, terminalsReady, settings.data, tools.data, terminals.data, account]);
 
   const { ref: plusRef, open: openPlus, menu: plusMenu } = useAnchoredMenu([
     { key: 'files', label: 'Upload Files', icon: 'paper-clip', onPress: () => void attach.pickFiles() },
@@ -195,6 +213,11 @@ export function Composer({
       ...current,
       toolIds: on ? [...current.toolIds.filter((item) => item !== id), id] : current.toolIds.filter((item) => item !== id),
     }));
+  // Choosing a system switches the code interpreter off, as on the web; null stops using one.
+  const pickSystem = (id: string | null) => {
+    chooseTerminal(account, id);
+    if (id) setToggle('codeInterpreter', false);
+  };
   const removeAttachment = (index: number) =>
     updateDraft(draftKey, (current) => {
       const itemId = current.files[index]?.itemId;
@@ -321,6 +344,20 @@ export function Composer({
                 <Text style={[styles.chipCount, { color: palette.onActive }]}>{toolIds.length}</Text>
               </Pressable>
             ) : null}
+            {systems.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={system ? `System: ${terminalLabel(system)}. Change` : 'System: none. Choose one'}
+                onPress={() => setSheetOpen(true)}
+                style={[styles.chip, styles.systemChip, system ? { backgroundColor: palette.active } : { borderWidth: 1, borderColor: palette.border }]}>
+                <Icon name="cloud" size={16} color={system ? palette.onActive : palette.textMuted} />
+                {system ? (
+                  <Text style={[styles.systemName, { color: palette.onActive }]} numberOfLines={1}>
+                    {terminalLabel(system)}
+                  </Text>
+                ) : null}
+              </Pressable>
+            ) : null}
           </ScrollView>
           <Pressable
             accessibilityRole="button"
@@ -383,6 +420,7 @@ export function Composer({
         toolIds={toolIds}
         onToggleTool={setTool}
         approval={approvalsOn ? { mode: approvalMode, onChange: setApprovalMode } : undefined}
+        systems={systems.length > 0 ? { list: systems, chosenId: system?.id ?? null, onChoose: pickSystem } : undefined}
       />
     </View>
   );
@@ -403,6 +441,8 @@ const styles = StyleSheet.create({
   chip: { height: 30, minWidth: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   toolChip: { flexDirection: 'row', gap: 3, paddingHorizontal: 9 },
   chipCount: { fontFamily: fonts.semibold, fontSize: 12 },
+  systemChip: { flexDirection: 'row', gap: 4, paddingHorizontal: 8, maxWidth: 150 },
+  systemName: { fontFamily: fonts.medium, fontSize: 12, flexShrink: 1 },
   model: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, maxWidth: '45%' },
   modelText: { fontFamily: fonts.medium, fontSize: 13, flexShrink: 1 },
   send: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },

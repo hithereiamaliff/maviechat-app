@@ -1,4 +1,5 @@
 import {
+  activeTerminal,
   availableToggles,
   branchPath,
   buildCompletionRequest,
@@ -25,6 +26,7 @@ import {
   type FeatureToggles,
   type FileItem,
   type ModelItem,
+  type TerminalServer,
   type Turn,
 } from '@maviechat/owui-protocol';
 import { useQueryClient } from '@tanstack/react-query';
@@ -35,6 +37,7 @@ import { useLive } from '@/features/live/LiveProvider';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useServerConfig, useSessionUser, useUserSettings } from '@/lib/server';
 import { useSession } from '@/session/SessionProvider';
+import { chosenTerminal, terminalAccount } from './terminals';
 
 interface Extras {
   toggles?: FeatureToggles;
@@ -159,6 +162,8 @@ export function useSendMessage() {
       const chatFiles = job.temporary ? undefined : ((record?.chat?.files as unknown[] | undefined) ?? (job.chatId ? [] : undefined));
       const files = requestFiles(parentId ? branchPath(turn.history, parentId) : [], turn.userMessage, chatFiles);
       const memory = memoryOn(ui, config.data);
+      // The system chosen for chats goes with each message whose model may use it, as on the web.
+      const terminal = activeTerminal(queryClient.getQueryData<TerminalServer[]>(['terminals']) ?? [], chosenTerminal(terminalAccount(session.baseUrl, session.user.id)), [model], job.temporary);
       const body = buildCompletionRequest({
         turn,
         chatId: job.temporary ? temporaryChatId(sessionId) : routeId,
@@ -171,7 +176,10 @@ export function useSendMessage() {
           ? chatFeatures(
               capabilities,
               // "Always search the web" (Interface) counts for every message, follow-ups and queued ones too.
-              effectiveToggles({ ...(job.toggles ?? {}), ...(interfaceOn(ui, 'webSearch') ? { webSearch: true } : {}) }, availableToggles(capabilities, model)),
+              effectiveToggles(
+                { ...(job.toggles ?? {}), ...(interfaceOn(ui, 'webSearch') ? { webSearch: true } : {}), ...(terminal ? { codeInterpreter: false } : {}) },
+                availableToggles(capabilities, model),
+              ),
               memory,
             )
           : { voice: false, image_generation: false, code_interpreter: false, web_search: false },
@@ -185,6 +193,7 @@ export function useSendMessage() {
           followUps: ui.autoFollowUps as boolean | undefined,
         },
         toolIds: job.toolIds,
+        terminalId: terminal?.id,
         files,
         regenerationPrompt: job.regenerationPrompt,
         continueMessageId: job.continueMessageId,

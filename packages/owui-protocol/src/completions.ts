@@ -218,6 +218,8 @@ export interface CompletionRequestInput {
   /** User settings (`ui.title.auto`, `ui.autoTags`, `ui.autoFollowUps`); all default to on. */
   tasks: { title?: boolean; tags?: boolean; followUps?: boolean };
   toolIds?: string[];
+  /** A system the model works on directly (see `activeTerminal`). */
+  terminalId?: string | null;
   files?: unknown[];
   folderId?: string | null;
   /** "Add Details", "More Concise" or your own words: asks for a different take on the reply. */
@@ -244,6 +246,7 @@ export function buildCompletionRequest(input: CompletionRequestInput): Record<st
     params: { ...(input.params ?? {}) },
     ...(input.files && input.files.length > 0 ? { files: input.files } : {}),
     ...(input.toolIds && input.toolIds.length > 0 ? { tool_ids: input.toolIds } : {}),
+    ...(input.terminalId ? { terminal_id: input.terminalId } : {}),
     tool_servers: [],
     features: input.features,
     variables: input.variables,

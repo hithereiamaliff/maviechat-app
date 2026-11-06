@@ -12,6 +12,7 @@ import {
   listPrompts,
   searchKnowledgeBases,
   searchKnowledgeFiles,
+  listTerminals,
 } from '@maviechat/owui-protocol';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
@@ -54,6 +55,12 @@ export function useUserSettings() {
 export function useTools() {
   const { client } = useAuthed();
   return useQuery({ queryKey: ['tools'], queryFn: () => listTools(client), staleTime: 5 * 60_000 });
+}
+
+/** The systems the model can work on for this account (Open WebUI's terminal servers); none when the server has none. */
+export function useTerminals() {
+  const { client } = useAuthed();
+  return useQuery({ queryKey: ['terminals'], queryFn: () => listTerminals(client), staleTime: 60_000 });
 }
 
 /** Server features for this user (flag + permission), once config and session are loaded. */

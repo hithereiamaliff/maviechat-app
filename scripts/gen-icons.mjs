@@ -45,6 +45,7 @@ const ICONS = [
   'circle-stack',
   'clipboard-document',
   'clock',
+  'cloud',
   'code-bracket',
   'cog-6-tooth',
   'command-line',

@@ -112,6 +112,11 @@ describe('buildCompletionRequest', () => {
   it('sends only the system prompt as messages', () => {
     expect(buildCompletionRequest({ ...base, chatId: 'c1', system: '  Be brief.  ' }).messages).toEqual([{ role: 'system', content: 'Be brief.' }]);
   });
+
+  it('names the system the model works on, only when there is one', () => {
+    expect(buildCompletionRequest({ ...base, chatId: 'c1', terminalId: 'box-1' }).terminal_id).toBe('box-1');
+    expect(buildCompletionRequest({ ...base, chatId: 'c1', terminalId: null })).not.toHaveProperty('terminal_id');
+  });
 });
 
 describe('chatFeatures', () => {

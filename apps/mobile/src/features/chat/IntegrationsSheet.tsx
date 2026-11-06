@@ -1,4 +1,4 @@
-import type { FeatureToggles, ToggleKey, ToolItem } from '@maviechat/owui-protocol';
+import { terminalLabel, type FeatureToggles, type TerminalServer, type ToggleKey, type ToolItem } from '@maviechat/owui-protocol';
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
@@ -17,7 +17,10 @@ const APPROVAL_MODES: { value: 'full' | 'ask'; label: string; hint: string; icon
   { value: 'ask', label: 'Ask for approval', hint: 'The reply stops before each tool until you allow or deny it.', icon: 'shield-check' },
 ];
 
-/** The web app's integrations menu as a bottom sheet: web search, image, code interpreter and tools. */
+/**
+ * The web app's integrations menu as a bottom sheet: web search, image, code interpreter, tools,
+ * and the system the model works on (the web's terminal menu).
+ */
 export function IntegrationsSheet({
   visible,
   onClose,
@@ -28,6 +31,7 @@ export function IntegrationsSheet({
   toolIds,
   onToggleTool,
   approval,
+  systems,
   always = [],
 }: {
   visible: boolean;
@@ -40,6 +44,8 @@ export function IntegrationsSheet({
   onToggleTool: (id: string, on: boolean) => void;
   /** Tool permissions, when the server allows them. */
   approval?: { mode: 'full' | 'ask'; onChange: (mode: 'full' | 'ask') => void };
+  /** The systems the model can work on: one at a time, or none. */
+  systems?: { list: TerminalServer[]; chosenId: string | null; onChoose: (id: string | null) => void };
   /** On for every message by your settings ("always search the web"): shown on, not switchable here. */
   always?: ToggleKey[];
 }) {
@@ -90,6 +96,34 @@ export function IntegrationsSheet({
               )}
             </>
           ) : null}
+          {systems && systems.list.length > 0 ? (
+            <>
+              <Text style={[styles.section, { color: palette.textFaint }]}>System</Text>
+              {systems.list.map((terminal) => {
+                const on = systems.chosenId === terminal.id;
+                return (
+                  <Pressable
+                    key={terminal.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: on }}
+                    accessibilityHint={on ? 'Tap again to stop using it' : undefined}
+                    onPress={() => systems.onChoose(on ? null : terminal.id)}
+                    style={styles.row}>
+                    <Icon name="cloud" size={20} color={palette.textMuted} />
+                    <View style={styles.rowText}>
+                      <Text style={[styles.label, { color: palette.text }]} numberOfLines={1}>
+                        {terminalLabel(terminal)}
+                      </Text>
+                    </View>
+                    {on ? <Icon name="check" size={18} color={palette.text} strokeWidth={2} /> : null}
+                  </Pressable>
+                );
+              })}
+              <Text style={[styles.note, { color: palette.textMuted }]}>
+                The model can run commands and work with files on the system you choose. Tap it again to stop. The code interpreter is off while a system is on.
+              </Text>
+            </>
+          ) : null}
           {approval ? (
             <>
               <Text style={[styles.section, { color: palette.textFaint }]}>Tool permissions</Text>
@@ -134,4 +168,5 @@ const styles = StyleSheet.create({
   rowText: { flex: 1, gap: 2 },
   label: { fontFamily: fonts.medium, fontSize: 15 },
   hint: { fontFamily: fonts.regular, fontSize: 13 },
+  note: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18, marginTop: 2 },
 });
