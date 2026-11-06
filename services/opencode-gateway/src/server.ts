@@ -28,8 +28,12 @@ server.headersTimeout = 30_000;
 // Pairing and unpairing, for `maviechat-gateway` only: a socket that only the gateway's own user
 // can open, kept in the container's own files (never in a shared volume or on the network).
 const adminSocket = process.env.ADMIN_SOCKET || '/run/maviechat/admin.sock';
-mkdirSync(path.dirname(adminSocket), { recursive: true, mode: 0o700 });
-rmSync(adminSocket, { force: true });
+try {
+  mkdirSync(path.dirname(adminSocket), { recursive: true, mode: 0o700 });
+  rmSync(adminSocket, { force: true });
+} catch {
+  // Listening then fails, and says so in the log (below).
+}
 const adminServer = createServer((request, response) => {
   admin(request, response).catch(() => response.end());
 });
@@ -43,6 +47,11 @@ const started = () => {
 };
 if (host) server.listen(port, host, started);
 else server.listen(port, started);
+// A socket that can't open (a read-only container without a tmpfs there) turns off pairing from the
+// command line, but never the gateway itself.
+adminServer.on('error', (error: NodeJS.ErrnoException) =>
+  log(`admin socket unavailable (${error.code ?? 'error'}): maviechat-gateway pair, devices and revoke won't work until ${path.dirname(adminSocket)} is writable (in a read-only container, mount a tmpfs there)`),
+);
 adminServer.listen(adminSocket, () => chmodSync(adminSocket, 0o600));
 for (const signal of ['SIGTERM', 'SIGINT'] as const)
   process.on(signal, () => {

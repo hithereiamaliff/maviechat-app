@@ -95,7 +95,7 @@ All settings are environment variables, kept in `.env`.
 | `HOST` | The address to listen on. The example sets `127.0.0.1`; unset means every address, which suits a container on a Docker network. |
 | `PORT` | Default `8080`. |
 | `DATA_DIR` | Where paired phones are stored. Default `/data`. |
-| `ADMIN_SOCKET` | The socket `maviechat-gateway` uses. Default `/run/maviechat/admin.sock`, inside the container, open only to the gateway's own user. |
+| `ADMIN_SOCKET` | The socket `maviechat-gateway` uses. Default `/run/maviechat/admin.sock`, inside the container, open only to the gateway's own user. In a read-only container (`read_only: true`), add `tmpfs: ["/run/maviechat:uid=1000,gid=1000,mode=0700"]` so it can be made; without it the gateway still runs, but pairing from the command line doesn't. |
 
 `DOMAIN` in `.env` is for Caddy only.
 
