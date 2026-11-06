@@ -10,7 +10,7 @@ Each space can hold several accounts. Replies keep going on the server when you 
 
 MavieChat is an independent project by TechMavie Digital. It isn't affiliated with or endorsed by Open WebUI, DeepTutor or OpenCode.
 
-**Status:** in TestFlight; the App Store release is being prepared. `docs/plan.md` has the milestones.
+**Status:** in TestFlight; the App Store release is being prepared.
 
 ## How it's built
 
@@ -53,11 +53,9 @@ npm run bundle
 
 ## Docs
 
-- `docs/plan.md`: the plan and milestones.
 - `docs/protocol.md`: the Open WebUI protocol as MavieChat uses it.
 - `docs/parity.md`: the screen-by-screen checklist against Open WebUI's web app.
 - `docs/deeptutor.md`: DeepTutor in MavieChat.
-- `docs/setup.md`: one-time setup (test account, EAS, TestFlight).
 - `AGENTS.md`: rules for coding agents (clean-room, secrets, server access).
 
 ## Security and licence

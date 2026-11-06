@@ -354,4 +354,3 @@ The server merges these writes: it keeps its own copy of in-progress assistant m
 - The web app assumes an exact version match and reloads on change. Six releases shipped between 2026-10-10 and 2026-10-29.
 - Many compatibility shims exist: dict-shaped `message_ids`, `parent_message`, `new_chat`, the deprecated `/api/chat/completed`, event aliases, history repair (`sanitizeHistory`), and responses without `modelIdx`.
 - No OpenAPI spec in Docker images (`ENV=prod` hides `/docs`), and key endpoints take untyped dicts. Our TypeScript types are hand-written and keep unknown fields.
-

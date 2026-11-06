@@ -12,7 +12,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | `web` | opens Open WebUI in an in-app browser |
 | `—` | out of scope |
 
-`Mn` is the milestone in `docs/plan.md`.
+`Mn` is the development milestone the item belongs to.
 
 **Gating everywhere:** a control shows only if its `config.features.*` flag is on, the user has the permission (admins bypass), and `config.ui.visibility` doesn't hide it. See `docs/protocol.md` §2.
 

@@ -26,4 +26,6 @@ Turns Open WebUI's "chat finished" and "chat failed" events into push notificati
 - `EVENTS_SECRET`: at least 32 URL-safe characters; it is part of the webhook address.
 - `OWUI_URL`: the one Open WebUI server whose users may register.
 - `DATA_DIR`: default `/data`.
+- `DT_URL`, `DT_PUBLIC_URL` (optional, both or neither): DeepTutor as the relay reaches it (for example `http://deeptutor:3782` on a shared Docker network) and as the app knows it (`https://learn.techmavie.digital`). Without them, DeepTutor watching is off.
 
+Logs never contain the secret, tokens or message text.
