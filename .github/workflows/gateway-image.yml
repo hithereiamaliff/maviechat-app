@@ -1,35 +1,21 @@
-# Tests, then the multi-platform image at ghcr.io/<owner>/maviechat-gateway:
-# "latest" from main, version tags from v* tags, and a sha tag for every build.
-name: Image
+# The OpenCode gateway's Docker image, ghcr.io/<owner>/maviechat-gateway (amd64 and arm64):
+# "latest" from main, a version from gateway-v* tags, and a sha tag for every build.
+# It builds only while the repository is public, so the image can be public too.
+name: Gateway image
 
 on:
   push:
     branches: [main]
-    tags: ['v*']
-  pull_request:
+    paths: ['services/opencode-gateway/**', '.github/workflows/gateway-image.yml']
+    tags: ['gateway-v*']
 
 concurrency:
-  group: image-${{ github.ref }}
+  group: gateway-image-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npm run typecheck
-
   image:
-    needs: test
-    if: github.event_name == 'push'
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -49,12 +35,11 @@ jobs:
           images: ghcr.io/${{ github.repository_owner }}/maviechat-gateway
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=match,pattern=gateway-v(.*),group=1
             type=sha
       - uses: docker/build-push-action@v6
         with:
-          context: .
+          context: services/opencode-gateway
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

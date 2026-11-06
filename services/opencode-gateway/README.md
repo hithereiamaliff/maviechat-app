@@ -52,11 +52,11 @@ MavieChat and this gateway are independent of OpenCode and its makers.
 
 ## 2. Run the gateway
 
-1. Make a folder for it and download three files from this repository:
+1. Make a folder for it and download three files from this folder of the MavieChat repository:
 
    ```bash
    mkdir -p ~/maviechat-gateway && cd ~/maviechat-gateway
-   base=https://raw.githubusercontent.com/hithereiamaliff/maviechat-gateway/main
+   base=https://raw.githubusercontent.com/hithereiamaliff/maviechat-app/main/services/opencode-gateway
    curl -fsSLo compose.yaml "$base/compose.example.yaml"
    curl -fsSLo Caddyfile "$base/Caddyfile"
    curl -fsSLo .env "$base/.env.example"
@@ -129,19 +129,19 @@ Paired phones stay paired: they're kept in the `gateway-data` volume.
 
 ## Building and testing
 
-Node 24 runs the TypeScript directly, and there are no runtime packages.
+Node 24 runs the TypeScript directly, and there are no runtime packages. From the repository's root:
 
 ```bash
 npm install
 npm test
 npm run typecheck
-docker build -t maviechat-gateway .
+docker build -t maviechat-gateway services/opencode-gateway
 ```
 
 ## Reporting a security problem
 
-Please use this repository's private vulnerability reporting (Security, then Report a vulnerability) rather than a public issue.
+See [SECURITY.md](../../SECURITY.md): please report privately rather than in a public issue.
 
 ## Licence
 
-See [LICENSE](LICENSE).
+See [LICENSE](../../LICENSE).
