@@ -4,9 +4,10 @@ import { useSyncExternalStore } from 'react';
 
 /*
  * Settings kept on this iPhone rather than with an account: the Read Aloud voice (voices differ
- * from device to device, so one picked here means nothing to a browser), and DeepTutor's Read Aloud
- * speed and auto-playback (DeepTutor keeps no such settings of its own). Open WebUI's speed and
- * auto-playback are saved with your Open WebUI account, as on the web.
+ * from device to device, so one picked here means nothing to a browser), DeepTutor's Read Aloud
+ * speed and auto-playback (DeepTutor keeps no such settings of its own), and whether Notes shows
+ * as a list or a grid (the web keeps that per browser). Open WebUI's speed and auto-playback are
+ * saved with your Open WebUI account, as on the web.
  */
 
 export interface ChosenVoice {
@@ -21,10 +22,12 @@ export interface DevicePrefs {
   voice: ChosenVoice | null;
   deepTutorRate: number;
   deepTutorAutoPlay: boolean;
+  /** Notes as cards in a grid rather than a list. */
+  notesGrid: boolean;
 }
 
 const KEY = 'maviechat.device-prefs';
-const DEFAULTS: DevicePrefs = { voice: null, deepTutorRate: 1, deepTutorAutoPlay: false };
+const DEFAULTS: DevicePrefs = { voice: null, deepTutorRate: 1, deepTutorAutoPlay: false, notesGrid: false };
 const options: SecureStore.SecureStoreOptions = { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY };
 
 let prefs: DevicePrefs = DEFAULTS;
@@ -39,7 +42,7 @@ function parse(raw: string | null): DevicePrefs {
     const value = JSON.parse(raw) as Partial<DevicePrefs>;
     const voice = value.voice && typeof value.voice.identifier === 'string' && typeof value.voice.language === 'string' ? { identifier: value.voice.identifier, name: String(value.voice.name ?? ''), language: value.voice.language } : null;
     const rate = Number(value.deepTutorRate);
-    return { voice, deepTutorRate: Number.isFinite(rate) && rate > 0 ? rate : 1, deepTutorAutoPlay: value.deepTutorAutoPlay === true };
+    return { voice, deepTutorRate: Number.isFinite(rate) && rate > 0 ? rate : 1, deepTutorAutoPlay: value.deepTutorAutoPlay === true, notesGrid: value.notesGrid === true };
   } catch {
     return DEFAULTS;
   }
