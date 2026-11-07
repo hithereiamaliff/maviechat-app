@@ -6,10 +6,26 @@ import { escapeHtml } from './html';
  * new line is a line break), GitHub tables and strikethrough, and checklists as the editor's own
  * task lists (`<ul data-type="taskList">` with `<li data-type="taskItem" data-checked="…">`), the
  * shape the web makes from Markdown itself. Raw HTML is shown as text, except underline and line
- * breaks, which the web writes into a note's Markdown; links keep only web and mail addresses.
+ * breaks, which the web writes into a note's Markdown; links keep only web and mail addresses, and
+ * the server's own file links: a picture as `![name](/api/v1/files/…/content)`, and an attached
+ * file as a link of its own on a line, which 0.12's editor shows as an attachment
+ * (`<div data-file-id>`, its shape for one).
  */
 
 const KEPT_HTML = /^(<\/?u>|<br\s*\/?>)$/i;
+const FILE_LINK = /^\/api\/v1\/files\/([\w-]+)\/content$/;
+
+/** A paragraph that holds only file links (one a line): the file ids and names, else null. */
+function attachmentsOnly(tokens: Tokens.Generic[]): { id: string; name: string }[] | null {
+  const files: { id: string; name: string }[] = [];
+  for (const token of tokens) {
+    if (token.type === 'br' || (token.type === 'text' && !token.raw.trim())) continue;
+    const id = token.type === 'link' ? FILE_LINK.exec(String(token.href))?.[1] : undefined;
+    if (!id) return null;
+    files.push({ id, name: String(token.text) });
+  }
+  return files.length ? files : null;
+}
 
 const notes = new Marked({ gfm: true, breaks: true });
 notes.use({
@@ -29,9 +45,14 @@ notes.use({
     checkbox() {
       return '';
     },
+    paragraph(token: Tokens.Paragraph) {
+      const files = attachmentsOnly(token.tokens);
+      if (!files) return false;
+      return files.map((file) => `<div data-file-id="${escapeHtml(file.id)}" data-file-size="0"><a href="/api/v1/files/${escapeHtml(file.id)}/content">${escapeHtml(file.name)}</a></div>\n`).join('');
+    },
   },
   walkTokens(token) {
-    if ((token.type === 'link' || token.type === 'image') && !/^(https?:|mailto:|data:image\/)/i.test(token.href)) token.href = '';
+    if ((token.type === 'link' || token.type === 'image') && !/^(https?:|mailto:|data:image\/)/i.test(token.href) && !FILE_LINK.test(token.href)) token.href = '';
   },
 });
 

@@ -23,4 +23,13 @@ describe('a note as the web’s editor loads it', () => {
     expect(noteHtml('```js\nlet x = 1;\n```')).toBe('<pre><code class="language-js">let x = 1;\n</code></pre>\n');
     expect(noteHtml('[site](https://example.com) [bad](javascript:alert(1))')).toBe('<p><a href="https://example.com">site</a> <a href="">bad</a></p>\n');
   });
+
+  it('keeps the server’s file links: a picture inline, a file on its own line as an attachment', () => {
+    expect(noteHtml('![photo.jpg](/api/v1/files/ab-12/content)')).toBe('<p><img src="/api/v1/files/ab-12/content" alt="photo.jpg"></p>\n');
+    expect(noteHtml('[report.pdf](/api/v1/files/f-1/content)\n[memo.m4a](/api/v1/files/f-2/content)')).toBe(
+      '<div data-file-id="f-1" data-file-size="0"><a href="/api/v1/files/f-1/content">report.pdf</a></div>\n<div data-file-id="f-2" data-file-size="0"><a href="/api/v1/files/f-2/content">memo.m4a</a></div>\n',
+    );
+    expect(noteHtml('see [the report](/api/v1/files/f-1/content) here')).toBe('<p>see <a href="/api/v1/files/f-1/content">the report</a> here</p>\n');
+    expect(noteHtml('[x](/api/v1/files/../secret)')).toBe('<p><a href="">x</a></p>\n');
+  });
 });

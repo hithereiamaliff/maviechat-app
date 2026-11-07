@@ -33,7 +33,7 @@
  * `--models` tries the Workspace models slice on private probe models only: a model's terminal and
  * voice, the "… All" actions, import (three export formats; a taken id refused), Keep in Sidebar and
  * custom parameters in your settings (put back as they were); all deleted after (src/models-probe.ts).
- * `--notes` makes a probe note the app's way (Markdown and the web editor's HTML), finds it, saves it
+ * `--notes` asks a model for a note title (one short completion), makes a probe note the app's way (Markdown and the web editor's HTML), finds it, saves it
  * while a socket follows it (the note event and its time), renames, pins, keeps its sharing through
  * a save, and deletes it (src/notes-probe.ts).
  * `--a8` saves settings the app's way and puts them back exactly (src/a8-probe.ts), then tries
@@ -434,7 +434,7 @@ async function main() {
       }
 
       if (args.notes && capabilities) {
-        const notesProbe = await probeNotes({ client, baseUrl, token: session.token, userId: session.id, capabilities });
+        const notesProbe = await probeNotes({ client, baseUrl, token: session.token, userId: session.id, capabilities, modelId: typeof firstModelId === 'string' ? firstModelId : undefined });
         for (const result of notesProbe.steps) results.push({ ...result, name: `Notes: ${result.name}` });
         fixtures['write.notes'] = notesProbe.fixture;
       }

@@ -1,7 +1,6 @@
 import {
   attachWebAddress,
   fileItemFromUpload,
-  fitWithin,
   imageLimits,
   inlineImageItem,
   isWebAddress,
@@ -29,6 +28,7 @@ import { useInterface } from '@/lib/uiSettings';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
 import { isPhoto, photo, PHOTO_OPTIONS, readAsDataUrl, type Picked } from '@/lib/pickedFiles';
+import { shrinkPhoto } from '@/lib/shrinkPhoto';
 import { uploadPart } from '@/lib/uploadPart';
 import { getDraft, patchFile, removeFile, updateDraft } from './drafts';
 
@@ -48,23 +48,8 @@ export function useAttachments({ draftKey, model, temporary }: { draftKey: strin
   const settings = useUserSettings();
   const picture = usePictureMaker();
 
-  // As the web does before sending a photo: shrunk to your "Image Compression" size, capped by the
-  // admin's limits, keeping its shape. If that fails, the photo goes as it is.
-  const shrink = async (file: Picked): Promise<Picked> => {
-    const limits = imageLimits(settings.data?.ui, config.data);
-    const target = limits && file.width && file.height ? fitWithin(file.width, file.height, limits) : null;
-    if (!target) return file;
-    try {
-      const smaller = await picture.maker.fit(await readAsDataUrl(file.uri, file.mimeType ?? 'image/jpeg'), target.width, target.height);
-      const name = `${file.name.replace(/\.[^.]+$/, '')}.jpg`;
-      const out = new File(Paths.cache, `shrunk-${uuidv4().slice(0, 8)}-${name}`);
-      out.create({ overwrite: true });
-      await out.write(smaller.replace(/^data:[^,]*,/, ''), { encoding: 'base64' });
-      return { ...file, uri: out.uri, name, size: out.size ?? undefined, mimeType: 'image/jpeg', width: target.width, height: target.height };
-    } catch {
-      return file;
-    }
-  };
+  // As the web does before sending a photo: shrunk to your "Image Compression" size, capped by the admin's limits.
+  const shrink = (file: Picked) => shrinkPhoto(file, imageLimits(settings.data?.ui, config.data), picture.maker);
 
   const upload = async (file: Picked, image: boolean) => {
     const itemId = uuidv4();

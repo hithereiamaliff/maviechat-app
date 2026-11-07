@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyFormat, noteCounts, toggleTask } from './formatting';
+import { applyFormat, insertBlock, noteCounts, toggleTask } from './formatting';
 
 const at = (start: number, end = start) => ({ start, end });
 
@@ -61,5 +61,14 @@ describe('the note editor’s formatting bar', () => {
   it('counts words and characters without the marks', () => {
     expect(noteCounts('# Shopping\n\n- [ ] **milk** and [eggs](https://x.test)')).toEqual({ words: 4, characters: 21 });
     expect(noteCounts('')).toEqual({ words: 0, characters: 0 });
+  });
+
+  it('puts a block on lines of its own after the cursor’s line, with blank lines around it', () => {
+    expect(insertBlock('', 0, '![p](/x)')).toEqual({ text: '![p](/x)', selection: at(8) });
+    expect(insertBlock('hello world', 3, 'B')).toEqual({ text: 'hello world\n\nB', selection: at(14) });
+    expect(insertBlock('one\ntwo', 1, 'B')).toEqual({ text: 'one\n\nB\n\ntwo', selection: at(6) });
+    expect(insertBlock('one\n\ntwo', 4, 'B').text).toBe('one\n\nB\n\ntwo');
+    const first = insertBlock('a', 1, 'B');
+    expect(insertBlock(first.text, first.selection.start, 'C').text).toBe('a\n\nB\n\nC');
   });
 });

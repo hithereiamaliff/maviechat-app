@@ -194,6 +194,8 @@ export function useSendMessage() {
           tags: ui.autoTags as boolean | undefined,
           followUps: ui.autoFollowUps as boolean | undefined,
         },
+        // A saved chat with nothing in it yet (a note's chat, which the server makes empty) is named after its first message.
+        firstMessage: Boolean(job.chatId) && !job.temporary && parentId === null && Object.keys(record?.chat?.history?.messages ?? {}).length === 0,
         toolIds: job.toolIds,
         skillIds: job.skillIds,
         filterIds: job.filterIds,

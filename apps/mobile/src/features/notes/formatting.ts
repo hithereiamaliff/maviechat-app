@@ -155,3 +155,18 @@ export function noteCounts(md: string): { words: number; characters: number } {
   const words = plain.match(/[\p{L}\p{N}][\p{L}\p{N}'’_-]*/gu)?.length ?? 0;
   return { words, characters: plain.replace(/\n/g, '').length };
 }
+
+/**
+ * A block (a picture, an attached file, a reply from the note's chat) on lines of its own after
+ * the line the cursor is on, with a blank line around it; the cursor goes after it.
+ */
+export function insertBlock(text: string, at: number, block: string): Edit {
+  const lineEnd = text.indexOf('\n', Math.max(0, Math.min(at, text.length)));
+  const position = lineEnd === -1 ? text.length : lineEnd;
+  const before = text.slice(0, position);
+  const after = text.slice(position);
+  const lead = !before || before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+  const tail = !after || after.startsWith('\n\n') ? '' : after.startsWith('\n') ? '\n' : '\n\n';
+  const cursor = before.length + lead.length + block.length;
+  return { text: `${before}${lead}${block}${tail}${after}`, selection: { start: cursor, end: cursor } };
+}

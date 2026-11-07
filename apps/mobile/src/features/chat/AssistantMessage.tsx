@@ -74,6 +74,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   onAction,
   onApprove,
   onQuote,
+  onInsert,
 }: {
   message: HistoryMessage;
   modelLabel: string;
@@ -100,6 +101,8 @@ export const AssistantMessage = memo(function AssistantMessage({
   onApprove?: (callId: string, approve: boolean) => Promise<void>;
   /** Puts a prompt in the message box (Select Text's Ask, Explain and your own actions). */
   onQuote?: (prompt: string) => void;
+  /** A note's chat: puts this reply's text into the note (the web's Insert). */
+  onInsert?: () => void;
 }) {
   const palette = usePalette();
   const toast = useToast();
@@ -259,6 +262,12 @@ export const AssistantMessage = memo(function AssistantMessage({
         // The web's order; on a narrow phone the row scrolls sideways.
         <SideScroll showsHorizontalScrollIndicator={false} style={styles.actionsScroll} contentContainerStyle={styles.actions}>
           <BranchNav index={branch.index} count={branch.count} onStep={onStep} />
+          {onInsert ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Insert into note" hitSlop={4} onPress={onInsert} style={[styles.insert, { borderColor: palette.border }]}>
+              <Icon name="document-text" size={15} color={palette.textMuted} />
+              <Text style={[styles.insertText, { color: palette.textMuted }]}>Insert</Text>
+            </Pressable>
+          ) : null}
           {onEdit ? <IconButton icon="pencil" label="Edit" size={18} color={palette.textMuted} onPress={onEdit} /> : null}
           <IconButton
             icon="clipboard-document"
@@ -366,6 +375,8 @@ const styles = StyleSheet.create({
   actionsScroll: { marginTop: 4, marginLeft: -8, marginRight: -16 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingRight: 16 },
   actionButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  insert: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 28, paddingHorizontal: 8, marginHorizontal: 4, borderWidth: StyleSheet.hairlineWidth, borderRadius: 14 },
+  insertText: { fontFamily: fonts.medium, fontSize: 13 },
   actionIcon: { width: 18, height: 18 },
   followUps: { marginTop: 10, gap: 6 },
   followUpTitle: { fontFamily: fonts.medium, fontSize: 13 },

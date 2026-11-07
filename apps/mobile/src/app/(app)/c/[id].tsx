@@ -8,6 +8,7 @@ import {
   contextUsageLabel,
   createChat,
   forkChat,
+  getNoteChat,
   isTemporaryChatId,
   listChatTasks,
   messageBlocks,
@@ -15,6 +16,9 @@ import {
   mergeResponses,
   modelActions,
   newestLeaf,
+  newNoteChat,
+  NOTE_CHAT_PROMPTS,
+  listNoteChats,
   outputText,
   OwuiHttpError,
   pendingAskUser,
@@ -26,6 +30,7 @@ import {
   speechRate,
   updateChatControls,
   uuidv4,
+  withNoteSelection,
   type ChatRecord,
   type FileItem,
   type HistoryMessage,
@@ -37,9 +42,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { BackHeader } from '@/components/BackHeader';
 import { Button } from '@/components/Button';
+import { showActionSheet } from '@/components/dialogs';
+import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
@@ -63,6 +71,7 @@ import { useSendMessage } from '@/features/chat/useSendMessage';
 import { useChatActions } from '@/features/chats/useChatActions';
 import { sendChatToDeepTutor } from '@/features/deeptutor/crossReference';
 import { useLive } from '@/features/live/LiveProvider';
+import { insertIntoNote, noteSelection } from '@/features/notes/noteChatLink';
 import { useCodeRunner } from '@/features/python/useCodeRunner';
 import { useAutoReadAloud } from '@/lib/autoReadAloud';
 import { describeError } from '@/lib/errors';
@@ -82,8 +91,12 @@ const COMPACT_SKIPPED: Record<string, string> = {
 
 export default function ChatScreen() {
   const palette = usePalette();
-  const params = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams<{ id: string; note?: string; ask?: string }>();
   const chatId = Array.isArray(params.id) ? (params.id[0] ?? '') : (params.id ?? '');
+  // A note's chat (opened from the note): the server gives its model the note to read and rewrite.
+  const noteId = typeof params.note === 'string' && params.note ? params.note : null;
+  // The note's Enhance: its prompt goes out once the chat is ready.
+  const ask = noteId && params.ask === 'enhance' ? NOTE_CHAT_PROMPTS[0] : null;
   const temporary = isTemporaryChatId(chatId);
   const { client, session } = useAuthed();
   const queryClient = useQueryClient();
@@ -124,7 +137,18 @@ export default function ChatScreen() {
     [artifacts],
   );
   const pinned = chat?.pinned === true;
-  const toNewChat = () => router.replace('/');
+  // The text you had selected in the note goes with each message, as on the web, until you drop it.
+  const [fromNote, setFromNote] = useState(() => (noteId ? noteSelection(noteId) : ''));
+  const withSelection = (text: string) => (noteId ? withNoteSelection(text, fromNote) : text);
+  const openNoteChat = (id: string) => router.replace({ pathname: '/c/[id]', params: { id, ...(noteId ? { note: noteId } : {}) } });
+  // In a note's chat, after a delete (or with none to show): the note's latest chat, or a new one.
+  const toNewChat = () => {
+    if (!noteId) return router.replace('/');
+    void getNoteChat(client, noteId).then(
+      (next) => openNoteChat(next.id),
+      () => router.back(),
+    );
+  };
   // Open WebUI → DeepTutor: a copy of the shown branch goes into DeepTutor's "From MavieChat" notebook.
   const sendToDeepTutor = async () => {
     const dtClient = deepTutor.client;
@@ -167,6 +191,44 @@ export default function ChatScreen() {
         ]
       : []) satisfies MenuItem[]),
   ];
+
+  const pickNoteChat = async () => {
+    if (!noteId) return;
+    try {
+      const chats = await listNoteChats(client, noteId);
+      const options = [...chats.map((item) => `${item.id === chatId ? '✓ ' : ''}${item.title || 'Chat'} · ${new Date(item.updated_at * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`), 'Cancel'];
+      showActionSheet({ title: 'Chats About the Note', options, cancelButtonIndex: options.length - 1 }, (index) => {
+        const picked = chats[index];
+        if (picked && picked.id !== chatId) openNoteChat(picked.id);
+      });
+    } catch (error) {
+      toast(`Couldn't list the note's chats: ${describeError(error)}`, 'error');
+    }
+  };
+  const noteMenu: MenuItem[] = noteId
+    ? [
+        ...(messages.length > 1 ? [{ key: 'top', label: 'Scroll to Top', icon: 'arrow-up' as const, onPress: () => list.current?.scrollToTop() }] : []),
+        ...(artifacts.length ? [{ key: 'artifacts', label: 'Artifacts', icon: 'cube' as const, onPress: () => setArtifactAt(artifacts.length - 1) }] : []),
+        {
+          key: 'new',
+          label: 'New Chat About the Note',
+          icon: 'plus',
+          onPress: () =>
+            void newNoteChat(client, noteId).then(
+              (next) => openNoteChat(next.id),
+              (error: unknown) => toast(`Couldn't start a chat: ${describeError(error)}`, 'error'),
+            ),
+        },
+        { key: 'earlier', label: 'Chats About the Note…', icon: 'clock', onPress: () => void pickNoteChat() },
+        ...(chat
+          ? [
+              { key: 'rename', label: 'Rename', icon: 'pencil' as const, onPress: () => actions.rename(ref) },
+              { key: 'copy', label: 'Copy', icon: 'clipboard-document' as const, onPress: () => void actions.copy(ref) },
+              ...(actions.canDelete ? [{ key: 'delete', label: 'Delete', icon: 'trash' as const, destructive: true, onPress: () => actions.remove(ref, toNewChat) }] : []),
+            ]
+          : []),
+      ]
+    : [];
 
   // Controls: the cached chat changes at once; a saved chat is saved too (the server patches only these keys).
   const saveControls = (changes: ControlChanges) => {
@@ -273,7 +335,7 @@ export default function ChatScreen() {
   const deliver = async ({ text, files, toggles, toolIds, skillIds, filterIds, atModelId }: OutgoingMessage, parentId: string | null) => {
     const target = targets(atModelId);
     if (!target.model) return false;
-    const result = await send({ chatId, parentId, content: text, files, model: target.model, models: target.models, toggles, toolIds, skillIds, filterIds });
+    const result = await send({ chatId, parentId, content: withSelection(text), files, model: target.model, models: target.models, toggles, toolIds, skillIds, filterIds });
     if (result) select(result.replyId);
     return Boolean(result);
   };
@@ -368,7 +430,7 @@ export default function ChatScreen() {
     const at = atModel ? models.data?.find((item) => item.id === atModel) : undefined;
     const target = at ? { model: at, models: [at] } : { model, models: selected };
     if (!target.model) return;
-    void send({ chatId, parentId: lastId, content: prompt, files, model: target.model, models: target.models, toggles, toolIds, skillIds, filterIds })
+    void send({ chatId, parentId: lastId, content: noteId ? withNoteSelection(prompt, fromNote) : prompt, files, model: target.model, models: target.models, toggles, toolIds, skillIds, filterIds })
       .then((result) => {
         if (result) {
           select(result.replyId);
@@ -380,7 +442,7 @@ export default function ChatScreen() {
       .finally(() => {
         busy.current = false;
       });
-  }, [streaming, queue, model, selected, models.data, chat, chatId, lastId, send, select]);
+  }, [streaming, queue, model, selected, models.data, chat, chatId, lastId, send, select, noteId, fromNote]);
 
   const sendQueuedNow = async (id: string) => {
     const item = getDraft(chatId).queue.find((entry) => entry.id === id);
@@ -427,6 +489,13 @@ export default function ChatScreen() {
   useEffect(() => {
     sendRef.current = onSend;
   });
+  const asked = useRef(false);
+  useEffect(() => {
+    if (!ask || asked.current || !chat || !model || streaming) return;
+    asked.current = true;
+    const { toggles, toolIds, skillIds, filterIds } = getDraft(chatId);
+    void sendRef.current({ text: ask, files: [], toggles, toolIds, skillIds, filterIds });
+  }, [ask, chat, model, streaming, chatId]);
   const embedActions = useMemo<EmbedActions>(() => {
     const confirmSend = (text: string, files: FileItem[], afterSend?: () => void) =>
       Alert.alert('Send this message?', `The tool's content asks to send:\n\n${text.length > 600 ? `${text.slice(0, 600)}…` : text}`, [
@@ -495,10 +564,18 @@ export default function ChatScreen() {
       resolveApproval: temporary ? undefined : (reply, callId, approve) => resolveRef.current(reply.id, callId, approve ? 'approve' : 'reject'),
       // As the web's Ask and Explain do: the prompt replaces what's in the message box, for you to send.
       quote: (prompt) => updateDraft(chatId, (draft) => ({ ...draft, text: prompt })),
+      insertIntoNote: noteId
+        ? (reply) => {
+            const text = plainText(messageBlocks(reply)).trim();
+            if (!text) return;
+            if (insertIntoNote(noteId, text)) toast('Inserted into the note');
+            else toast('The note isn’t open here to insert into. Copy the reply instead.', 'error');
+          }
+        : undefined,
       canDeleteMessage: messageActions.canDeleteMessage,
       canDeleteReply: messageActions.canDeleteReply,
     };
-  }, [chatId, models.data, model, selected, messageActions, send, regenerate, continueReply, select, streaming, messages, temporary]);
+  }, [chatId, models.data, model, selected, messageActions, send, regenerate, continueReply, select, streaming, messages, temporary, noteId, toast]);
 
   // "Merge Responses": a model combines the shown answers; the result streams in and is kept on the shown reply.
   const [mergingId, setMergingId] = useState<string | null>(null);
@@ -545,18 +622,27 @@ export default function ChatScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
       {background ? <ChatBackground uri={background} /> : null}
-      <ChatHeader
-        title={temporary ? 'Temporary Chat' : chat?.title}
-        menu={menu}
-        accessory={
-          chat ? (
-            <>
-              {canSaveTemporary ? <IconButton icon="archive-box-arrow-down" label="Save Chat" onPress={() => void saveTemporary()} /> : null}
-              <IconButton icon="adjustments-horizontal" label="Controls" onPress={() => setControlsOpen(true)} />
-            </>
-          ) : null
-        }
-      />
+      {noteId ? (
+        <BackHeader
+          title={chat?.title && chat.title !== 'Chat' ? chat.title : 'Chat About the Note'}
+          fallback="/notes"
+          menu={noteMenu}
+          accessory={chat ? <IconButton icon="adjustments-horizontal" label="Controls" onPress={() => setControlsOpen(true)} /> : null}
+        />
+      ) : (
+        <ChatHeader
+          title={temporary ? 'Temporary Chat' : chat?.title}
+          menu={menu}
+          accessory={
+            chat ? (
+              <>
+                {canSaveTemporary ? <IconButton icon="archive-box-arrow-down" label="Save Chat" onPress={() => void saveTemporary()} /> : null}
+                <IconButton icon="adjustments-horizontal" label="Controls" onPress={() => setControlsOpen(true)} />
+              </>
+            ) : null
+          }
+        />
+      )}
       <KeyboardAvoidingView behavior="padding" style={styles.screen}>
         {query.isLoading ? (
           <ActivityIndicator style={styles.center} color={palette.textMuted} />
@@ -622,6 +708,33 @@ export default function ChatScreen() {
             />
           </View>
         ) : null}
+        {noteId && chat && messages.length === 0 && !streaming ? (
+          <View style={styles.suggestions}>
+            <Text style={[styles.suggestTitle, { color: palette.textMuted }]}>Suggested prompts</Text>
+            {NOTE_CHAT_PROMPTS.filter((prompt) => fromNote || prompt !== NOTE_CHAT_PROMPTS[3]).map((prompt) => (
+              <Pressable
+                key={prompt}
+                accessibilityRole="button"
+                onPress={() => {
+                  const { toggles, toolIds, skillIds, filterIds } = getDraft(chatId);
+                  void onSend({ text: prompt, files: [], toggles, toolIds, skillIds, filterIds });
+                }}
+                style={({ pressed }) => [styles.suggestion, { borderColor: palette.border }, pressed && { backgroundColor: palette.surface }]}>
+                <Text style={[styles.suggestText, { color: palette.text }]}>{prompt}</Text>
+                <Icon name="arrow-up" size={14} color={palette.textMuted} />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        {noteId && fromNote ? (
+          <View style={[styles.selection, { borderColor: palette.border, backgroundColor: palette.surface }]}>
+            <Icon name="cursor-arrow-rays" size={16} color={palette.textMuted} />
+            <Text style={[styles.selectionText, { color: palette.textMuted }]} numberOfLines={2}>
+              {`Goes with your messages: “${fromNote.trim()}”`}
+            </Text>
+            <IconButton icon="x-mark" label="Don’t send the text you selected" size={16} color={palette.textMuted} onPress={() => setFromNote('')} />
+          </View>
+        ) : null}
         {query.isError || notFound ? null : (
           <Composer
             draftKey={chatId}
@@ -634,7 +747,7 @@ export default function ChatScreen() {
             onSendQueued={(id) => void sendQueuedNow(id)}
             streaming={streaming}
             temporary={temporary}
-            onFork={chat && !temporary && actions.canClone ? () => void fork() : undefined}
+            onFork={chat && !temporary && actions.canClone && !noteId ? () => void fork() : undefined}
             onCompact={chat && !temporary && compactionOn ? () => void compact() : undefined}
             onStatus={history?.currentId ? () => void showStatus() : undefined}
           />
@@ -671,4 +784,10 @@ const styles = StyleSheet.create({
   message: { fontFamily: fonts.regular, fontSize: 15, textAlign: 'center' },
   retry: { alignSelf: 'stretch' },
   asking: { paddingHorizontal: 12, paddingTop: 6 },
+  suggestions: { paddingHorizontal: 16, paddingBottom: 8, gap: 6 },
+  suggestTitle: { fontFamily: fonts.medium, fontSize: 12 },
+  suggestion: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12 },
+  suggestText: { flex: 1, fontFamily: fonts.regular, fontSize: 14 },
+  selection: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 12, marginBottom: 6, paddingLeft: 10, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12 },
+  selectionText: { flex: 1, fontFamily: fonts.regular, fontSize: 13, paddingVertical: 6 },
 });

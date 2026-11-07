@@ -109,6 +109,12 @@ describe('buildCompletionRequest', () => {
     expect(body.background_tasks).toEqual({ title_generation: true, tags_generation: true, follow_up_generation: false });
   });
 
+  it('asks for a title and tags for the first message of a chat made empty (a note’s chat)', () => {
+    const body = buildCompletionRequest({ ...base, chatId: 'c1', firstMessage: true, tasks: {} });
+    expect(body.chat_id).toBe('c1');
+    expect(body.background_tasks).toEqual({ title_generation: true, tags_generation: true, follow_up_generation: true });
+  });
+
   it('sends only the system prompt as messages', () => {
     expect(buildCompletionRequest({ ...base, chatId: 'c1', system: '  Be brief.  ' }).messages).toEqual([{ role: 'system', content: 'Be brief.' }]);
   });

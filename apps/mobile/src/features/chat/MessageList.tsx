@@ -47,6 +47,8 @@ export interface MessageActions {
   resolveApproval?: (reply: HistoryMessage, callId: string, approve: boolean) => Promise<void>;
   /** Puts a prompt in the message box (a reply's Select Text: Ask, Explain and your own actions). */
   quote?: (prompt: string) => void;
+  /** A note's chat: puts the reply's text into the note (the web's Insert). */
+  insertIntoNote?: (reply: HistoryMessage) => void;
   canDeleteMessage: boolean;
   canDeleteReply: boolean;
 }
@@ -201,6 +203,7 @@ export function MessageList({
               onAction={runAction ? (action) => runAction(message, action) : undefined}
               onApprove={actions.resolveApproval ? (callId, approve) => actions.resolveApproval!(message, callId, approve) : undefined}
               onQuote={actions.quote}
+              onInsert={actions.insertIntoNote ? () => actions.insertIntoNote?.(message) : undefined}
             />
           );
           const groups = item.role === 'assistant' && history ? replyGroups(history, item.id) : null;

@@ -1,12 +1,13 @@
 import { router, type Href } from 'expo-router';
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconButton } from '@/components/IconButton';
 import { MenuButton, type MenuItem } from '@/components/Menu';
 import { fonts, usePalette } from '@/theme';
 
-/** A pushed screen's top bar: back (to `fallback` when there's nothing to go back to), its title, and its menu. */
-export function BackHeader({ title, fallback, menu, menuLabel = 'Options' }: { title: string; fallback: Href; menu?: MenuItem[]; menuLabel?: string }) {
+/** A pushed screen's top bar: back (to `fallback` when there's nothing to go back to), its title, buttons of its own, and its menu. */
+export function BackHeader({ title, fallback, menu, menuLabel = 'Options', accessory }: { title: string; fallback: Href; menu?: MenuItem[]; menuLabel?: string; accessory?: ReactNode }) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
   return (
@@ -15,6 +16,7 @@ export function BackHeader({ title, fallback, menu, menuLabel = 'Options' }: { t
       <Text style={[styles.title, { color: palette.text }]} numberOfLines={1} accessibilityRole="header">
         {title}
       </Text>
+      {accessory}
       {menu?.length ? <MenuButton label={menuLabel} items={menu} /> : null}
     </View>
   );

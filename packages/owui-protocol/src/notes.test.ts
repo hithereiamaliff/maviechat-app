@@ -1,7 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import type { Capabilities } from './capabilities';
 import { OwuiClient, type FetchLike } from './http';
-import { createNote, deleteNote, getNote, listNoteChoices, listNotes, listPinnedNotes, newNoteTitle, noteChangeOf, noteLink, noteTitle, saveKeepsSharing, saveNote, saveNoteNow, toggleNotePinned } from './notes';
+import {
+  attachmentLink,
+  attachmentsIn,
+  changeNotePages,
+  createNote,
+  deleteNote,
+  getNote,
+  getNoteChat,
+  hasHeldPictures,
+  listNoteChats,
+  listNoteChoices,
+  listNotes,
+  listPinnedNotes,
+  newNoteChat,
+  newNoteTitle,
+  newPageTitle,
+  noteChangeOf,
+  noteLink,
+  noteTitle,
+  pageLink,
+  pageParents,
+  pageStep,
+  pictureLink,
+  saveKeepsSharing,
+  saveNote,
+  saveNoteNow,
+  suggestNoteTitle,
+  toggleNotePinned,
+  withNoteFile,
+  withNoteSelection,
+  withoutAttachment,
+  withoutNoteFile,
+} from './notes';
 
 function recordingClient(...answers: unknown[]) {
   const calls: { method: string; url: string; body: unknown }[] = [];
@@ -112,5 +144,120 @@ describe('notes', () => {
     expect(newNoteTitle(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
     expect(noteTitle({ title: '  ' })).toBe('Untitled');
     expect(noteLink('https://chat.test', 'a b')).toBe('https://chat.test/notes/a%20b');
+  });
+
+  it('reads 0.11’s file list: uploaded files only, named and sized from the entry or its file', async () => {
+    const files = [
+      { type: 'file', id: 'f1', name: 'report.pdf', size: 2048, file: { meta: { content_type: 'application/pdf' } } },
+      { type: 'file', id: 'f2', file: { filename: 'memo.m4a', meta: { name: 'memo.m4a', size: 99, content_type: 'audio/mp4' } } },
+      { type: 'image', id: 'i1', url: 'data:image/png;base64,AAAA' },
+    ];
+    const note = await getNote(recordingClient({ ...NOTE, data: { content: { md: 'x' }, files } }).client, 'n1');
+    expect(note.files).toEqual([
+      { id: 'f1', name: 'report.pdf', size: 2048, contentType: 'application/pdf' },
+      { id: 'f2', name: 'memo.m4a', size: 99, contentType: 'audio/mp4' },
+    ]);
+    expect(withNoteFile(files, { type: 'file', id: 'f3', url: 'f3', name: 'new.txt' }).map((item) => (item as { id: string }).id)).toEqual(['f1', 'f2', 'i1', 'f3']);
+    expect(withoutNoteFile(files, 'f1')).toHaveLength(2);
+  });
+
+  it('saves a file list (none as null), and a page’s text with its page', async () => {
+    const { client, calls } = recordingClient(NOTE, NOTE, NOTE);
+    const note = await getNote(recordingClient(NOTE).client, 'n1');
+    await saveNote(client, note, { files: [] });
+    expect(calls[0]?.body).toEqual({ title: 'Shopping', access_grants: note.accessGrants, data: { files: null } });
+    await saveNote(client, note, { md: 'b', html: '<p>b</p>', pageId: 'p2' });
+    expect(calls[1]?.body).toEqual({ title: 'Shopping', access_grants: note.accessGrants, data: { content: { json: null, html: '<p>b</p>', md: 'b' } }, page_id: 'p2' });
+    const fresh = recordingClient(NOTE, NOTE);
+    await saveNoteNow(fresh.client, 'n1', { files: (current) => withNoteFile(current, { type: 'file', id: 'f9', url: 'f9', name: 'a.txt' }) });
+    expect((fresh.calls[1]?.body as { data: { files: { id: string }[] } }).data.files.map((item) => item.id)).toEqual(['f1', 'f9']);
+  });
+
+  it('finds 0.12’s attachments in the text, adds and takes them away', () => {
+    const md = `Intro\n\n${attachmentLink({ id: 'f-1', name: 'report [final].pdf' })}\n\n${pictureLink({ id: 'p-1', name: 'photo.jpg' })}\n\nsee [memo](/api/v1/files/f-2/content) too`;
+    expect(md).toContain('[report  final .pdf](/api/v1/files/f-1/content)');
+    expect(attachmentsIn(md)).toEqual([
+      { id: 'f-1', name: 'report  final .pdf', size: 0, contentType: '' },
+      { id: 'f-2', name: 'memo', size: 0, contentType: '' },
+    ]);
+    expect(withoutAttachment(md, 'f-1')).toBe('Intro\n\n![photo.jpg](/api/v1/files/p-1/content)\n\nsee [memo](/api/v1/files/f-2/content) too');
+    expect(withoutAttachment(md, 'f-2')).toContain('see  too');
+    expect(withoutAttachment(md, 'p-1')).toBe(md);
+  });
+
+  it('spots pictures held inside the text, which only the web’s editor keeps', () => {
+    expect(hasHeldPictures('![](data://abc)', '')).toBe(true);
+    expect(hasHeldPictures('', '<p><img src="data:image/png;base64,AAA"></p>')).toBe(true);
+    expect(hasHeldPictures('![photo](/api/v1/files/p/content)', '<img src="/api/v1/files/p/content">')).toBe(false);
+  });
+
+  it('reads 0.12’s pages: nesting, the first page’s title, the pages’ revision', async () => {
+    const pages = [
+      { id: 'main', title: 'Trip', content: { md: 'plan', html: '' } },
+      { id: 'a', parent_id: null, title: 'Days', content: { md: 'one', html: '<p>one</p>' }, revision: 2 },
+      { id: 'a1', parent_id: 'a', title: 'Monday', content: { md: 'mon' } },
+      { id: 'b', title: 'Costs', content: { md: '' } },
+    ];
+    const note = await getNote(recordingClient({ ...NOTE, data: { content: { md: 'all' }, pages, pages_revision: 7 } }).client, 'n1');
+    expect(note.pagesRevision).toBe(7);
+    expect(note.pages.map((page) => [page.id, page.depth, page.parentId, page.inheritsTitle])).toEqual([
+      ['main', 0, null, true],
+      ['a', 0, null, false],
+      ['a1', 1, 'a', false],
+      ['b', 0, null, false],
+    ]);
+    expect(newPageTitle(note.pages)).toBe('Page 5');
+    expect(newPageTitle([{ title: 'Page 2' }])).toBe('Page 3');
+    expect(pageStep(note.pages, 'b', -1)).toEqual({ action: 'move', pageId: 'b', parentId: null, beforeId: 'a' });
+    expect(pageStep(note.pages, 'a', 1)).toEqual({ action: 'move', pageId: 'a', parentId: null, beforeId: null });
+    expect(pageStep(note.pages, 'a', -1)).toBeNull();
+    expect(pageStep(note.pages, 'main', 1)).toBeNull();
+    expect(pageParents(note.pages, 'a').map((page) => page.id)).toEqual(['main', 'b']);
+    expect(pageLink('https://chat.test', 'n1', 'a1')).toBe('https://chat.test/notes/n1?page=a1');
+  });
+
+  it('changes pages with the revision it saw, and a new page’s own id', async () => {
+    const answer = { ...NOTE, data: { pages: [{ id: 'main', title: 'T', content: { md: '' } }], pages_revision: 4 } };
+    const { client, calls } = recordingClient(answer, answer);
+    const made = await changeNotePages(client, { id: 'n1', pagesRevision: 3, writeAccess: true }, { action: 'create', title: 'Page 2', parentId: null });
+    expect(calls[0]?.url).toBe('https://chat.test/api/v1/notes/n1/pages/update');
+    expect(calls[0]?.body).toEqual({ action: 'create', revision: 3, title: 'Page 2', parent_id: null, new_id: made.pageId });
+    expect(made.pageId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(made.note.pagesRevision).toBe(4);
+    await changeNotePages(client, { id: 'n1', pagesRevision: 4, writeAccess: true }, { action: 'move', pageId: 'p', parentId: 'q', beforeId: null });
+    expect(calls[1]?.body).toEqual({ action: 'move', revision: 4, page_id: 'p', parent_id: 'q', before_id: null });
+  });
+
+  it('reads a 0.12 change for the page you’re on, and 0.11’s files when sent', () => {
+    const raw = { id: 'n1', updated_at: 9 * NS, data: { content: { md: 'all' }, pages: [{ id: 'main', title: 'T', content: { md: 'first' } }, { id: 'p2', title: 'Two', content: { md: 'second', html: '<p>second</p>' } }], pages_revision: 2 } };
+    expect(noteChangeOf(raw, 'p2')).toMatchObject({ md: 'second', html: '<p>second</p>', pagesRevision: 2 });
+    expect(noteChangeOf(raw)?.md).toBe('first');
+    expect(noteChangeOf(raw, 'gone')?.md).toBeUndefined();
+    expect(noteChangeOf({ id: 'n1', data: { files: null } })?.files).toEqual([]);
+    expect(noteChangeOf({ id: 'n1', data: { content: { md: 'x' } } })?.files).toBeUndefined();
+  });
+
+  it('opens the note’s chats, and words a message with your selection as the web does', async () => {
+    const chat = { id: 'c1', title: 'Chat', chat: { params: { system: 'CONTEXT' } }, updated_at: 1, created_at: 1 };
+    const { client, calls } = recordingClient(chat, [chat, { nope: true }], chat);
+    expect((await getNoteChat(client, 'n 1')).id).toBe('c1');
+    expect((await listNoteChats(client, 'n 1')).map((item) => item.id)).toEqual(['c1']);
+    await newNoteChat(client, 'n 1');
+    expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([
+      'GET https://chat.test/api/v1/notes/n%201/chat',
+      'GET https://chat.test/api/v1/notes/n%201/chats',
+      'POST https://chat.test/api/v1/notes/n%201/chat',
+    ]);
+    expect(withNoteSelection('Shorten it.', '  the middle bit ')).toBe('Shorten it.\n\nSelected note text for replace_note_content operations:\nthe middle bit');
+    expect(withNoteSelection('Shorten it.', ' ')).toBe('Shorten it.');
+  });
+
+  it('asks a model for a title, once, and reads it from the answer', async () => {
+    const { client, calls } = recordingClient({ choices: [{ message: { content: 'Sure! {"title": "Weekly Groceries"}' } }] }, { choices: [{ message: { content: 'no idea' } }] });
+    expect(await suggestNoteTitle(client, 'm1', 'milk, eggs', 'n1')).toBe('Weekly Groceries');
+    expect(calls[0]?.url).toBe('https://chat.test/api/chat/completions');
+    expect(calls[0]?.body).toMatchObject({ model: 'm1', stream: false, chat_id: 'temporary:note-n1', messages: [{ role: 'user' }] });
+    expect((calls[0]?.body as { messages: { content: string }[] }).messages[0]?.content).toContain('<note>\nmilk, eggs\n</note>');
+    await expect(suggestNoteTitle(client, 'm1', 'x', 'n1')).rejects.toThrow('no title');
   });
 });

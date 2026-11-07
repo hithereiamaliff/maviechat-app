@@ -43,6 +43,8 @@ interface MarkdownProps {
   fadeIn?: boolean;
   /** Checklist boxes can be ticked (a note's): called with the box's place among the text's boxes, from 0. */
   onToggleTask?: (index: number) => void;
+  /** Opens a link itself (a note's attached files); false leaves it to the browser. */
+  onLink?: (href: string, text: string) => boolean;
 }
 
 interface Context {
@@ -64,10 +66,11 @@ interface Context {
   textDir?: TextStyle;
   /** Tickable checklist boxes, counted in the order they're drawn (the text's order). */
   tasks?: { toggle: (index: number) => void; next: number };
+  onLink?: (href: string, text: string) => boolean;
 }
 
 /** Renders markdown as native views (no web view). */
-export const Markdown = memo(function Markdown({ text, muted = false, sources, baseUrl, token, foldCode = false, fadeIn = false, onToggleTask }: MarkdownProps) {
+export const Markdown = memo(function Markdown({ text, muted = false, sources, baseUrl, token, foldCode = false, fadeIn = false, onToggleTask, onLink }: MarkdownProps) {
   const palette = usePalette();
   const dark = useColorScheme() === 'dark';
   const toast = useToast();
@@ -92,6 +95,7 @@ export const Markdown = memo(function Markdown({ text, muted = false, sources, b
     fade: tail && fadeState ? { ...tail, state: fadeState } : null,
     textDir: direction.text,
     tasks: onToggleTask ? { toggle: onToggleTask, next: 0 } : undefined,
+    onLink,
   };
   return <View style={direction.view}>{tokens.map((block, index) => renderBlock(block, `${index}`, context))}</View>;
 });
@@ -390,7 +394,7 @@ function renderInline(tokens: Token[] | undefined, key: string, context: Context
       case 'link': {
         const link = token as Tokens.Link;
         return (
-          <Text key={k} accessibilityRole="link" style={{ color: palette.link }} onPress={() => void openLink(link.href, context.baseUrl)}>
+          <Text key={k} accessibilityRole="link" style={{ color: palette.link }} onPress={() => (context.onLink?.(link.href, link.text) ? undefined : void openLink(link.href, context.baseUrl))}>
             {renderInline(link.tokens, k, context)}
           </Text>
         );

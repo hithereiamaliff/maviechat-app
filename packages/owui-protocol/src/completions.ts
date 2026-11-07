@@ -217,6 +217,8 @@ export interface CompletionRequestInput {
   variables: Record<string, string>;
   /** User settings (`ui.title.auto`, `ui.autoTags`, `ui.autoFollowUps`); all default to on. */
   tasks: { title?: boolean; tags?: boolean; followUps?: boolean };
+  /** The first message of a saved chat that was made empty (a note's chat): named and tagged as a new chat is, as the web does. */
+  firstMessage?: boolean;
   toolIds?: string[];
   /** Skills switched on for this message (`skill_ids`); `<$id|name>` in the text works too. */
   skillIds?: string[];
@@ -267,7 +269,7 @@ export function buildCompletionRequest(input: CompletionRequestInput): Record<st
     user_message: turn.userMessage,
     ...(input.regenerationPrompt ? { regeneration_prompt: input.regenerationPrompt } : {}),
     background_tasks: {
-      ...(isNewChat && !temporary ? { title_generation: input.tasks.title ?? true, tags_generation: input.tasks.tags ?? true } : {}),
+      ...((isNewChat || input.firstMessage) && !temporary ? { title_generation: input.tasks.title ?? true, tags_generation: input.tasks.tags ?? true } : {}),
       follow_up_generation: input.tasks.followUps ?? true,
     },
   };
