@@ -433,7 +433,7 @@
     "license": "BSL-1.0",
     "via": "React Native",
     "texts": [
-      90
+      91
     ]
   },
   {
@@ -507,7 +507,7 @@
     "license": "BSD-2-Clause",
     "via": "expo-image",
     "texts": [
-      87
+      88
     ]
   },
   {
@@ -572,7 +572,16 @@
     "license": "BSD-3-Clause",
     "via": "React Native",
     "texts": [
-      91
+      92
+    ]
+  },
+  {
+    "name": "emoji-datasource",
+    "version": "16.0.0",
+    "license": "MIT",
+    "via": "the app’s emoji names",
+    "texts": [
+      80
     ]
   },
   {
@@ -837,7 +846,7 @@
     "license": "MIT",
     "via": "React Native",
     "texts": [
-      93
+      94
     ]
   },
   {
@@ -846,7 +855,7 @@
     "license": "MIT",
     "via": "React Native",
     "texts": [
-      94
+      95
     ]
   },
   {
@@ -855,7 +864,7 @@
     "license": "Apache-2.0",
     "via": "React Native",
     "texts": [
-      95
+      96
     ]
   },
   {
@@ -888,7 +897,7 @@
     "license": "BSD-3-Clause",
     "via": "React Native",
     "texts": [
-      92
+      93
     ]
   },
   {
@@ -956,7 +965,7 @@
     "license": "BSD-2-Clause",
     "via": "expo-image",
     "texts": [
-      86
+      87
     ]
   },
   {
@@ -965,8 +974,8 @@
     "license": "BSD-3-Clause",
     "via": "expo-image",
     "texts": [
-      84,
-      85
+      85,
+      86
     ]
   },
   {
@@ -1128,7 +1137,7 @@
     "license": "MIT",
     "via": "expo-updates",
     "texts": [
-      88
+      89
     ]
   },
   {
@@ -1265,7 +1274,7 @@
     "license": "MIT",
     "via": "expo-image",
     "texts": [
-      80
+      81
     ]
   },
   {
@@ -1274,7 +1283,7 @@
     "license": "MIT",
     "via": "expo-image",
     "texts": [
-      81
+      82
     ]
   },
   {
@@ -1283,7 +1292,7 @@
     "license": "MIT",
     "via": "expo-image",
     "texts": [
-      82
+      83
     ]
   },
   {
@@ -1292,7 +1301,7 @@
     "license": "MIT",
     "via": "expo-image",
     "texts": [
-      83
+      84
     ]
   },
   {
@@ -1326,7 +1335,7 @@
     "license": "BSD-3-Clause",
     "via": "React Native",
     "texts": [
-      96
+      97
     ]
   },
   {
@@ -1351,7 +1360,7 @@
     "license": "Public domain",
     "via": "expo-updates",
     "texts": [
-      89
+      90
     ]
   },
   {

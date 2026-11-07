@@ -138,6 +138,10 @@ describe('saved prompts and their variables', () => {
     expect(menuTrigger('see https://x.y/z', 17)).toBeNull();
     expect(menuTrigger('mail me@x.com', 13)).toBeNull();
     expect(menuTrigger('# ', 2)).toBeNull();
+    expect(menuTrigger('nice :thu', 9)).toEqual({ char: ':', query: 'thu', start: 5 });
+    expect(menuTrigger('at 10:30', 8)).toBeNull();
+    expect(menuTrigger('Note: hi', 8)).toBeNull();
+    expect(menuTrigger('@ab:cd', 6)).toEqual({ char: '@', query: 'ab:cd', start: 0 });
     expect(menuTrigger('look #note here', 10)).toEqual({ char: '#', query: 'note', start: 5 });
     expect(menuTrigger('use $wri', 8)).toEqual({ char: '$', query: 'wri', start: 4 });
     expect(menuTrigger('price US$5', 10)).toBeNull();

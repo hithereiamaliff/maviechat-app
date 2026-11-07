@@ -21,6 +21,7 @@ import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { useToast } from '@/components/Toast';
+import { emojiForShortName } from '@/lib/emoji';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useKnowledgeSearch, useModels, usePrompts, useSessionUser, useUserSettings } from '@/lib/server';
 import { attachPageToDraft } from './attachPage';
@@ -49,7 +50,7 @@ interface Options {
  * The input's menus, as on the web: `/` for commands, your saved prompts (built-in variables
  * filled in, your own asked for in a form) and skills (put in the message as the web puts them,
  * for the server to add); `$` for skills alone; `@` for a model to talk to, knowledge, folders and
- * web pages; `#` for knowledge and web pages.
+ * web pages; `#` for knowledge and web pages; `:` for an emoji by its name (`:smile`).
  */
 export function useInputMenus({ draftKey, text, cursor, focused, setText, onPickModel, onTemporary, onFork, onCompact, onStatus }: Options) {
   const { client } = useAuthed();
@@ -112,6 +113,11 @@ export function useInputMenus({ draftKey, text, cursor, focused, setText, onPick
       .map((skill) => ({ key: `s-${skill.id}`, section: 'Skills', icon: 'sparkles', title: skill.name, subtitle: skill.description || 'Skill', onPick: () => place(`${skillMention(skill)} `) }));
   if (trigger?.char === '$') {
     entries.push(...skillEntries());
+  } else if (trigger?.char === ':') {
+    // As on the web: the emoji itself takes the place of `:name`.
+    for (const emoji of emojiForShortName(query)) {
+      entries.push({ key: `e-${emoji.code}`, section: 'Emoji', icon: 'face-smile', glyph: emoji.char, title: `:${emoji.names[0]}:`, onPick: () => place(emoji.char) });
+    }
   } else if (trigger?.char === '/') {
     const commands = [
       { id: 'model', title: 'Model', subtitle: 'Choose the model', run: onPickModel },
@@ -200,8 +206,8 @@ export function useInputMenus({ draftKey, text, cursor, focused, setText, onPick
 
   const loading = (trigger?.char === '/' && prompts.isLoading) || (trigger?.char === '$' && skills.isLoading) || ((trigger?.char === '@' || trigger?.char === '#') && knowledge.isFetching);
   return {
-    // `$` is also typed in prices: its list shows only when a skill matches.
-    trigger: trigger?.char === '$' && entries.length === 0 && !loading ? null : trigger,
+    // `$` is also typed in prices, and `:` in text: their lists show only when something matches.
+    trigger: (trigger?.char === '$' || trigger?.char === ':') && entries.length === 0 && !loading ? null : trigger,
     entries,
     loading,
     empty: trigger?.char === '/' ? 'No commands, prompts or skills match.' : trigger?.char === '$' ? 'No skills match.' : 'Nothing matches. Type a web address to attach a page.',

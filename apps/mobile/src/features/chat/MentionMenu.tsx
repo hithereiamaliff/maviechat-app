@@ -7,14 +7,17 @@ export interface MenuEntry {
   /** Entries are grouped under their section, in the order sections first appear. */
   section: string;
   icon: IconName;
+  /** Shown in place of the icon (an emoji). */
+  glyph?: string;
   title: string;
   subtitle?: string;
   onPick: () => void;
 }
 
 /**
- * The list above the input while you type `/`, `@` or `#`: commands and saved prompts, or models,
- * knowledge and web pages to bring in. Tapping one picks it; typing on narrows the list.
+ * The list above the input while you type `/`, `@`, `#`, `$` or `:`: commands and saved prompts,
+ * models, knowledge and web pages to bring in, skills, or emoji. Tapping one picks it; typing on
+ * narrows the list.
  */
 export function MentionMenu({ entries, loading, empty }: { entries: MenuEntry[]; loading: boolean; empty: string }) {
   const palette = usePalette();
@@ -34,7 +37,7 @@ export function MentionMenu({ entries, loading, empty }: { entries: MenuEntry[];
                   accessibilityRole="button"
                   onPress={entry.onPick}
                   style={({ pressed }) => [styles.row, pressed && { backgroundColor: palette.surfaceStrong }]}>
-                  <Icon name={entry.icon} size={17} color={palette.textMuted} />
+                  {entry.glyph ? <Text style={styles.glyph}>{entry.glyph}</Text> : <Icon name={entry.icon} size={17} color={palette.textMuted} />}
                   <View style={styles.text}>
                     <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
                       {entry.title}
@@ -69,6 +72,7 @@ const styles = StyleSheet.create({
   text: { flex: 1, gap: 1 },
   title: { fontFamily: fonts.medium, fontSize: 15 },
   subtitle: { fontFamily: fonts.regular, fontSize: 12 },
+  glyph: { fontSize: 18, width: 22, textAlign: 'center' },
   empty: { paddingHorizontal: 14, paddingVertical: 10 },
   more: { marginVertical: 6 },
 });

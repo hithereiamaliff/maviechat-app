@@ -148,17 +148,31 @@ export function SidebarChatRow({
 }
 
 /** You, at the bottom: your picture (else initials) and name, opening the account menu. */
-export function SidebarUser({ name, picture, menu }: { name: string; picture?: string | null; menu: MenuItem[] }) {
+/**
+ * The account row at the foot of the sidebar: your picture (with the web's green dot while
+ * statuses are on), your name and your status; it opens your menu.
+ */
+export function SidebarUser({ name, picture, menu, status, online = false }: { name: string; picture?: string | null; menu: MenuItem[]; status?: string; online?: boolean }) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.footer, { borderTopColor: palette.border, paddingBottom: insets.bottom + 6 }]}>
       <MenuTrigger label="Account" items={menu}>
         <View style={styles.user}>
-          <UserAvatar name={name} picture={picture} size={30} />
-          <Text style={[styles.userName, { color: palette.text }]} numberOfLines={1}>
-            {name}
-          </Text>
+          <View>
+            <UserAvatar name={name} picture={picture} size={30} />
+            {online ? <View style={[styles.online, { borderColor: palette.background, backgroundColor: palette.success }]} /> : null}
+          </View>
+          <View style={styles.userText}>
+            <Text style={[styles.userName, { color: palette.text }]} numberOfLines={1}>
+              {name}
+            </Text>
+            {status ? (
+              <Text style={[styles.userStatus, { color: palette.textMuted }]} numberOfLines={1}>
+                {status}
+              </Text>
+            ) : null}
+          </View>
         </View>
       </MenuTrigger>
     </View>
@@ -205,5 +219,8 @@ const styles = StyleSheet.create({
   mark: { width: 8, height: 8, borderRadius: 2 },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 6 },
   user: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8 },
-  userName: { flex: 1, fontFamily: fonts.medium, fontSize: 15 },
+  userText: { flex: 1 },
+  userName: { fontFamily: fonts.medium, fontSize: 15 },
+  userStatus: { fontFamily: fonts.regular, fontSize: 12, marginTop: 1 },
+  online: { position: 'absolute', right: -1, bottom: -1, width: 11, height: 11, borderRadius: 6, borderWidth: 2 },
 });

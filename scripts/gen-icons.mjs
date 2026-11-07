@@ -67,6 +67,7 @@ const ICONS = [
   'exclamation-triangle',
   'eye',
   'eye-slash',
+  'face-smile',
   'film',
   'folder',
   'folder-open',

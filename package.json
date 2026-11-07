@@ -25,6 +25,7 @@
     "bench:chat": "npm run bench:chat --workspace @maviechat/contract-probe --",
     "ref:sync": "bash scripts/ref-sync.sh",
     "icons": "node scripts/gen-icons.mjs",
+    "emoji": "node scripts/gen-emoji.mjs",
     "licenses": "node scripts/check-licenses.mjs --write"
   },
   "devDependencies": {

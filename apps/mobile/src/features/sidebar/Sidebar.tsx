@@ -11,6 +11,8 @@ import {
   searchChats,
   searchText,
   SEARCH_PAGE_SIZE,
+  userStatusOf,
+  userStatusOn,
   setFolderExpanded,
   sidebarShortcuts,
   toggleNotePinned,
@@ -27,6 +29,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { MenuButton, type MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
 import { useAccountsSheet, useOwuiAccountSignOut } from '@/features/accounts/AccountsSheet';
+import { statusLine, useSetStatus, useStatusSheet } from '@/features/sidebar/StatusSheet';
 import { ModelAvatar } from '@/features/chat/ModelAvatar';
 import { usePinnedModels } from '@/features/chat/usePinnedModels';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
@@ -65,6 +68,8 @@ export function Sidebar() {
   const owui = useSession();
   const signOutOf = useOwuiAccountSignOut();
   const accountsSheet = useAccountsSheet('owui');
+  const statusSheet = useStatusSheet();
+  const setStatus = useSetStatus();
   const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
   const openCodeSignedIn = useOpenCode().state.status === 'signed-in';
   const queryClient = useQueryClient();
@@ -229,7 +234,18 @@ export function Sidebar() {
     capabilities && !settings.isPending
       ? sidebarShortcuts(capabilities, (settings.data?.ui as { pinnedMenuItems?: unknown } | null | undefined)?.pinnedMenuItems)
       : [];
+  // Your status, as the web's user menu has it (while the admin keeps statuses on).
+  const statusOn = userStatusOn(config.data);
+  const status = statusLine(userStatusOf(you.data));
   const userMenu: MenuItem[] = [
+    ...(statusOn
+      ? status
+        ? [
+            { key: 'status', label: status, icon: 'face-smile' as const, onPress: statusSheet.open },
+            { key: 'clear-status', label: 'Clear Status', icon: 'x-mark' as const, onPress: () => void setStatus({ emoji: '', message: '' }) },
+          ]
+        : [{ key: 'status', label: 'Update Your Status', icon: 'face-smile' as const, onPress: statusSheet.open }]
+      : []),
     ...(capabilities && canUseWorkspace(capabilities)
       ? [{ key: 'workspace', label: 'Workspace', icon: 'squares-2x2' as const, onPress: openWorkspace }]
       : []),
@@ -479,11 +495,12 @@ export function Sidebar() {
         />
       </View>
 
-      <SidebarUser name={you.data?.name ?? session.user.name} picture={you.data?.profile_image_url} menu={userMenu} />
+      <SidebarUser name={you.data?.name ?? session.user.name} picture={you.data?.profile_image_url} menu={userMenu} status={statusOn ? status : undefined} online={config.data?.features?.enable_user_status === true} />
       {picker.element}
       {shareSheet.element}
       {tagsSheet.element}
       {accountsSheet.element}
+      {statusSheet.element}
       {folderActions.element}
     </SidebarPanel>
   );

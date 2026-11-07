@@ -78,7 +78,8 @@ if (process.argv.includes('--write')) writeNotices();
 /**
  * The notices the About screen shows: every shipped package with its licence text (MIT, BSD and
  * Apache all ask for it to travel with the app), Heroicons (a dev dependency whose artwork the
- * app draws), and the native libraries compiled into the iOS app (scripts/native-licenses).
+ * app draws), emoji-datasource (a dev dependency whose emoji names the app carries), and the
+ * native libraries compiled into the iOS app (scripts/native-licenses).
  * Texts are kept once each in license-texts.json; entries point at them.
  */
 function writeNotices() {
@@ -153,6 +154,11 @@ function writeNotices() {
   notices.push({ name: 'heroicons', version: manifestOf(heroicons).version ?? 'unknown', license: 'MIT', via: 'the app’s icons', texts: filesIn(heroicons).map(keep) });
   if (!filesIn(heroicons).length) missing.push('heroicons');
 
+  // The emoji names and groups the app draws its status emoji and pickers from (scripts/gen-emoji.mjs).
+  const emojiData = path.join(root, 'node_modules/emoji-datasource');
+  notices.push({ name: 'emoji-datasource', version: manifestOf(emojiData).version ?? 'unknown', license: 'MIT', via: 'the app’s emoji names', texts: filesIn(emojiData).map(keep) });
+  if (!filesIn(emojiData).length) missing.push('emoji-datasource');
+
   const nativeDir = path.join(root, 'scripts/native-licenses');
   const native = JSON.parse(readFileSync(path.join(nativeDir, 'index.json'), 'utf8')).libraries;
   for (const library of native) {
@@ -169,5 +175,5 @@ function writeNotices() {
   writeFileSync(target, `${JSON.stringify(notices, null, 2)}\n`);
   writeFileSync(path.join(path.dirname(target), 'license-texts.json'), `${JSON.stringify(texts, null, 2)}\n`);
   const size = texts.reduce((sum, text) => sum + text.length, 0);
-  console.log(`✓ ${notices.length} notices (${shipped.length} packages, Heroicons, ${native.length} native libraries), ${texts.length} texts (${Math.round(size / 1024)} KB) → ${path.relative(root, path.dirname(target))}`);
+  console.log(`✓ ${notices.length} notices (${shipped.length} packages, Heroicons, emoji-datasource, ${native.length} native libraries), ${texts.length} texts (${Math.round(size / 1024)} KB) → ${path.relative(root, path.dirname(target))}`);
 }

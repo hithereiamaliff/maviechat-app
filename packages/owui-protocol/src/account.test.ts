@@ -10,9 +10,12 @@ import {
   maskSecret,
   profileImageSource,
   profileOf,
+  setUserStatus,
   updatePassword,
   updateProfile,
   updateUserVariables,
+  userStatusOf,
+  userStatusOn,
   validBirthDate,
   variablesProblem,
   variableTag,
@@ -111,5 +114,23 @@ describe('password and API key', () => {
   it('masks a secret down to its start and last four', () => {
     expect(maskSecret('sk-1234567890abcdef')).toBe('sk-••••••••cdef');
     expect(maskSecret('short')).toBe('•••••');
+  });
+});
+
+describe('your status', () => {
+  it('reads it from the session user, and is on unless the server turns it off', () => {
+    expect(userStatusOf({ status_emoji: 'grinning', status_message: 'In meetings', name: 'A' })).toEqual({ emoji: 'grinning', message: 'In meetings' });
+    expect(userStatusOf({ status_emoji: null })).toEqual({ emoji: '', message: '' });
+    expect(userStatusOn({ features: { enable_user_status: false } })).toBe(false);
+    expect(userStatusOn({ features: {} })).toBe(true);
+    expect(userStatusOn(undefined)).toBe(true);
+  });
+
+  it('sets it with the web’s fields, and clears it with both empty', async () => {
+    const { client, calls } = recordingClient({ id: 'u1', status_emoji: '+1', status_message: 'Done' });
+    expect(await setUserStatus(client, { emoji: '+1', message: 'Done' })).toEqual({ emoji: '+1', message: 'Done' });
+    expect(calls[0]).toMatchObject({ method: 'POST', url: 'https://x.test/api/v1/users/user/status/update', body: { status_emoji: '+1', status_message: 'Done' } });
+    await setUserStatus(client, { emoji: '', message: '' });
+    expect(calls[1]?.body).toEqual({ status_emoji: '', status_message: '' });
   });
 });

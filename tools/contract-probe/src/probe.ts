@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -36,6 +36,8 @@
  * `--notes` asks a model for a note title (one short completion), makes a probe note the app's way (Markdown and the web editor's HTML), finds it, saves it
  * while a socket follows it (the note event and its time), renames, pins, keeps its sharing through
  * a save, and deletes it (src/notes-probe.ts).
+ * `--status` sets your status the app's way (a short name, an emoji kept as itself, cleared) and the
+ * web's recent emoji list, each put back as it was (src/status-probe.ts).
  * `--a8` saves settings the app's way and puts them back exactly (src/a8-probe.ts), then tries
  * memories, the profile, your variables, a refused password change and an API key (src/a8-account-probe.ts),
  * and the data controls: export, import, shared chats and files (src/a8-data-probe.ts).
@@ -79,6 +81,7 @@ import { probeInterface } from './interface-probe';
 import { probeMessages } from './messages-probe';
 import { probeModels } from './models-probe';
 import { probeNotes } from './notes-probe';
+import { probeStatus } from './status-probe';
 import { probeSearch } from './search-probe';
 import { probeNewChat } from './newchat-probe';
 import { probeA8Account } from './a8-account-probe';
@@ -124,6 +127,7 @@ const { values: args } = parseArgs({
     search: { type: 'boolean' },
     models: { type: 'boolean' },
     notes: { type: 'boolean' },
+    status: { type: 'boolean' },
     a8: { type: 'boolean' },
     m3: { type: 'boolean' },
     m3text: { type: 'boolean' },
@@ -431,6 +435,12 @@ async function main() {
         const modelsProbe = await probeModels({ client, capabilities });
         for (const result of modelsProbe.steps) results.push({ ...result, name: `Models: ${result.name}` });
         fixtures['write.models'] = modelsProbe.fixture;
+      }
+
+      if (args.status) {
+        const statusProbe = await probeStatus({ client, config: serverConfig });
+        for (const result of statusProbe.steps) results.push({ ...result, name: `Status: ${result.name}` });
+        fixtures['write.status'] = statusProbe.fixture;
       }
 
       if (args.notes && capabilities) {

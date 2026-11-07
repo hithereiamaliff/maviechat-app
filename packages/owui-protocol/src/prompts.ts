@@ -184,9 +184,9 @@ export function applyInputVariables(content: string, values: Record<string, stri
   return content.replace(/{{\s*([^|}\s]+)\s*(?:\|\s*((?:[^}"]|"[^"]*")*))?}}/g, (whole, name: string) => (name in values ? (values[name] as string) : whole));
 }
 
-/** The word being typed after a menu character (`/`, `@`, `#`) where the cursor is, if any. */
+/** The word being typed after a menu character (`/`, `@`, `#`, `$`, `:`) where the cursor is, if any. */
 export interface MenuTrigger {
-  char: '/' | '@' | '#' | '$';
+  char: '/' | '@' | '#' | '$' | ':';
   query: string;
   /** Where the character is; the text from here to the cursor is replaced on picking. */
   start: number;
@@ -194,7 +194,8 @@ export interface MenuTrigger {
 
 export function menuTrigger(input: string, cursor: number): MenuTrigger | null {
   const before = input.slice(0, cursor);
-  const match = /(^|\s)([/@#$])([^\s/@#$]*)$/.exec(before);
+  // `:` starts an emoji's short name (`:smile`), as on the web; names have no other punctuation.
+  const match = /(^|\s)([/@#$])([^\s/@#$]*)$/.exec(before) ?? /(^|\s)(:)([a-zA-Z0-9_+-]*)$/.exec(before);
   if (!match) return null;
   const char = match[2] as MenuTrigger['char'];
   return { char, query: match[3] as string, start: before.length - (match[3] as string).length - 1 };

@@ -3,7 +3,8 @@ import { OwuiHttpError, type OwuiClient } from './http';
 
 /*
  * Your account (Open WebUI 0.11.3, Settings → Account): your profile (picture, name, bio, gender,
- * birth date), your own variables for system prompts, your password, and your API key.
+ * birth date), your own variables for system prompts, your password, and your API key; and your
+ * status, set from the user menu.
  */
 
 // ── Profile ──────────────────────────────────────────────────────────────────
@@ -171,4 +172,28 @@ export function deleteApiKey(client: OwuiClient): Promise<boolean> {
 export function maskSecret(secret: string): string {
   if (secret.length <= 10) return '•'.repeat(secret.length);
   return `${secret.slice(0, 3)}${'•'.repeat(8)}${secret.slice(-4)}`;
+}
+
+// ── Status ───────────────────────────────────────────────────────────────────
+
+/**
+ * Your status, as the web's user menu shows it: an emoji, kept by its short name ("grinning";
+ * an emoji without one is kept as itself) and a message. The session user carries it.
+ */
+export interface UserStatus {
+  emoji: string;
+  message: string;
+}
+
+export const userStatusOf = (user: unknown): UserStatus => {
+  const row = typeof user === 'object' && user !== null ? (user as Record<string, unknown>) : {};
+  return { emoji: text(row.status_emoji), message: text(row.status_message) };
+};
+
+/** Whether statuses are on (`features.enable_user_status`; the web counts them on unless the server says no). */
+export const userStatusOn = (config: { features?: Record<string, unknown> } | null | undefined): boolean => config?.features?.enable_user_status !== false;
+
+/** Sets your status (refused, 403, while statuses are off). Both empty clears it, as the web's Clear does. */
+export async function setUserStatus(client: OwuiClient, status: UserStatus): Promise<UserStatus> {
+  return userStatusOf(await client.post<unknown>('/api/v1/users/user/status/update', { status_emoji: status.emoji, status_message: status.message }));
 }

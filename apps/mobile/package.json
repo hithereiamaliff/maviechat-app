@@ -53,6 +53,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.3.0",
+    "emoji-datasource": "^16.0.0",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~58.0.4",
     "heroicons": "^2.2.0",
