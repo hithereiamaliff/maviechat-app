@@ -40,9 +40,9 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [x] | Logo + server name (tap = new chat), New Chat, Search | M1 |
 | [x] | Pinned shortcuts under Search, in the user's order (`ui.pinnedMenuItems`, default Notes and Workspace), each only when the account may use it; Playground for admins. Slice 5: they open on the web (Workspace until M3) | M1 |
 | [ ] | Section: pinned models (`PinnedModelList.svelte`) opening `/?model=id` | M2 |
-| [x] | Section: Folders tree, own and shared. Tap opens the folder landing; the chevron expands; unread badge (folder landing from slice 4) | M1 |
-| [ ] | Folder menu: New Chat, Create subfolder, Mark all read, Edit, Export JSON, Delete (optionally with contents) | M2 |
-| [ ] | Folder settings: name, description, background, default models, system prompt, knowledge, sharing (`Folders/FolderModal.svelte`) | M2 |
+| [~] | Section: Folders tree, own and shared. Tap opens the folder landing; the chevron expands; unread badge (folder landing from slice 4). Folders slice (2026-11-07): the heading shows while folders are on, with New Folder (+). Folders other people share with you aren't listed yet | M1 |
+| [x] | Folder menu: New Chat, Create subfolder, Mark all read, Edit, Export JSON, Delete (optionally with contents). Folders slice (2026-11-07): all of them, on each folder row and on the folder's page (without New Chat there, since the page is one), plus Share (0.11 has it in the menu; 0.12 moved it into the form). Delete asks whether the chats go too or move out | M2 |
+| [x] | Folder settings: name, description, background, default models, system prompt, knowledge, sharing (`Folders/FolderModal.svelte`). Folders slice (2026-11-07): name; system prompt (with that permission); knowledge (each whole or searched); a background picture, shrunk on the phone to 1920 px; on 0.12+ the description and default model, which 0.11's form doesn't have. Sharing is in the menu | M2 |
 | [x] | Chats: "Pinned" group, then Today / Yesterday / Previous 7 days / Previous 30 days / month / year (from `updated_at`), infinite scroll | M1 |
 | [x] | Chat row: generating spinner, unread dot; the "…" button is always visible on phones (no long-press in Open WebUI) | M1 |
 | [~] | Chat menu: Share, Download (JSON/TXT/PDF), Rename (+ Generate), Mark unread, Pin, Clone, Move to folder, Archive, Delete (`ChatMenu.svelte`). Slice 1: Rename, Pin, Archive, Delete (only with the `chat.delete` permission); slice 4: Rename + Generate, Mark as unread, Move (needs the folders feature); A6: Tags, Share, Download (JSON, text), Clone. PDF waits for a store build | M1 (rename/pin/archive/delete/move); M2 (rest) |
@@ -88,7 +88,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [x] | Centred input; stacked model avatars; model name or "Hello, {name}"; description; "By author". Slice 5: the model's picture and name (or "Hello, {name}"), two lines of description (tap for the rest), "By author" (community authors link to their page), input asking "How can I help you today?". A4: with Compare the pictures overlap; the last model's details show until you tap another's picture | M1 |
 | [x] | "Suggested" prompts (model's own, else admin defaults), shuffled and filtered as you type; tap sends, or inserts if that setting is on. Slice 5: all of it (a model whose own list is empty shows none; nothing past 500 typed characters). When there are none the web shows its own name and version; the app leaves that line out | M1 |
 | [ ] | Landing mode "chat" (input pinned to the bottom) | M2 |
-| [ ] | Folder landing page: folder header, input, Chats / Knowledge tabs | M2 |
+| [~] | Folder landing page: folder header, input, Chats / Knowledge tabs. Folders slice (2026-11-07): the folder's menu in the bar, the description (0.12+), the background picture fading into the page as on the web, the input starting chats with the folder's models, and the chats with Show More. On 0.11 the models picked there become the folder's, as the web does. The web's Knowledge tab is empty in 0.11.3 and 0.12.5, so there's no tab; the emoji icon the web lets you pick isn't shown yet | M2 |
 
 ## 7. Message input (`chat/MessageInput.svelte`, `chat/MessageInput/*`)
 

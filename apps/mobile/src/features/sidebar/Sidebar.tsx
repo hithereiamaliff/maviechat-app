@@ -19,13 +19,14 @@ import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
-import type { MenuItem } from '@/components/Menu';
+import { MenuButton, type MenuItem } from '@/components/Menu';
 import { useAccountsSheet, useOwuiAccountSignOut } from '@/features/accounts/AccountsSheet';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
 import { useShareSheet } from '@/features/chats/ShareSheet';
 import { useTagsSheet } from '@/features/chats/TagsSheet';
 import { useChatActions } from '@/features/chats/useChatActions';
 import { switchToDeepTutor, switchToOpenCode } from '@/features/deeptutor/switch';
+import { useFolderActions } from '@/features/folders/useFolderActions';
 import { useAuthed, useCapabilities, useServerConfig, useSessionUser, useUserSettings } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
@@ -92,6 +93,13 @@ export function Sidebar() {
   const tree = useMemo(() => folderTree(folders.data ?? []), [folders.data]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const isExpanded = (folder: FolderNode) => expanded[folder.id] ?? folder.is_expanded ?? false;
+  const folderActions = useFolderActions({
+    onNavigate: () => sidebar.close(),
+    // A folder made inside another shows at once: the outer one opens.
+    onCreated: (_folder, parentId) => {
+      if (parentId) setExpanded((state) => ({ ...state, [parentId]: true }));
+    },
+  });
   const openFolderIds = useMemo(() => {
     const ids: string[] = [];
     const walk = (nodes: FolderNode[]) => {
@@ -115,6 +123,7 @@ export function Sidebar() {
         search: { active: searching, results: results.data, loading: results.isFetching },
         pinned: pinned.data ?? [],
         folders: foldersOn ? tree : [],
+        foldersOn,
         isExpanded: (folder) => expanded[folder.id] ?? folder.is_expanded ?? false,
         folderChats: (id) => folderChats[openFolderIds.indexOf(id)]?.data,
         chats: chats.data?.pages.flat() ?? [],
@@ -234,7 +243,7 @@ export function Sidebar() {
   const renderRow = ({ item }: { item: SidebarRow }) => {
     switch (item.type) {
       case 'header':
-        return <SidebarHeading label={item.label} />;
+        return <SidebarHeading label={item.label} action={item.addFolder ? { icon: 'plus', label: 'New Folder', onPress: folderActions.newFolder } : undefined} />;
       case 'note':
         return <SidebarNote label={item.label} depth={item.depth} />;
       case 'folder':
@@ -265,6 +274,16 @@ export function Sidebar() {
             {item.folder.unread_count ? (
               <Text style={[styles.badge, { backgroundColor: palette.surfaceStrong, color: palette.textMuted }]}>{item.folder.unread_count}</Text>
             ) : null}
+            <MenuButton
+              items={folderActions.items(item.folder, {
+                onDeleted: () => {
+                  if (item.folder.id === currentFolderId) router.replace('/');
+                },
+              })}
+              label={`Options for ${item.folder.name}`}
+              size={18}
+              color={palette.textMuted}
+            />
           </Pressable>
         );
       case 'chat':
@@ -358,6 +377,7 @@ export function Sidebar() {
       {shareSheet.element}
       {tagsSheet.element}
       {accountsSheet.element}
+      {folderActions.element}
     </SidebarPanel>
   );
 }

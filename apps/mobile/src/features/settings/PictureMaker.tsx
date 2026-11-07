@@ -13,6 +13,8 @@ export interface PictureMaker {
   square(dataUrl: string, size?: number): Promise<string>;
   /** Initials in white on `colour`, as a PNG data: URL. */
   initials(text: string, colour: string): Promise<string>;
+  /** The whole picture as a JPEG data: URL, shrunk to fit `maxSide` across and down (never enlarged). */
+  fit(dataUrl: string, maxSide: number): Promise<string>;
 }
 
 const PAGE = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><script>
@@ -53,6 +55,35 @@ const PAGE = `<!doctype html><html><head><meta name="viewport" content="width=de
     }
     return current.toDataURL('image/jpeg', 0.85);
   }
+  // The whole picture, shrunk (never enlarged) to fit max × max: drawn first at the largest
+  // power-of-two multiple of that size the picture allows (at most 4096 across, within what a
+  // phone's canvas holds), then halved step by step for a smooth result.
+  function fit(image, max) {
+    var w = image.naturalWidth, h = image.naturalHeight;
+    if (!w || !h) throw new Error('empty');
+    var scale = Math.min(1, max / Math.max(w, h));
+    var tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(h * scale));
+    var factor = 1;
+    while (Math.max(tw, th) * factor * 2 <= Math.min(Math.max(w, h), 4096)) factor *= 2;
+    var current = document.createElement('canvas');
+    current.width = tw * factor; current.height = th * factor;
+    var context = current.getContext('2d');
+    // A JPEG has no transparency: what's see-through in the picture becomes white, not black.
+    context.fillStyle = '#FFFFFF';
+    context.fillRect(0, 0, current.width, current.height);
+    context.imageSmoothingQuality = 'high';
+    context.drawImage(image, 0, 0, w, h, 0, 0, current.width, current.height);
+    while (factor > 1) {
+      factor /= 2;
+      var next = document.createElement('canvas');
+      next.width = tw * factor; next.height = th * factor;
+      var nextContext = next.getContext('2d');
+      nextContext.imageSmoothingQuality = 'high';
+      nextContext.drawImage(current, 0, 0, current.width, current.height, 0, 0, next.width, next.height);
+      current = next;
+    }
+    return current.toDataURL('image/jpeg', 0.82);
+  }
   function initials(text, colour) {
     var c = canvas(250), context = c.getContext('2d');
     context.fillStyle = colour;
@@ -67,7 +98,9 @@ const PAGE = `<!doctype html><html><head><meta name="viewport" content="width=de
   window.__job = function (job) {
     var work = job.kind === 'initials'
       ? Promise.resolve().then(function () { return initials(job.text, job.colour); })
-      : load(job.src).then(function (image) { return square(image, job.size); });
+      : job.kind === 'fit'
+        ? load(job.src).then(function (image) { return fit(image, job.max); })
+        : load(job.src).then(function (image) { return square(image, job.size); });
     work.then(
       function (url) { post({ id: job.id, url: url }); },
       function (error) { post({ id: job.id, error: String(error && error.message || error) }); }
@@ -77,7 +110,7 @@ const PAGE = `<!doctype html><html><head><meta name="viewport" content="width=de
 })();
 </script></body></html>`;
 
-type JobInput = { kind: 'square'; src: string; size: number } | { kind: 'initials'; text: string; colour: string };
+type JobInput = { kind: 'square'; src: string; size: number } | { kind: 'fit'; src: string; max: number } | { kind: 'initials'; text: string; colour: string };
 type Job = JobInput & { id: number };
 
 /** The maker and its hidden web view: render `element` once in the screen that uses it. */
@@ -135,6 +168,7 @@ export function usePictureMaker(): { maker: PictureMaker; element: ReactNode } {
     () => ({
       square: (dataUrl, size = 250) => run({ kind: 'square', src: dataUrl, size }),
       initials: (text, colour) => run({ kind: 'initials', text, colour }),
+      fit: (dataUrl, maxSide) => run({ kind: 'fit', src: dataUrl, max: maxSide }),
     }),
     [run],
   );

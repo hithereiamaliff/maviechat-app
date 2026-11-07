@@ -71,9 +71,16 @@ export function SidebarSearch({ value, onChange, placeholder }: { value: string 
 }
 
 /** A section's heading in the list (Pinned, Today, …). */
-export function SidebarHeading({ label }: { label: string }) {
+/** A section's heading, with a button at its end where the section has one (Folders: New Folder). */
+export function SidebarHeading({ label, action }: { label: string; action?: { icon: IconName; label: string; onPress: () => void } }) {
   const palette = usePalette();
-  return <Text style={[styles.heading, { color: palette.textFaint }]}>{label}</Text>;
+  if (!action) return <Text style={[styles.heading, { color: palette.textFaint }]}>{label}</Text>;
+  return (
+    <View style={styles.headingRow}>
+      <Text style={[styles.heading, styles.headingText, { color: palette.textFaint }]}>{label}</Text>
+      <IconButton icon={action.icon} label={action.label} onPress={action.onPress} size={16} color={palette.textMuted} />
+    </View>
+  );
 }
 
 /** A line of faint text in the list (Loading…, No chats found). */
@@ -171,6 +178,8 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontFamily: fonts.regular, fontSize: 15, paddingVertical: 0 },
   heading: { fontFamily: fonts.medium, fontSize: 12, paddingHorizontal: 12, paddingTop: 14, paddingBottom: 4 },
+  headingRow: { flexDirection: 'row', alignItems: 'flex-end' },
+  headingText: { flex: 1 },
   note: { fontFamily: fonts.regular, fontSize: 13, paddingVertical: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, paddingRight: 0, borderRadius: radius.md },
   title: { flex: 1, fontFamily: fonts.regular, fontSize: 14 },

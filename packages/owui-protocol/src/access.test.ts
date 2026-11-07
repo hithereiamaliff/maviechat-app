@@ -37,6 +37,16 @@ describe('sharing a Workspace item', () => {
     expect(accessRights({ isAdmin: true } as unknown as Capabilities, 'tools')).toEqual({ list: true, everyone: true, people: true, groups: true });
   });
 
+  it('shares a folder with people and groups only, through its own address', async () => {
+    const can = (granted: string[]) => ({ isAdmin: false, can: (path: string, fallback = false) => (granted.includes(path) ? true : fallback) }) as unknown as Capabilities;
+    expect(accessRights(can(['sharing.folders', 'sharing.public_folders']), 'folders')).toEqual({ list: true, everyone: false, people: true, groups: true });
+    expect(accessRights({ isAdmin: true } as unknown as Capabilities, 'folders')).toEqual({ list: true, everyone: false, people: true, groups: true });
+    const grant = { principal_type: 'group', principal_id: 'g1', permission: 'read' } as const;
+    const { client, calls } = recordingClient({ id: 'f/1', access_grants: [grant] });
+    expect(await updateAccess(client, 'folders', 'f/1', [grant])).toEqual([grant]);
+    expect(calls).toEqual([{ url: 'https://chat.test/api/v1/folders/f%2F1/access/update', body: { access_grants: [grant] } }]);
+  });
+
   it('saves through each area’s own address, and spots what wasn’t kept', async () => {
     const sent = [
       { principal_type: 'user' as const, principal_id: '*', permission: 'read' as const },

@@ -59,6 +59,13 @@ describe('buildSidebarRows', () => {
     ]);
   });
 
+  it('keeps the Folders heading, with New Folder, while folders are on and there are none yet', () => {
+    const rows = buildSidebarRows({ ...base, foldersOn: true, chats: [chat('a', sec(2026, 10, 1))] });
+    expect(summary(rows)).toEqual(['header:Folders', 'header:Today', 'a']);
+    expect(rows[0]).toMatchObject({ type: 'header', addFolder: true });
+    expect(summary(buildSidebarRows({ ...base, chats: [chat('a', sec(2026, 10, 1))] }))).toEqual(['header:Today', 'a']);
+  });
+
   it('shows loading and empty notes', () => {
     expect(summary(buildSidebarRows({ ...base, chats: [], chatsLoading: true }))).toEqual(['note:Loading chats…']);
     expect(summary(buildSidebarRows({ ...base, chats: [] }))).toEqual(['note:No chats yet']);

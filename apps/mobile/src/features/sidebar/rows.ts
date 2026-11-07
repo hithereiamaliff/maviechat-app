@@ -1,7 +1,7 @@
 import { groupByTime, type ChatListItem, type FolderNode } from '@maviechat/owui-protocol';
 
 export type SidebarRow =
-  | { type: 'header'; key: string; label: string }
+  | { type: 'header'; key: string; label: string; addFolder?: boolean }
   | { type: 'chat'; key: string; chat: ChatListItem; depth: number; pinned: boolean }
   | { type: 'folder'; key: string; folder: FolderNode; depth: number; expanded: boolean }
   | { type: 'note'; key: string; label: string; depth: number };
@@ -10,6 +10,8 @@ interface BuildInput {
   search: { active: boolean; results: ChatListItem[] | undefined; loading: boolean };
   pinned: ChatListItem[];
   folders: FolderNode[];
+  /** Folders are on for this account: their heading shows (with New Folder) even before there are any. */
+  foldersOn?: boolean;
   isExpanded: (folder: FolderNode) => boolean;
   folderChats: (folderId: string) => ChatListItem[] | undefined;
   chats: ChatListItem[];
@@ -33,8 +35,8 @@ export function buildSidebarRows(input: BuildInput): SidebarRow[] {
     for (const chat of input.pinned) rows.push({ type: 'chat', key: `pinned-${chat.id}`, chat, depth: 0, pinned: true });
   }
 
-  if (input.folders.length > 0) {
-    rows.push({ type: 'header', key: 'h-folders', label: 'Folders' });
+  if (input.folders.length > 0 || input.foldersOn) {
+    rows.push({ type: 'header', key: 'h-folders', label: 'Folders', addFolder: input.foldersOn });
     const addFolder = (folder: FolderNode, depth: number) => {
       const expanded = input.isExpanded(folder);
       rows.push({ type: 'folder', key: `folder-${folder.id}`, folder, depth, expanded });

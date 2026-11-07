@@ -1,4 +1,6 @@
+import type { ChatRecord } from './chats';
 import type { OwuiClient } from './http';
+import type { AccessGrant } from './workspaceModels';
 
 /** `GET /api/v1/folders/` item (`FolderNameIdResponse`). Times are Unix seconds. */
 export interface FolderItem {
@@ -24,6 +26,89 @@ export function listFolders(client: OwuiClient): Promise<FolderItem[]> {
 
 export function setFolderExpanded(client: OwuiClient, id: string, expanded: boolean): Promise<unknown> {
   return client.post<unknown>(`/api/v1/folders/${encodeURIComponent(id)}/update/expanded`, { is_expanded: expanded });
+}
+
+/** How the folder looks. */
+export interface FolderMeta {
+  /** An emoji's short code, from the web's icon picker. */
+  icon?: string | null;
+  /** A picture behind the folder's page: a data URL, or null for none. */
+  background_image_url?: string | null;
+  [key: string]: unknown;
+}
+
+/** What every chat in the folder gets. The server adds the system prompt and the knowledge itself. */
+export interface FolderData {
+  system_prompt?: string;
+  /** Knowledge bases and files, kept as a model keeps its knowledge. */
+  files?: unknown[];
+  /** The models a new chat in the folder starts with. */
+  model_ids?: string[];
+  /** 0.12: a line under the folder's name. */
+  description?: string;
+  [key: string]: unknown;
+}
+
+/** `GET /api/v1/folders/{id}`: the folder with its settings, and the people and groups it's shared with. */
+export interface FolderDetail {
+  id: string;
+  name: string;
+  parent_id?: string | null;
+  user_id?: string;
+  meta?: FolderMeta | null;
+  data?: FolderData | null;
+  access_grants?: AccessGrant[];
+  is_expanded?: boolean;
+  created_at: number;
+  updated_at: number;
+  [key: string]: unknown;
+}
+
+const folderPath = (id: string) => `/api/v1/folders/${encodeURIComponent(id)}`;
+
+export function getFolder(client: OwuiClient, id: string): Promise<FolderDetail> {
+  return client.get<FolderDetail>(folderPath(id));
+}
+
+/** A new folder, at the top or inside `parentId`. The server refuses a name the folders beside it already use. */
+export function createFolder(client: OwuiClient, input: { name: string; parentId?: string | null; data?: FolderData; meta?: FolderMeta }): Promise<FolderDetail> {
+  return client.post<FolderDetail>('/api/v1/folders/', {
+    name: input.name,
+    parent_id: input.parentId ?? null,
+    ...(input.data ? { data: input.data } : {}),
+    ...(input.meta ? { meta: input.meta } : {}),
+  });
+}
+
+/** Renames the folder or changes its settings. The server merges `data` and `meta` key by key, so keys left out stay as they are. */
+export function updateFolder(client: OwuiClient, id: string, change: { name?: string; data?: FolderData; meta?: FolderMeta }): Promise<FolderDetail> {
+  return client.post<FolderDetail>(`${folderPath(id)}/update`, change);
+}
+
+/**
+ * Deletes the folder and the folders inside it. With `deleteContents` their chats go too;
+ * without, the chats move out of the folder. Either way the server refuses when the folder
+ * holds chats and the account may not delete chats.
+ */
+export function deleteFolder(client: OwuiClient, id: string, { deleteContents }: { deleteContents: boolean }): Promise<unknown> {
+  return client.delete<unknown>(folderPath(id), { query: { delete_contents: deleteContents } });
+}
+
+/** Marks every chat in the folder, and in the folders inside it, as read. */
+export function markFolderRead(client: OwuiClient, id: string): Promise<unknown> {
+  return client.post<unknown>(`${folderPath(id)}/read`, {});
+}
+
+/** Every chat in the folder and the folders inside it, whole, as the web's Export saves them. */
+export function folderChatsForExport(client: OwuiClient, id: string): Promise<ChatRecord[]> {
+  return client.get<ChatRecord[]>(`/api/v1/chats/folder/${encodeURIComponent(id)}`);
+}
+
+/** The export file's name, as the web names it (`folder-<name>-export.json`; the web adds the time). */
+export function folderExportName(name: string): string {
+  // eslint-disable-next-line no-control-regex
+  const safe = name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim() || 'folder';
+  return `folder-${safe}-export.json`;
 }
 
 /** Nests folders by `parent_id`, sorted by name. Folders whose parent is missing become top-level. */

@@ -228,7 +228,7 @@ export function AttachmentsSection({
   );
 }
 
-function KnowledgePicker({ visible, chosen, onPick, onClose }: { visible: boolean; chosen: string[]; onPick: Setter<KnowledgeRef>; onClose: () => void }) {
+export function KnowledgePicker({ visible, chosen, onPick, onClose }: { visible: boolean; chosen: string[]; onPick: Setter<KnowledgeRef>; onClose: () => void }) {
   const palette = usePalette();
   const { client } = useAuthed();
   const [query, setQuery] = useState('');

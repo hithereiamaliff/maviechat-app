@@ -10,7 +10,7 @@ import { grantsOf, type AccessGrant } from './workspaceModels';
  * says so when the answer keeps less than it sent. Write needs read beside it, as the web sends.
  */
 
-export type AccessArea = 'models' | 'knowledge' | 'prompts' | 'skills' | 'tools';
+export type AccessArea = 'models' | 'knowledge' | 'prompts' | 'skills' | 'tools' | 'folders';
 
 export interface AccessEntry {
   type: 'user' | 'group';
@@ -62,10 +62,11 @@ export interface AccessRights {
 }
 
 export function accessRights(capabilities: Capabilities, area: AccessArea): AccessRights {
-  if (capabilities.isAdmin) return { list: true, everyone: true, people: true, groups: true };
+  // A folder is shared with people and groups only: the web offers no "everyone", and the server drops it.
+  if (capabilities.isAdmin) return { list: true, everyone: area !== 'folders', people: true, groups: true };
   return {
     list: capabilities.can(`sharing.${area}`),
-    everyone: capabilities.can(`sharing.public_${area}`),
+    everyone: area !== 'folders' && capabilities.can(`sharing.public_${area}`),
     people: capabilities.can('access_grants.allow_users', true),
     groups: capabilities.can('access_grants.allow_groups', true),
   };
@@ -84,6 +85,8 @@ function accessRequest(area: AccessArea, id: string, grants: AccessGrant[]): { p
       return { path: `/api/v1/skills/id/${key}/access/update`, body: { access_grants: grants } };
     case 'tools':
       return { path: `/api/v1/tools/id/${key}/access/update`, body: { access_grants: grants } };
+    case 'folders':
+      return { path: `/api/v1/folders/${key}/access/update`, body: { access_grants: grants } };
   }
 }
 
