@@ -18,12 +18,15 @@ export function AttachmentStrip({
   baseUrl,
   token,
   onRemove,
+  onOpen,
 }: {
   files: FileItem[];
   previews: Record<string, string>;
   baseUrl: string;
   token: string;
   onRemove: (index: number) => void;
+  /** A file chip opens its preview (whole document or not). */
+  onOpen?: (index: number) => void;
 }) {
   const palette = usePalette();
   if (files.length === 0) return null;
@@ -55,18 +58,28 @@ export function AttachmentStrip({
             {remove}
           </View>
         ) : (
-          <View key={file.itemId ?? index} style={[styles.chip, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            {uploading ? <ActivityIndicator size="small" color={palette.textMuted} /> : <Icon name="document-text" size={18} color={palette.textMuted} />}
+          <Pressable
+            key={file.itemId ?? index}
+            accessibilityRole="button"
+            accessibilityHint="Shows the attachment"
+            disabled={!onOpen}
+            onPress={() => onOpen?.(index)}
+            style={[styles.chip, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            {uploading ? (
+              <ActivityIndicator size="small" color={palette.textMuted} />
+            ) : (
+              <Icon name={file.type === 'chat' ? 'chat-bubble-left-right' : file.type === 'collection' ? 'circle-stack' : 'document-text'} size={18} color={palette.textMuted} />
+            )}
             <View style={styles.chipText}>
               <Text style={[styles.name, { color: palette.text }]} numberOfLines={1}>
                 {file.name ?? 'File'}
               </Text>
               <Text style={[styles.meta, { color: palette.textFaint }]} numberOfLines={1}>
-                {uploading ? 'Uploading…' : size(file.size) || 'File'}
+                {uploading ? 'Uploading…' : file.context === 'full' ? 'Entire document' : size(file.size) || (file.type === 'chat' ? 'Chat' : file.type === 'collection' ? 'Knowledge' : 'File')}
               </Text>
             </View>
             {remove}
-          </View>
+          </Pressable>
         );
       })}
     </ScrollView>

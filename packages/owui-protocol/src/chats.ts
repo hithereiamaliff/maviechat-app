@@ -1,4 +1,4 @@
-import type { ChatHistory, HistoryMessage } from './history';
+import { branchPath, type ChatHistory, type HistoryMessage } from './history';
 import type { OwuiClient } from './http';
 
 /** A row of the sidebar lists (`ChatTitleIdResponse`). Times are Unix seconds. */
@@ -154,6 +154,17 @@ export function saveMessages(client: OwuiClient, chatId: string, messages: Histo
 /** Creates a saved chat from a whole history (used to keep a temporary chat). The server picks the id. */
 export function createChat(client: OwuiClient, chat: ChatDocument): Promise<ChatRecord> {
   return client.post<ChatRecord>('/api/v1/chats/new', { chat });
+}
+
+/**
+ * A temporary chat as a saved one (its Save Chat), as the web saves it: named after your first
+ * message (50 characters, then "..."), with its models, controls and whole history.
+ */
+export function savedTemporaryChat(history: ChatHistory, { models, params }: { models: string[]; params?: Record<string, unknown> }, timestamp = Date.now()): ChatDocument {
+  const messages = branchPath(history, history.currentId);
+  const first = messages.find((message) => message.role === 'user')?.content;
+  const title = typeof first === 'string' && first.trim() ? first : 'New Chat';
+  return { title: title.length > 50 ? `${title.slice(0, 50)}...` : title, models, params: params ?? {}, history, messages, tags: [], timestamp };
 }
 
 /** `null` moves the chat out of its folder. */

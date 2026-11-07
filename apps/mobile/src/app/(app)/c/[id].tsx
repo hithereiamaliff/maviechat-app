@@ -3,6 +3,7 @@ import {
   awaitingYou,
   branchArtifacts,
   combineQueued,
+  createChat,
   forkChat,
   isTemporaryChatId,
   messageBlocks,
@@ -15,6 +16,7 @@ import {
   pendingAskUser,
   plainText,
   resolveToolCall,
+  savedTemporaryChat,
   saveMessage,
   selectBranch,
   speechRate,
@@ -211,6 +213,21 @@ export default function ChatScreen() {
   // reply you stopped: the web reads only replies that finish.
   const settings = useUserSettings();
   const capabilities = useCapabilities();
+  // A temporary chat with messages can become a saved one, as the web's Save Chat makes it (not where temporary chats are enforced).
+  const enforcedTemporary = capabilities ? !capabilities.isAdmin && capabilities.can('chat.temporary_enforced') : true;
+  const canSaveTemporary = temporary && !enforcedTemporary && Object.keys(chat?.chat?.history?.messages ?? {}).length > 0 && !streaming;
+  const saveTemporary = async () => {
+    const history = chat?.chat?.history;
+    if (!history?.currentId) return;
+    try {
+      const saved = await createChat(client, savedTemporaryChat(history, { models: selected.map((item) => item.id), params: (chat?.chat?.params ?? {}) as Record<string, unknown> }));
+      void queryClient.invalidateQueries({ queryKey: ['chats'] });
+      router.replace(`/c/${saved.id}`);
+      toast('Conversation saved', 'success');
+    } catch (error) {
+      toast(`Couldn't save the conversation: ${describeError(error)}`, 'error');
+    }
+  };
   const reply = lastReply?.role === 'assistant' ? lastReply : undefined;
   const stoppedByYou = useRef(false);
   const stopReply = (id: string) => {
@@ -439,7 +456,14 @@ export default function ChatScreen() {
       <ChatHeader
         title={temporary ? 'Temporary Chat' : chat?.title}
         menu={menu}
-        accessory={chat ? <IconButton icon="adjustments-horizontal" label="Controls" onPress={() => setControlsOpen(true)} /> : null}
+        accessory={
+          chat ? (
+            <>
+              {canSaveTemporary ? <IconButton icon="archive-box-arrow-down" label="Save Chat" onPress={() => void saveTemporary()} /> : null}
+              <IconButton icon="adjustments-horizontal" label="Controls" onPress={() => setControlsOpen(true)} />
+            </>
+          ) : null
+        }
       />
       <KeyboardAvoidingView behavior="padding" style={styles.screen}>
         {query.isLoading ? (

@@ -8,6 +8,9 @@ export interface Picked {
   mimeType?: string;
   /** Read in full rather than searched (a long paste, as the web marks it). */
   context?: 'full';
+  /** A photo's size in pixels, when known (to shrink it to the server's and your limits). */
+  width?: number;
+  height?: number;
 }
 
 export const PHOTO_OPTIONS: ImagePicker.ImagePickerOptions = {
@@ -26,6 +29,8 @@ export function photo(asset: ImagePicker.ImagePickerAsset): Picked {
     name: `${base}.${extension}`,
     size: asset.fileSize,
     mimeType: asset.mimeType ?? `image/${extension === 'jpg' ? 'jpeg' : extension}`,
+    width: asset.width || undefined,
+    height: asset.height || undefined,
   };
 }
 

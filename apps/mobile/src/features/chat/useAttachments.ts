@@ -1,6 +1,10 @@
 import {
+  attachWebAddress,
   fileItemFromUpload,
+  fitWithin,
+  imageLimits,
   inlineImageItem,
+  isWebAddress,
   modelSupports,
   OwuiHttpError,
   readableAsText,
@@ -19,7 +23,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useToast } from '@/components/Toast';
 import { deepTutorAttachment } from '@/features/deeptutor/crossReference';
 import { describeError } from '@/lib/errors';
-import { useAuthed, useCapabilities, useServerConfig } from '@/lib/server';
+import { usePictureMaker } from '@/features/settings/PictureMaker';
+import { useAuthed, useCapabilities, useServerConfig, useUserSettings } from '@/lib/server';
 import { useInterface } from '@/lib/uiSettings';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
@@ -40,6 +45,26 @@ export function useAttachments({ draftKey, model, temporary }: { draftKey: strin
   const toast = useToast();
   const deepTutor = useDeepTutor();
   const ui = useInterface();
+  const settings = useUserSettings();
+  const picture = usePictureMaker();
+
+  // As the web does before sending a photo: shrunk to your "Image Compression" size, capped by the
+  // admin's limits, keeping its shape. If that fails, the photo goes as it is.
+  const shrink = async (file: Picked): Promise<Picked> => {
+    const limits = imageLimits(settings.data?.ui, config.data);
+    const target = limits && file.width && file.height ? fitWithin(file.width, file.height, limits) : null;
+    if (!target) return file;
+    try {
+      const smaller = await picture.maker.fit(await readAsDataUrl(file.uri, file.mimeType ?? 'image/jpeg'), target.width, target.height);
+      const name = `${file.name.replace(/\.[^.]+$/, '')}.jpg`;
+      const out = new File(Paths.cache, `shrunk-${uuidv4().slice(0, 8)}-${name}`);
+      out.create({ overwrite: true });
+      await out.write(smaller.replace(/^data:[^,]*,/, ''), { encoding: 'base64' });
+      return { ...file, uri: out.uri, name, size: out.size ?? undefined, mimeType: 'image/jpeg', width: target.width, height: target.height };
+    } catch {
+      return file;
+    }
+  };
 
   const upload = async (file: Picked, image: boolean) => {
     const itemId = uuidv4();
@@ -123,13 +148,15 @@ export function useAttachments({ draftKey, model, temporary }: { draftKey: strin
       if (image && !modelSupports(model, 'vision')) {
         refusals.add('Selected model(s) do not support image inputs');
       } else if (image && temporary) {
-        void keepPhoto(file);
+        void shrink(file).then(keepPhoto);
       } else if (!modelSupports(model, 'file_upload')) {
         refusals.add('Model(s) do not support file upload');
       } else if (temporary) {
         void keepText(file);
+      } else if (image) {
+        void shrink(file).then((small) => upload(small, true));
       } else {
-        void upload(file, image);
+        void upload(file, false);
       }
     }
     for (const reason of refusals) toast(reason, 'error');
@@ -173,6 +200,22 @@ export function useAttachments({ draftKey, model, temporary }: { draftKey: strin
   };
 
   return {
+    /** The hidden web view that shrinks photos: render it once where the attachments are used. */
+    pictureElement: picture.element,
+    /** The + menu's Attach Webpage: the server fetches the page, and its text goes with the message. */
+    attachWebpage: async (address: string) => {
+      const url = address.trim();
+      if (capabilities && !capabilities.can('chat.web_upload', true)) return toast('You do not have permission to upload web content.', 'error');
+      if (!isWebAddress(url)) return toast('That isn’t a web address. It starts with https://.', 'error');
+      const itemId = uuidv4();
+      updateDraft(draftKey, (draft) => ({ ...draft, files: [...draft.files, { type: 'text', id: null, url, name: url, status: 'uploading', itemId }] }));
+      try {
+        patchFile(draftKey, itemId, { ...(await attachWebAddress(client, url)), itemId });
+      } catch (error) {
+        removeFile(draftKey, itemId);
+        toast(`Couldn't attach that page: ${describeError(error)}`, 'error');
+      }
+    },
     attachDeepTutorChat,
     /** A long paste, attached as the web attaches it: `Pasted_Text_….txt`, read in full. */
     attachText: (text: string) =>
@@ -186,7 +229,14 @@ export function useAttachments({ draftKey, model, temporary }: { draftKey: strin
           return [];
         }
         const base64 = image.data.replace(/^data:[^,]*,/, '');
-        return [{ ...(await cached(`Pasted_Image_${uuidv4().slice(0, 8)}.jpg`, (file) => file.write(base64, { encoding: 'base64' }))), mimeType: 'image/jpeg' }];
+        return [
+          {
+            ...(await cached(`Pasted_Image_${uuidv4().slice(0, 8)}.jpg`, (file) => file.write(base64, { encoding: 'base64' }))),
+            mimeType: 'image/jpeg',
+            width: image.size?.width || undefined,
+            height: image.size?.height || undefined,
+          },
+        ];
       }),
     pickFiles: () =>
       run(async () => {

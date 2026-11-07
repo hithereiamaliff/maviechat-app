@@ -132,7 +132,7 @@ function Editor({
     try {
       const result = await ImagePicker.launchImageLibraryAsync(PHOTO);
       const asset = result.canceled ? undefined : result.assets[0];
-      if (asset?.base64) setBackground(await picture.maker.fit(`data:image/jpeg;base64,${asset.base64}`, BACKGROUND_SIDE));
+      if (asset?.base64) setBackground(await picture.maker.fit(`data:image/jpeg;base64,${asset.base64}`, BACKGROUND_SIDE, BACKGROUND_SIDE));
     } catch (error) {
       toast(`Couldn’t use the photo: ${describeError(error)}`, 'error');
     }

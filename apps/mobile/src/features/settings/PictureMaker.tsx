@@ -13,8 +13,8 @@ export interface PictureMaker {
   square(dataUrl: string, size?: number): Promise<string>;
   /** Initials in white on `colour`, as a PNG data: URL. */
   initials(text: string, colour: string): Promise<string>;
-  /** The whole picture as a JPEG data: URL, shrunk to fit `maxSide` across and down (never enlarged). */
-  fit(dataUrl: string, maxSide: number): Promise<string>;
+  /** The whole picture as a JPEG data: URL, shrunk to fit `maxWidth` × `maxHeight` (null: no limit that way; never enlarged). */
+  fit(dataUrl: string, maxWidth: number | null, maxHeight: number | null): Promise<string>;
 }
 
 const PAGE = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><script>
@@ -55,13 +55,13 @@ const PAGE = `<!doctype html><html><head><meta name="viewport" content="width=de
     }
     return current.toDataURL('image/jpeg', 0.85);
   }
-  // The whole picture, shrunk (never enlarged) to fit max × max: drawn first at the largest
+  // The whole picture, shrunk (never enlarged) to fit maxW × maxH: drawn first at the largest
   // power-of-two multiple of that size the picture allows (at most 4096 across, within what a
   // phone's canvas holds), then halved step by step for a smooth result.
-  function fit(image, max) {
+  function fit(image, maxW, maxH) {
     var w = image.naturalWidth, h = image.naturalHeight;
     if (!w || !h) throw new Error('empty');
-    var scale = Math.min(1, max / Math.max(w, h));
+    var scale = Math.min(1, maxW ? maxW / w : Infinity, maxH ? maxH / h : Infinity);
     var tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(h * scale));
     var factor = 1;
     while (Math.max(tw, th) * factor * 2 <= Math.min(Math.max(w, h), 4096)) factor *= 2;
@@ -99,7 +99,7 @@ const PAGE = `<!doctype html><html><head><meta name="viewport" content="width=de
     var work = job.kind === 'initials'
       ? Promise.resolve().then(function () { return initials(job.text, job.colour); })
       : job.kind === 'fit'
-        ? load(job.src).then(function (image) { return fit(image, job.max); })
+        ? load(job.src).then(function (image) { return fit(image, job.maxWidth, job.maxHeight); })
         : load(job.src).then(function (image) { return square(image, job.size); });
     work.then(
       function (url) { post({ id: job.id, url: url }); },
@@ -110,7 +110,7 @@ const PAGE = `<!doctype html><html><head><meta name="viewport" content="width=de
 })();
 </script></body></html>`;
 
-type JobInput = { kind: 'square'; src: string; size: number } | { kind: 'fit'; src: string; max: number } | { kind: 'initials'; text: string; colour: string };
+type JobInput = { kind: 'square'; src: string; size: number } | { kind: 'fit'; src: string; maxWidth: number | null; maxHeight: number | null } | { kind: 'initials'; text: string; colour: string };
 type Job = JobInput & { id: number };
 
 /** The maker and its hidden web view: render `element` once in the screen that uses it. */
@@ -168,7 +168,7 @@ export function usePictureMaker(): { maker: PictureMaker; element: ReactNode } {
     () => ({
       square: (dataUrl, size = 250) => run({ kind: 'square', src: dataUrl, size }),
       initials: (text, colour) => run({ kind: 'initials', text, colour }),
-      fit: (dataUrl, maxSide) => run({ kind: 'fit', src: dataUrl, max: maxSide }),
+      fit: (dataUrl, maxWidth, maxHeight) => run({ kind: 'fit', src: dataUrl, maxWidth, maxHeight }),
     }),
     [run],
   );

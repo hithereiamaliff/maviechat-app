@@ -16,8 +16,11 @@ export interface UploadedFile {
  * `{type: 'image', url: <data URL>}` and documents travel as `{type: 'text', content}`.
  */
 export interface FileItem {
-  /** A whole knowledge base (`collection`) or folder can ride along too, picked from the `@` or `#` menu. */
-  type: 'file' | 'image' | 'text' | 'collection' | 'folder';
+  /**
+   * A whole knowledge base (`collection`) or folder can ride along too, picked from the `@` or `#`
+   * menu, and another chat (`chat`, Reference Chats) or a note (`note`): the server reads them.
+   */
+  type: 'file' | 'image' | 'text' | 'collection' | 'folder' | 'chat' | 'note';
   file?: UploadedFile | '';
   id: string | null;
   url: string;
@@ -102,6 +105,49 @@ export async function searchFiles(client: OwuiClient, query: string, skip = 0): 
     if (error instanceof OwuiHttpError && error.status === 404) return [];
     throw error;
   }
+}
+
+/** One of your files, uploaded before, attached again (the + menu's Attach Files), as an upload would be. */
+export function previousFileItem(file: StoredFile, itemId: string): FileItem {
+  return {
+    type: 'file',
+    id: file.id,
+    url: file.id,
+    name: file.filename,
+    collection_name: '',
+    status: 'processed',
+    size: file.size ?? 0,
+    error: '',
+    itemId,
+    ...(file.contentType ? { content_type: file.contentType } : {}),
+  };
+}
+
+/** Another chat for the model to read (the + menu's Reference Chats). */
+export function chatReferenceItem(chat: { id: string; title?: string | null }, itemId: string): FileItem {
+  return { type: 'chat', id: chat.id, url: '', name: chat.title || 'New Chat', status: 'processed', itemId };
+}
+
+/**
+ * How big a photo may be before it's sent, as the web decides: your "Image Compression" size
+ * (`ui.imageCompression` with `ui.imageCompressionSize`), capped by the admin's limits
+ * (`file.image_compression`). Null when nothing limits it.
+ */
+export function imageLimits(ui: Record<string, unknown> | null | undefined, config: Record<string, unknown> | null | undefined): { width: number | null; height: number | null } | null {
+  const positive = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null);
+  const server = (config?.file as { image_compression?: { width?: unknown; height?: unknown } } | undefined)?.image_compression;
+  const mine = ui?.imageCompression === true ? (ui.imageCompressionSize as { width?: unknown; height?: unknown } | undefined) : undefined;
+  const cap = (own: number | null, limit: number | null) => (limit !== null && (own === null || own > limit) ? limit : own);
+  const width = cap(positive(mine?.width), positive(server?.width));
+  const height = cap(positive(mine?.height), positive(server?.height));
+  return width === null && height === null ? null : { width, height };
+}
+
+/** The size a photo is shrunk to, keeping its shape, or null when it already fits. */
+export function fitWithin(width: number, height: number, limits: { width: number | null; height: number | null }): { width: number; height: number } | null {
+  const scale = Math.min(limits.width ? limits.width / width : Infinity, limits.height ? limits.height / height : Infinity);
+  if (!(scale < 1)) return null;
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
 
 /** How many files you have (admins: everyone's). */

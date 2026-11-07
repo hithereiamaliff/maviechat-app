@@ -22,6 +22,7 @@ import { useEffect, useImperativeHandle, useRef, useState, type ComponentRef, ty
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
+import { showPrompt } from '@/components/dialogs';
 import { useAnchoredMenu, type MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
 import { DeepTutorPicker } from '@/features/deeptutor/DeepTutorPicker';
@@ -32,7 +33,9 @@ import { useGrowingInput } from '@/lib/useGrowingInput';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
 import { AttachmentStrip } from './AttachmentStrip';
+import { AttachSheet, type AttachMode } from './AttachSheet';
 import { getDraft, updateDraft, useDraft } from './drafts';
+import { FilePreviewSheet } from './FilePreviewSheet';
 import { FullScreenInput } from './FullScreenInput';
 import { IntegrationsSheet, TOGGLE_INFO } from './IntegrationsSheet';
 import { MentionMenu } from './MentionMenu';
@@ -137,6 +140,8 @@ export function Composer({
   const [expanded, setExpanded] = useState(false);
   const [deepTutorOpen, setDeepTutorOpen] = useState(false);
   const [knobsOpen, setKnobsOpen] = useState(false);
+  const [attachMode, setAttachMode] = useState<AttachMode | null>(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }), []);
@@ -213,6 +218,26 @@ export function Composer({
     { key: 'photos', label: 'Photo Library', icon: 'photo', onPress: () => void attach.pickPhotos() },
     { key: 'camera', label: 'Capture', icon: 'camera', onPress: () => void attach.capture() },
     { key: 'paste', label: 'Paste Image', icon: 'clipboard-document', onPress: () => void attach.pasteImage() },
+    {
+      key: 'web',
+      label: 'Attach Webpage',
+      icon: 'globe-alt',
+      onPress: () =>
+        showPrompt(
+          'Attach Webpage',
+          'The page’s address, starting with https://',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Attach', onPress: (value?: string) => void attach.attachWebpage(value ?? '') },
+          ],
+          'plain-text',
+          '',
+          'url',
+        ),
+    },
+    { key: 'previous', label: 'Attach Files', icon: 'document-text', onPress: () => setAttachMode('files') },
+    { key: 'knowledge', label: 'Attach Knowledge', icon: 'circle-stack', onPress: () => setAttachMode('knowledge') },
+    { key: 'chats', label: 'Reference Chats', icon: 'chat-bubble-left-right', onPress: () => setAttachMode('chats') },
     ...(deepTutorSignedIn
       ? [{ key: 'deeptutor', label: 'Reference DeepTutor Chat', icon: 'academic-cap' as const, onPress: () => setDeepTutorOpen(true) }]
       : []),
@@ -287,7 +312,7 @@ export function Composer({
             </Pressable>
           </View>
         ) : null}
-        <AttachmentStrip files={draft.files} previews={draft.previews} baseUrl={session.baseUrl} token={session.token} onRemove={removeAttachment} />
+        <AttachmentStrip files={draft.files} previews={draft.previews} baseUrl={session.baseUrl} token={session.token} onRemove={removeAttachment} onOpen={setPreviewIndex} />
         <View>
           <TextInput
             ref={input}
@@ -414,6 +439,15 @@ export function Composer({
         </View>
       </View>
       {plusMenu}
+      {attach.pictureElement}
+      <AttachSheet mode={attachMode} draftKey={draftKey} chatId={draftKey} onClose={() => setAttachMode(null)} />
+      <FilePreviewSheet
+        file={previewIndex !== null ? (draft.files[previewIndex] ?? null) : null}
+        onClose={() => setPreviewIndex(null)}
+        onChange={(change) =>
+          updateDraft(draftKey, (current) => ({ ...current, files: current.files.map((file, index) => (index === previewIndex ? { ...file, ...change } : file)) }))
+        }
+      />
       {knobModels.length ? <ModelControlsSheet visible={knobsOpen} models={knobModels} onClose={() => setKnobsOpen(false)} /> : null}
       {deepTutorSignedIn ? (
         <DeepTutorPicker visible={deepTutorOpen} onClose={() => setDeepTutorOpen(false)} onPick={(session) => void attach.attachDeepTutorChat(session)} />
