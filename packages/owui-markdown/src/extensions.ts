@@ -1,4 +1,4 @@
-import type { TokenizerExtension, Tokens } from 'marked';
+import type { Token, TokenizerExtension, Tokens } from 'marked';
 
 /** `[1]` or `[1, 3]`: a reference to the response's sources (not a link, footnote or link definition). */
 export interface CitationToken extends Tokens.Generic {
@@ -116,4 +116,64 @@ export const inlineMath: TokenizerExtension = {
 
 function mathToken(raw: string, text: string, display: boolean): InlineMathToken {
   return { type: 'inlineMath', raw, text: text.trim(), display };
+}
+
+/**
+ * `:::kind{key="value" …}` on its own line, then markdown, then `:::` on its own line: a labelled
+ * section. Some models wrap a letter (`:::writing`), code output or search results in one.
+ */
+export interface ColonFenceToken extends Tokens.Generic {
+  type: 'colonFence';
+  kind: string;
+  /** Only from braces right after the kind; text after them is ignored. */
+  attributes: Record<string, string>;
+  /** The markdown inside, trimmed. */
+  text: string;
+  tokens: Token[];
+}
+
+export const colonFence: TokenizerExtension = {
+  name: 'colonFence',
+  level: 'block',
+  start: (src) => src.match(/^:::[\w-]/m)?.index,
+  tokenizer(src) {
+    const opening = /^:::([\w-]+)([^\n]*)(?:\n|$)/.exec(src);
+    if (!opening) return undefined;
+    const body: string[] = [];
+    let at = opening[0].length;
+    while (at < src.length) {
+      const end = src.indexOf('\n', at);
+      const line = end === -1 ? src.slice(at) : src.slice(at, end);
+      const next = end === -1 ? src.length : end + 1;
+      if (/^:::[ \t]*$/.test(line)) {
+        const text = body.join('\n').trim();
+        const tokens: Token[] = [];
+        this.lexer.blockTokens(text, tokens);
+        const token: ColonFenceToken = {
+          type: 'colonFence',
+          raw: src.slice(0, next),
+          kind: opening[1] ?? '',
+          attributes: fenceAttributes(opening[2] ?? ''),
+          text,
+          tokens,
+        };
+        return token;
+      }
+      body.push(line);
+      at = next;
+    }
+    // Not closed (yet, while a reply streams): plain markdown until it is.
+    return undefined;
+  },
+};
+
+function fenceAttributes(rest: string): Record<string, string> {
+  if (!rest.startsWith('{')) return {};
+  const close = rest.lastIndexOf('}');
+  if (close < 1) return {};
+  const attributes: Record<string, string> = {};
+  for (const match of rest.slice(1, close).matchAll(/([\w-]+)="([^"]*)"/g)) {
+    if (match[1]) attributes[match[1]] = match[2] ?? '';
+  }
+  return attributes;
 }

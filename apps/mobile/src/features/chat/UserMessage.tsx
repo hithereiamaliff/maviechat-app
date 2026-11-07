@@ -31,10 +31,10 @@ export const UserMessage = memo(function UserMessage({
   onStep: (step: -1 | 1) => void;
   baseUrl: string;
   token: string;
-  /** Saves the edited text in place; no new reply. */
-  onSaveEdit?: (content: string) => Promise<boolean>;
-  /** Sends the edited text as a new version of this message, which gets its own reply. */
-  onSendEdit?: (content: string) => Promise<boolean>;
+  /** Saves the edited text and files in place; no new reply. */
+  onSaveEdit?: (content: string, files: FileItem[]) => Promise<boolean>;
+  /** Sends the edited text and files as a new version of this message, which gets its own reply. */
+  onSendEdit?: (content: string, files: FileItem[]) => Promise<boolean>;
   onDelete?: () => void;
 }) {
   const palette = usePalette();
@@ -42,18 +42,24 @@ export const UserMessage = memo(function UserMessage({
   const ui = useInterface();
   const [showActions, setShowActions] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  // While editing, the files kept so far (as on the web, each can be taken out).
+  const [keptFiles, setKeptFiles] = useState<FileItem[]>([]);
   const [busy, setBusy] = useState(false);
   const files = attachments(message.files);
-  const hasFiles = files.length > 0;
 
-  const finish = async (action: ((content: string) => Promise<boolean>) | undefined) => {
+  const startEditing = () => {
+    setEditing(message.content);
+    setKeptFiles(files);
+  };
+
+  const finish = async (action: ((content: string, files: FileItem[]) => Promise<boolean>) | undefined) => {
     if (!action || editing === null) return;
-    if (!editing.trim() && !hasFiles) {
+    if (!editing.trim() && keptFiles.length === 0) {
       toast('Please enter a message or attach a file.', 'error');
       return;
     }
     setBusy(true);
-    const done = await action(editing);
+    const done = await action(editing, keptFiles);
     setBusy(false);
     if (done) {
       setEditing(null);
@@ -61,34 +67,49 @@ export const UserMessage = memo(function UserMessage({
     }
   };
 
-  const fileViews = hasFiles ? (
-    <View style={styles.files}>
-      {files.map((file, index) => {
-        const url = attachmentUrl(file, baseUrl);
-        return isImageItem(file) && url ? (
-          <Image
-            key={index}
-            accessibilityLabel={typeof file.name === 'string' ? file.name : 'Image'}
-            source={{ uri: url, headers: url.startsWith(baseUrl) ? { Authorization: `Bearer ${token}` } : undefined }}
-            style={[styles.image, { backgroundColor: palette.surface }]}
-            contentFit="cover"
-          />
-        ) : (
-          <View key={index} style={[styles.fileChip, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <Icon name="document-text" size={16} color={palette.textMuted} />
-            <Text style={[styles.fileName, { color: palette.text }]} numberOfLines={1}>
-              {typeof file.name === 'string' ? file.name : 'File'}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  ) : null;
+  const fileViews = (shown: FileItem[], onRemove?: (index: number) => void) =>
+    shown.length ? (
+      <View style={styles.files}>
+        {shown.map((file, index) => {
+          const url = attachmentUrl(file, baseUrl);
+          const name = typeof file.name === 'string' ? file.name : isImageItem(file) ? 'Image' : 'File';
+          const remove = onRemove ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Remove ${name}`}
+              hitSlop={8}
+              onPress={() => onRemove(index)}
+              style={[styles.remove, { backgroundColor: palette.surfaceStrong, borderColor: palette.border }]}>
+              <Icon name="x-mark" size={12} color={palette.text} strokeWidth={2.5} />
+            </Pressable>
+          ) : null;
+          return isImageItem(file) && url ? (
+            <View key={index}>
+              <Image
+                accessibilityLabel={name}
+                source={{ uri: url, headers: url.startsWith(baseUrl) ? { Authorization: `Bearer ${token}` } : undefined }}
+                style={[onRemove ? styles.thumb : styles.image, { backgroundColor: palette.surface }]}
+                contentFit="cover"
+              />
+              {remove}
+            </View>
+          ) : (
+            <View key={index} style={[styles.fileChip, onRemove && styles.fileChipEditing, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <Icon name="document-text" size={16} color={palette.textMuted} />
+              <Text style={[styles.fileName, { color: palette.text }]} numberOfLines={1}>
+                {name}
+              </Text>
+              {remove}
+            </View>
+          );
+        })}
+      </View>
+    ) : null;
 
   if (editing !== null) {
     return (
       <View style={styles.wrap}>
-        {fileViews}
+        {fileViews(keptFiles, (index) => setKeptFiles((current) => current.filter((_, at) => at !== index)))}
         <View style={[styles.editor, { backgroundColor: palette.bubble }]}>
           <TextInput
             value={editing}
@@ -112,7 +133,7 @@ export const UserMessage = memo(function UserMessage({
 
   return (
     <Pressable onPress={() => setShowActions((value) => !value)} style={styles.wrap} accessibilityHint="Shows message actions">
-      {fileViews}
+      {fileViews(files)}
       {message.content ? (
         <View style={[styles.bubble, { backgroundColor: palette.bubble }]}>
           {ui('renderMarkdownInUserMessages') ? (
@@ -128,7 +149,7 @@ export const UserMessage = memo(function UserMessage({
         {showActions ? (
           <>
             {onSaveEdit || onSendEdit ? (
-              <IconButton icon="pencil" label="Edit" size={18} color={palette.textMuted} onPress={() => setEditing(message.content)} />
+              <IconButton icon="pencil" label="Edit" size={18} color={palette.textMuted} onPress={startEditing} />
             ) : null}
             <IconButton
               icon="clipboard-document"
@@ -169,6 +190,18 @@ const styles = StyleSheet.create({
   wrap: { alignItems: 'flex-end', marginTop: 16, gap: 4 },
   files: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6, maxWidth: '90%' },
   image: { width: 140, height: 140, borderRadius: radius.lg },
+  thumb: { width: 72, height: 72, borderRadius: radius.md },
+  remove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   fileChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -180,6 +213,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   fileName: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 13 },
+  fileChipEditing: { paddingRight: 18 },
   bubble: { maxWidth: '88%', borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10 },
   text: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 24 },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 4 },

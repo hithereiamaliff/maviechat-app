@@ -12,6 +12,7 @@ export * from './auth';
 export * from './capabilities';
 export * from './chatgpt';
 export * from './chats';
+export * from './code';
 export * from './completions';
 export * from './data';
 export * from './export';

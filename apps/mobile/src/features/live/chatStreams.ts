@@ -1,4 +1,4 @@
-import { applyMessageEvent, askUserQuestions, type AskUserAnswer, type AskUserQuestion, type ChatEventEnvelope, type ChatRecord, type HistoryMessage } from '@maviechat/owui-protocol';
+import { applyMessageEvent, askUserQuestions, type AskUserAnswer, type AskUserQuestion, type ChatEventEnvelope, type ChatRecord, type CodeOutput, type HistoryMessage } from '@maviechat/owui-protocol';
 import type { QueryClient } from '@tanstack/react-query';
 
 type Reply = (response: unknown) => void;
@@ -14,6 +14,8 @@ export interface StreamHooks {
   isViewing(chatId: string): boolean;
   /** True when a push notification announces this chat's finished reply, so the app needn't. */
   pushAnnounces?(chatId: string): boolean;
+  /** Runs the code interpreter's Python on the phone, with the chat's files the server lists. */
+  runPython?(code: string, files: unknown): Promise<CodeOutput>;
 }
 
 interface QueuedEvent {
@@ -223,9 +225,18 @@ export class ChatStreams {
       case 'request:elicitation':
         reply?.({ action: 'cancel' });
         return;
-      case 'execute:python':
-        reply?.({ stdout: '', stderr: "MavieChat can't run Python on the phone. Use the server's code interpreter instead.", result: null });
+      case 'execute:python': {
+        if (!this.hooks.runPython) {
+          reply?.({ stdout: '', stderr: "MavieChat can't run Python here. Use the server's code interpreter instead.", result: null });
+          return;
+        }
+        try {
+          reply?.(await this.hooks.runPython(text(payload.code), payload.files));
+        } catch (error) {
+          reply?.({ stdout: '', stderr: error instanceof Error ? error.message : String(error), result: null });
+        }
         return;
+      }
       default:
         // execute (JavaScript), tool servers, direct connections, terminals: not available in the app.
         reply?.({ error: `MavieChat can't handle “${type}” requests yet.` });

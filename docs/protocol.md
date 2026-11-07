@@ -116,7 +116,7 @@ This is a spec written from reading Open WebUI's source (v0.12.5, read 2026-11-0
 
 **Feedback:** `POST /api/v1/evaluations/feedback`, `POST|GET|DELETE /feedback/{id}`.
 
-**Code:** `POST /api/v1/utils/code/execute` (the server's Jupyter engine).
+**Code:** `POST /api/v1/utils/code/execute` (the server's Jupyter engine; refused with 400 for any other engine, 403 with code execution off). Pyodide: the server's static `/pyodide/` (`pyodide.js`, the `pyodide.asm.mjs` module, `pyodide.asm.wasm`, `python_stdlib.zip`, `pyodide-lock.json` and the wheels it names), with CORS for a page without an origin. Pyodide 314.0.3 (Python 3.14) on 0.11.3 and 0.12.5.
 
 **Notifications** (0.11.3 ✓ the module exists)
 - `/api/v1/notifications/{events,targets,targets/{id}[/default|/test]}`.
@@ -268,8 +268,9 @@ The server merges these writes: it keeps its own copy of in-progress assistant m
   - `input` → value or `false`;
   - `request:user_input` → `{status, answers}`;
   - `request:elicitation` → `{action: accept|decline|cancel, content?}`.
+- **`execute:python`** (`{id, code, session_id, files}`, sent only to the socket that started the reply): run on the phone, the chat's files written to `/mnt/uploads`, answered `{stdout, stderr, result}`. Plots print as `data:image/png;base64,…` lines, which the server turns into images.
 - **Answered "unsupported" immediately** so the turn never hangs:
-  - `execute` (run JavaScript) and `execute:python` (Pyodide in the client);
+  - `execute` (run JavaScript);
   - `request:chat:completion` (direct connections run by the client);
   - `request:terminal`.
 - `execute:tool` (call a user tool server from the client): later, with plain fetch.
@@ -295,7 +296,7 @@ The server merges these writes: it keeps its own copy of in-progress assistant m
 - **Title, tags, follow-ups:** the server runs them when `background_tasks` asks and the admin flags allow. Results arrive as `chat:title`, `chat:tags` and `chat:message:follow_ups`.
 - **Speech-to-text:** engine `"web"` means the browser's own recognition (we use iOS on-device instead). Otherwise `POST /api/v1/audio/transcriptions`.
 - **Text-to-speech:** engine `""` means the browser (we use iOS AVSpeech). Otherwise `POST /api/v1/audio/speech`. Voice priority: the model's `info.meta.tts.voice`, then user settings, then config.
-- **Code:** "Run" on a code block uses `POST /api/v1/utils/code/execute` when `code.engine === "jupyter"`. The code interpreter with `interpreter_engine: "pyodide"` sends `execute:python` to the client (unsupported in the app); suggest Jupyter on the server.
+- **Code:** "Run" on a code block (shown while `features.enable_code_execution` isn't false, for Python) uses `POST /api/v1/utils/code/execute` when `code.engine === "jupyter"`, and Python on the phone otherwise (the web runs it in the browser). The code interpreter with `interpreter_engine: "pyodide"` sends `execute:python` to the client, which the app runs the same way. With legacy tool calling the server runs a `<code_interpreter type="code" lang="python">` block only when the reply ends with it.
 - **Web search and image generation:** `features.*` flags. With native function calling they are built-in tools.
 - **Direct connections and user tool servers:** executed by the browser in the web app. Out of scope until M5 or later.
 
@@ -319,7 +320,7 @@ The server merges these writes: it keeps its own copy of in-progress assistant m
 - **`messages`** for saved chats holds only the system prompt (0.11.3 web ✓); the server loads the conversation from `parent_id` and `user_message`.
 - **No client save after a reply.** In 0.11.3 the web client only refreshes the sidebar after a reply; the server persists output and runs outlet filters. `chat:outlet` patches message text (the app keeps `originalContent`).
 - **Answers the app gives to device-execution requests** (so turns never hang):
-  - `execute:python` → `{stdout: '', stderr: …, result: null}`;
+  - `execute:python` → what Python on the phone gave, `{stdout, stderr, result}` (an error, a time limit or a failed start in `stderr`);
   - `execute`, `execute:tool`, `request:chat:completion`, `request:terminal` → `{error}`;
   - `request:user_input` → `{status: 'cancelled', answers: {}}`;
   - `request:elicitation` → `{action: 'cancel'}`;

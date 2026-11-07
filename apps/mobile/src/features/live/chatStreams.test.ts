@@ -127,6 +127,24 @@ describe('ChatStreams', () => {
     expect(answers.some((value) => typeof value === 'object' && value !== null && 'error' in value)).toBe(true);
   });
 
+  it("runs the code interpreter's Python on the phone, with the chat's files, and answers what it gave", async () => {
+    const { streams, event, hooks } = setup();
+    const answers: unknown[] = [];
+    const files = [{ type: 'file', id: 'f1', name: 'data.csv' }];
+    hooks.runPython = vi.fn(async (code: string) => ({ stdout: `ran ${code}\n`, stderr: '', result: 3 }));
+    streams.handle(event('c1', 'a1', 'execute:python', { id: 'x', code: '1 + 2', session_id: 's', files }), (value) => answers.push(value));
+    await vi.waitFor(() => expect(answers).toHaveLength(1));
+    expect(hooks.runPython).toHaveBeenCalledWith('1 + 2', files);
+    expect(answers[0]).toEqual({ stdout: 'ran 1 + 2\n', stderr: '', result: 3 });
+
+    hooks.runPython = vi.fn(async () => {
+      throw new Error('no network');
+    });
+    streams.handle(event('c1', 'a1', 'execute:python', { code: 'x' }), (value) => answers.push(value));
+    await vi.waitFor(() => expect(answers).toHaveLength(2));
+    expect(answers[1]).toEqual({ stdout: '', stderr: 'no network', result: null });
+  });
+
   it("asks the model's live questions and sends your answers, or a cancel when you skip", async () => {
     const { streams, event, hooks } = setup();
     const picked = { colour: { type: 'option' as const, option_index: 0, label: 'Teal', description: '' } };

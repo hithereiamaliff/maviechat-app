@@ -45,7 +45,6 @@ interface Options {
 }
 
 /**
-/**
  * The input's menus, as on the web: `/` for commands, your saved prompts (built-in variables
  * filled in, your own asked for in a form) and skills (put in the message as the web puts them,
  * for the server to add); `$` for skills alone; `@` for a model to talk to, knowledge, folders and

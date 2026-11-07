@@ -7,6 +7,7 @@ import {
   replyGroups,
   switchGroupVersion,
   type ChatHistory,
+  type FileItem,
   type HistoryMessage,
   type ModelAction,
   type ModelItem,
@@ -25,8 +26,10 @@ import { UserMessage } from './UserMessage';
 
 /** What you can do to a message; undefined actions are hidden. */
 export interface MessageActions {
-  saveEdit?: (message: HistoryMessage, content: string) => Promise<boolean>;
-  sendEdit?: (message: HistoryMessage, content: string) => Promise<boolean>;
+  /** Your message's edited text and the files you kept, saved in place. */
+  saveEdit?: (message: HistoryMessage, content: string, files: FileItem[]) => Promise<boolean>;
+  /** …or sent as a new version of it, which gets its own reply. */
+  sendEdit?: (message: HistoryMessage, content: string, files: FileItem[]) => Promise<boolean>;
   regenerate?: (reply: HistoryMessage, prompt?: string) => void;
   /** Edits a reply in place, or as a new version (`asCopy`). */
   editReply?: (reply: HistoryMessage, texts: string[], asCopy: boolean) => Promise<boolean>;
@@ -220,8 +223,8 @@ export function MessageList({
               onStep={(step) => switchVersion(item.id, step)}
               baseUrl={baseUrl}
               token={token}
-              onSaveEdit={saveEdit ? (content) => saveEdit(item, content) : undefined}
-              onSendEdit={sendEdit ? (content) => sendEdit(item, content) : undefined}
+              onSaveEdit={saveEdit ? (content, files) => saveEdit(item, content, files) : undefined}
+              onSendEdit={sendEdit ? (content, files) => sendEdit(item, content, files) : undefined}
               // As on the web, the very first message can go only while another version of it remains.
               onDelete={remove && actions.canDeleteMessage && (item.parentId !== null || branch.count > 1) ? () => remove(item) : undefined}
             />

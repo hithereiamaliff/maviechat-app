@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contentToBlocks, groupSteps, messageBlocks, outputToBlocks, plainText, type OutputItem } from './output';
+import { contentToBlocks, embedAddress, embedList, groupSteps, messageBlocks, outputToBlocks, plainText, type OutputItem } from './output';
 
 const output: OutputItem[] = [
   { type: 'reasoning', id: 'r1', status: 'completed', duration: 4.2, content: [{ type: 'reasoning_text', text: 'Thinking it over.' }] },
@@ -74,5 +74,34 @@ describe('groupSteps', () => {
 
   it('plainText keeps only the visible text', () => {
     expect(plainText(outputToBlocks(output))).toBe('It is sunny.');
+  });
+});
+
+describe('tool embeds', () => {
+  it("shows the web content a tool returned with its call", () => {
+    const blocks = outputToBlocks([
+      { type: 'function_call', id: 'f1', call_id: 'c1', name: 'chart', arguments: '{"n":3}', status: 'completed' },
+      { type: 'function_call_output', id: 'o1', call_id: 'c1', output: [{ type: 'input_text', text: 'Embedded UI result is active' }], embeds: ['<p>chart</p>', 7, ''] },
+      { type: 'function_call', id: 'f2', call_id: 'c2', name: 'plain', arguments: '{}', status: 'completed' },
+      { type: 'function_call_output', id: 'o2', call_id: 'c2', output: [] },
+    ]);
+    expect(blocks[0]).toMatchObject({ kind: 'tool', name: 'chart', embeds: ['<p>chart</p>'] });
+    expect(blocks[1]).not.toHaveProperty('embeds');
+  });
+
+  it("reads older chats' embeds from the details block", () => {
+    const content = '<details type="tool_calls" done="true" id="c1" name="map" arguments="{}" result="&quot;ok&quot;" embeds="[&quot;https://maps.example.com/embed?q=1&quot;]">\n<summary>Tool Executed</summary>\n</details>';
+    expect(contentToBlocks(content)[0]).toMatchObject({ kind: 'tool', name: 'map', embeds: ['https://maps.example.com/embed?q=1'] });
+  });
+
+  it('takes lists or their JSON, and knows addresses from HTML', () => {
+    expect(embedList(['<b>x</b>', null])).toEqual(['<b>x</b>']);
+    expect(embedList('["a"]')).toEqual(['a']);
+    expect(embedList('not json')).toEqual([]);
+    expect(embedList(undefined)).toEqual([]);
+    expect(embedAddress(' https://example.com/x ')).toBe('https://example.com/x');
+    expect(embedAddress('//cdn.example.com/w')).toBe('https://cdn.example.com/w');
+    expect(embedAddress('<html><body>hi</body></html>')).toBeNull();
+    expect(embedAddress('/api/v1/files/1/content')).toBeNull();
   });
 });

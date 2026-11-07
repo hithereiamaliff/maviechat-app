@@ -43,6 +43,8 @@ export type DisplayBlock =
       waiting?: boolean;
       /** You denied it. */
       rejected?: boolean;
+      /** Web content the tool returned to show (HTML, or a page's address), in place of its input and output. */
+      embeds?: string[];
     }
   | { kind: 'code'; id: string; lang: string; code: string; resultText: string | null; done: boolean }
   | { kind: 'search'; id: string; label: string; queries: string[]; done: boolean }
@@ -63,8 +65,12 @@ export function messageBlocks(message: Pick<HistoryMessage, 'id' | 'content' | '
 
 export function outputToBlocks(output: OutputItem[], messageDone = true): DisplayBlock[] {
   const results = new Map<string, string>();
+  const embeds = new Map<string, string[]>();
   for (const item of output) {
-    if (item.type === 'function_call_output' && item.call_id) results.set(item.call_id, partsText(item.output));
+    if (item.type !== 'function_call_output' || !item.call_id) continue;
+    results.set(item.call_id, partsText(item.output));
+    const shown = embedList(item.embeds);
+    if (shown.length) embeds.set(item.call_id, shown);
   }
 
   const blocks: DisplayBlock[] = [];
@@ -87,6 +93,7 @@ export function outputToBlocks(output: OutputItem[], messageDone = true): Displa
         const result = item.call_id ? results.get(item.call_id) : undefined;
         const waiting = result === undefined && (item.status === 'pending' || item.status === 'requires_approval');
         const rejected = item.status === 'rejected';
+        const shown = item.call_id ? embeds.get(item.call_id) : undefined;
         blocks.push({
           kind: 'tool',
           id,
@@ -97,6 +104,7 @@ export function outputToBlocks(output: OutputItem[], messageDone = true): Displa
           done: result !== undefined || done || waiting || rejected,
           ...(waiting ? { waiting: true } : {}),
           ...(rejected ? { rejected: true } : {}),
+          ...(shown ? { embeds: shown } : {}),
         });
         break;
       }
@@ -150,7 +158,8 @@ export function contentToBlocks(content: string, idPrefix = 'content'): DisplayB
       case 'reasoning':
         blocks.push({ kind: 'reasoning', id: nextId(), text: unquote(body), durationSec: seconds(attrs.duration), done });
         break;
-      case 'tool_calls':
+      case 'tool_calls': {
+        const shown = embedList(attrs.embeds);
         blocks.push({
           kind: 'tool',
           id: nextId(),
@@ -158,8 +167,10 @@ export function contentToBlocks(content: string, idPrefix = 'content'): DisplayB
           argumentsText: prettyJson(attrs.arguments ?? ''),
           resultText: attrs.result !== undefined ? prettyJson(attrs.result) : null,
           done,
+          ...(shown.length ? { embeds: shown } : {}),
         });
         break;
+      }
       case 'code_interpreter':
         blocks.push({
           kind: 'code',
@@ -197,6 +208,30 @@ export function groupSteps(blocks: DisplayBlock[]): DisplayItem[] {
   }
   flush();
   return items;
+}
+
+/**
+ * Web content to show, as tools and the server send it: a list of HTML pages or addresses, or that
+ * list as JSON (in older chats' `<details embeds="…">`). Anything else is left out.
+ */
+export function embedList(value: unknown): string[] {
+  let list = value;
+  if (typeof value === 'string') {
+    try {
+      list = JSON.parse(value);
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(list) ? list.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
+}
+
+/** A web embed's address, when it is one (`https://…` or `//…`), else null: it's HTML. */
+export function embedAddress(embed: string): string | null {
+  const trimmed = embed.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^\/\/[^/]/.test(trimmed)) return `https:${trimmed}`;
+  return null;
 }
 
 /** All visible text of a response, for copying. */

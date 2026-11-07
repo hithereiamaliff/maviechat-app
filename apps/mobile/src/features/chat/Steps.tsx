@@ -5,6 +5,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { CodeBlock } from '@/markdown/CodeBlock';
 import { Markdown } from '@/markdown/Markdown';
 import { fonts, usePalette } from '@/theme';
+import { EmbedFrame } from './EmbedFrame';
 
 /** "Thought for 4 seconds", "View result from web_search", …: the web app's step labels. */
 export function stepLabel(step: StepBlock): string {
@@ -108,8 +109,29 @@ function StepContent({ step }: { step: StepBlock }) {
   }
 }
 
-/** `open`: starts opened (Open WebUI's "always expand details"). */
-export function StepView({ step, open = false }: { step: StepBlock; open?: boolean }) {
+/**
+ * `open`: starts opened (Open WebUI's "always expand details"). A tool that returned web content
+ * shows that content under its name instead, unless it's in a group (the group shows it below).
+ */
+export function StepView({ step, open = false, grouped = false }: { step: StepBlock; open?: boolean; grouped?: boolean }) {
+  const palette = usePalette();
+  if (!grouped && step.kind === 'tool' && step.embeds?.length) {
+    return (
+      <View style={styles.step}>
+        <View style={styles.stepHeader}>
+          <Icon name="wrench-screwdriver" size={16} color={palette.textMuted} />
+          <Text style={[styles.stepLabel, { color: palette.textMuted }]} numberOfLines={1}>
+            {step.name}
+          </Text>
+        </View>
+        <View style={styles.embeds}>
+          {step.embeds.map((embed, index) => (
+            <EmbedFrame key={index} embed={embed} args={step.argumentsText} />
+          ))}
+        </View>
+      </View>
+    );
+  }
   return (
     <Disclosure icon={stepIcon(step)} label={stepLabel(step)} busy={!step.done} initiallyOpen={open}>
       <StepContent step={step} />
@@ -120,12 +142,22 @@ export function StepView({ step, open = false }: { step: StepBlock; open?: boole
 /** Two or more consecutive steps, folded into one line ("Explored · 3 steps"). */
 export function StepGroup({ item, open = false }: { item: Extract<DisplayItem, { kind: 'group' }>; open?: boolean }) {
   const busy = item.steps.some((step) => !step.done);
+  const embeds = item.steps.flatMap((step) => (step.kind === 'tool' ? (step.embeds ?? []).map((embed) => ({ embed, args: step.argumentsText })) : []));
   return (
-    <Disclosure icon="sparkles" label={busy ? `Exploring… · ${item.steps.length} steps` : `Explored · ${item.steps.length} steps`} busy={busy} initiallyOpen={open}>
-      {item.steps.map((step) => (
-        <StepView key={step.id} step={step} open={open} />
-      ))}
-    </Disclosure>
+    <>
+      <Disclosure icon="sparkles" label={busy ? `Exploring… · ${item.steps.length} steps` : `Explored · ${item.steps.length} steps`} busy={busy} initiallyOpen={open}>
+        {item.steps.map((step) => (
+          <StepView key={step.id} step={step} open={open} grouped />
+        ))}
+      </Disclosure>
+      {embeds.length ? (
+        <View style={styles.embeds}>
+          {embeds.map((item, index) => (
+            <EmbedFrame key={index} embed={item.embed} args={item.args} />
+          ))}
+        </View>
+      ) : null}
+    </>
   );
 }
 
@@ -135,4 +167,5 @@ const styles = StyleSheet.create({
   stepLabel: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 14 },
   stepBody: { borderLeftWidth: 2, paddingLeft: 12, marginLeft: 7, marginTop: 4 },
   empty: { fontFamily: fonts.regular, fontSize: 14 },
+  embeds: { gap: 8, marginTop: 4, marginBottom: 4 },
 });

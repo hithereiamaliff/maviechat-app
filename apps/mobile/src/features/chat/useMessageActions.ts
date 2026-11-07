@@ -16,6 +16,7 @@ import {
   withEditedTexts,
   type ChatHistory,
   type ChatRecord,
+  type FileItem,
   type HistoryMessage,
   type ModelAction,
   type ModelItem,
@@ -78,7 +79,10 @@ export function useMessageActions(chatId: string) {
     [historyOf, patch, temporary, client, chatId, failed],
   );
 
-  const saveEdit = useCallback((message: HistoryMessage, content: string) => replace(message, { ...message, content }, 'save the message'), [replace]);
+  const saveEdit = useCallback(
+    (message: HistoryMessage, content: string, files: FileItem[]) => replace(message, { ...message, content, files }, 'save the message'),
+    [replace],
+  );
 
   /** A reply edited in place, or kept as a new version beside it ("Save As Copy", which then shows). */
   const editReply = useCallback(

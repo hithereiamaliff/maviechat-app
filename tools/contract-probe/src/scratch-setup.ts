@@ -63,7 +63,9 @@ class Pipe:
             reply = "Echo: " + last[:8000] + (" | Context: " + context if context else "")
         if not body.get("stream"):
             return reply
-        return (word + " " for word in reply.split(" "))
+        # Word by word, with nothing after the last (the code interpreter runs a block only when the reply ends with it).
+        words = reply.split(" ")
+        return (word + (" " if index < len(words) - 1 else "") for index, word in enumerate(words))
 `;
 
 const { values: args } = parseArgs({ options: { env: { type: 'string' }, url: { type: 'string' }, 'user-env': { type: 'string' } } });

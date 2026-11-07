@@ -1,12 +1,26 @@
 import type { ModelItem, SourceRef } from '@maviechat/owui-protocol';
-import { isClosedCodeBlock, lexMarkdown, type MentionToken, type Token, type Tokens } from '@maviechat/owui-markdown';
+import {
+  calloutOf,
+  colonFenceLabel,
+  inlineText,
+  isClosedCodeBlock,
+  lexMarkdown,
+  tableCsv,
+  type CalloutKind,
+  type ColonFenceToken,
+  type MentionToken,
+  type Token,
+  type Tokens,
+} from '@maviechat/owui-markdown';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { memo, useMemo, type ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text, View, type TextStyle } from 'react-native';
-import { Icon } from '@/components/Icon';
+import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, View, type TextStyle } from 'react-native';
+import { Icon, type IconName } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
+import { shareFile } from '@/features/settings/exportFile';
+import { describeError } from '@/lib/errors';
 import { openLink } from '@/lib/links';
 import { fonts, radius, usePalette, type Palette } from '@/theme';
 import { CodeBlock } from './CodeBlock';
@@ -33,12 +47,16 @@ interface Context {
   /** For `@M:` mentions; undefined until the model list has loaded. */
   models?: ModelItem[];
   copy: (text: string) => void;
+  /** Hands a table's CSV to the share sheet (Save to Files, AirDrop…). */
+  saveCsv: (csv: string, name: string) => void;
   foldCode: boolean;
+  dark: boolean;
 }
 
 /** Renders markdown as native views (no web view). */
 export const Markdown = memo(function Markdown({ text, muted = false, sources, baseUrl, token, foldCode = false }: MarkdownProps) {
   const palette = usePalette();
+  const dark = useColorScheme() === 'dark';
   const toast = useToast();
   const models = useQueryClient().getQueryData<ModelItem[]>(['models']);
   const tokens = useMemo(() => lexMarkdown(text), [text]);
@@ -51,7 +69,10 @@ export const Markdown = memo(function Markdown({ text, muted = false, sources, b
     models,
     // As on the web, tapping inline code copies it.
     copy: (code) => void Clipboard.setStringAsync(code).then(() => toast('Copied to clipboard')),
+    // With a byte-order mark, as the web saves it, so spreadsheet apps read the text as UTF-8.
+    saveCsv: (csv, name) => void shareFile(name, `\uFEFF${csv}`).catch((error: unknown) => toast(`Couldn't save the table: ${describeError(error)}`, 'error')),
     foldCode,
+    dark,
   };
   return <View>{tokens.map((block, index) => renderBlock(block, `${index}`, context))}</View>;
 });
@@ -108,6 +129,20 @@ function renderBlock(token: Token, key: string, context: Context): ReactNode {
     }
     case 'blockquote': {
       const quote = token as Tokens.Blockquote;
+      const callout = calloutOf(quote);
+      if (callout) {
+        const look = CALLOUTS[callout.kind];
+        const tint = calloutColor(callout.kind, context);
+        return (
+          <View key={key} style={[styles.callout, { borderLeftColor: tint }]}>
+            <View style={styles.calloutHeader}>
+              <Icon name={look.icon} size={16} color={tint} strokeWidth={2} />
+              <Text style={[styles.calloutLabel, { color: tint }]}>{look.label}</Text>
+            </View>
+            {callout.tokens.map((child, index) => renderBlock(child, `${key}.${index}`, context))}
+          </View>
+        );
+      }
       return (
         <View key={key} style={[styles.quote, { borderLeftColor: palette.border }]}>
           {quote.tokens.map((child, index) => renderBlock(child, `${key}.${index}`, { ...context, color: palette.textMuted }))}
@@ -138,6 +173,20 @@ function renderBlock(token: Token, key: string, context: Context): ReactNode {
     }
     case 'blockMath':
       return <BlockMath key={key} tex={(token as unknown as { text: string }).text} color={color} />;
+    case 'colonFence': {
+      const fence = token as unknown as ColonFenceToken;
+      return (
+        <View key={key} style={[styles.section, { borderColor: palette.border }]}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionLabel, { color: palette.textMuted }]} numberOfLines={1}>
+              {colonFenceLabel(fence)}
+            </Text>
+            <SmallAction icon="clipboard-document" label="Copy" accessibilityLabel="Copy this section" color={palette.textMuted} onPress={() => context.copy(fence.text)} />
+          </View>
+          {fence.tokens.map((child, index) => renderBlock(child, `${key}.${index}`, context))}
+        </View>
+      );
+    }
     default:
       return 'raw' in token && token.raw.trim() ? (
         <Text key={key} style={[styles.paragraph, { color }]}>
@@ -173,28 +222,88 @@ function renderList(list: Tokens.List, key: string, context: Context): ReactNode
 
 function renderTable(table: Tokens.Table, key: string, context: Context): ReactNode {
   const { palette, color } = context;
+  // Every row is a row of views, so columns line up only with a width each.
+  const widths = columnWidths(table);
+  const cellStyle = (index: number): TextStyle => {
+    const align = table.align[index];
+    return align ? { width: widths[index], textAlign: align } : { width: widths[index] };
+  };
   return (
-    <ScrollView key={key} horizontal showsHorizontalScrollIndicator={false} style={styles.tableScroll}>
-      <View style={[styles.table, { borderColor: palette.border }]}>
-        <View style={[styles.tableRow, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-          {table.header.map((cell, index) => (
-            <Text key={index} style={[styles.cell, styles.headerCell, { color }]}>
-              {renderInline(cell.tokens, `${key}.h${index}`, context)}
-            </Text>
-          ))}
-        </View>
-        {table.rows.map((row, rowIndex) => (
-          <View key={rowIndex} style={[styles.tableRow, { borderColor: palette.border }]}>
-            {row.map((cell, index) => (
-              <Text key={index} style={[styles.cell, { color }]}>
-                {renderInline(cell.tokens, `${key}.${rowIndex}.${index}`, context)}
+    <View key={key} style={styles.tableWrap}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={[styles.table, { borderColor: palette.border }]}>
+          <View style={[styles.tableRow, { backgroundColor: palette.surface, borderColor: palette.border }, table.rows.length === 0 && styles.lastRow]}>
+            {table.header.map((cell, index) => (
+              <Text key={index} style={[styles.cell, styles.headerCell, cellStyle(index), { color }]}>
+                {renderInline(cell.tokens, `${key}.h${index}`, context)}
               </Text>
             ))}
           </View>
-        ))}
+          {table.rows.map((row, rowIndex) => (
+            <View key={rowIndex} style={[styles.tableRow, { borderColor: palette.border }, rowIndex === table.rows.length - 1 && styles.lastRow]}>
+              {row.map((cell, index) => (
+                <Text key={index} style={[styles.cell, cellStyle(index), { color }]}>
+                  {renderInline(cell.tokens, `${key}.${rowIndex}.${index}`, context)}
+                </Text>
+              ))}
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+      <View style={styles.tableActions}>
+        <SmallAction icon="clipboard-document" label="Copy" accessibilityLabel="Copy the table" color={palette.textMuted} onPress={() => context.copy(table.raw.trim())} />
+        <SmallAction
+          icon="arrow-down-tray"
+          label="Save as CSV"
+          accessibilityLabel="Save the table as a CSV file"
+          color={palette.textMuted}
+          onPress={() => context.saveCsv(tableCsv(table), `table-${key.replace(/\./g, '-')}.csv`)}
+        />
       </View>
-    </ScrollView>
+    </View>
   );
+}
+
+/** A column's width from its longest line of text (about 7.6 points a character at 14 points, wide scripts double), within limits. */
+function columnWidths(table: Tokens.Table): number[] {
+  const measure = (text: string, factor = 1) =>
+    Math.max(0, ...text.split('\n').map((line) => [...line].reduce((width, char) => width + ((char.codePointAt(0) ?? 0) >= 0x2e80 ? 14 : 7.6), 0) * factor));
+  return table.header.map((header, index) => {
+    const widest = Math.max(measure(inlineText(header.tokens), 1.08), ...table.rows.map((row) => measure(inlineText(row[index]?.tokens ?? []))));
+    return Math.round(Math.min(280, Math.max(72, widest + 22)));
+  });
+}
+
+function SmallAction({ icon, label, accessibilityLabel, color, onPress }: { icon: IconName; label: string; accessibilityLabel: string; color: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} hitSlop={8} onPress={onPress} style={styles.smallAction}>
+      <Icon name={icon} size={14} color={color} strokeWidth={2} />
+      <Text style={[styles.smallActionText, { color }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const CALLOUTS: Record<CalloutKind, { label: string; icon: IconName }> = {
+  note: { label: 'Note', icon: 'information-circle' },
+  tip: { label: 'Tip', icon: 'light-bulb' },
+  important: { label: 'Important', icon: 'star' },
+  warning: { label: 'Warning', icon: 'exclamation-triangle' },
+  caution: { label: 'Caution', icon: 'exclamation-circle' },
+};
+
+function calloutColor(kind: CalloutKind, { palette, dark }: Context): string {
+  switch (kind) {
+    case 'note':
+      return palette.link;
+    case 'tip':
+      return palette.success;
+    case 'important':
+      return dark ? '#C084FC' : '#9333EA';
+    case 'warning':
+      return palette.warning;
+    case 'caution':
+      return palette.danger;
+  }
 }
 
 function renderInline(tokens: Token[] | undefined, key: string, context: Context): ReactNode[] {
@@ -368,10 +477,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   rule: { height: StyleSheet.hairlineWidth, marginVertical: 14 },
-  tableScroll: { marginVertical: 8 },
+  tableWrap: { marginVertical: 8, gap: 6 },
   table: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.sm, overflow: 'hidden' },
   tableRow: { flexDirection: 'row', borderBottomWidth: StyleSheet.hairlineWidth },
-  cell: { minWidth: 96, maxWidth: 260, paddingHorizontal: 10, paddingVertical: 8, fontFamily: fonts.regular, fontSize: 14, lineHeight: 20 },
+  lastRow: { borderBottomWidth: 0 },
+  cell: { paddingHorizontal: 10, paddingVertical: 8, fontFamily: fonts.regular, fontSize: 14, lineHeight: 20 },
   headerCell: { fontFamily: fonts.semibold },
+  tableActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16, paddingRight: 2 },
+  smallAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  smallActionText: { fontFamily: fonts.medium, fontSize: 12 },
+  callout: { borderLeftWidth: 4, paddingLeft: 12, marginVertical: 6 },
+  calloutHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingTop: 4 },
+  calloutLabel: { fontFamily: fonts.medium, fontSize: 14 },
+  section: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg, paddingHorizontal: 14, paddingVertical: 10, marginVertical: 8 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  sectionLabel: { flexShrink: 1, fontFamily: fonts.regular, fontSize: 12 },
   image: { width: '100%', aspectRatio: 4 / 3, borderRadius: radius.md, marginVertical: 8 },
 });

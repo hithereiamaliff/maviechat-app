@@ -34,7 +34,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import { IconButton } from '@/components/IconButton';
@@ -47,6 +47,7 @@ import { useFolderPicker } from '@/features/chats/FolderPicker';
 import { useShareSheet } from '@/features/chats/ShareSheet';
 import { useTagsSheet } from '@/features/chats/TagsSheet';
 import { Composer, type OutgoingMessage } from '@/features/chat/Composer';
+import { EmbedActionsContext, type EmbedActions } from '@/features/chat/EmbedFrame';
 import { ControlsSheet, type ControlChanges } from '@/features/chat/controls/ControlsSheet';
 import { getDraft, updateDraft, useQueue } from '@/features/chat/drafts';
 import { MessageList, type MessageActions, type MessageListHandle } from '@/features/chat/MessageList';
@@ -58,11 +59,13 @@ import { useSendMessage } from '@/features/chat/useSendMessage';
 import { useChatActions } from '@/features/chats/useChatActions';
 import { sendChatToDeepTutor } from '@/features/deeptutor/crossReference';
 import { useLive } from '@/features/live/LiveProvider';
+import { useCodeRunner } from '@/features/python/useCodeRunner';
 import { useAutoReadAloud } from '@/lib/autoReadAloud';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useModels, useServerConfig, useUserSettings } from '@/lib/server';
 import { useInterface } from '@/lib/uiSettings';
 import { ArtifactsContext } from '@/markdown/ArtifactsContext';
+import { CodeRunContext } from '@/markdown/CodeRunContext';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
 
@@ -289,6 +292,7 @@ export default function ChatScreen() {
   // `/compact`, where the admin turned context compaction on: the server summarises the older
   // messages so a long chat fits the model again. As on the web, the model answering does it.
   const serverConfig = useServerConfig();
+  const runCode = useCodeRunner();
   const compactionOn = serverConfig.data?.features?.enable_context_compaction === true;
   const compact = async () => {
     if (streaming) {
@@ -393,6 +397,37 @@ export default function ChatScreen() {
     resolveRef.current = resolve;
   });
 
+  // What a tool's web content may ask of this chat, as on the web: text for the message box, or a
+  // message sent once you agree (the web asks too, for content from elsewhere).
+  const sendRef = useRef(onSend);
+  useEffect(() => {
+    sendRef.current = onSend;
+  });
+  const embedActions = useMemo<EmbedActions>(() => {
+    const confirmSend = (text: string, files: FileItem[], afterSend?: () => void) =>
+      Alert.alert('Send this message?', `The tool's content asks to send:\n\n${text.length > 600 ? `${text.slice(0, 600)}…` : text}`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send',
+          onPress: () => {
+            const { toggles, toolIds, skillIds, filterIds } = getDraft(chatId);
+            void sendRef.current({ text, files, toggles, toolIds, skillIds, filterIds }).then((sent) => {
+              if (sent) afterSend?.();
+            });
+          },
+        },
+      ]);
+    return {
+      setPrompt: (text) => updateDraft(chatId, (draft) => ({ ...draft, text })),
+      sendPrompt: (text) => confirmSend(text, []),
+      sendDraft: () => {
+        const draft = getDraft(chatId);
+        if (!draft.text.trim() && draft.files.length === 0) return;
+        confirmSend(draft.text, draft.files, () => updateDraft(chatId, (current) => ({ ...current, text: '', files: [] })));
+      },
+    };
+  }, [chatId]);
+
   const listActions = useMemo<MessageActions>(() => {
     const extras = () => {
       const { toggles, toolIds, skillIds, filterIds } = getDraft(chatId);
@@ -401,9 +436,8 @@ export default function ChatScreen() {
     const modelOf = (reply: HistoryMessage) => models.data?.find((item) => item.id === reply.model) ?? model;
     return {
       saveEdit: messageActions.saveEdit,
-      sendEdit: async (message, content) => {
+      sendEdit: async (message, content, files) => {
         if (!model) return false;
-        const files = (Array.isArray(message.files) ? message.files : []) as FileItem[];
         const result = await send({ chatId, parentId: message.parentId, content, files, model, models: selected, ...extras() });
         if (result) select(result.replyId);
         return Boolean(result);
@@ -522,6 +556,8 @@ export default function ChatScreen() {
           </View>
         ) : (
           <ArtifactsContext.Provider value={openArtifact}>
+          <CodeRunContext.Provider value={runCode}>
+          <EmbedActionsContext.Provider value={embedActions}>
           <MessageList
             ref={list}
             messages={messages}
@@ -546,6 +582,8 @@ export default function ChatScreen() {
             onMerge={streaming ? undefined : (replyId, groups) => void merge(replyId, groups)}
             mergingId={mergingId}
           />
+          </EmbedActionsContext.Provider>
+          </CodeRunContext.Provider>
           </ArtifactsContext.Provider>
         )}
         {asking && lastReply ? (

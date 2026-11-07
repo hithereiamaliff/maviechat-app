@@ -1,4 +1,4 @@
-import { isTemporaryChatId, openSocketSession, type AskUserAnswer, type AskUserQuestion, type SocketSession, type SocketStatus } from '@maviechat/owui-protocol';
+import { isTemporaryChatId, openSocketSession, type AskUserAnswer, type AskUserQuestion, type CodeOutput, type SocketSession, type SocketStatus } from '@maviechat/owui-protocol';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Alert, AppState, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -9,6 +9,9 @@ import { AskUserCard } from '@/features/chat/AskUserCard';
 import { patchChatRow } from '@/features/chats/cache';
 import { setViewingChat } from '@/features/notifications/presence';
 import { pushAnnouncesReplies } from '@/features/notifications/push';
+import { PythonHost } from '@/features/python/PythonHost';
+import { PythonRunner } from '@/features/python/runner';
+import { pythonFiles } from '@/features/python/serverFiles';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, usePalette } from '@/theme';
 import { ChatStreams } from './chatStreams';
@@ -20,6 +23,8 @@ interface LiveContextValue {
   waitForSession(timeoutMs?: number): Promise<string>;
   /** Tells the server (and the sidebar) you've read this chat, as the web does on open, on leave and when a reply lands. */
   markRead(chatId: string): void;
+  /** Runs Python on the phone (Pyodide, as the web runs it in the browser), sharing state with the code interpreter's runs. */
+  runPython(code: string): Promise<CodeOutput>;
 }
 
 /** The web waits this long before saying the connection was lost, so brief drops pass silently. */
@@ -77,6 +82,15 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
   }, [currentChatId]);
   useEffect(() => () => setViewingChat(null), []);
 
+  // Python for code blocks' Run and the code interpreter, started on first use.
+  const [python] = useState(() => new PythonRunner());
+  useEffect(() => () => python.dispose(), [python]);
+  // The latest sign-in, for fetching the code interpreter's files.
+  const sessionRef = useRef(session);
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
   // The model's questions asked live, one set at a time, answered in a sheet.
   const [asking, setAsking] = useState<{ questions: AskUserQuestion[]; deadline: number | null; done: (answers: Record<string, AskUserAnswer> | null) => void } | null>(null);
   const [streams] = useState(
@@ -89,6 +103,12 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
         isViewing: (chatId) => viewing.current === chatId,
         // Open WebUI reports saved chats' replies only, so temporary chats keep the app's own notice.
         pushAnnounces: (chatId) => !isTemporaryChatId(chatId) && pushAnnouncesReplies(session.user.id),
+        // The code interpreter's code, with the chat's files in /mnt/uploads, as the web runs it.
+        runPython: async (code, files) => {
+          const { files: prepared, notes } = await pythonFiles(sessionRef.current, files);
+          const output = await python.run({ code, files: prepared });
+          return notes.length ? { ...output, stderr: `${notes.join('\n')}\n${output.stderr}` } : output;
+        },
       }),
   );
 
@@ -152,6 +172,8 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
     [queryClient],
   );
 
+  const runPython = useCallback((code: string) => python.run({ code }), [python]);
+
   const value = useMemo<LiveContextValue>(
     () => ({
       status,
@@ -166,8 +188,9 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
         }
       },
       markRead,
+      runPython,
     }),
-    [status, streams, markRead],
+    [status, streams, markRead, runPython],
   );
 
   const finish = (answers: Record<string, AskUserAnswer> | null) => {
@@ -177,6 +200,7 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
   return (
     <LiveContext.Provider value={value}>
       {children}
+      <PythonHost runner={python} baseUrl={baseUrl} />
       <Modal visible={asking !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => finish(null)}>
         {asking ? <LiveQuestions questions={asking.questions} deadline={asking.deadline} onDone={finish} /> : null}
       </Modal>

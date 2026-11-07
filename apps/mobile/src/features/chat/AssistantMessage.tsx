@@ -1,6 +1,7 @@
 import {
   attachmentUrl,
   awaitingYou,
+  embedList,
   errorText,
   groupSteps,
   isImageItem,
@@ -33,6 +34,7 @@ import { Markdown } from '@/markdown/Markdown';
 import { fonts, radius, usePalette } from '@/theme';
 import { ApprovalCard } from './ApprovalCard';
 import { BranchNav } from './BranchNav';
+import { EmbedFrame } from './EmbedFrame';
 import { RatePanel } from './RatePanel';
 import { SelectTextSheet } from './SelectTextSheet';
 import { Sources } from './Sources';
@@ -117,6 +119,8 @@ export const AssistantMessage = memo(function AssistantMessage({
   const status = latestStatus(message.statusHistory);
   const error = errorText(message.error);
   const approvals = useMemo(() => pendingApprovals(message), [message]);
+  // Web content a tool sent for the reply as a whole (tools run the web's default way).
+  const embeds = useMemo(() => embedList(message.embeds), [message.embeds]);
   // Stopped for your approval or answer: not being written any more.
   const streaming = message.done === false && !awaitingYou(message);
   const usage = usageSummary(message.usage);
@@ -200,6 +204,14 @@ export const AssistantMessage = memo(function AssistantMessage({
           <StepView key={item.id} step={item} open={ui('expandDetails')} />
         ),
       )}
+
+      {embeds.length ? (
+        <View style={styles.embeds}>
+          {embeds.map((embed, index) => (
+            <EmbedFrame key={index} embed={embed} />
+          ))}
+        </View>
+      ) : null}
 
       {approvals.map((call) => (
         <ApprovalCard key={call.callId} call={call} onDecide={onApprove ? (approve) => onApprove(call.callId, approve) : undefined} />
@@ -327,6 +339,7 @@ const styles = StyleSheet.create({
   status: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 4 },
   statusText: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 14 },
   pending: { alignSelf: 'flex-start', marginVertical: 8 },
+  embeds: { gap: 8, marginVertical: 6 },
   images: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 6 },
   image: { width: 220, height: 220, borderRadius: radius.lg },
   error: {
