@@ -6,11 +6,13 @@ import {
   isWebAddress,
   knowledgeAttachment,
   listFolders,
+  listSkillChoices,
   matchPrompts,
   menuTrigger,
   modelTags,
   pickerModels,
   replaceTrigger,
+  skillMention,
   uuidv4,
   type InputVariable,
   type MenuTrigger,
@@ -38,14 +40,18 @@ interface Options {
   onTemporary?: () => void;
   /** A saved chat's `/fork`: carry on in a copy of the conversation so far. */
   onFork?: () => void;
+  /** A saved chat's `/compact`, where the admin turned context compaction on. */
+  onCompact?: () => void;
 }
 
 /**
- * The input's menus, as on the web: `/` for commands and your saved prompts (built-in variables
- * filled in, your own asked for in a form); `@` for a model to talk to, knowledge, folders and
+/**
+ * The input's menus, as on the web: `/` for commands, your saved prompts (built-in variables
+ * filled in, your own asked for in a form) and skills (put in the message as the web puts them,
+ * for the server to add); `$` for skills alone; `@` for a model to talk to, knowledge, folders and
  * web pages; `#` for knowledge and web pages.
  */
-export function useInputMenus({ draftKey, text, cursor, focused, setText, onPickModel, onTemporary, onFork }: Options) {
+export function useInputMenus({ draftKey, text, cursor, focused, setText, onPickModel, onTemporary, onFork, onCompact }: Options) {
   const { client } = useAuthed();
   const toast = useToast();
   const capabilities = useCapabilities();
@@ -54,6 +60,12 @@ export function useInputMenus({ draftKey, text, cursor, focused, setText, onPick
   const trigger = focused ? menuTrigger(text, cursor) : null;
   const query = trigger?.query ?? '';
   const prompts = usePrompts(trigger?.char === '/');
+  const skills = useQuery({
+    queryKey: ['workspace', 'skill-choices'],
+    queryFn: () => listSkillChoices(client),
+    enabled: trigger?.char === '/' || trigger?.char === '$',
+    staleTime: 60_000,
+  });
   const knowledge = useKnowledgeSearch(query, trigger?.char === '@' || trigger?.char === '#');
   const models = useModels();
   const foldersOn = capabilities?.feature('folders') ?? false;
@@ -99,18 +111,36 @@ export function useInputMenus({ draftKey, text, cursor, focused, setText, onPick
   };
 
   const entries: MenuEntry[] = [];
-  if (trigger?.char === '/') {
+  const wanted = query.toLowerCase();
+  const skillEntries = (): MenuEntry[] =>
+    (skills.data ?? [])
+      .filter((item) => item.active && (item.name.toLowerCase().includes(wanted) || item.id.toLowerCase().includes(wanted)))
+      .slice(0, 8)
+      .map((skill) => ({ key: `s-${skill.id}`, section: 'Skills', icon: 'sparkles', title: skill.name, subtitle: skill.description || 'Skill', onPick: () => place(`${skillMention(skill)} `) }));
+  if (trigger?.char === '$') {
+    entries.push(...skillEntries());
+  } else if (trigger?.char === '/') {
     const commands = [
       { id: 'model', title: 'Model', subtitle: 'Choose the model', run: onPickModel },
       { id: 'settings', title: 'Settings', subtitle: 'Open your settings', run: () => router.push('/settings') },
       ...(onTemporary ? [{ id: 'temporary', title: 'Temporary', subtitle: 'Turn temporary chat on or off', run: onTemporary }] : []),
+      ...(onCompact ? [{ id: 'compact', title: 'Compact', subtitle: 'Summarise the chat so far, to make room', run: onCompact }] : []),
       ...(onFork ? [{ id: 'fork', title: 'Fork', subtitle: 'Carry on in a copy of this chat', run: onFork }] : []),
     ].filter((command) => command.id.startsWith(query.toLowerCase()));
     for (const command of commands) {
       entries.push({
         key: `c-${command.id}`,
         section: 'Commands',
-        icon: command.id === 'model' ? 'cpu-chip' : command.id === 'settings' ? 'cog-6-tooth' : command.id === 'fork' ? 'rectangle-stack' : 'eye-slash',
+        icon:
+          command.id === 'model'
+            ? 'cpu-chip'
+            : command.id === 'settings'
+              ? 'cog-6-tooth'
+              : command.id === 'fork'
+                ? 'rectangle-stack'
+                : command.id === 'compact'
+                  ? 'bars-arrow-up'
+                  : 'eye-slash',
         title: `/${command.id}`,
         subtitle: command.subtitle,
         onPick: () => {
@@ -122,6 +152,7 @@ export function useInputMenus({ draftKey, text, cursor, focused, setText, onPick
     for (const prompt of matchPrompts(prompts.data ?? [], query)) {
       entries.push({ key: `p-${prompt.command}`, section: 'Prompts', icon: 'chat-bubble-bottom-center-text', title: `/${prompt.command}`, subtitle: prompt.name, onPick: () => void insertPrompt(prompt) });
     }
+    entries.push(...skillEntries());
   } else if (trigger) {
     if (isWebAddress(query)) entries.push({ key: 'web', section: 'Web', icon: 'globe-alt', title: 'Attach this page', subtitle: query, onPick: () => void attachWeb(query) });
     if (trigger.char === '@') {
@@ -152,7 +183,6 @@ export function useInputMenus({ draftKey, text, cursor, focused, setText, onPick
       });
     }
     if (trigger.char === '@') {
-      const wanted = query.toLowerCase();
       const shown = pickerModels(models.data ?? []).filter((model) =>
         [model.name, model.id, ...modelTags(model)].some((value) => String(value ?? '').toLowerCase().includes(wanted)),
       );
@@ -172,11 +202,13 @@ export function useInputMenus({ draftKey, text, cursor, focused, setText, onPick
     }
   }
 
+  const loading = (trigger?.char === '/' && prompts.isLoading) || (trigger?.char === '$' && skills.isLoading) || ((trigger?.char === '@' || trigger?.char === '#') && knowledge.isFetching);
   return {
-    trigger,
+    // `$` is also typed in prices: its list shows only when a skill matches.
+    trigger: trigger?.char === '$' && entries.length === 0 && !loading ? null : trigger,
     entries,
-    loading: (trigger?.char === '/' && prompts.isLoading) || ((trigger?.char === '@' || trigger?.char === '#') && knowledge.isFetching),
-    empty: trigger?.char === '/' ? 'No commands or prompts match.' : 'Nothing matches. Type a web address to attach a page.',
+    loading,
+    empty: trigger?.char === '/' ? 'No commands, prompts or skills match.' : trigger?.char === '$' ? 'No skills match.' : 'Nothing matches. Type a web address to attach a page.',
     form: form?.variables ?? null,
     insertForm: (values: Record<string, string>) => {
       if (!form) return;

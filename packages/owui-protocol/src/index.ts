@@ -28,6 +28,7 @@ export * from './mfa';
 export * from './models';
 export * from './modelControls';
 export * from './multi';
+export * from './notes';
 export * from './notifications';
 export * from './output';
 export * from './overview';

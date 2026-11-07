@@ -218,6 +218,10 @@ export interface CompletionRequestInput {
   /** User settings (`ui.title.auto`, `ui.autoTags`, `ui.autoFollowUps`); all default to on. */
   tasks: { title?: boolean; tags?: boolean; followUps?: boolean };
   toolIds?: string[];
+  /** Skills switched on for this message (`skill_ids`); `<$id|name>` in the text works too. */
+  skillIds?: string[];
+  /** The model's switchable filters turned on (`filter_ids`). */
+  filterIds?: string[];
   /** A system the model works on directly (see `activeTerminal`). */
   terminalId?: string | null;
   files?: unknown[];
@@ -246,6 +250,8 @@ export function buildCompletionRequest(input: CompletionRequestInput): Record<st
     params: { ...(input.params ?? {}) },
     ...(input.files && input.files.length > 0 ? { files: input.files } : {}),
     ...(input.toolIds && input.toolIds.length > 0 ? { tool_ids: input.toolIds } : {}),
+    ...(input.filterIds && input.filterIds.length > 0 ? { filter_ids: input.filterIds } : {}),
+    ...(input.skillIds && input.skillIds.length > 0 ? { skill_ids: input.skillIds } : {}),
     ...(input.terminalId ? { terminal_id: input.terminalId } : {}),
     tool_servers: [],
     features: input.features,

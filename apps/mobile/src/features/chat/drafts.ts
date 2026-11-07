@@ -13,6 +13,10 @@ export interface Draft {
   previews: Record<string, string>;
   toggles: FeatureToggles;
   toolIds: string[];
+  /** Skills switched on (`skill_ids`), from the model's own at first. */
+  skillIds: string[];
+  /** The model's switchable filters turned on (`filter_ids`), from its defaults at first. */
+  filterIds: string[];
   /** The model whose defaults the toggles and tools came from; picking another model applies its own. */
   defaultsFor: string | null;
   queue: QueuedMessage[];
@@ -23,7 +27,7 @@ export interface Draft {
 /** The new-chat screen's draft. */
 export const NEW_CHAT = 'new';
 
-const EMPTY: Draft = { text: '', files: [], previews: {}, toggles: {}, toolIds: [], defaultsFor: null, queue: [] };
+const EMPTY: Draft = { text: '', files: [], previews: {}, toggles: {}, toolIds: [], skillIds: [], filterIds: [], defaultsFor: null, queue: [] };
 const drafts = new Map<string, Draft>();
 const listeners = new Set<() => void>();
 
@@ -49,9 +53,9 @@ export function removeFile(key: string, itemId: string): void {
 
 /** The first message created the chat: it keeps the toggles, tools and `@` model, and the new-chat input starts over. */
 export function carryOver(from: string, to: string): void {
-  const { toggles, toolIds, defaultsFor, atModel } = getDraft(from);
+  const { toggles, toolIds, skillIds, filterIds, defaultsFor, atModel } = getDraft(from);
   drafts.delete(from);
-  updateDraft(to, (draft) => ({ ...draft, toggles, toolIds, defaultsFor, atModel }));
+  updateDraft(to, (draft) => ({ ...draft, toggles, toolIds, skillIds, filterIds, defaultsFor, atModel }));
 }
 
 function subscribe(listener: () => void): () => void {

@@ -65,6 +65,7 @@ const ICONS = [
   'folder',
   'folder-open',
   'folder-plus',
+  'funnel',
   'globe-alt',
   'hand-thumb-down',
   'hand-thumb-up',

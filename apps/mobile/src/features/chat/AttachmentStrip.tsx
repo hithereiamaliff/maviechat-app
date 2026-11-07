@@ -68,14 +68,22 @@ export function AttachmentStrip({
             {uploading ? (
               <ActivityIndicator size="small" color={palette.textMuted} />
             ) : (
-              <Icon name={file.type === 'chat' ? 'chat-bubble-left-right' : file.type === 'collection' ? 'circle-stack' : 'document-text'} size={18} color={palette.textMuted} />
+              <Icon
+                name={file.type === 'chat' ? 'chat-bubble-left-right' : file.type === 'note' ? 'pencil-square' : file.type === 'collection' ? 'circle-stack' : 'document-text'}
+                size={18}
+                color={palette.textMuted}
+              />
             )}
             <View style={styles.chipText}>
               <Text style={[styles.name, { color: palette.text }]} numberOfLines={1}>
                 {file.name ?? 'File'}
               </Text>
               <Text style={[styles.meta, { color: palette.textFaint }]} numberOfLines={1}>
-                {uploading ? 'Uploading…' : file.context === 'full' ? 'Entire document' : size(file.size) || (file.type === 'chat' ? 'Chat' : file.type === 'collection' ? 'Knowledge' : 'File')}
+                {uploading
+                  ? 'Uploading…'
+                  : file.context === 'full'
+                    ? 'Entire document'
+                    : size(file.size) || (file.type === 'chat' ? 'Chat' : file.type === 'note' ? 'Note' : file.type === 'collection' ? 'Knowledge' : 'File')}
               </Text>
             </View>
             {remove}

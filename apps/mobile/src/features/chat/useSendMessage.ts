@@ -42,6 +42,8 @@ import { chosenTerminal, terminalAccount } from './terminals';
 interface Extras {
   toggles?: FeatureToggles;
   toolIds?: string[];
+  skillIds?: string[];
+  filterIds?: string[];
 }
 
 export interface SendInput extends Extras {
@@ -193,6 +195,8 @@ export function useSendMessage() {
           followUps: ui.autoFollowUps as boolean | undefined,
         },
         toolIds: job.toolIds,
+        skillIds: job.skillIds,
+        filterIds: job.filterIds,
         terminalId: terminal?.id,
         files,
         regenerationPrompt: job.regenerationPrompt,
@@ -251,32 +255,32 @@ export function useSendMessage() {
   );
 
   const send = useCallback(
-    async ({ chatId, parentId, content, model, models, files = [], temporary = false, toggles, toolIds, folderId, params }: SendInput): Promise<Sent | null> => {
+    async ({ chatId, parentId, content, model, models, files = [], temporary = false, toggles, toolIds, skillIds, filterIds, folderId, params }: SendInput): Promise<Sent | null> => {
       const text = content.trim();
       if (!text && files.length === 0) return null;
       const turn = buildTurn({ history: historyOf(chatId), content: text, models: models?.length ? models : [model], files, parentId });
-      return dispatch({ chatId, temporary: temporary || isTemporaryChatId(chatId), turn, model, toggles, toolIds, folderId, params: chatId === null ? params : undefined });
+      return dispatch({ chatId, temporary: temporary || isTemporaryChatId(chatId), turn, model, toggles, toolIds, skillIds, filterIds, folderId, params: chatId === null ? params : undefined });
     },
     [dispatch, historyOf],
   );
 
   const regenerate = useCallback(
-    async ({ chatId, userMessageId, model, modelIdx, prompt, toggles, toolIds }: RegenerateInput): Promise<Sent | null> => {
+    async ({ chatId, userMessageId, model, modelIdx, prompt, toggles, toolIds, skillIds, filterIds }: RegenerateInput): Promise<Sent | null> => {
       const history = historyOf(chatId);
       if (!history.messages[userMessageId]) return null;
       const turn = buildRegenerateTurn({ history, userMessageId, model, modelIdx });
-      return dispatch({ chatId, temporary: isTemporaryChatId(chatId), turn, model, toggles, toolIds, regenerationPrompt: prompt });
+      return dispatch({ chatId, temporary: isTemporaryChatId(chatId), turn, model, toggles, toolIds, skillIds, filterIds, regenerationPrompt: prompt });
     },
     [dispatch, historyOf],
   );
 
   /** "Continue Response": the last reply carries on where it stopped, in place. */
   const continueReply = useCallback(
-    async ({ chatId, messageId, model, toggles, toolIds }: ContinueInput): Promise<Sent | null> => {
+    async ({ chatId, messageId, model, toggles, toolIds, skillIds, filterIds }: ContinueInput): Promise<Sent | null> => {
       const history = historyOf(chatId);
       if (!history.messages[messageId]) return null;
       const turn = buildContinueTurn({ history, messageId });
-      return dispatch({ chatId, temporary: isTemporaryChatId(chatId), turn, model, toggles, toolIds, continueMessageId: messageId });
+      return dispatch({ chatId, temporary: isTemporaryChatId(chatId), turn, model, toggles, toolIds, skillIds, filterIds, continueMessageId: messageId });
     },
     [dispatch, historyOf],
   );

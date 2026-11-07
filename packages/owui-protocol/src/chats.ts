@@ -167,6 +167,15 @@ export function savedTemporaryChat(history: ChatHistory, { models, params }: { m
   return { title: title.length > 50 ? `${title.slice(0, 50)}...` : title, models, params: params ?? {}, history, messages, tags: [], timestamp };
 }
 
+/**
+ * `/compact`: the server summarises the older part of a long chat so it fits the model again
+ * (when the admin turned context compaction on). Answers whether it did, and why not.
+ */
+export async function compactChat(client: OwuiClient, id: string, model: string): Promise<{ compacted: boolean; reason: string | null }> {
+  const answer = await client.post<{ compacted?: unknown; reason?: unknown } | null>(`${chatPath(id)}/compact`, { model });
+  return { compacted: answer?.compacted === true, reason: typeof answer?.reason === 'string' ? answer.reason : null };
+}
+
 /** `null` moves the chat out of its folder. */
 export function moveChatToFolder(client: OwuiClient, id: string, folderId: string | null): Promise<ChatRecord> {
   return client.post<ChatRecord>(`${chatPath(id)}/folder`, { folder_id: folderId });

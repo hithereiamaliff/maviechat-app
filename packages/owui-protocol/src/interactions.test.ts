@@ -139,6 +139,8 @@ describe('saved prompts and their variables', () => {
     expect(menuTrigger('mail me@x.com', 13)).toBeNull();
     expect(menuTrigger('# ', 2)).toBeNull();
     expect(menuTrigger('look #note here', 10)).toEqual({ char: '#', query: 'note', start: 5 });
+    expect(menuTrigger('use $wri', 8)).toEqual({ char: '$', query: 'wri', start: 4 });
+    expect(menuTrigger('price US$5', 10)).toBeNull();
     const trigger = menuTrigger('Hi /sum please', 7)!;
     expect(replaceTrigger('Hi /sum please', trigger, 7, 'Summarise:')).toEqual({ text: 'Hi Summarise: please', cursor: 13 });
   });

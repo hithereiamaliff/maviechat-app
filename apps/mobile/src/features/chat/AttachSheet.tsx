@@ -1,4 +1,16 @@
-import { chatReferenceItem, fileSizeLabel, knowledgeAttachment, listChats, previousFileItem, searchChats, searchFiles, uuidv4, type FileItem } from '@maviechat/owui-protocol';
+import {
+  chatReferenceItem,
+  fileSizeLabel,
+  knowledgeAttachment,
+  listChats,
+  listNoteChoices,
+  noteReferenceItem,
+  previousFileItem,
+  searchChats,
+  searchFiles,
+  uuidv4,
+  type FileItem,
+} from '@maviechat/owui-protocol';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -10,10 +22,10 @@ import { fonts, radius, usePalette } from '@/theme';
 import { updateDraft } from './drafts';
 
 /** The + menu's lists of what's already on the server. */
-export type AttachMode = 'files' | 'knowledge' | 'chats';
+export type AttachMode = 'files' | 'notes' | 'knowledge' | 'chats';
 
-const TITLES: Record<AttachMode, string> = { files: 'Attach Files', knowledge: 'Attach Knowledge', chats: 'Reference Chats' };
-const PLACEHOLDERS: Record<AttachMode, string> = { files: 'Search your files', knowledge: 'Search knowledge', chats: 'Search chats' };
+const TITLES: Record<AttachMode, string> = { files: 'Attach Files', notes: 'Attach Notes', knowledge: 'Attach Knowledge', chats: 'Reference Chats' };
+const PLACEHOLDERS: Record<AttachMode, string> = { files: 'Search your files', notes: 'Search notes', knowledge: 'Search knowledge', chats: 'Search chats' };
 
 interface Row {
   key: string;
@@ -24,9 +36,9 @@ interface Row {
 }
 
 /**
- * Attach Files (yours, uploaded before), Attach Knowledge (bases and their files) or Reference
- * Chats (another chat for the model to read), as the web's + menu offers them. A pick joins
- * the message's attachments, once.
+ * Attach Files (yours, uploaded before), Attach Notes, Attach Knowledge (bases and their files)
+ * or Reference Chats (another chat for the model to read), as the web's + menu offers them. A
+ * pick joins the message's attachments, once.
  */
 export function AttachSheet({ mode, draftKey, chatId, onClose }: { mode: AttachMode | null; draftKey: string; chatId?: string; onClose: () => void }) {
   const palette = usePalette();
@@ -44,6 +56,7 @@ function Picker({ mode, draftKey, chatId, onClose }: { mode: AttachMode; draftKe
   const debounced = useDebounced(query.trim(), 300);
   const files = useQuery({ queryKey: ['attach-files', debounced], queryFn: () => searchFiles(client, debounced), enabled: mode === 'files' });
   const knowledge = useKnowledgeSearch(debounced, mode === 'knowledge');
+  const notes = useQuery({ queryKey: ['attach-notes', debounced], queryFn: () => listNoteChoices(client, debounced), enabled: mode === 'notes' });
   const chats = useQuery({
     queryKey: ['attach-chats', debounced],
     queryFn: () => (debounced ? searchChats(client, debounced) : listChats(client, 1)),
@@ -59,6 +72,14 @@ function Picker({ mode, draftKey, chatId, onClose }: { mode: AttachMode; draftKe
           subtitle: [fileSizeLabel(file.size), new Date(file.created_at * 1000).toLocaleDateString()].filter(Boolean).join(' · '),
           item: () => previousFileItem(file, uuidv4()),
         }))
+      : mode === 'notes'
+        ? (notes.data ?? []).map((note) => ({
+            key: note.id,
+            icon: 'pencil-square' as const,
+            title: note.title,
+            subtitle: note.updatedAt ? new Date(note.updatedAt).toLocaleDateString() : '',
+            item: () => noteReferenceItem(note, uuidv4()),
+          }))
       : mode === 'knowledge'
         ? (knowledge.data ?? [])
             .filter((choice) => choice.kind !== 'folder')
@@ -78,7 +99,7 @@ function Picker({ mode, draftKey, chatId, onClose }: { mode: AttachMode; draftKe
               subtitle: new Date(chat.updated_at * 1000).toLocaleDateString(),
               item: () => chatReferenceItem(chat, uuidv4()),
             }));
-  const loading = mode === 'files' ? files.isLoading : mode === 'knowledge' ? knowledge.isLoading : chats.isLoading;
+  const loading = { files: files.isLoading, notes: notes.isLoading, knowledge: knowledge.isLoading, chats: chats.isLoading }[mode];
 
   const pick = (row: Row) => {
     const item = row.item();

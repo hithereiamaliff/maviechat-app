@@ -88,14 +88,27 @@ function NewChat({ link }: { link: ChatLink }) {
   const suggestions = useMemo(() => promptSuggestions(infoModel, config.data), [infoModel, config.data]);
   const insertSuggestion = ui('insertSuggestionPrompt');
 
-  const start = async ({ text, files, toggles, toolIds, atModelId }: OutgoingMessage) => {
+  const start = async ({ text, files, toggles, toolIds, skillIds, filterIds, atModelId }: OutgoingMessage) => {
     // A model picked with `@` answers alone (as on the web).
     const at = atModelId ? choice.models.find((item) => item.id === atModelId) : undefined;
     if (!model) {
       toast(choice.loading ? 'Loading models…' : 'No model is available to this account.', 'error');
       return false;
     }
-    const result = await send({ chatId: null, parentId: null, content: text, files, model: at ?? model, models: at ? [at] : choice.selected, toggles, toolIds, temporary, params: chatParams });
+    const result = await send({
+      chatId: null,
+      parentId: null,
+      content: text,
+      files,
+      model: at ?? model,
+      models: at ? [at] : choice.selected,
+      toggles,
+      toolIds,
+      skillIds,
+      filterIds,
+      temporary,
+      params: chatParams,
+    });
     if (!result) return false;
     carryOver(NEW_CHAT, result.chatId);
     router.replace({ pathname: '/c/[id]', params: { id: result.chatId } });
@@ -109,12 +122,12 @@ function NewChat({ link }: { link: ChatLink }) {
       composer.current?.focus();
       return;
     }
-    const { files, toggles, toolIds } = getDraft(NEW_CHAT);
+    const { files, toggles, toolIds, skillIds, filterIds } = getDraft(NEW_CHAT);
     if (filesPending(files)) {
       toast('Wait for the attachments to finish uploading.', 'error');
       return;
     }
-    void start({ text, files, toggles, toolIds });
+    void start({ text, files, toggles, toolIds, skillIds, filterIds });
   };
 
   // In the middle of the page (the default), or at the bottom as in a chat (the "chat" landing mode).

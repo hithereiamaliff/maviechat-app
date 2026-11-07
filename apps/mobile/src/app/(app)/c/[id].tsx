@@ -3,6 +3,7 @@ import {
   awaitingYou,
   branchArtifacts,
   combineQueued,
+  compactChat,
   createChat,
   forkChat,
   isTemporaryChatId,
@@ -59,11 +60,18 @@ import { sendChatToDeepTutor } from '@/features/deeptutor/crossReference';
 import { useLive } from '@/features/live/LiveProvider';
 import { useAutoReadAloud } from '@/lib/autoReadAloud';
 import { describeError } from '@/lib/errors';
-import { useAuthed, useCapabilities, useModels, useUserSettings } from '@/lib/server';
+import { useAuthed, useCapabilities, useModels, useServerConfig, useUserSettings } from '@/lib/server';
 import { useInterface } from '@/lib/uiSettings';
 import { ArtifactsContext } from '@/markdown/ArtifactsContext';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
+
+/** Why the server didn't compact, as it says. */
+const COMPACT_SKIPPED: Record<string, string> = {
+  too_short: 'This chat is too short to compact.',
+  empty: 'There’s nothing to compact yet.',
+  disabled: 'Context compaction is turned off on this server.',
+};
 
 export default function ChatScreen() {
   const palette = usePalette();
@@ -253,10 +261,10 @@ export default function ChatScreen() {
     const at = atModelId ? models.data?.find((item) => item.id === atModelId) : undefined;
     return at ? { model: at, models: [at] } : { model, models: selected };
   };
-  const deliver = async ({ text, files, toggles, toolIds, atModelId }: OutgoingMessage, parentId: string | null) => {
+  const deliver = async ({ text, files, toggles, toolIds, skillIds, filterIds, atModelId }: OutgoingMessage, parentId: string | null) => {
     const target = targets(atModelId);
     if (!target.model) return false;
-    const result = await send({ chatId, parentId, content: text, files, model: target.model, models: target.models, toggles, toolIds });
+    const result = await send({ chatId, parentId, content: text, files, model: target.model, models: target.models, toggles, toolIds, skillIds, filterIds });
     if (result) select(result.replyId);
     return Boolean(result);
   };
@@ -275,6 +283,31 @@ export default function ChatScreen() {
       router.replace(`/c/${copy.id}`);
     } catch (error) {
       toast(`Couldn't fork the chat: ${describeError(error)}`, 'error');
+    }
+  };
+
+  // `/compact`, where the admin turned context compaction on: the server summarises the older
+  // messages so a long chat fits the model again. As on the web, the model answering does it.
+  const serverConfig = useServerConfig();
+  const compactionOn = serverConfig.data?.features?.enable_context_compaction === true;
+  const compact = async () => {
+    if (streaming) {
+      toast('Wait for the reply to finish before compacting.');
+      return;
+    }
+    const modelId = getDraft(chatId).atModel ?? model?.id;
+    if (!history?.currentId || !modelId) {
+      toast('There’s nothing to compact yet.');
+      return;
+    }
+    toast('Compacting…');
+    try {
+      const result = await compactChat(client, chatId, modelId);
+      if (result.compacted) toast('Chat compacted', 'success');
+      else toast(COMPACT_SKIPPED[result.reason ?? ''] ?? 'There was nothing to compact.');
+      await queryClient.invalidateQueries({ queryKey: ['chat', chatId] });
+    } catch (error) {
+      toast(`Couldn't compact the chat: ${describeError(error)}`, 'error');
     }
   };
 
@@ -303,11 +336,11 @@ export default function ChatScreen() {
     const ids = new Set(items.map((item) => item.id));
     updateDraft(chatId, (draft) => ({ ...draft, queue: draft.queue.filter((item) => !ids.has(item.id)) }));
     const { prompt, files } = combineQueued(items);
-    const { toggles, toolIds, atModel } = getDraft(chatId);
+    const { toggles, toolIds, skillIds, filterIds, atModel } = getDraft(chatId);
     const at = atModel ? models.data?.find((item) => item.id === atModel) : undefined;
     const target = at ? { model: at, models: [at] } : { model, models: selected };
     if (!target.model) return;
-    void send({ chatId, parentId: lastId, content: prompt, files, model: target.model, models: target.models, toggles, toolIds })
+    void send({ chatId, parentId: lastId, content: prompt, files, model: target.model, models: target.models, toggles, toolIds, skillIds, filterIds })
       .then((result) => {
         if (result) {
           select(result.replyId);
@@ -329,8 +362,8 @@ export default function ChatScreen() {
     stalled.current = false;
     try {
       if (streaming) await stopReply(chatId);
-      const { toggles, toolIds, atModel } = getDraft(chatId);
-      const sent = await deliver({ text: item.prompt, files: item.files, toggles, toolIds, atModelId: atModel ?? undefined }, lastId);
+      const { toggles, toolIds, skillIds, filterIds, atModel } = getDraft(chatId);
+      const sent = await deliver({ text: item.prompt, files: item.files, toggles, toolIds, skillIds, filterIds, atModelId: atModel ?? undefined }, lastId);
       if (!sent) {
         stalled.current = true;
         updateDraft(chatId, (draft) => ({ ...draft, queue: [item, ...draft.queue] }));
@@ -362,8 +395,8 @@ export default function ChatScreen() {
 
   const listActions = useMemo<MessageActions>(() => {
     const extras = () => {
-      const { toggles, toolIds } = getDraft(chatId);
-      return { toggles, toolIds };
+      const { toggles, toolIds, skillIds, filterIds } = getDraft(chatId);
+      return { toggles, toolIds, skillIds, filterIds };
     };
     const modelOf = (reply: HistoryMessage) => models.data?.find((item) => item.id === reply.model) ?? model;
     return {
@@ -499,8 +532,8 @@ export default function ChatScreen() {
             onFollowUp={(text) => {
               // Into the message box, or straight off (the web's setting).
               if (ui('insertFollowUpPrompt')) return updateDraft(chatId, (draft) => ({ ...draft, text }));
-              const { toggles, toolIds } = getDraft(chatId);
-              void onSend({ text, files: [], toggles, toolIds });
+              const { toggles, toolIds, skillIds, filterIds } = getDraft(chatId);
+              void onSend({ text, files: [], toggles, toolIds, skillIds, filterIds });
             }}
             pinToBottomKey={lastId ?? undefined}
             baseUrl={session.baseUrl}
@@ -539,6 +572,7 @@ export default function ChatScreen() {
             streaming={streaming}
             temporary={temporary}
             onFork={chat && !temporary && actions.canClone ? () => void fork() : undefined}
+            onCompact={chat && !temporary && compactionOn ? () => void compact() : undefined}
           />
         )}
       </KeyboardAvoidingView>

@@ -33,6 +33,8 @@ export function IntegrationsSheet({
   onToggleTool,
   approval,
   systems,
+  skills,
+  filters,
   always = [],
 }: {
   visible: boolean;
@@ -47,6 +49,10 @@ export function IntegrationsSheet({
   approval?: { mode: 'full' | 'ask'; onChange: (mode: 'full' | 'ask') => void };
   /** The systems the model can work on: one at a time, or none. */
   systems?: { list: TerminalServer[]; chosenId: string | null; onChoose: (id: string | null) => void };
+  /** Skills to switch on for the message (the model's own start on). */
+  skills?: { list: { id: string; name: string; description: string }[]; chosen: string[]; onToggle: (id: string, on: boolean) => void };
+  /** The model's switchable filters (its defaults start on). */
+  filters?: { list: { id: string; name: string; description: string }[]; chosen: string[]; onToggle: (id: string, on: boolean) => void };
   /** On for every message by your settings ("always search the web"): shown on, not switchable here. */
   always?: ToggleKey[];
 }) {
@@ -94,6 +100,20 @@ export function IntegrationsSheet({
                 row(tool.id, 'wrench-screwdriver', tool.name || tool.id, tool.meta?.description, toolIds.includes(tool.id), (on) =>
                   onToggleTool(tool.id, on),
                 ),
+              )}
+            </>
+          ) : null}
+          {skills && skills.list.length > 0 ? (
+            <>
+              <Text style={[styles.section, { color: palette.textFaint }]}>Skills</Text>
+              {skills.list.map((skill) => row(`skill-${skill.id}`, 'sparkles', skill.name, skill.description, skills.chosen.includes(skill.id), (on) => skills.onToggle(skill.id, on)))}
+            </>
+          ) : null}
+          {filters && filters.list.length > 0 ? (
+            <>
+              <Text style={[styles.section, { color: palette.textFaint }]}>Filters</Text>
+              {filters.list.map((filter) =>
+                row(`filter-${filter.id}`, 'funnel', filter.name, filter.description, filters.chosen.includes(filter.id), (on) => filters.onToggle(filter.id, on)),
               )}
             </>
           ) : null}

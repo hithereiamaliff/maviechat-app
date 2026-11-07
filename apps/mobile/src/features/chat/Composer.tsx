@@ -4,11 +4,15 @@ import {
   canUseTerminal,
   chatTerminals,
   saveToolApprovalMode,
+  defaultFilterIds,
+  defaultSkillIds,
   defaultToggles,
   defaultToolIds,
   effectiveToggles,
   filesPending,
+  listSkillChoices,
   modelControls,
+  modelFilters,
   modelTerminal,
   terminalLabel,
   usableTools,
@@ -17,7 +21,7 @@ import {
   type ModelItem,
   type ToggleKey,
 } from '@maviechat/owui-protocol';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useImperativeHandle, useRef, useState, type ComponentRef, type Ref } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -52,6 +56,10 @@ export interface OutgoingMessage {
   files: FileItem[];
   toggles: FeatureToggles;
   toolIds: string[];
+  /** Skills switched on in Integrations (`skill_ids`). */
+  skillIds?: string[];
+  /** The model's switchable filters turned on (`filter_ids`). */
+  filterIds?: string[];
   /** Picked with `@`: this model alone answers, instead of the chat's models. */
   atModelId?: string;
 }
@@ -88,6 +96,8 @@ interface ComposerProps {
   onTemporary?: () => void;
   /** A saved chat's `/fork` command. */
   onFork?: () => void;
+  /** A saved chat's `/compact` command, where the server has context compaction on. */
+  onCompact?: () => void;
 }
 
 const NO_TOGGLES: Record<ToggleKey, boolean> = { webSearch: false, imageGeneration: false, codeInterpreter: false };
@@ -115,6 +125,7 @@ export function Composer({
   placeholder = 'Send a Message',
   onTemporary,
   onFork,
+  onCompact,
 }: ComposerProps) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
@@ -133,6 +144,8 @@ export function Composer({
       .then(() => queryClient.invalidateQueries({ queryKey: ['user-settings'] }))
       .catch((error: unknown) => toast(`Couldn't change tool permissions: ${describeError(error)}`, 'error'));
   const tools = useTools();
+  // Skills you can switch on (the web's Integrations list, and the `/` list): the active ones.
+  const skills = useQuery({ queryKey: ['workspace', 'skill-choices'], queryFn: () => listSkillChoices(client), staleTime: 60_000 });
   const draft = useDraft(draftKey);
   const attach = useAttachments({ draftKey, model, temporary });
   const [sending, setSending] = useState(false);
@@ -143,6 +156,7 @@ export function Composer({
   const [attachMode, setAttachMode] = useState<AttachMode | null>(null);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
+  const notesOn = capabilities?.feature('notes', true) ?? false;
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }), []);
   const allModels = useModels();
@@ -165,10 +179,16 @@ export function Composer({
   // 0.12's knobs: the chosen models that have some (none on 0.11).
   const knobModels = (models ?? (model ? [model] : [])).filter((item) => modelControls(item).length > 0);
   const toolIds = draft.toolIds.filter((id) => usable.some((tool) => tool.id === id));
+  const activeSkills = (skills.data ?? []).filter((skill) => skill.active);
+  const skillIds = draft.skillIds.filter((id) => activeSkills.some((skill) => skill.id === id));
+  // The filters of the model that leads (the web's list, too, follows the first model).
+  const filters = modelFilters(atModel ?? model);
+  const filterIds = draft.filterIds.filter((id) => filters.some((filter) => filter.id === id));
   const hasContent = draft.text.trim().length > 0 || draft.files.length > 0;
   const uploading = filesPending(draft.files);
   const canSend = hasContent && !sending && !uploading;
-  const showIntegrations = available.webSearch || available.imageGeneration || available.codeInterpreter || usable.length > 0 || approvalsOn || systems.length > 0;
+  const showIntegrations =
+    available.webSearch || available.imageGeneration || available.codeInterpreter || usable.length > 0 || approvalsOn || systems.length > 0 || activeSkills.length > 0 || filters.length > 0;
   const canExpand = draft.text.split('\n').length > 2;
   // With "Paste long text as a file" on, a paste over 1,000 characters is attached instead, and the box keeps what it had.
   const setText = (text: string) => {
@@ -193,25 +213,28 @@ export function Composer({
     onPickModel,
     onTemporary,
     onFork,
+    onCompact,
   });
 
-
-  // Like the web, a model brings its own default toggles, tools and system when you start with it.
+  // Like the web, a model brings its own default toggles, tools, skills, filters and system when you start with it.
   const settingsReady = !settings.isPending;
   const toolsReady = !tools.isPending;
   const terminalsReady = !terminals.isPending;
+  const skillsReady = !skills.isPending;
   useEffect(() => {
-    if (!model || !capabilities || !settingsReady || !toolsReady || !terminalsReady || getDraft(draftKey).defaultsFor === model.id) return;
+    if (!model || !capabilities || !settingsReady || !toolsReady || !terminalsReady || !skillsReady || getDraft(draftKey).defaultsFor === model.id) return;
     const saved = (settings.data?.ui as { tools?: unknown } | null | undefined)?.tools;
     updateDraft(draftKey, (current) => ({
       ...current,
       toggles: defaultToggles(capabilities, model),
       toolIds: defaultToolIds(model, tools.data ?? [], saved),
+      skillIds: defaultSkillIds(model, skills.data ?? []),
+      filterIds: defaultFilterIds(model),
       defaultsFor: model.id,
     }));
     const preset = modelTerminal(model, terminals.data ?? []);
     if (preset) chooseTerminal(account, preset);
-  }, [draftKey, model, capabilities, settingsReady, toolsReady, terminalsReady, settings.data, tools.data, terminals.data, account]);
+  }, [draftKey, model, capabilities, settingsReady, toolsReady, terminalsReady, skillsReady, settings.data, tools.data, terminals.data, skills.data, account]);
 
   const { ref: plusRef, open: openPlus, menu: plusMenu } = useAnchoredMenu([
     { key: 'files', label: 'Upload Files', icon: 'paper-clip', onPress: () => void attach.pickFiles() },
@@ -236,6 +259,7 @@ export function Composer({
         ),
     },
     { key: 'previous', label: 'Attach Files', icon: 'document-text', onPress: () => setAttachMode('files') },
+    ...(notesOn ? [{ key: 'notes', label: 'Attach Notes', icon: 'pencil-square' as const, onPress: () => setAttachMode('notes') }] : []),
     { key: 'knowledge', label: 'Attach Knowledge', icon: 'circle-stack', onPress: () => setAttachMode('knowledge') },
     { key: 'chats', label: 'Reference Chats', icon: 'chat-bubble-left-right', onPress: () => setAttachMode('chats') },
     ...(deepTutorSignedIn
@@ -250,6 +274,10 @@ export function Composer({
       ...current,
       toolIds: on ? [...current.toolIds.filter((item) => item !== id), id] : current.toolIds.filter((item) => item !== id),
     }));
+  const setSkill = (id: string, on: boolean) =>
+    updateDraft(draftKey, (current) => ({ ...current, skillIds: on ? [...current.skillIds.filter((item) => item !== id), id] : current.skillIds.filter((item) => item !== id) }));
+  const setFilter = (id: string, on: boolean) =>
+    updateDraft(draftKey, (current) => ({ ...current, filterIds: on ? [...current.filterIds.filter((item) => item !== id), id] : current.filterIds.filter((item) => item !== id) }));
   // Choosing a system switches the code interpreter off, as on the web; null stops using one.
   const pickSystem = (id: string | null) => {
     chooseTerminal(account, id);
@@ -265,7 +293,7 @@ export function Composer({
 
   const submit = async () => {
     if (!canSend) return;
-    const message = { text: draft.text, files: draft.files, toggles, toolIds, ...(atModel ? { atModelId: atModel.id } : {}) };
+    const message = { text: draft.text, files: draft.files, toggles, toolIds, skillIds, filterIds, ...(atModel ? { atModelId: atModel.id } : {}) };
     const previews = draft.previews;
     setSending(true);
     // As on the web, the input empties as the message goes; one that didn't go out comes back,
@@ -471,6 +499,8 @@ export function Composer({
         tools={usable}
         toolIds={toolIds}
         onToggleTool={setTool}
+        skills={activeSkills.length ? { list: activeSkills, chosen: skillIds, onToggle: setSkill } : undefined}
+        filters={filters.length ? { list: filters, chosen: filterIds, onToggle: setFilter } : undefined}
         approval={approvalsOn ? { mode: approvalMode, onChange: setApprovalMode } : undefined}
         systems={systems.length > 0 ? { list: systems, chosenId: system?.id ?? null, onChoose: pickSystem } : undefined}
       />

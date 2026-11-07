@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -21,6 +21,8 @@
  * account's own settings, then puts them back (src/newchat-probe.ts).
  * `--attach` reads the lists the + menu offers and saves a temporary chat the app's way, then
  * deletes it (src/attach-probe.ts).
+ * `--integrations` reads your notes, skills and the models' filters, and asks `/compact` of a
+ * one-message probe chat (turned down before any model runs), then deletes it (src/integrations-probe.ts).
  * `--a8` saves settings the app's way and puts them back exactly (src/a8-probe.ts), then tries
  * memories, the profile, your variables, a refused password change and an API key (src/a8-account-probe.ts),
  * and the data controls: export, import, shared chats and files (src/a8-data-probe.ts).
@@ -59,6 +61,7 @@ import { probeA5 } from './a5-probe';
 import { probeA6 } from './a6-probe';
 import { probeAttach } from './attach-probe';
 import { probeFolders } from './folders-probe';
+import { probeIntegrations } from './integrations-probe';
 import { probeNewChat } from './newchat-probe';
 import { probeA8Account } from './a8-account-probe';
 import { probeA8Data } from './a8-data-probe';
@@ -97,6 +100,7 @@ const { values: args } = parseArgs({
     folders: { type: 'boolean' },
     newchat: { type: 'boolean' },
     attach: { type: 'boolean' },
+    integrations: { type: 'boolean' },
     a8: { type: 'boolean' },
     m3: { type: 'boolean' },
     m3text: { type: 'boolean' },
@@ -364,6 +368,12 @@ async function main() {
         const attach = await probeAttach({ client, canDelete: capabilities.can('chat.delete') });
         for (const result of attach.steps) results.push({ ...result, name: `Attach: ${result.name}` });
         fixtures['write.attach'] = attach.fixture;
+      }
+
+      if (args.integrations && capabilities) {
+        const integrations = await probeIntegrations({ client, capabilities, canDelete: capabilities.can('chat.delete') });
+        for (const result of integrations.steps) results.push({ ...result, name: `Integrations: ${result.name}` });
+        fixtures['write.integrations'] = integrations.fixture;
       }
 
       if (args.a8 && capabilities) {

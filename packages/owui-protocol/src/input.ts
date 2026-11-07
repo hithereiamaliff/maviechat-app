@@ -67,6 +67,38 @@ export function defaultToolIds(model: ModelItem | undefined, tools: ToolItem[], 
   return [...new Set(source.filter((id): id is string => typeof id === 'string' && known.has(id)))];
 }
 
+/** A model's switchable filters (the server lists only those an admin made switchable). */
+export function modelFilters(model: ModelItem | undefined): { id: string; name: string; description: string }[] {
+  const raw = (model as { filters?: unknown } | undefined)?.filters;
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item) => {
+    const row = typeof item === 'object' && item !== null ? (item as Record<string, unknown>) : {};
+    return typeof row.id === 'string' && row.id
+      ? [{ id: row.id, name: typeof row.name === 'string' && row.name ? row.name : row.id, description: typeof row.description === 'string' ? row.description : '' }]
+      : [];
+  });
+}
+
+/** The model's filters that start on (`info.meta.defaultFilterIds`), as the web turns them on for a new message. */
+export function defaultFilterIds(model: ModelItem | undefined): string[] {
+  const own = (model?.info?.meta as { defaultFilterIds?: unknown } | undefined)?.defaultFilterIds;
+  const known = new Set(modelFilters(model).map((filter) => filter.id));
+  return Array.isArray(own) ? [...new Set(own.filter((id): id is string => typeof id === 'string' && known.has(id)))] : [];
+}
+
+/** The model's skills that start on (`info.meta.skillIds`), the ones still active. */
+export function defaultSkillIds(model: ModelItem | undefined, skills: { id: string; active: boolean }[]): string[] {
+  const own = (model?.info?.meta as { skillIds?: unknown } | undefined)?.skillIds;
+  const active = new Set(skills.filter((skill) => skill.active).map((skill) => skill.id));
+  return Array.isArray(own) ? [...new Set(own.filter((id): id is string => typeof id === 'string' && active.has(id)))] : [];
+}
+
+/** A skill as the web puts it in a message from the `/` list; the server adds the skill's text. */
+export function skillMention(skill: { id: string; name: string }): string {
+  // The server reads the label up to the first ">", so a name can't carry one.
+  return '<$' + skill.id + '|' + skill.name.replace(/>/g, '') + '>';
+}
+
 /** The server's attachment limits (`file.max_count`, `file.max_size` in MB); null when the files may be attached. */
 export function uploadLimitError(
   config: ServerConfig | undefined,
