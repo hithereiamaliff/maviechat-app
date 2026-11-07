@@ -43,6 +43,14 @@ describe('your settings', () => {
     expect(interfaceChange('defaultUploadContext', true)).toEqual({ defaultUploadContext: 'full' });
     expect(withUiChanges({ title: { auto: true, prompt: 'x' } }, interfaceChange('titleAuto', false))).toEqual({ title: { auto: false, prompt: 'x' } });
   });
+
+  it('reads the landing page mode as the web stores it', () => {
+    expect(interfaceOn({}, 'landingPageMode')).toBe(false);
+    expect(interfaceOn({ landingPageMode: '' }, 'landingPageMode')).toBe(false);
+    expect(interfaceOn({ landingPageMode: 'chat' }, 'landingPageMode')).toBe(true);
+    expect(interfaceChange('landingPageMode', true)).toEqual({ landingPageMode: 'chat' });
+    expect(interfaceChange('landingPageMode', false)).toEqual({ landingPageMode: '' });
+  });
 });
 
 describe('Read Aloud speed', () => {

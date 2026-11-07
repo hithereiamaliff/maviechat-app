@@ -1,6 +1,7 @@
 import {
   matchesModelFilter,
   modelFilterOptions,
+  modelLink,
   modelSizeLabel,
   modelTags,
   OwuiHttpError,
@@ -10,16 +11,19 @@ import {
   type ModelItem,
 } from '@maviechat/owui-protocol';
 import { useQueryClient } from '@tanstack/react-query';
+import * as Clipboard from 'expo-clipboard';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { MenuButton } from '@/components/Menu';
 import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { useAuthed } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
 import { ModelAvatar } from './ModelAvatar';
 import { searchModels } from './search';
+import { usePinnedModels } from './usePinnedModels';
 
 interface ModelPickerProps {
   visible: boolean;
@@ -40,9 +44,10 @@ interface ModelPickerProps {
  */
 export function ModelPicker({ visible, models, selectedIds, defaultIds, onChange, compareAllowed, onClose }: ModelPickerProps) {
   const palette = usePalette();
-  const { client } = useAuthed();
+  const { client, session } = useAuthed();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const pinned = usePinnedModels();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('');
   const [saving, setSaving] = useState(false);
@@ -187,6 +192,26 @@ export function ModelPicker({ visible, models, selectedIds, defaultIds, onChange
                 ) : selected ? (
                   <Icon name="check" size={18} color={palette.text} strokeWidth={2} />
                 ) : null}
+                <MenuButton
+                  items={[
+                    pinned.isPinned(model.id)
+                      ? { key: 'pin', label: 'Hide from Sidebar', icon: 'bookmark-slash', onPress: () => pinned.toggle(model.id) }
+                      : { key: 'pin', label: 'Keep in Sidebar', icon: 'bookmark', onPress: () => pinned.toggle(model.id) },
+                    {
+                      key: 'link',
+                      label: 'Copy Link',
+                      icon: 'link',
+                      onPress: () =>
+                        void Clipboard.setStringAsync(modelLink(session.baseUrl, model.id)).then(
+                          () => toast('Link copied'),
+                          () => toast('Couldn’t copy the link.', 'error'),
+                        ),
+                    },
+                  ]}
+                  label={`Options for ${model.name ?? model.id}`}
+                  size={18}
+                  color={palette.textMuted}
+                />
               </Pressable>
             );
           })}

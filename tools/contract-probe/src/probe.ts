@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -17,6 +17,8 @@
  * probe chat made without a model, and builds the downloads (src/a6-probe.ts).
  * `--folders` makes, changes, exports and deletes probe folders, with a probe chat inside
  * (src/folders-probe.ts).
+ * `--newchat` reads the banners, and pins a model and switches the landing mode in the test
+ * account's own settings, then puts them back (src/newchat-probe.ts).
  * `--a8` saves settings the app's way and puts them back exactly (src/a8-probe.ts), then tries
  * memories, the profile, your variables, a refused password change and an API key (src/a8-account-probe.ts),
  * and the data controls: export, import, shared chats and files (src/a8-data-probe.ts).
@@ -54,6 +56,7 @@ import { probeA4 } from './a4-probe';
 import { probeA5 } from './a5-probe';
 import { probeA6 } from './a6-probe';
 import { probeFolders } from './folders-probe';
+import { probeNewChat } from './newchat-probe';
 import { probeA8Account } from './a8-account-probe';
 import { probeA8Data } from './a8-data-probe';
 import { probeA8 } from './a8-probe';
@@ -89,6 +92,7 @@ const { values: args } = parseArgs({
     a5: { type: 'boolean' },
     a6: { type: 'boolean' },
     folders: { type: 'boolean' },
+    newchat: { type: 'boolean' },
     a8: { type: 'boolean' },
     m3: { type: 'boolean' },
     m3text: { type: 'boolean' },
@@ -344,6 +348,12 @@ async function main() {
         const folders = await probeFolders({ client, capabilities, canDelete: capabilities.can('chat.delete') });
         for (const result of folders.steps) results.push({ ...result, name: `Folders: ${result.name}` });
         fixtures['write.folders'] = folders.fixture;
+      }
+
+      if (args.newchat && capabilities) {
+        const newChat = await probeNewChat({ client, capabilities });
+        for (const result of newChat.steps) results.push({ ...result, name: `New chat: ${result.name}` });
+        fixtures['write.newchat'] = newChat.fixture;
       }
 
       if (args.a8 && capabilities) {

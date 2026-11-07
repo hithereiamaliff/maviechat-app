@@ -89,6 +89,32 @@ export function defaultModelId(models: ModelItem[], settings: UserSettings | und
 }
 
 /**
+ * The models kept in the sidebar: yours (`ui.pinnedModels`), else the admin's default list
+ * (`default_pinned_models`), which an account that never pinned one keeps following.
+ */
+export function pinnedModelIds(settings: UserSettings | undefined, config: ServerConfig | undefined): string[] {
+  const mine: unknown = (settings?.ui as { pinnedModels?: unknown } | null | undefined)?.pinnedModels;
+  if (Array.isArray(mine)) return mine.filter((id): id is string => typeof id === 'string' && id.length > 0);
+  const server = config?.default_pinned_models;
+  return typeof server === 'string' ? server.split(',').filter((id) => id) : [];
+}
+
+/** The pinned models this account can see, in their order (pins for others stay saved, unshown). */
+export function visiblePinnedModels(ids: string[], models: ModelItem[]): ModelItem[] {
+  return ids.flatMap((id) => models.find((model) => model.id === id && !model.info?.meta?.hidden) ?? []);
+}
+
+/** The pins after Keep in Sidebar (added at the end) or Hide from Sidebar (taken out). */
+export function togglePinnedModel(ids: string[], id: string): string[] {
+  return ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id];
+}
+
+/** The web's link that opens a new chat with this model, as its Copy Link copies it. */
+export function modelLink(baseUrl: string, id: string): string {
+  return `${baseUrl.replace(/\/+$/, '')}/?model=${encodeURIComponent(id)}`;
+}
+
+/**
  * The selection after tapping a model in the picker, as on the web: with Compare on, the model
  * joins (at the end) or leaves, but the last one stays; with it off, the model replaces the rest.
  */

@@ -21,6 +21,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Icon, type IconName } from '@/components/Icon';
 import { MenuButton, type MenuItem } from '@/components/Menu';
 import { useAccountsSheet, useOwuiAccountSignOut } from '@/features/accounts/AccountsSheet';
+import { ModelAvatar } from '@/features/chat/ModelAvatar';
+import { usePinnedModels } from '@/features/chat/usePinnedModels';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
 import { useShareSheet } from '@/features/chats/ShareSheet';
 import { useTagsSheet } from '@/features/chats/TagsSheet';
@@ -84,6 +86,7 @@ export function Sidebar() {
   const pinned = useQuery({ queryKey: ['chats', 'pinned'], queryFn: () => listPinnedChats(client) });
   const folders = useQuery({ queryKey: ['folders'], queryFn: () => listFolders(client), enabled: foldersOn });
   const results = useQuery({ queryKey: ['chats', 'search', query], queryFn: () => searchChats(client, query), enabled: searching });
+  const pinnedModels = usePinnedModels();
 
   // Refresh when the sidebar opens; socket-driven updates arrive with sending (next slice).
   useEffect(() => {
@@ -122,6 +125,7 @@ export function Sidebar() {
       buildSidebarRows({
         search: { active: searching, results: results.data, loading: results.isFetching },
         pinned: pinned.data ?? [],
+        pinnedModels: pinnedModels.visible.map((model) => ({ id: model.id, name: model.name ?? model.id })),
         folders: foldersOn ? tree : [],
         foldersOn,
         isExpanded: (folder) => expanded[folder.id] ?? folder.is_expanded ?? false,
@@ -129,7 +133,7 @@ export function Sidebar() {
         chats: chats.data?.pages.flat() ?? [],
         chatsLoading: chats.isLoading,
       }),
-    [searching, results.data, results.isFetching, pinned.data, foldersOn, tree, expanded, folderChats, openFolderIds, chats.data, chats.isLoading],
+    [searching, results.data, results.isFetching, pinned.data, pinnedModels.visible, foldersOn, tree, expanded, folderChats, openFolderIds, chats.data, chats.isLoading],
   );
 
   const openChat = (id: string) => {
@@ -152,6 +156,11 @@ export function Sidebar() {
   const openFolder = (folder: FolderNode) => {
     sidebar.close();
     if (folder.id !== currentFolderId) router.replace({ pathname: '/folders/[id]', params: { id: folder.id } });
+  };
+  // As the web's pinned model links to `/?model=`: a new chat with that model.
+  const openModel = (id: string) => {
+    sidebar.close();
+    router.replace({ pathname: '/', params: { model: id } });
   };
   const openOnWeb = (path: string) => {
     sidebar.close();
@@ -246,6 +255,25 @@ export function Sidebar() {
         return <SidebarHeading label={item.label} action={item.addFolder ? { icon: 'plus', label: 'New Folder', onPress: folderActions.newFolder } : undefined} />;
       case 'note':
         return <SidebarNote label={item.label} depth={item.depth} />;
+      case 'model':
+        return (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityHint="Starts a new chat with this model"
+            onPress={() => openModel(item.id)}
+            style={({ pressed }) => [styles.row, styles.modelRow, pressed && { backgroundColor: palette.sidebarActive }]}>
+            <ModelAvatar modelId={item.id} size={20} />
+            <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <MenuButton
+              items={[{ key: 'unpin', label: 'Hide from Sidebar', icon: 'bookmark-slash', onPress: () => pinnedModels.toggle(item.id) }]}
+              label={`Options for ${item.name}`}
+              size={18}
+              color={palette.textMuted}
+            />
+          </Pressable>
+        );
       case 'folder':
         // As on the web: the row opens the folder's page, the chevron opens or closes it here.
         return (
@@ -386,5 +414,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, paddingRight: 0, borderRadius: radius.md },
   title: { flex: 1, fontFamily: fonts.regular, fontSize: 14 },
   chevron: { width: 22, height: 30, alignItems: 'center', justifyContent: 'center' },
+  modelRow: { paddingLeft: 12, gap: 10 },
   badge: { overflow: 'hidden', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, fontFamily: fonts.medium, fontSize: 11, marginRight: 8 },
 });

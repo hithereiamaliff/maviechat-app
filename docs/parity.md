@@ -28,7 +28,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | | Item | Source | Mn |
 |---|---|---|---|
 | [~] | Routes: `/` new chat, `/c/{id}` chat, `/folders/{id}` folder landing, `/s/{id}` shared chat (read-only, Clone). Slice 4: `/folders/{id}`. A shared link opens the server's page in the browser (the app has no link handling yet) | `src/routes/(app)/…` | M1 (`/s` M2) |
-| [ ] | Deep-link parameters: `q`, `models`, `web-search`, `image-generation`, `code-interpreter`, `tools`, `temporary-chat`, `message` | `chat/Chat.svelte` | M2 |
+| [~] | Deep-link parameters: `q`, `models`, `web-search`, `image-generation`, `code-interpreter`, `tools`, `temporary-chat`, `message`. New chat and sidebar slice (2026-11-07): `maviechat://?q=…` takes `q`, `models` (else `model`), `web-search`, `image-generation`, `code-interpreter`, `tools` (else `tool-ids`) and `temporary-chat`. 0.11.3 reads no `message`. Unlike the web, `q` only fills the message box and is never sent by itself, because any app or page can open such a link. Not yet: `youtube` and `load-url` (they need Attach Webpage) and `call`. A launch from such a link stays in Open WebUI instead of reopening the last space. | `chat/Chat.svelte` | M2 |
 | [x] | Toasts: "Connection lost / Reconnected" (after 2 s, only while the app is open; slice 4), "Session expired" (shown on the sign-in screen; slice 1) | `src/routes/+layout.svelte` | M1 |
 | [x] | Swipe-anywhere sidebar overlay; swipe-left controls panel; sideways-scrolling content wins the gesture | `common/MobileSwipePanel.svelte`, `chat/ChatControls.svelte` | M1 / M2 |
 | [~] | Pending-approval overlay ("Check Again", Sign Out). The app doesn't sign a pending account in; the sign-in screen says it awaits approval, and signing in again is the "Check Again" | `layout/Overlay/AccountPending.svelte` | M1 |
@@ -39,7 +39,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 |---|---|---|
 | [x] | Logo + server name (tap = new chat), New Chat, Search | M1 |
 | [x] | Pinned shortcuts under Search, in the user's order (`ui.pinnedMenuItems`, default Notes and Workspace), each only when the account may use it; Playground for admins. Slice 5: they open on the web (Workspace until M3) | M1 |
-| [ ] | Section: pinned models (`PinnedModelList.svelte`) opening `/?model=id` | M2 |
+| [x] | Section: pinned models (`PinnedModelList.svelte`) opening `/?model=id`. New chat and sidebar slice (2026-11-07): "Models" above Pinned, from `ui.pinnedModels`, else the admin's `default_pinned_models`; only models you can see. Each opens a new chat with that model, and its "…" has Hide from Sidebar. The web's drag-to-reorder isn't offered. | M2 |
 | [~] | Section: Folders tree, own and shared. Tap opens the folder landing; the chevron expands; unread badge (folder landing from slice 4). Folders slice (2026-11-07): the heading shows while folders are on, with New Folder (+). Folders other people share with you aren't listed yet | M1 |
 | [x] | Folder menu: New Chat, Create subfolder, Mark all read, Edit, Export JSON, Delete (optionally with contents). Folders slice (2026-11-07): all of them, on each folder row and on the folder's page (without New Chat there, since the page is one), plus Share (0.11 has it in the menu; 0.12 moved it into the form). Delete asks whether the chats go too or move out | M2 |
 | [x] | Folder settings: name, description, background, default models, system prompt, knowledge, sharing (`Folders/FolderModal.svelte`). Folders slice (2026-11-07): name; system prompt (with that permission); knowledge (each whole or searched); a background picture, shrunk on the phone to 1920 px; on 0.12+ the description and default model, which 0.11's form doesn't have. Sharing is in the menu | M2 |
@@ -59,7 +59,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [~] | "…" menu: Scroll to top, Artifacts, Share, Download JSON/TXT/PDF, Rename, Copy chat, Move to folder, Archive, Delete, Tags editor. Slice 1: Rename, Pin, Archive, Delete; slice 4: Move, and Unarchive on an archived chat; A6: Tags, Share, Download (JSON, text), Copy, Clone | M1 core, M2 rest |
 | [~] | Temporary Chat toggle (new chat only) / Save Chat (temporary chat with messages). Slice 3: the toggle, with the `chat.temporary` / `temporary_enforced` rules | M1 toggle, M2 Save Chat |
 | [x] | New Chat button (phone only), Controls (knobs) button | M1 |
-| [ ] | Admin banners on the new-chat screen | M2 |
+| [x] | Admin banners on the new-chat screen. New chat and sidebar slice (2026-11-07): under the bar on a new chat, with type, title and Markdown content. Closing a dismissible banner keeps it closed on this device (the web keeps it per browser), and other banners come back next time. | M2 |
 
 ## 4. Model selector — lives in the input bar, bottom right (`chat/ModelSelector.svelte`, `ModelSelector/*`)
 
@@ -67,7 +67,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 |---|---|---|
 | [x] | Search by name/ID/tag; filters All / Local / External / Direct / tag. Slice 5: fuzzy search as on the web, filter chips All / Local / External / tags, hidden models left out. Direct connections live in the browser, so the server's list never has them | M1 |
 | [x] | Rows: avatar, name, tags, badges, description, checkmark. Slice 5: picture, size label (Ollama, LM Studio, llama.cpp), loaded dot, tag and External icons, description line, default badge, checkmark | M1 |
-| [ ] | Row "…": Keep in Sidebar / Hide from Sidebar, Copy link (Edit/Delete for admins → M3) | M2 |
+| [x] | Row "…": Keep in Sidebar / Hide from Sidebar, Copy link (Edit/Delete for admins → M3). New chat and sidebar slice (2026-11-07): Keep in Sidebar / Hide from Sidebar and Copy Link, which copies the web's `/?model=` link, on each row of the model picker. | M2 |
 | [x] | **Compare** toggle for multi-model (permission `multiple_models`). A4 (2026-11-03): the Compare switch beside search; with it on, taps add or remove models (numbered in order, the last one stays) and the picker stays open; off keeps the first. The input bar reads "Model +2". "Set as default" saves the list | M2 |
 | [x] | "Set as default" (new chat only) | M1 |
 | [ ] | Model controls (preset knobs next to the selector) (`MessageInput/ModelControls.svelte`) | M2 |
@@ -87,7 +87,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 |---|---|---|
 | [x] | Centred input; stacked model avatars; model name or "Hello, {name}"; description; "By author". Slice 5: the model's picture and name (or "Hello, {name}"), two lines of description (tap for the rest), "By author" (community authors link to their page), input asking "How can I help you today?". A4: with Compare the pictures overlap; the last model's details show until you tap another's picture | M1 |
 | [x] | "Suggested" prompts (model's own, else admin defaults), shuffled and filtered as you type; tap sends, or inserts if that setting is on. Slice 5: all of it (a model whose own list is empty shows none; nothing past 500 typed characters). When there are none the web shows its own name and version; the app leaves that line out | M1 |
-| [ ] | Landing mode "chat" (input pinned to the bottom) | M2 |
+| [x] | Landing mode "chat" (input pinned to the bottom). New chat and sidebar slice (2026-11-07): Settings → Interface → "New chats open as a chat" (`landingPageMode`). The greeting and suggestions stay in the page, and the input waits at the bottom. | M2 |
 | [~] | Folder landing page: folder header, input, Chats / Knowledge tabs. Folders slice (2026-11-07): the folder's menu in the bar, the description (0.12+), the background picture fading into the page as on the web, the input starting chats with the folder's models, and the chats with Show More. On 0.11 the models picked there become the folder's, as the web does. The web's Knowledge tab is empty in 0.11.3 and 0.12.5, so there's no tab; the emoji icon the web lets you pick isn't shown yet | M2 |
 
 ## 7. Message input (`chat/MessageInput.svelte`, `chat/MessageInput/*`)

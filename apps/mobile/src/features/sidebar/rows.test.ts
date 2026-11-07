@@ -31,7 +31,9 @@ const base = {
 };
 
 const summary = (rows: ReturnType<typeof buildSidebarRows>) =>
-  rows.map((row) => (row.type === 'chat' ? `${'  '.repeat(row.depth)}${row.chat.id}` : row.type === 'folder' ? `${'  '.repeat(row.depth)}[${row.folder.name}]` : `${row.type}:${row.label}`));
+  rows.map((row) =>
+    row.type === 'chat' ? `${'  '.repeat(row.depth)}${row.chat.id}` : row.type === 'folder' ? `${'  '.repeat(row.depth)}[${row.folder.name}]` : row.type === 'model' ? `<${row.name}>` : `${row.type}:${row.label}`,
+  );
 
 describe('buildSidebarRows', () => {
   it('orders Pinned, Folders, then dated chats', () => {
@@ -57,6 +59,12 @@ describe('buildSidebarRows', () => {
       'header:July',
       'c',
     ]);
+  });
+
+  it('puts the models kept in the sidebar first, under Models', () => {
+    const rows = buildSidebarRows({ ...base, pinnedModels: [{ id: 'gpt', name: 'GPT' }], pinned: [chat('p1', sec(2026, 9, 1))], chats: [] });
+    expect(summary(rows)).toEqual(['header:Models', '<GPT>', 'header:Pinned', 'p1']);
+    expect(summary(buildSidebarRows({ ...base, pinnedModels: [{ id: 'gpt', name: 'GPT' }], chats: [], search: { active: true, results: [], loading: false } }))).toEqual(['note:No chats found']);
   });
 
   it('keeps the Folders heading, with New Folder, while folders are on and there are none yet', () => {

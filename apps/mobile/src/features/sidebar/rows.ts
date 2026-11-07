@@ -4,11 +4,14 @@ export type SidebarRow =
   | { type: 'header'; key: string; label: string; addFolder?: boolean }
   | { type: 'chat'; key: string; chat: ChatListItem; depth: number; pinned: boolean }
   | { type: 'folder'; key: string; folder: FolderNode; depth: number; expanded: boolean }
-  | { type: 'note'; key: string; label: string; depth: number };
+  | { type: 'note'; key: string; label: string; depth: number }
+  | { type: 'model'; key: string; id: string; name: string };
 
 interface BuildInput {
   search: { active: boolean; results: ChatListItem[] | undefined; loading: boolean };
   pinned: ChatListItem[];
+  /** Models kept in the sidebar (the web's Models section), in their order. */
+  pinnedModels?: { id: string; name: string }[];
   folders: FolderNode[];
   /** Folders are on for this account: their heading shows (with New Folder) even before there are any. */
   foldersOn?: boolean;
@@ -28,6 +31,11 @@ export function buildSidebarRows(input: BuildInput): SidebarRow[] {
     else if (input.search.results?.length === 0) rows.push({ type: 'note', key: 'search-empty', label: 'No chats found', depth: 0 });
     for (const chat of input.search.results ?? []) rows.push({ type: 'chat', key: `search-${chat.id}`, chat, depth: 0, pinned: false });
     return rows;
+  }
+
+  if (input.pinnedModels?.length) {
+    rows.push({ type: 'header', key: 'h-models', label: 'Models' });
+    for (const model of input.pinnedModels) rows.push({ type: 'model', key: `model-${model.id}`, id: model.id, name: model.name });
   }
 
   if (input.pinned.length > 0) {

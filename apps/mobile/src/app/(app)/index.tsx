@@ -1,15 +1,17 @@
 import { filesPending, modelAuthor, promptSuggestions } from '@maviechat/owui-protocol';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { useToast } from '@/components/Toast';
+import { Banners } from '@/features/chat/Banners';
 import { ChatHeader } from '@/features/chat/ChatHeader';
+import { chatLinkFrom, type ChatLink } from '@/features/chat/chatLink';
 import { Composer, type ComposerHandle, type OutgoingMessage } from '@/features/chat/Composer';
 import { ControlsSheet } from '@/features/chat/controls/ControlsSheet';
-import { carryOver, getDraft, NEW_CHAT, updateDraft, useDraftText } from '@/features/chat/drafts';
+import { carryOver, getDraft, NEW_CHAT, updateDraft, useDraft, useDraftText } from '@/features/chat/drafts';
 import { ModelAvatar } from '@/features/chat/ModelAvatar';
 import { ModelPicker } from '@/features/chat/ModelPicker';
 import { Suggestions } from '@/features/chat/Suggestions';
@@ -20,26 +22,35 @@ import { useCapabilities, useServerConfig, useSessionUser } from '@/lib/server';
 import { useInterface } from '@/lib/uiSettings';
 import { fonts, usePalette } from '@/theme';
 
+/** A new chat starts over for each link that opens it (`chatLinkFrom`). */
+export default function NewChatRoute() {
+  const params = useLocalSearchParams<Record<string, string | string[]>>();
+  const link = chatLinkFrom(params);
+  return <NewChat key={link.key} link={link} />;
+}
+
 /**
- * New chat: the web app's default landing layout. The model's picture and name (or "Hello"),
- * its description and author, the centred input, then suggestions.
+ * New chat: the web app's default landing layout. The admin's banners; the model's picture and
+ * name (or "Hello"), its description and author, the centred input, then suggestions. With the
+ * "chat" landing mode the input waits at the bottom instead, as in a chat.
  */
-export default function NewChat() {
+function NewChat({ link }: { link: ChatLink }) {
   const palette = usePalette();
   const toast = useToast();
   const config = useServerConfig();
   const user = useSessionUser();
   const capabilities = useCapabilities();
-  // `?model=` (Workspace's "Try in Chat") starts with that model.
-  const asked = useLocalSearchParams<{ model?: string }>().model;
-  const choice = useModelChoice(undefined, typeof asked === 'string' && asked ? [asked] : []);
+  // A link's models (Workspace's "Try in Chat", a pinned model, `?models=`) come first.
+  const choice = useModelChoice(undefined, link.models);
   const { send } = useSendMessage();
   const typed = useDraftText(NEW_CHAT);
+  const draft = useDraft(NEW_CHAT);
   const composer = useRef<ComposerHandle>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const ui = useInterface();
-  // Until you switch it yourself, a new chat is temporary when your settings say so.
-  const [temporaryChoice, setTemporaryOn] = useState<boolean | null>(null);
+  const chatLanding = ui('landingPageMode');
+  // Until you switch it yourself, a new chat is temporary when your settings (or the link) say so.
+  const [temporaryChoice, setTemporaryOn] = useState<boolean | null>(link.temporary ? true : null);
   const temporaryOn = temporaryChoice ?? ui('temporaryChatByDefault');
   const [fullDescription, setFullDescription] = useState(false);
   // The new chat's own system prompt and parameters (Controls), saved with it once it exists.
@@ -53,6 +64,22 @@ export default function NewChat() {
   const temporary = enforced || (allowed && temporaryOn);
 
   const model = choice.model;
+
+  // A link's message goes in the box at once. Its switches and tools wait until the model's own
+  // defaults are in (the input bar sets those first), so they aren't replaced. Nothing is sent.
+  const linkText = useRef(false);
+  const linkSwitches = useRef(false);
+  useEffect(() => {
+    if (linkText.current || link.text === null) return;
+    linkText.current = true;
+    updateDraft(NEW_CHAT, (current) => ({ ...current, text: link.text ?? current.text }));
+  }, [link]);
+  useEffect(() => {
+    if (linkSwitches.current || (!Object.keys(link.toggles).length && !link.toolIds.length) || !model || draft.defaultsFor !== model.id) return;
+    linkSwitches.current = true;
+    updateDraft(NEW_CHAT, (current) => ({ ...current, toggles: { ...current.toggles, ...link.toggles }, toolIds: link.toolIds.length ? link.toolIds : current.toolIds }));
+  }, [link, model, draft.defaultsFor]);
+
   // With Compare, the web shows one model's details at a time (the last, until you tap another's picture).
   const [infoIdx, setInfoIdx] = useState<number | null>(null);
   const infoModel = (infoIdx !== null ? choice.selected[infoIdx] : undefined) ?? choice.selected[choice.selected.length - 1] ?? model;
@@ -90,6 +117,25 @@ export default function NewChat() {
     void start({ text, files, toggles, toolIds });
   };
 
+  // In the middle of the page (the default), or at the bottom as in a chat (the "chat" landing mode).
+  const composerAt = (floating: boolean) => (
+    <Composer
+      ref={composer}
+      floating={floating}
+      draftKey={NEW_CHAT}
+      placeholder="How can I help you today?"
+      model={model}
+      models={choice.selected}
+      modelLabel={choice.label}
+      onPickModel={() => setPickerOpen(true)}
+      onSend={start}
+      onStop={() => {}}
+      streaming={false}
+      temporary={temporary}
+      onTemporary={allowed && !enforced ? () => setTemporaryOn(!temporaryOn) : undefined}
+    />
+  );
+
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
       <ChatHeader
@@ -114,6 +160,7 @@ export default function NewChat() {
           </>
         }
       />
+      <Banners />
       <KeyboardAvoidingView behavior="padding" style={styles.screen}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.greeting}>
@@ -175,24 +222,11 @@ export default function NewChat() {
             ) : null}
           </View>
 
-          <Composer
-            ref={composer}
-            floating
-            draftKey={NEW_CHAT}
-            placeholder="How can I help you today?"
-            model={model}
-            models={choice.selected}
-            modelLabel={choice.label}
-            onPickModel={() => setPickerOpen(true)}
-            onSend={start}
-            onStop={() => {}}
-            streaming={false}
-            temporary={temporary}
-            onTemporary={allowed && !enforced ? () => setTemporaryOn(!temporaryOn) : undefined}
-          />
+          {chatLanding ? null : composerAt(true)}
 
           <Suggestions suggestions={suggestions} input={typed} inserts={insertSuggestion} onSelect={suggest} />
         </ScrollView>
+        {chatLanding ? composerAt(false) : null}
       </KeyboardAvoidingView>
       <ModelPicker
         visible={pickerOpen}

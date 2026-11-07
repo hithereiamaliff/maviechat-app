@@ -84,6 +84,7 @@ export interface InterfaceSetting {
  * call mode) or features the app doesn't have yet.
  */
 export const INTERFACE_SETTINGS = {
+  landingPageMode: { path: 'landingPageMode', group: 'UI', default: false, on: 'chat', off: '', label: 'New chats open as a chat', hint: 'The message box starts at the bottom, as in a chat, instead of in the middle.' },
   copyFormatted: { path: 'copyFormatted', group: 'UI', default: false, label: 'Copy with formatting', hint: 'Copying a reply keeps its bold, lists and links, instead of giving its Markdown.' },
   enableMessageQueue: { path: 'enableMessageQueue', group: 'Chat', default: true, label: 'Queue messages', hint: 'Send while a reply is being written; your message waits its turn.' },
   temporaryChatByDefault: { path: 'temporaryChatByDefault', group: 'Chat', default: false, label: 'New chats are temporary', needsTemporary: true },

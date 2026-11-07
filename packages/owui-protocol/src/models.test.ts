@@ -5,11 +5,15 @@ import {
   modelAuthor,
   modelFilterOptions,
   modelImagePath,
+  modelLink,
   modelName,
   modelSizeLabel,
   modelTags,
   pickerModels,
+  pinnedModelIds,
   promptSuggestions,
+  togglePinnedModel,
+  visiblePinnedModels,
   type ModelItem,
 } from './models';
 import { errorText, latestStatus, normalizeSources } from './sources';
@@ -45,6 +49,23 @@ describe('models', () => {
     expect(modelName(models, 'claude')).toBe('Claude');
     expect(modelName(models, 'unknown')).toBe('unknown');
     expect(modelName(models, undefined)).toBe('Assistant');
+  });
+});
+
+describe('models kept in the sidebar', () => {
+  it('follows the admin’s default list until you pin your own, and shows only models you can see', () => {
+    expect(pinnedModelIds({ ui: {} }, { default_pinned_models: 'gpt,,claude' })).toEqual(['gpt', 'claude']);
+    expect(pinnedModelIds({ ui: { pinnedModels: [] } }, { default_pinned_models: 'gpt' })).toEqual([]);
+    expect(pinnedModelIds({ ui: { pinnedModels: ['claude', 3, ''] } }, undefined)).toEqual(['claude']);
+    expect(pinnedModelIds(undefined, undefined)).toEqual([]);
+    const hidden: ModelItem = { id: 'hidden', name: 'Hidden', info: { meta: { hidden: true } } };
+    expect(visiblePinnedModels(['claude', 'gone', 'hidden', 'gpt'], [...models, hidden]).map((model) => model.id)).toEqual(['claude', 'gpt']);
+  });
+
+  it('pins at the end and unpins, and links a model as the web copies it', () => {
+    expect(togglePinnedModel(['gpt'], 'claude')).toEqual(['gpt', 'claude']);
+    expect(togglePinnedModel(['gpt', 'claude'], 'gpt')).toEqual(['claude']);
+    expect(modelLink('https://chat.test/', 'org/model:7b')).toBe('https://chat.test/?model=org%2Fmodel%3A7b');
   });
 });
 
