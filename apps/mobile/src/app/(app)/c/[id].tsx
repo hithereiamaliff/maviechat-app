@@ -1,5 +1,7 @@
 import {
+  artifactIndex,
   awaitingYou,
+  branchArtifacts,
   combineQueued,
   forkChat,
   isTemporaryChatId,
@@ -35,6 +37,7 @@ import { Button } from '@/components/Button';
 import { IconButton } from '@/components/IconButton';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { ArtifactsSheet } from '@/features/chat/ArtifactsSheet';
 import { AskUserCard } from '@/features/chat/AskUserCard';
 import { ChatHeader } from '@/features/chat/ChatHeader';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
@@ -56,6 +59,7 @@ import { useAutoReadAloud } from '@/lib/autoReadAloud';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useModels, useUserSettings } from '@/lib/server';
 import { useInterface } from '@/lib/uiSettings';
+import { ArtifactsContext } from '@/markdown/ArtifactsContext';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
 
@@ -89,6 +93,18 @@ export default function ChatScreen() {
 
   const chat = query.data;
   const ref = { id: chatId, title: chat?.title ?? 'this chat' };
+  // The web's artifacts: pages and SVGs from the replies on the shown branch (worked out when a reply is saved, not while it streams).
+  const artifacts = useMemo(() => branchArtifacts(messages.filter((message) => message.role !== 'user').map((message) => plainText(messageBlocks(message)))), [messages]);
+  const [artifactAt, setArtifactAt] = useState<number | null>(null);
+  const openArtifact = useCallback(
+    (code: string) => {
+      const index = artifactIndex(artifacts, code);
+      if (index === -1) return false;
+      setArtifactAt(index);
+      return true;
+    },
+    [artifacts],
+  );
   const pinned = chat?.pinned === true;
   const toNewChat = () => router.replace('/');
   // Open WebUI → DeepTutor: a copy of the shown branch goes into DeepTutor's "From MavieChat" notebook.
@@ -107,8 +123,10 @@ export default function ChatScreen() {
     const copy = await actions.clone(ref);
     if (copy) router.replace(`/c/${copy}`);
   };
-  const menu: MenuItem[] =
-    chat && !temporary
+  const menu: MenuItem[] = [
+    // As on the web, only when the chat has some; the latest version first.
+    ...(artifacts.length ? [{ key: 'artifacts', label: 'Artifacts', icon: 'cube' as const, onPress: () => setArtifactAt(artifacts.length - 1) }] : []),
+    ...((chat && !temporary
       ? [
           { key: 'rename', label: 'Rename', icon: 'pencil', onPress: () => actions.rename(ref) },
           { key: 'pin', label: pinned ? 'Unpin' : 'Pin', icon: pinned ? 'bookmark-slash' : 'bookmark', onPress: () => actions.togglePin(ref, pinned) },
@@ -128,7 +146,8 @@ export default function ChatScreen() {
             ? [{ key: 'delete', label: 'Delete', icon: 'trash' as const, destructive: true, onPress: () => actions.remove(ref, toNewChat) }]
             : []),
         ]
-      : [];
+      : []) satisfies MenuItem[]),
+  ];
 
   // Controls: the cached chat changes at once; a saved chat is saved too (the server patches only these keys).
   const saveControls = (changes: ControlChanges) => {
@@ -443,6 +462,7 @@ export default function ChatScreen() {
             </View>
           </View>
         ) : (
+          <ArtifactsContext.Provider value={openArtifact}>
           <MessageList
             ref={list}
             messages={messages}
@@ -467,6 +487,7 @@ export default function ChatScreen() {
             onMerge={streaming ? undefined : (replyId, groups) => void merge(replyId, groups)}
             mergingId={mergingId}
           />
+          </ArtifactsContext.Provider>
         )}
         {asking && lastReply ? (
           <View style={styles.asking}>
@@ -498,6 +519,7 @@ export default function ChatScreen() {
       {picker.element}
       {shareSheet.element}
       {tagsSheet.element}
+      <ArtifactsSheet artifacts={artifacts} start={artifactAt} chatId={chatId} onClose={() => setArtifactAt(null)} />
       <ControlsSheet
         visible={controlsOpen}
         onClose={() => setControlsOpen(false)}

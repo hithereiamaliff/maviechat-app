@@ -11,6 +11,8 @@ interface WebFrameProps {
   maxHeight?: number;
   /** A full-screen preview scrolls inside; inline frames grow to fit instead. */
   fill?: boolean;
+  /** Scripts run (the default); an artifact follows the web's "allow scripts" setting. */
+  javaScript?: boolean;
 }
 
 /**
@@ -18,7 +20,7 @@ interface WebFrameProps {
  * storage shared with the app, links open in the browser, and inline frames take the height
  * the page reports.
  */
-export function WebFrame({ html, initialHeight = 240, maxHeight = 900, fill = false }: WebFrameProps) {
+export function WebFrame({ html, initialHeight = 240, maxHeight = 900, fill = false, javaScript = true }: WebFrameProps) {
   const palette = usePalette();
   const [height, setHeight] = useState(initialHeight);
   return (
@@ -28,7 +30,7 @@ export function WebFrame({ html, initialHeight = 240, maxHeight = 900, fill = fa
         originWhitelist={['*']}
         incognito
         scrollEnabled={fill}
-        javaScriptEnabled
+        javaScriptEnabled={javaScript}
         onMessage={(event) => {
           if (fill) return;
           try {

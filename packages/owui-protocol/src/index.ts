@@ -1,4 +1,5 @@
 export * from './access';
+export * from './artifacts';
 export * from './account';
 export * from './adminConnections';
 export * from './adminEvaluations';

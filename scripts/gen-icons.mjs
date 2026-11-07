@@ -51,6 +51,7 @@ const ICONS = [
   'command-line',
   'computer-desktop',
   'cpu-chip',
+  'cube',
   'document-text',
   'ellipsis-horizontal',
   'envelope',

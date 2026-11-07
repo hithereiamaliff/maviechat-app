@@ -1,11 +1,12 @@
 import { highlightCode } from '@maviechat/owui-markdown';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import { memo, useMemo, useState } from 'react';
+import { memo, useContext, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { Modal } from '@/components/Modal';
 import { fonts, radius, usePalette, useSyntaxColors } from '@/theme';
+import { ArtifactsContext } from './ArtifactsContext';
 import { codeView, mermaidPage, previewPage, vegaPage } from './webPages';
 import { WebFrame } from './WebFrame';
 
@@ -33,6 +34,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, title, complete =
   const [copied, setCopied] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const openArtifact = useContext(ArtifactsContext);
   const view = complete ? codeView(lang, code) : null;
   const diagram = useMemo(() => (view === 'mermaid' ? mermaidPage(code, dark) : view === 'vega' ? vegaPage(code, dark) : null), [view, code, dark]);
   const drawing = diagram !== null && !showCode;
@@ -64,7 +66,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, title, complete =
             </Pressable>
           ) : null}
           {view === 'preview' ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Preview" hitSlop={8} onPress={() => setPreviewing(true)} style={styles.action}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Preview" hitSlop={8} onPress={() => (openArtifact?.(code) ? undefined : setPreviewing(true))} style={styles.action}>
               <Icon name="arrows-pointing-out" size={14} color={palette.textMuted} strokeWidth={2} />
               <Text style={[styles.actionText, { color: palette.textMuted }]}>Preview</Text>
             </Pressable>
