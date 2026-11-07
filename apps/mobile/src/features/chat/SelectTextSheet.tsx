@@ -6,13 +6,14 @@ import { Icon } from '@/components/Icon';
 import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { useUserSettings } from '@/lib/server';
+import { useInterface } from '@/lib/uiSettings';
 import { fonts, radius, usePalette } from '@/theme';
 import { selectionActions, selectionPrompt, type SelectionAction } from './selectionActions';
 
 /**
  * A reply's text to select from, with the web's actions for a selection: Ask and Explain (or your
- * own, from the web's settings). Each puts its prompt in the message box, as 0.11.3 does; with
- * nothing selected, it uses the whole reply.
+ * own, from Settings → Interface), unless you turned quick actions off. Each puts its prompt in
+ * the message box, as 0.11.3 does; with nothing selected, it uses the whole reply.
  */
 export function SelectTextSheet({ text, visible, onClose, onPrompt }: { text: string; visible: boolean; onClose: () => void; onPrompt: (prompt: string) => void }) {
   const palette = usePalette();
@@ -27,7 +28,8 @@ function Sheet({ text, onClose, onPrompt }: { text: string; onClose: () => void;
   const palette = usePalette();
   const toast = useToast();
   const settings = useUserSettings();
-  const actions = selectionActions(settings.data?.ui);
+  const ui = useInterface();
+  const actions = ui('showFloatingActionButtons') ? selectionActions(settings.data?.ui) : [];
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [asking, setAsking] = useState<SelectionAction | null>(null);
   const [question, setQuestion] = useState('');

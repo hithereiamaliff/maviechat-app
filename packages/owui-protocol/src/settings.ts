@@ -76,6 +76,8 @@ export interface InterfaceSetting {
   off?: unknown;
   /** Shown only to accounts that may start temporary chats. */
   needsTemporary?: boolean;
+  /** Shown only while that switch is off (the web's "show username" goes with bubbles off). */
+  onlyWhenOff?: string;
 }
 
 /**
@@ -87,7 +89,10 @@ export const INTERFACE_SETTINGS = {
   landingPageMode: { path: 'landingPageMode', group: 'UI', default: false, on: 'chat', off: '', label: 'New chats open as a chat', hint: 'The message box starts at the bottom, as in a chat, instead of in the middle.' },
   copyFormatted: { path: 'copyFormatted', group: 'UI', default: false, label: 'Copy with formatting', hint: 'Copying a reply keeps its bold, lists and links, instead of giving its Markdown.' },
   enableMessageQueue: { path: 'enableMessageQueue', group: 'Chat', default: true, label: 'Queue messages', hint: 'Send while a reply is being written; your message waits its turn.' },
+  chatBubble: { path: 'chatBubble', group: 'Chat', default: true, label: 'Chat bubbles', hint: 'Your messages in bubbles on the right. Off, every message is a full-width row under a name.' },
+  showUsername: { path: 'showUsername', group: 'Chat', default: false, label: 'Your name instead of “You”', hint: 'Without bubbles, your messages are labelled with your name.', onlyWhenOff: 'chatBubble' },
   temporaryChatByDefault: { path: 'temporaryChatByDefault', group: 'Chat', default: false, label: 'New chats are temporary', needsTemporary: true },
+  chatFadeStreamingText: { path: 'chatFadeStreamingText', group: 'Chat', default: true, label: 'Fade in replies as they’re written', hint: 'Each new word fades in, instead of appearing at once.' },
   renderMarkdownInUserMessages: { path: 'renderMarkdownInUserMessages', group: 'Chat', default: true, label: 'Format your messages', hint: 'Show the Markdown in what you send: bold, lists, code.' },
   renderMarkdownInAssistantMessages: { path: 'renderMarkdownInAssistantMessages', group: 'Chat', default: true, label: 'Format replies', hint: 'Off shows replies as plain text.' },
   titleAuto: { path: 'title.auto', group: 'Chat', default: true, label: 'Name chats automatically' },
@@ -103,9 +108,11 @@ export const INTERFACE_SETTINGS = {
   collapseCodeBlocks: { path: 'collapseCodeBlocks', group: 'Chat', default: false, label: 'Fold code blocks' },
   expandDetails: { path: 'expandDetails', group: 'Chat', default: false, label: 'Open thinking and tool steps', hint: 'Reasoning, tool calls and searches start opened instead of folded.' },
   displayMultiModelResponsesInTabs: { path: 'displayMultiModelResponsesInTabs', group: 'Chat', default: false, label: 'Several models’ answers as tabs' },
+  showFloatingActionButtons: { path: 'showFloatingActionButtons', group: 'Chat', default: true, label: 'Quick actions on selected text', hint: 'Ask, Explain or your own, in Select Text.' },
   webSearch: { path: 'webSearch', group: 'Chat', default: false, on: 'always', off: null, label: 'Always search the web', hint: 'Every message searches the web, where the server, your account and the model allow it.' },
   largeTextAsFile: { path: 'largeTextAsFile', group: 'File', default: false, label: 'Paste long text as a file', hint: 'Pasting more than 1,000 characters attaches them as a text file, read in full.' },
   defaultUploadContext: { path: 'defaultUploadContext', group: 'File', default: false, on: 'full', off: 'focused', label: 'Send whole documents', hint: 'Files you attach are read in full, instead of searched for the parts that matter.' },
+  imageCompression: { path: 'imageCompression', group: 'File', default: false, label: 'Shrink photos', hint: 'Photos you attach are made smaller first, to the size you set (your admin’s limits apply anyway).' },
 } as const satisfies Record<string, InterfaceSetting>;
 
 export type InterfaceKey = keyof typeof INTERFACE_SETTINGS;
@@ -145,4 +152,30 @@ export function stepSpeechRate(rate: number, direction: 1 | -1): number {
 /** A speed as the app shows it: "1×", "1.25×". */
 export function speechRateLabel(rate: number): string {
   return `${Number(rate.toFixed(2))}×`;
+}
+
+// ── Settings that aren't switches ────────────────────────────────────────────
+
+export type ChatDirection = 'auto' | 'LTR' | 'RTL';
+
+/** Which way chat text runs (`ui.chatDirection`): each paragraph its own way (auto), or all one way. */
+export function chatDirection(ui: Tree | null | undefined): ChatDirection {
+  const value = uiValue(ui, 'chatDirection');
+  return value === 'LTR' || value === 'RTL' ? value : 'auto';
+}
+
+/** The picture behind your chats (`ui.backgroundImageUrl`, a `data:` URL as the web saves it), or null. */
+export function chatBackgroundUrl(ui: Tree | null | undefined): string | null {
+  const value = uiValue(ui, 'backgroundImageUrl');
+  return typeof value === 'string' && /^(data:image\/|https?:\/\/)/i.test(value.trim()) ? value.trim() : null;
+}
+
+/** The largest size photos are shrunk to (`ui.imageCompressionSize`), in pixels; null for no limit that way. */
+export function imageCompressionSize(ui: Tree | null | undefined): { width: number | null; height: number | null } {
+  const size = uiValue(ui, 'imageCompressionSize');
+  const side = (value: unknown) => {
+    const number = typeof value === 'string' && value.trim() ? Number(value) : value;
+    return typeof number === 'number' && Number.isFinite(number) && number > 0 ? Math.round(number) : null;
+  };
+  return isTree(size) ? { width: side(size.width), height: side(size.height) } : { width: null, height: null };
 }

@@ -41,6 +41,7 @@ import { IconButton } from '@/components/IconButton';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
 import { ArtifactsSheet } from '@/features/chat/ArtifactsSheet';
+import { ChatBackground, useChatBackground } from '@/features/chat/ChatBackground';
 import { AskUserCard } from '@/features/chat/AskUserCard';
 import { ChatHeader } from '@/features/chat/ChatHeader';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
@@ -105,6 +106,7 @@ export default function ChatScreen() {
   const stalled = useRef(false);
 
   const chat = query.data;
+  const background = useChatBackground(typeof chat?.folder_id === 'string' ? chat.folder_id : null);
   const ref = { id: chatId, title: chat?.title ?? 'this chat' };
   // The web's artifacts: pages and SVGs from the replies on the shown branch (worked out when a reply is saved, not while it streams).
   const artifacts = useMemo(() => branchArtifacts(messages.filter((message) => message.role !== 'user').map((message) => plainText(messageBlocks(message)))), [messages]);
@@ -520,6 +522,7 @@ export default function ChatScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
+      {background ? <ChatBackground uri={background} /> : null}
       <ChatHeader
         title={temporary ? 'Temporary Chat' : chat?.title}
         menu={menu}

@@ -7,6 +7,7 @@ import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { useToast } from '@/components/Toast';
 import { Banners } from '@/features/chat/Banners';
+import { ChatBackground, useChatBackground } from '@/features/chat/ChatBackground';
 import { ChatHeader } from '@/features/chat/ChatHeader';
 import { chatLinkFrom, type ChatLink } from '@/features/chat/chatLink';
 import { Composer, type ComposerHandle, type OutgoingMessage } from '@/features/chat/Composer';
@@ -36,6 +37,7 @@ export default function NewChatRoute() {
  */
 function NewChat({ link }: { link: ChatLink }) {
   const palette = usePalette();
+  const background = useChatBackground(null);
   const toast = useToast();
   const config = useServerConfig();
   const user = useSessionUser();
@@ -151,6 +153,7 @@ function NewChat({ link }: { link: ChatLink }) {
 
   return (
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
+      {background ? <ChatBackground uri={background} /> : null}
       <ChatHeader
         accessory={
           <>

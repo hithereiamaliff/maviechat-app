@@ -1,12 +1,14 @@
 import { attachmentUrl, isImageItem, type FileItem, type HistoryMessage } from '@maviechat/owui-protocol';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
-import { memo, useState } from 'react';
+import { memo, useContext, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { useToast } from '@/components/Toast';
+import { useAuthed } from '@/lib/server';
 import { useInterface } from '@/lib/uiSettings';
+import { ChatDirectionContext, directionStyles } from '@/markdown/ChatDirectionContext';
 import { Markdown } from '@/markdown/Markdown';
 import { fonts, radius, usePalette } from '@/theme';
 import { BranchNav } from './BranchNav';
@@ -40,6 +42,11 @@ export const UserMessage = memo(function UserMessage({
   const palette = usePalette();
   const toast = useToast();
   const ui = useInterface();
+  const { session } = useAuthed();
+  // Bubbles off (the web's "Chat Bubble UI"): a full-width row under "You", or your name.
+  const bubbles = ui('chatBubble');
+  const textDir = directionStyles(useContext(ChatDirectionContext)).text;
+  const name = !bubbles && ui('showUsername') && session.user.name ? session.user.name : 'You';
   const [showActions, setShowActions] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   // While editing, the files kept so far (as on the web, each can be taken out).
@@ -69,7 +76,7 @@ export const UserMessage = memo(function UserMessage({
 
   const fileViews = (shown: FileItem[], onRemove?: (index: number) => void) =>
     shown.length ? (
-      <View style={styles.files}>
+      <View style={[styles.files, !bubbles && styles.filesFlat]}>
         {shown.map((file, index) => {
           const url = attachmentUrl(file, baseUrl);
           const name = typeof file.name === 'string' ? file.name : isImageItem(file) ? 'Image' : 'File';
@@ -108,7 +115,7 @@ export const UserMessage = memo(function UserMessage({
 
   if (editing !== null) {
     return (
-      <View style={styles.wrap}>
+      <View style={[styles.wrap, !bubbles && styles.wrapFlat]}>
         {fileViews(keptFiles, (index) => setKeptFiles((current) => current.filter((_, at) => at !== index)))}
         <View style={[styles.editor, { backgroundColor: palette.bubble }]}>
           <TextInput
@@ -132,14 +139,19 @@ export const UserMessage = memo(function UserMessage({
   }
 
   return (
-    <Pressable onPress={() => setShowActions((value) => !value)} style={styles.wrap} accessibilityHint="Shows message actions">
+    <Pressable onPress={() => setShowActions((value) => !value)} style={[styles.wrap, !bubbles && styles.wrapFlat]} accessibilityHint="Shows message actions">
+      {!bubbles ? (
+        <Text style={[styles.name, { color: palette.text }]} numberOfLines={1}>
+          {name}
+        </Text>
+      ) : null}
       {fileViews(files)}
       {message.content ? (
-        <View style={[styles.bubble, { backgroundColor: palette.bubble }]}>
+        <View style={bubbles ? [styles.bubble, { backgroundColor: palette.bubble }] : styles.flat}>
           {ui('renderMarkdownInUserMessages') ? (
             <Markdown text={message.content} />
           ) : (
-            <Text selectable style={[styles.text, { color: palette.text }]}>
+            <Text selectable style={[styles.text, { color: palette.text }, textDir]}>
               {message.content}
             </Text>
           )}
@@ -188,7 +200,11 @@ function EditButton({ label, onPress, primary = false, disabled }: { label: stri
 
 const styles = StyleSheet.create({
   wrap: { alignItems: 'flex-end', marginTop: 16, gap: 4 },
+  wrapFlat: { alignItems: 'stretch', marginTop: 18 },
+  name: { fontFamily: fonts.semibold, fontSize: 15 },
   files: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 6, maxWidth: '90%' },
+  filesFlat: { justifyContent: 'flex-start', maxWidth: '100%' },
+  flat: { alignSelf: 'stretch' },
   image: { width: 140, height: 140, borderRadius: radius.lg },
   thumb: { width: 72, height: 72, borderRadius: radius.md },
   remove: {

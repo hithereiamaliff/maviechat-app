@@ -102,6 +102,7 @@ This is a spec written from reading Open WebUI's source (v0.12.5, read 2026-11-0
 **User settings and info**
 - `GET /api/v1/users/user/settings` returns `{ui: {...}}`.
 - `POST /api/v1/users/user/settings/update {ui: {...}}`. Read, change and write back, keeping unknown keys.
+- Chat look (0.11.3 web keys, defaults in brackets): `chatBubble` [true], `showUsername` [false, used with bubbles off], `chatFadeStreamingText` [true], `chatDirection` (`auto` | `LTR` | `RTL`) [auto], `backgroundImageUrl` (a `data:` URL; `null` removes it, and both 0.11.3 and 0.12.5 then drop the key) [none], `showFloatingActionButtons` [true], `floatingActionButtons` (a list of `{id, label, input, prompt}`, or `null` for Ask and Explain; the web asks for input when the prompt holds `{{INPUT_CONTENT}}`, whatever `input` says), `imageCompression` [false] with `imageCompressionSize` `{width, height}` (numbers, or empty for no limit that way; the admin's `file.image_compression` caps them).
 - `/users/user/info[/update]`, `/users/user/status/update`, `/users/user/variables[/update]`.
 
 **Memories:** `GET /api/v1/memories/`, `/add`, `/{id}/update`, `/query`, `DELETE /{id}`.

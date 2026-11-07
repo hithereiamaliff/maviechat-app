@@ -1,14 +1,13 @@
 import { getFolder, isAtLeast, listFolderChats, listFolders, updateFolder } from '@maviechat/owui-protocol';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
+import { ChatBackground } from '@/features/chat/ChatBackground';
 import { ChatHeader } from '@/features/chat/ChatHeader';
 import { Composer, type OutgoingMessage } from '@/features/chat/Composer';
 import { carryOver } from '@/features/chat/drafts';
@@ -126,7 +125,7 @@ export default function FolderScreen() {
         menu={folder ? folderActions.items({ id: folder.id, name: folder.name }, { newChat: false, onDeleted: () => router.replace('/') }) : undefined}
       />
       <View style={styles.screen}>
-        {background ? <FolderBackground uri={background} /> : null}
+        {background ? <ChatBackground uri={background} /> : null}
         <KeyboardAvoidingView behavior="padding" style={styles.screen}>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <View style={styles.greeting}>
@@ -198,26 +197,6 @@ export default function FolderScreen() {
         onClose={() => setPickerOpen(false)}
       />
       {folderActions.element}
-    </View>
-  );
-}
-
-/** The folder's picture under the page, fading into the page's colour towards the bottom, as on the web. */
-function FolderBackground({ uri }: { uri: string }) {
-  const palette = usePalette();
-  const dark = useColorScheme() === 'dark';
-  return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
-      <Svg style={StyleSheet.absoluteFill}>
-        <Defs>
-          <LinearGradient id="folder-fade" x1="0" y1="1" x2="0" y2="0">
-            <Stop offset="0" stopColor={palette.background} stopOpacity={1} />
-            <Stop offset="1" stopColor={palette.background} stopOpacity={dark ? 0.9 : 0.85} />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#folder-fade)" />
-      </Svg>
     </View>
   );
 }

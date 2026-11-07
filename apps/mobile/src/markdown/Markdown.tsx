@@ -15,7 +15,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
-import { memo, useMemo, type ReactNode } from 'react';
+import { memo, useContext, useMemo, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, View, type TextStyle } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
@@ -23,8 +23,10 @@ import { shareFile } from '@/features/settings/exportFile';
 import { describeError } from '@/lib/errors';
 import { openLink } from '@/lib/links';
 import { fonts, radius, usePalette, type Palette } from '@/theme';
+import { ChatDirectionContext, directionStyles } from './ChatDirectionContext';
 import { CodeBlock } from './CodeBlock';
 import { BlockMath, InlineMath } from './MathView';
+import { fadeAlpha, fadingTail, useStreamFade, withAlpha, type StreamFade } from './streamFade';
 
 interface MarkdownProps {
   text: string;
@@ -36,6 +38,8 @@ interface MarkdownProps {
   token?: string;
   /** Code blocks start folded. */
   foldCode?: boolean;
+  /** Being written: new words fade in (the web's "Fade Effect for Streaming Text"). */
+  fadeIn?: boolean;
 }
 
 interface Context {
@@ -51,15 +55,22 @@ interface Context {
   saveCsv: (csv: string, name: string) => void;
   foldCode: boolean;
   dark: boolean;
+  /** The text token new words arrive in, while fading them in. */
+  fade: { token: Token; start: number; state: StreamFade } | null;
+  /** A chosen chat direction for text (none: automatic). */
+  textDir?: TextStyle;
 }
 
 /** Renders markdown as native views (no web view). */
-export const Markdown = memo(function Markdown({ text, muted = false, sources, baseUrl, token, foldCode = false }: MarkdownProps) {
+export const Markdown = memo(function Markdown({ text, muted = false, sources, baseUrl, token, foldCode = false, fadeIn = false }: MarkdownProps) {
   const palette = usePalette();
   const dark = useColorScheme() === 'dark';
   const toast = useToast();
   const models = useQueryClient().getQueryData<ModelItem[]>(['models']);
   const tokens = useMemo(() => lexMarkdown(text), [text]);
+  const fadeState = useStreamFade(text, fadeIn);
+  const tail = useMemo(() => (fadeIn ? fadingTail(tokens, text) : null), [fadeIn, tokens, text]);
+  const direction = directionStyles(useContext(ChatDirectionContext));
   const context: Context = {
     palette,
     color: muted ? palette.textMuted : palette.text,
@@ -73,8 +84,10 @@ export const Markdown = memo(function Markdown({ text, muted = false, sources, b
     saveCsv: (csv, name) => void shareFile(name, `\uFEFF${csv}`).catch((error: unknown) => toast(`Couldn't save the table: ${describeError(error)}`, 'error')),
     foldCode,
     dark,
+    fade: tail && fadeState ? { ...tail, state: fadeState } : null,
+    textDir: direction.text,
   };
-  return <View>{tokens.map((block, index) => renderBlock(block, `${index}`, context))}</View>;
+  return <View style={direction.view}>{tokens.map((block, index) => renderBlock(block, `${index}`, context))}</View>;
 });
 
 function renderBlock(token: Token, key: string, context: Context): ReactNode {
@@ -94,7 +107,7 @@ function renderBlock(token: Token, key: string, context: Context): ReactNode {
         const flush = (index: number) => {
           if (run.some((child) => child.type !== 'text' || (child as Tokens.Text).text.trim())) {
             parts.push(
-              <Text key={`${key}.t${index}`} style={[styles.paragraph, { color }]}>
+              <Text key={`${key}.t${index}`} style={[styles.paragraph, { color }, context.textDir]}>
                 {renderInline(run, `${key}.t${index}`, context)}
               </Text>,
             );
@@ -110,7 +123,7 @@ function renderBlock(token: Token, key: string, context: Context): ReactNode {
         return <View key={key}>{parts}</View>;
       }
       return (
-        <Text key={key} style={[styles.paragraph, { color }]}>
+        <Text key={key} style={[styles.paragraph, { color }, context.textDir]}>
           {renderInline(paragraph.tokens, key, context)}
         </Text>
       );
@@ -118,7 +131,7 @@ function renderBlock(token: Token, key: string, context: Context): ReactNode {
     case 'heading': {
       const heading = token as Tokens.Heading;
       return (
-        <Text key={key} accessibilityRole="header" style={[styles.heading, headingSize(heading.depth), { color }]}>
+        <Text key={key} accessibilityRole="header" style={[styles.heading, headingSize(heading.depth), { color }, context.textDir]}>
           {renderInline(heading.tokens, key, context)}
         </Text>
       );
@@ -158,7 +171,7 @@ function renderBlock(token: Token, key: string, context: Context): ReactNode {
     case 'html': {
       const text = (token as Tokens.HTML).text.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim();
       return text ? (
-        <Text key={key} style={[styles.paragraph, { color }]}>
+        <Text key={key} style={[styles.paragraph, { color }, context.textDir]}>
           {text}
         </Text>
       ) : null;
@@ -166,7 +179,7 @@ function renderBlock(token: Token, key: string, context: Context): ReactNode {
     case 'text': {
       const textToken = token as Tokens.Text;
       return (
-        <Text key={key} style={[styles.paragraph, { color }]}>
+        <Text key={key} style={[styles.paragraph, { color }, context.textDir]}>
           {textToken.tokens ? renderInline(textToken.tokens, key, context) : textToken.text}
         </Text>
       );
@@ -189,7 +202,7 @@ function renderBlock(token: Token, key: string, context: Context): ReactNode {
     }
     default:
       return 'raw' in token && token.raw.trim() ? (
-        <Text key={key} style={[styles.paragraph, { color }]}>
+        <Text key={key} style={[styles.paragraph, { color }, context.textDir]}>
           {token.raw}
         </Text>
       ) : null;
@@ -226,7 +239,7 @@ function renderTable(table: Tokens.Table, key: string, context: Context): ReactN
   const widths = columnWidths(table);
   const cellStyle = (index: number): TextStyle => {
     const align = table.align[index];
-    return align ? { width: widths[index], textAlign: align } : { width: widths[index] };
+    return align ? { width: widths[index], textAlign: align } : { width: widths[index], ...context.textDir };
   };
   return (
     <View key={key} style={styles.tableWrap}>
@@ -314,7 +327,9 @@ function renderInline(tokens: Token[] | undefined, key: string, context: Context
     switch (token.type) {
       case 'text': {
         const text = token as Tokens.Text;
-        return text.tokens ? <Text key={k}>{renderInline(text.tokens, k, context)}</Text> : text.text;
+        if (text.tokens) return <Text key={k}>{renderInline(text.tokens, k, context)}</Text>;
+        if (context.fade && token === context.fade.token) return fadingWords(text.text, context.fade.start, context.fade.state, context.color, k);
+        return text.text;
       }
       case 'escape':
         return (token as Tokens.Escape).text;
@@ -406,6 +421,23 @@ function renderInline(tokens: Token[] | undefined, key: string, context: Context
       default:
         return 'raw' in token ? token.raw : null;
     }
+  });
+}
+
+/** The words of the text being written, each at the opacity its fade has reached (spaces as they are). */
+function fadingWords(text: string, start: number, fade: StreamFade, color: string, key: string): ReactNode[] {
+  let offset = start;
+  return text.split(/(\s+)/).map((part, index) => {
+    const at = offset;
+    offset += part.length;
+    const alpha = part.trim() ? fadeAlpha(fade, at) : 1;
+    return alpha >= 1 ? (
+      part
+    ) : (
+      <Text key={`${key}.f${index}`} style={{ color: withAlpha(color, alpha) }}>
+        {part}
+      </Text>
+    );
   });
 }
 

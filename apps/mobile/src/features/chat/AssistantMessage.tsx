@@ -115,6 +115,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   const annotation = (message.annotation as ReplyAnnotation | undefined) ?? {};
   const blocks = useMemo(() => messageBlocks(message), [message]);
   const items = useMemo(() => groupSteps(blocks), [blocks]);
+  const lastTextId = useMemo(() => [...items].reverse().find((item) => item.kind === 'text')?.id, [items]);
   const sources = useMemo(() => normalizeSources(message.sources), [message.sources]);
   const status = latestStatus(message.statusHistory);
   const error = errorText(message.error);
@@ -192,7 +193,16 @@ export const AssistantMessage = memo(function AssistantMessage({
       {items.map((item) =>
         item.kind === 'text' ? (
           ui('renderMarkdownInAssistantMessages') ? (
-            <Markdown key={item.id} text={item.text} sources={sources} baseUrl={baseUrl} token={token} foldCode={ui('collapseCodeBlocks')} />
+            <Markdown
+              key={item.id}
+              text={item.text}
+              sources={sources}
+              baseUrl={baseUrl}
+              token={token}
+              foldCode={ui('collapseCodeBlocks')}
+              // New words fade in at the end of what's being written (the web's default).
+              fadeIn={streaming && item.id === lastTextId && ui('chatFadeStreamingText')}
+            />
           ) : (
             <Text key={item.id} selectable style={[styles.plain, { color: palette.text }]}>
               {item.text}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OwuiClient, type FetchLike } from './http';
-import { interfaceChange, interfaceOn, saveUiSettings, speechRate, speechRateLabel, stepSpeechRate, uiValue, withUiChanges } from './settings';
+import { chatBackgroundUrl, chatDirection, imageCompressionSize, interfaceChange, interfaceOn, saveUiSettings, speechRate, speechRateLabel, stepSpeechRate, uiValue, withUiChanges } from './settings';
 
 describe('your settings', () => {
   it('reads and changes them by path, copying what it changes and dropping what is put back', () => {
@@ -70,5 +70,29 @@ describe('Read Aloud speed', () => {
     expect(stepSpeechRate(1.1, -1)).toBe(1);
     expect(speechRateLabel(1)).toBe('1×');
     expect(speechRateLabel(1.25)).toBe('1.25×');
+  });
+});
+
+describe('chat appearance settings', () => {
+  it('follows the web’s defaults for bubbles, names, fading and quick actions', () => {
+    expect(interfaceOn({}, 'chatBubble')).toBe(true);
+    expect(interfaceOn({}, 'showUsername')).toBe(false);
+    expect(interfaceOn({}, 'chatFadeStreamingText')).toBe(true);
+    expect(interfaceOn({}, 'showFloatingActionButtons')).toBe(true);
+    expect(interfaceOn({}, 'imageCompression')).toBe(false);
+    expect(interfaceOn({ chatBubble: false, chatFadeStreamingText: false }, 'chatBubble')).toBe(false);
+    expect(interfaceChange('chatBubble', false)).toEqual({ chatBubble: false });
+  });
+
+  it('reads the chat direction, the background and the photo size as the web saves them', () => {
+    expect(chatDirection({})).toBe('auto');
+    expect(chatDirection({ chatDirection: 'RTL' })).toBe('RTL');
+    expect(chatDirection({ chatDirection: 'sideways' })).toBe('auto');
+    expect(chatBackgroundUrl({ backgroundImageUrl: 'data:image/jpeg;base64,/9j/4AAQ' })).toBe('data:image/jpeg;base64,/9j/4AAQ');
+    expect(chatBackgroundUrl({ backgroundImageUrl: null })).toBeNull();
+    expect(chatBackgroundUrl({ backgroundImageUrl: 'javascript:alert(1)' })).toBeNull();
+    expect(imageCompressionSize({ imageCompressionSize: { width: 1024, height: '' } })).toEqual({ width: 1024, height: null });
+    expect(imageCompressionSize({ imageCompressionSize: { width: '800', height: 600.4 } })).toEqual({ width: 800, height: 600 });
+    expect(imageCompressionSize({})).toEqual({ width: null, height: null });
   });
 });

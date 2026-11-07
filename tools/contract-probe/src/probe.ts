@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -26,6 +26,8 @@
  * `--messages` checks where Run runs (the server's own Pyodide, file by file, or Jupyter), saves a
  * probe message with a file taken out, and on the scratch servers answers the code interpreter's
  * `execute:python` through the echo model (src/messages-probe.ts).
+ * `--interface` saves the settings slice's switches, chat direction, background, quick actions
+ * and photo size the app's way, reads each back, then puts the settings back (src/interface-probe.ts).
  * `--a8` saves settings the app's way and puts them back exactly (src/a8-probe.ts), then tries
  * memories, the profile, your variables, a refused password change and an API key (src/a8-account-probe.ts),
  * and the data controls: export, import, shared chats and files (src/a8-data-probe.ts).
@@ -65,6 +67,7 @@ import { probeA6 } from './a6-probe';
 import { probeAttach } from './attach-probe';
 import { probeFolders } from './folders-probe';
 import { probeIntegrations } from './integrations-probe';
+import { probeInterface } from './interface-probe';
 import { probeMessages } from './messages-probe';
 import { probeNewChat } from './newchat-probe';
 import { probeA8Account } from './a8-account-probe';
@@ -106,6 +109,7 @@ const { values: args } = parseArgs({
     attach: { type: 'boolean' },
     integrations: { type: 'boolean' },
     messages: { type: 'boolean' },
+    interface: { type: 'boolean' },
     a8: { type: 'boolean' },
     m3: { type: 'boolean' },
     m3text: { type: 'boolean' },
@@ -395,6 +399,12 @@ async function main() {
         });
         for (const result of messages.steps) results.push({ ...result, name: `Messages: ${result.name}` });
         fixtures['write.messages'] = messages.fixture;
+      }
+
+      if (args.interface && capabilities) {
+        const settingsProbe = await probeInterface({ client, capabilities });
+        for (const result of settingsProbe.steps) results.push({ ...result, name: `Interface: ${result.name}` });
+        fixtures['write.interface'] = settingsProbe.fixture;
       }
 
       if (args.a8 && capabilities) {

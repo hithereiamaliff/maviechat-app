@@ -241,6 +241,8 @@ function OutputImage({ uri }: { uri: string }) {
 
 const styles = StyleSheet.create({
   block: {
+    // Code reads left to right whatever the chat's direction.
+    direction: 'ltr',
     marginVertical: 8,
     borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,

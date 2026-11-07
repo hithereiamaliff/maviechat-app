@@ -1,5 +1,6 @@
 import type { HistoryMessage } from './history';
 import { OwuiHttpError, type OwuiClient } from './http';
+import { imageCompressionSize } from './settings';
 
 /** `POST /api/v1/files/` answer (`FileModelResponse`); unknown fields are kept. */
 export interface UploadedFile {
@@ -136,10 +137,10 @@ export function chatReferenceItem(chat: { id: string; title?: string | null }, i
 export function imageLimits(ui: Record<string, unknown> | null | undefined, config: Record<string, unknown> | null | undefined): { width: number | null; height: number | null } | null {
   const positive = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null);
   const server = (config?.file as { image_compression?: { width?: unknown; height?: unknown } } | undefined)?.image_compression;
-  const mine = ui?.imageCompression === true ? (ui.imageCompressionSize as { width?: unknown; height?: unknown } | undefined) : undefined;
+  const mine = ui?.imageCompression === true ? imageCompressionSize(ui) : { width: null, height: null };
   const cap = (own: number | null, limit: number | null) => (limit !== null && (own === null || own > limit) ? limit : own);
-  const width = cap(positive(mine?.width), positive(server?.width));
-  const height = cap(positive(mine?.height), positive(server?.height));
+  const width = cap(mine.width, positive(server?.width));
+  const height = cap(mine.height, positive(server?.height));
   return width === null && height === null ? null : { width, height };
 }
 

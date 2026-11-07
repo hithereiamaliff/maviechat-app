@@ -1,4 +1,5 @@
 import {
+  chatDirection,
   groupPosition,
   groupsDone,
   mergedResponse,
@@ -18,6 +19,8 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { useUserSettings } from '@/lib/server';
+import { ChatDirectionContext, directionStyles } from '@/markdown/ChatDirectionContext';
 import { usePalette } from '@/theme';
 import { AssistantMessage } from './AssistantMessage';
 import { MultiReplies } from './MultiReplies';
@@ -111,6 +114,8 @@ export function MessageList({
   const palette = usePalette();
   const list = useRef<FlashListRef<HistoryMessage>>(null);
   const following = useRef(true);
+  // Settings → Interface → Chat direction: the whole conversation mirrored for right to left.
+  const direction = chatDirection(useUserSettings().data?.ui);
 
   useImperativeHandle(
     ref,
@@ -144,7 +149,8 @@ export function MessageList({
   }, [pinToBottomKey]);
 
   return (
-    <View style={styles.wrap}>
+    <ChatDirectionContext.Provider value={direction}>
+    <View style={[styles.wrap, directionStyles(direction).view]}>
       <FlashList
         ref={list}
         data={messages}
@@ -251,6 +257,7 @@ export function MessageList({
         </Pressable>
       ) : null}
     </View>
+    </ChatDirectionContext.Provider>
   );
 }
 
