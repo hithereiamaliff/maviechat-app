@@ -39,6 +39,8 @@ export interface MessageActions {
   remove?: (message: HistoryMessage) => void;
   /** Allow or deny a tool call a reply is waiting on. */
   resolveApproval?: (reply: HistoryMessage, callId: string, approve: boolean) => Promise<void>;
+  /** Puts a prompt in the message box (a reply's Select Text: Ask, Explain and your own actions). */
+  quote?: (prompt: string) => void;
   canDeleteMessage: boolean;
   canDeleteReply: boolean;
 }
@@ -183,6 +185,7 @@ export function MessageList({
               actions={actionsFor?.(message)}
               onAction={runAction ? (action) => runAction(message, action) : undefined}
               onApprove={actions.resolveApproval ? (callId, approve) => actions.resolveApproval!(message, callId, approve) : undefined}
+              onQuote={actions.quote}
             />
           );
           const groups = item.role === 'assistant' && history ? replyGroups(history, item.id) : null;

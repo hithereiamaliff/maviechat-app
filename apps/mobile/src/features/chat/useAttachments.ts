@@ -12,7 +12,9 @@ import {
   type FileItem,
   type ModelItem,
 } from '@maviechat/owui-protocol';
+import * as Clipboard from 'expo-clipboard';
 import * as DocumentPicker from 'expo-document-picker';
+import { File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { useToast } from '@/components/Toast';
 import { deepTutorAttachment } from '@/features/deeptutor/crossReference';
@@ -52,8 +54,8 @@ export function useAttachments({ draftKey, model, temporary }: { draftKey: strin
       size: file.size,
       error: '',
       itemId,
-      // "Send whole documents" (Interface): read in full rather than searched, as the web marks it.
-      ...(!image && ui('defaultUploadContext') ? { context: 'full' } : {}),
+      // "Send whole documents" (Interface), or a long paste: read in full rather than searched, as the web marks it.
+      ...(!image && (file.context === 'full' || ui('defaultUploadContext')) ? { context: 'full' } : {}),
     };
     updateDraft(draftKey, (draft) => ({
       ...draft,
@@ -162,8 +164,30 @@ export function useAttachments({ draftKey, model, temporary }: { draftKey: strin
     }
   };
 
+  // A file in the cache, for what came from the clipboard rather than a picker.
+  const cached = async (name: string, write: (file: File) => Promise<void>): Promise<Picked> => {
+    const file = new File(Paths.cache, name);
+    file.create({ overwrite: true });
+    await write(file);
+    return { uri: file.uri, name, size: file.size ?? undefined };
+  };
+
   return {
     attachDeepTutorChat,
+    /** A long paste, attached as the web attaches it: `Pasted_Text_….txt`, read in full. */
+    attachText: (text: string) =>
+      run(async () => [{ ...(await cached(`Pasted_Text_${uuidv4().slice(0, 8)}.txt`, (file) => file.write(text))), mimeType: 'text/plain', context: 'full' as const }]),
+    /** The picture on the clipboard, as a photo (a phone can't paste one into the message box itself). */
+    pasteImage: () =>
+      run(async () => {
+        const image = await Clipboard.getImageAsync({ format: 'jpeg', jpegQuality: 0.8 });
+        if (!image?.data) {
+          toast('There’s no picture on the clipboard.', 'error');
+          return [];
+        }
+        const base64 = image.data.replace(/^data:[^,]*,/, '');
+        return [{ ...(await cached(`Pasted_Image_${uuidv4().slice(0, 8)}.jpg`, (file) => file.write(base64, { encoding: 'base64' }))), mimeType: 'image/jpeg' }];
+      }),
     pickFiles: () =>
       run(async () => {
         const result = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true });

@@ -6,6 +6,8 @@ export interface Picked {
   name: string;
   size?: number;
   mimeType?: string;
+  /** Read in full rather than searched (a long paste, as the web marks it). */
+  context?: 'full';
 }
 
 export const PHOTO_OPTIONS: ImagePicker.ImagePickerOptions = {

@@ -10,6 +10,7 @@ const target = path.join(root, 'apps/mobile/src/components/icons.generated.ts');
 const ICONS = [
   'academic-cap',
   'adjustments-horizontal',
+  'adjustments-vertical',
   'archive-box',
   'archive-box-arrow-down',
   'arrow-down',
@@ -52,6 +53,7 @@ const ICONS = [
   'computer-desktop',
   'cpu-chip',
   'cube',
+  'cursor-arrow-rays',
   'document-text',
   'ellipsis-horizontal',
   'envelope',

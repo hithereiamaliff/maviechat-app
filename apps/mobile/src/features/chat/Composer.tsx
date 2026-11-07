@@ -8,6 +8,7 @@ import {
   defaultToolIds,
   effectiveToggles,
   filesPending,
+  modelControls,
   modelTerminal,
   terminalLabel,
   usableTools,
@@ -35,6 +36,8 @@ import { getDraft, updateDraft, useDraft } from './drafts';
 import { FullScreenInput } from './FullScreenInput';
 import { IntegrationsSheet, TOGGLE_INFO } from './IntegrationsSheet';
 import { MentionMenu } from './MentionMenu';
+import { ModelControlsSheet } from './ModelControlsSheet';
+import { pastedText } from './paste';
 import { PromptVariablesSheet } from './PromptVariablesSheet';
 import { QueuedMessages } from './QueuedMessages';
 import { chooseTerminal, terminalAccount, useChosenTerminal } from './terminals';
@@ -133,6 +136,7 @@ export function Composer({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [deepTutorOpen, setDeepTutorOpen] = useState(false);
+  const [knobsOpen, setKnobsOpen] = useState(false);
   const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
   const input = useRef<ComponentRef<typeof TextInput>>(null);
   useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }), []);
@@ -153,13 +157,20 @@ export function Composer({
   const always: ToggleKey[] = ui('webSearch') && available.webSearch ? ['webSearch'] : [];
   const toggles = effectiveToggles(always.length ? { ...draft.toggles, webSearch: true } : draft.toggles, available);
   const usable = usableTools(tools.data ?? []);
+  // 0.12's knobs: the chosen models that have some (none on 0.11).
+  const knobModels = (models ?? (model ? [model] : [])).filter((item) => modelControls(item).length > 0);
   const toolIds = draft.toolIds.filter((id) => usable.some((tool) => tool.id === id));
   const hasContent = draft.text.trim().length > 0 || draft.files.length > 0;
   const uploading = filesPending(draft.files);
   const canSend = hasContent && !sending && !uploading;
   const showIntegrations = available.webSearch || available.imageGeneration || available.codeInterpreter || usable.length > 0 || approvalsOn || systems.length > 0;
   const canExpand = draft.text.split('\n').length > 2;
-  const setText = (text: string) => updateDraft(draftKey, (current) => ({ ...current, text }));
+  // With "Paste long text as a file" on, a paste over 1,000 characters is attached instead, and the box keeps what it had.
+  const setText = (text: string) => {
+    const pasted = ui('largeTextAsFile') ? pastedText(getDraft(draftKey).text, text) : null;
+    if (pasted !== null) return void attach.attachText(pasted);
+    updateDraft(draftKey, (current) => ({ ...current, text }));
+  };
   const field = useGrowingInput(draft.text, setText);
   const [cursor, setCursor] = useState(0);
   const [focused, setFocused] = useState(false);
@@ -201,6 +212,7 @@ export function Composer({
     { key: 'files', label: 'Upload Files', icon: 'paper-clip', onPress: () => void attach.pickFiles() },
     { key: 'photos', label: 'Photo Library', icon: 'photo', onPress: () => void attach.pickPhotos() },
     { key: 'camera', label: 'Capture', icon: 'camera', onPress: () => void attach.capture() },
+    { key: 'paste', label: 'Paste Image', icon: 'clipboard-document', onPress: () => void attach.pasteImage() },
     ...(deepTutorSignedIn
       ? [{ key: 'deeptutor', label: 'Reference DeepTutor Chat', icon: 'academic-cap' as const, onPress: () => setDeepTutorOpen(true) }]
       : []),
@@ -359,6 +371,11 @@ export function Composer({
               </Pressable>
             ) : null}
           </ScrollView>
+          {knobModels.length ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Model controls" onPress={() => setKnobsOpen(true)} hitSlop={6} style={styles.knobs}>
+              <Icon name="adjustments-vertical" size={16} color={palette.textMuted} />
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Model: ${modelLabel}. Change model`}
@@ -397,6 +414,7 @@ export function Composer({
         </View>
       </View>
       {plusMenu}
+      {knobModels.length ? <ModelControlsSheet visible={knobsOpen} models={knobModels} onClose={() => setKnobsOpen(false)} /> : null}
       {deepTutorSignedIn ? (
         <DeepTutorPicker visible={deepTutorOpen} onClose={() => setDeepTutorOpen(false)} onPick={(session) => void attach.attachDeepTutorChat(session)} />
       ) : null}
@@ -444,6 +462,7 @@ const styles = StyleSheet.create({
   systemChip: { flexDirection: 'row', gap: 4, paddingHorizontal: 8, maxWidth: 150 },
   systemName: { fontFamily: fonts.medium, fontSize: 12, flexShrink: 1 },
   model: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, maxWidth: '45%' },
+  knobs: { paddingHorizontal: 2 },
   modelText: { fontFamily: fonts.medium, fontSize: 13, flexShrink: 1 },
   send: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   stopSquare: { width: 11, height: 11, borderRadius: 2 },

@@ -34,6 +34,7 @@ import { fonts, radius, usePalette } from '@/theme';
 import { ApprovalCard } from './ApprovalCard';
 import { BranchNav } from './BranchNav';
 import { RatePanel } from './RatePanel';
+import { SelectTextSheet } from './SelectTextSheet';
 import { Sources } from './Sources';
 import { StepGroup, StepView } from './Steps';
 
@@ -69,6 +70,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   actions = [],
   onAction,
   onApprove,
+  onQuote,
 }: {
   message: HistoryMessage;
   modelLabel: string;
@@ -93,6 +95,8 @@ export const AssistantMessage = memo(function AssistantMessage({
   onAction?: (action: ModelAction) => void;
   /** Allow or deny a tool call waiting for your OK; absent where it can't be answered (temporary chats). */
   onApprove?: (callId: string, approve: boolean) => Promise<void>;
+  /** Puts a prompt in the message box (Select Text's Ask, Explain and your own actions). */
+  onQuote?: (prompt: string) => void;
 }) {
   const palette = usePalette();
   const toast = useToast();
@@ -105,6 +109,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   const [revealed, setRevealed] = useState(false);
   // Kept by message (the list reuses rows as you scroll).
   const [rating, setRating] = useStoredState<boolean>(`rate-panel:${message.id}`, false);
+  const [selecting, setSelecting] = useState(false);
   const annotation = (message.annotation as ReplyAnnotation | undefined) ?? {};
   const blocks = useMemo(() => messageBlocks(message), [message]);
   const items = useMemo(() => groupSteps(blocks), [blocks]);
@@ -239,6 +244,7 @@ export const AssistantMessage = memo(function AssistantMessage({
             color={palette.textMuted}
             onPress={() => void copyReply(plainText(blocks), ui('copyFormatted')).then(() => toast('Copied to clipboard'))}
           />
+          {onQuote ? <IconButton icon="cursor-arrow-rays" label="Select Text" size={18} color={palette.textMuted} onPress={() => setSelecting(true)} /> : null}
           {canSpeak ? <ReadAloudButton id={message.id} markdown={outputText(message.output) || message.content || ''} rate={ttsRate} /> : null}
           {usage ? (
             <IconButton
@@ -304,6 +310,8 @@ export const AssistantMessage = memo(function AssistantMessage({
           {onDelete ? <IconButton icon="trash" label="Delete" size={18} color={palette.textMuted} onPress={onDelete} /> : null}
         </ScrollView>
       ) : null}
+
+      {onQuote ? <SelectTextSheet text={plainText(blocks)} visible={selecting} onClose={() => setSelecting(false)} onPrompt={onQuote} /> : null}
 
       {onRate && rating && annotation.rating && !streaming ? (
         <RatePanel annotation={annotation} onSave={(details) => onRate({ details })} onClose={() => setRating(false)} />

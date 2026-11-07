@@ -104,6 +104,7 @@ export const INTERFACE_SETTINGS = {
   expandDetails: { path: 'expandDetails', group: 'Chat', default: false, label: 'Open thinking and tool steps', hint: 'Reasoning, tool calls and searches start opened instead of folded.' },
   displayMultiModelResponsesInTabs: { path: 'displayMultiModelResponsesInTabs', group: 'Chat', default: false, label: 'Several models’ answers as tabs' },
   webSearch: { path: 'webSearch', group: 'Chat', default: false, on: 'always', off: null, label: 'Always search the web', hint: 'Every message searches the web, where the server, your account and the model allow it.' },
+  largeTextAsFile: { path: 'largeTextAsFile', group: 'File', default: false, label: 'Paste long text as a file', hint: 'Pasting more than 1,000 characters attaches them as a text file, read in full.' },
   defaultUploadContext: { path: 'defaultUploadContext', group: 'File', default: false, on: 'full', off: 'focused', label: 'Send whole documents', hint: 'Files you attach are read in full, instead of searched for the parts that matter.' },
 } as const satisfies Record<string, InterfaceSetting>;
 

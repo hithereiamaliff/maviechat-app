@@ -70,7 +70,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [x] | Row "…": Keep in Sidebar / Hide from Sidebar, Copy link (Edit/Delete for admins → M3). New chat and sidebar slice (2026-11-07): Keep in Sidebar / Hide from Sidebar and Copy Link, which copies the web's `/?model=` link, on each row of the model picker. | M2 |
 | [x] | **Compare** toggle for multi-model (permission `multiple_models`). A4 (2026-11-03): the Compare switch beside search; with it on, taps add or remove models (numbered in order, the last one stays) and the picker stays open; off keeps the first. The input bar reads "Model +2". "Set as default" saves the list | M2 |
 | [x] | "Set as default" (new chat only) | M1 |
-| [ ] | Model controls (preset knobs next to the selector) (`MessageInput/ModelControls.svelte`) | M2 |
+| [x] | Model controls (preset knobs next to the selector) (`MessageInput/ModelControls.svelte`). In-the-chat slice (2026-11-07): 0.12's knobs (`info.params.model_controls`), with a knobs button beside the model in the input bar when a chosen model has some (none on 0.11). The sheet offers each knob's options or its default, saved in `ui.params.model_controls`, which goes with every message as the app sends `ui.params` | M2 |
 
 ## 5. Controls panel (`chat/ChatControls.svelte`, `chat/Controls/*`)
 
@@ -106,7 +106,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [~] | `/` commands + saved prompts with variables form (`InputVariablesModal.svelte`); `@` models/knowledge/files/URL; `#` folders/collections/files/URLs; `$` skills. A5 (2026-11-03): a list above the input. `/`: /model, /settings, /temporary (new chat) and your saved prompts, whose own variables get a form (text, long text, choices, checkbox, numbers, dates, email, link, phone, colour; defaults and required). `@`: a model to talk to ("Talking to @model", kept until taken off), knowledge bases and their files, folders, a web address. `#`: knowledge and web addresses. Not yet: /compact, /fork, /status, `$` skills, `:` emoji (the iPhone keyboard has them) | M2 |
 | [x] | Built-in variables `{{USER_NAME}}`, `{{CURRENT_DATE}}`, `{{CLIPBOARD}}`, `{{USER_LOCATION}}`, …. A5: all of the web's, filled in as a prompt goes in; `{{USER_LOCATION}}` reads "LOCATION_UNKNOWN" (no location module in build 4), and clipboard pictures aren't attached | M2 |
 | [~] | Message queue while replying (setting "Enable Message Queue", default on); queue while uploads finish. Slice 3: the queue (combined with blank lines when the reply ends; off = stop then send); Send waits for uploads instead of queueing | M1 |
-| [ ] | Paste image/file uploads it; long paste becomes a `.txt` attachment (setting) | M2 |
+| [x] | Paste image/file uploads it; long paste becomes a `.txt` attachment (setting). In-the-chat slice (2026-11-07): a phone's text field can't take a pasted picture, so the + menu has Paste Image. With Settings → Interface → "Paste long text as a file" (`largeTextAsFile`) on, an insertion over 1,000 characters attaches as `Pasted_Text_….txt`, read in full, and the box keeps what it had | M2 |
 | [x] | Drafts kept per chat (text, attachments, toggles, tools, queue; while the app runs) | M1 |
 | web | Voice call mode (`CallOverlay.svelte`), realtime voice | — |
 
@@ -138,7 +138,7 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | [x] | Follow-ups list under the last reply (tap sends, or inserts per setting) | M1 |
 | [x] | Rating panel: 1–10, reason chips (up/down sets), comment, Save (`Messages/RateComment.svelte`). A2: shown under the reply after 👍/👎; 6–10 after 👍 and 1–5 after 👎; one reason (the web's keys, our own words); filed with `/api/v1/evaluations/feedback` (created once, then updated) and kept on the reply as `annotation` + `feedbackId`. The web's automatic tag generation for ratings is not done | M2 |
 | [x] | Multi-model: full-width swipeable cards; solid border = the branch continued from; per-model arrows; tabs setting; "Merge Responses". A4 (2026-11-03): all of it. The web selects a card when you click it; in the app the reply already reacts to taps, so other cards carry "Continue with this answer". Dots under the cards show which one you're on. Merge also sends the chat id (see protocol §5) | M2 |
-| [ ] | Text-selection actions Ask / Explain (`ContentRenderer/FloatingButtons.svelte`) → long-press "Select text" sheet | M2 |
+| [x] | Text-selection actions Ask / Explain (`ContentRenderer/FloatingButtons.svelte`) → long-press "Select text" sheet. In-the-chat slice (2026-11-07): a reply's Select Text button opens its text to select from, with Ask (asks for your question), Explain, or your own actions from the web's settings (`ui.floatingActionButtons`). As in 0.11.3, the prompt (the selection quoted) goes in the message box for you to send; with nothing selected, the whole reply is used | M2 |
 
 ## 9. Chat-level features
 

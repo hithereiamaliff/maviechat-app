@@ -26,6 +26,7 @@ export * from './knowledge';
 export * from './memories';
 export * from './mfa';
 export * from './models';
+export * from './modelControls';
 export * from './multi';
 export * from './notifications';
 export * from './output';

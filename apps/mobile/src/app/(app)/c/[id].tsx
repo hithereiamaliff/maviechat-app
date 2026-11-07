@@ -385,6 +385,8 @@ export default function ChatScreen() {
       runAction: (reply, action) => void messageActions.runAction(reply, action),
       remove: messageActions.remove,
       resolveApproval: temporary ? undefined : (reply, callId, approve) => resolveRef.current(reply.id, callId, approve ? 'approve' : 'reject'),
+      // As the web's Ask and Explain do: the prompt replaces what's in the message box, for you to send.
+      quote: (prompt) => updateDraft(chatId, (draft) => ({ ...draft, text: prompt })),
       canDeleteMessage: messageActions.canDeleteMessage,
       canDeleteReply: messageActions.canDeleteReply,
     };
