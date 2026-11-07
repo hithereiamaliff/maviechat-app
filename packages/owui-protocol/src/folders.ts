@@ -1,4 +1,4 @@
-import type { ChatRecord } from './chats';
+import type { ChatListItem, ChatRecord } from './chats';
 import type { OwuiClient } from './http';
 import type { AccessGrant } from './workspaceModels';
 
@@ -18,6 +18,60 @@ export interface FolderItem {
 
 export interface FolderNode extends FolderItem {
   children: FolderNode[];
+}
+
+type Tree = Record<string, unknown>;
+const record = (value: unknown): Tree => (typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Tree) : {});
+const text = (value: unknown): string => (typeof value === 'string' ? value : '');
+
+/**
+ * A folder someone else shares with you, or one inside it (`GET /api/v1/folders/shared`): whose it
+ * is, and what you may do in it (`write`: make chats and folders in it, edit and share it; `read`:
+ * read its chats).
+ */
+export interface SharedFolder extends FolderItem {
+  user_id: string;
+  owner_name: string;
+  permission: 'read' | 'write';
+}
+
+export async function listSharedFolders(client: OwuiClient): Promise<SharedFolder[]> {
+  const raw = await client.get<unknown>('/api/v1/folders/shared');
+  return (Array.isArray(raw) ? raw : []).flatMap((item) => {
+    const row = record(item);
+    if (!text(row.id) || typeof row.name !== 'string') return [];
+    return [{ ...(row as unknown as FolderItem), user_id: text(row.user_id), owner_name: text(row.owner_name), permission: row.permission === 'write' ? ('write' as const) : ('read' as const) }];
+  });
+}
+
+/** Your folders and the ones shared with you, in one list for the tree (one shared with you that's yours stays yours). */
+export function withSharedFolders(own: FolderItem[], shared: SharedFolder[]): FolderItem[] {
+  const mine = new Set(own.map((folder) => folder.id));
+  return [...own, ...shared.filter((folder) => !mine.has(folder.id))];
+}
+
+/** A chat in a folder, as everyone who may see the folder sees it: whose it is, read only when it isn't yours. */
+export interface FolderChat extends ChatListItem {
+  user_id?: string;
+  owner_name?: string;
+  readonly?: boolean;
+}
+
+export interface FolderChatsPage {
+  chats: FolderChat[];
+  /** What you may do in the folder: make chats in it (`write`), or read them. */
+  permission: 'read' | 'write';
+  hasMore: boolean;
+}
+
+/**
+ * A page (10) of a folder's chats, everyone's, as the web lists any folder's chats (so the owner
+ * sees chats that people with write access made in it too), unread first, then newest.
+ */
+export async function listFolderChatsForAll(client: OwuiClient, folderId: string, page = 1): Promise<FolderChatsPage> {
+  const body = record(await client.get<unknown>(`/api/v1/folders/${encodeURIComponent(folderId)}/shared/chats`, { query: { page } }));
+  const chats = (Array.isArray(body.chats) ? body.chats : []).filter((chat): chat is FolderChat => Boolean(text(record(chat).id)));
+  return { chats, permission: body.folder_permission === 'write' ? 'write' : 'read', hasMore: body.has_more === true };
 }
 
 export function listFolders(client: OwuiClient): Promise<FolderItem[]> {

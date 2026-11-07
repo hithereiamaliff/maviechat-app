@@ -17,13 +17,16 @@ const EMPTY_HISTORY: ChatHistory = { messages: {}, currentId: null };
 
 /**
  * Loads a chat and tracks which branch is shown; switching branches is saved like the web app does.
- * A temporary chat exists only in the app's cache, so it is never fetched or saved.
+ * A temporary chat exists only in the app's cache, so it is never fetched or saved; nor is
+ * someone else's (a chat in a folder shared with you), which you only read.
  */
 export function useChatView(chatId: string) {
-  const { client } = useAuthed();
+  const { client, session } = useAuthed();
   const toast = useToast();
   const temporary = isTemporaryChatId(chatId);
   const query = useQuery({ queryKey: ['chat', chatId], queryFn: () => getChat(client, chatId), enabled: Boolean(chatId) && !temporary });
+  const owner = query.data?.user_id;
+  const saved = !temporary && !(typeof owner === 'string' && owner !== '' && owner !== session.user.id);
   // Keyed by chat, so opening another chat starts from that chat's own saved branch.
   const [selection, setSelection] = useState<{ chatId: string; leaf: string } | null>(null);
 
@@ -39,9 +42,9 @@ export function useChatView(chatId: string) {
       const next = switchSibling(history, messageId, direction);
       if (!next) return;
       setSelection({ chatId, leaf: next });
-      if (!temporary) selectBranch(client, chatId, next).catch(() => toast("Couldn't save which version is shown", 'error'));
+      if (saved) selectBranch(client, chatId, next).catch(() => toast("Couldn't save which version is shown", 'error'));
     },
-    [history, client, chatId, toast, temporary],
+    [history, client, chatId, toast, saved],
   );
 
   /** Show this leaf (e.g. a reply just sent) without saving the choice; the server already did. */
@@ -51,9 +54,9 @@ export function useChatView(chatId: string) {
   const show = useCallback(
     (leafId: string) => {
       setSelection({ chatId, leaf: leafId });
-      if (!temporary) selectBranch(client, chatId, leafId).catch(() => toast("Couldn't save which version is shown", 'error'));
+      if (saved) selectBranch(client, chatId, leafId).catch(() => toast("Couldn't save which version is shown", 'error'));
     },
-    [client, chatId, toast, temporary],
+    [client, chatId, toast, saved],
   );
 
   return { query, messages, position, step, select, show };

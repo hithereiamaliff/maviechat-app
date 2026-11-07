@@ -90,8 +90,12 @@ export function useFolderActions({ onNavigate, onCreated }: Options = {}) {
     ]);
   };
 
-  /** The menu for a folder; `newChat: false` leaves out New Chat (on the folder's own page, which is one). */
-  const items = (folder: FolderRef, { onDeleted, newChat = true }: { onDeleted?: () => void; newChat?: boolean } = {}): MenuItem[] => [
+  /**
+   * The menu for a folder; `newChat: false` leaves out New Chat (on the folder's own page, which is
+   * one). A folder shared with you to write in (`shared`) has no Export (it would hold only your
+   * chats) and no Delete (only its owner may delete it).
+   */
+  const items = (folder: FolderRef, { onDeleted, newChat = true, shared = false }: { onDeleted?: () => void; newChat?: boolean; shared?: boolean } = {}): MenuItem[] => [
     ...(newChat
       ? [
           {
@@ -108,9 +112,9 @@ export function useFolderActions({ onNavigate, onCreated }: Options = {}) {
     { key: 'subfolder', label: 'Create Folder', icon: 'folder-plus', onPress: () => setSheet({ mode: 'create', parentId: folder.id, parentName: folder.name }) },
     { key: 'read', label: 'Mark all as read', icon: 'envelope-open', onPress: () => void markRead(folder) },
     { key: 'edit', label: 'Edit', icon: 'pencil', onPress: () => setSheet({ mode: 'edit', folderId: folder.id }) },
-    ...(canExport ? [{ key: 'export', label: 'Export', icon: 'arrow-down-tray' as const, onPress: () => void exportChats(folder) }] : []),
+    ...(canExport && !shared ? [{ key: 'export', label: 'Export', icon: 'arrow-down-tray' as const, onPress: () => void exportChats(folder) }] : []),
     ...(canShare ? [{ key: 'share', label: 'Share', icon: 'user-plus' as const, onPress: () => void share(folder) }] : []),
-    { key: 'delete', label: 'Delete', icon: 'trash', destructive: true, onPress: () => remove(folder, onDeleted) },
+    ...(shared ? [] : [{ key: 'delete', label: 'Delete', icon: 'trash' as const, destructive: true, onPress: () => remove(folder, onDeleted) }]),
   ];
 
   const element = (

@@ -9,6 +9,7 @@ import {
   createChat,
   forkChat,
   getNoteChat,
+  getUserInfo,
   isTemporaryChatId,
   listChatTasks,
   messageBlocks,
@@ -38,7 +39,7 @@ import {
   type MergedResponse,
   type ReplyGroup,
 } from '@maviechat/owui-protocol';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -137,6 +138,10 @@ export default function ChatScreen() {
     [artifacts],
   );
   const pinned = chat?.pinned === true;
+  // Someone else's chat (in a folder shared with you): read only, as on the web.
+  const ownerId = typeof chat?.user_id === 'string' ? chat.user_id : '';
+  const readOnly = !temporary && ownerId !== '' && ownerId !== session.user.id;
+  const owner = useQuery({ queryKey: ['user-info', ownerId], queryFn: () => getUserInfo(client, ownerId), enabled: readOnly, staleTime: 10 * 60_000 });
   // The text you had selected in the note goes with each message, as on the web, until you drop it.
   const [fromNote, setFromNote] = useState(() => (noteId ? noteSelection(noteId) : ''));
   const withSelection = (text: string) => (noteId ? withNoteSelection(text, fromNote) : text);
@@ -165,6 +170,13 @@ export default function ChatScreen() {
     const copy = await actions.clone(ref);
     if (copy) router.replace(`/c/${copy}`);
   };
+  // Someone else's chat keeps what reads it: Scroll to Top, Artifacts, Download and Copy, as on the web.
+  const readOnlyMenu: MenuItem[] = [
+    ...(messages.length > 1 ? [{ key: 'top', label: 'Scroll to Top', icon: 'arrow-up' as const, onPress: () => list.current?.scrollToTop() }] : []),
+    ...(artifacts.length ? [{ key: 'artifacts', label: 'Artifacts', icon: 'cube' as const, onPress: () => setArtifactAt(artifacts.length - 1) }] : []),
+    ...(chat && actions.canExport ? [{ key: 'download', label: 'Download', icon: 'arrow-down' as const, onPress: () => actions.download(ref) }] : []),
+    ...(chat ? [{ key: 'copy', label: 'Copy', icon: 'clipboard-document' as const, onPress: () => void actions.copy(ref) }] : []),
+  ];
   const menu: MenuItem[] = [
     ...(messages.length > 1 ? [{ key: 'top', label: 'Scroll to Top', icon: 'arrow-up' as const, onPress: () => list.current?.scrollToTop() }] : []),
     // As on the web, only when the chat has some; the latest version first.
@@ -256,7 +268,7 @@ export default function ChatScreen() {
   const writing = (message: HistoryMessage | undefined) => message?.role === 'assistant' && message.done === false && !awaitingYou(message);
   const streaming = messages.some(writing) || (lastAsked?.childrenIds ?? []).some((id) => writing(history?.messages[id]));
   const lastReply = messages[messages.length - 1];
-  const asking = !temporary && lastReply?.role === 'assistant' ? pendingAskUser(lastReply) : null;
+  const asking = !temporary && !readOnly && lastReply?.role === 'assistant' ? pendingAskUser(lastReply) : null;
   const lastId = messages[messages.length - 1]?.id ?? null;
   const queueEnabled = ui('enableMessageQueue');
   const model = choice.model;
@@ -267,15 +279,15 @@ export default function ChatScreen() {
   const loaded = Boolean(chat);
   const { markRead } = live;
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || readOnly) return;
     markRead(chatId);
     return () => markRead(chatId);
-  }, [loaded, chatId, markRead]);
+  }, [loaded, chatId, markRead, readOnly]);
   const wasStreaming = useRef(false);
   useEffect(() => {
-    if (wasStreaming.current && !streaming) markRead(chatId);
+    if (wasStreaming.current && !streaming && !readOnly) markRead(chatId);
     wasStreaming.current = streaming;
-  }, [streaming, chatId, markRead]);
+  }, [streaming, chatId, markRead, readOnly]);
 
   // "Copy each reply when it's done": the reply's words, as the web copies them.
   const autoCopy = ui('responseAutoCopy');
@@ -402,6 +414,7 @@ export default function ChatScreen() {
   };
 
   const onSend = async (message: OutgoingMessage) => {
+    if (readOnly) return false;
     stalled.current = false;
     if (streaming) {
       // As on the web: a message typed during a reply waits for it, unless the queue is turned off in settings.
@@ -522,6 +535,8 @@ export default function ChatScreen() {
   }, [chatId]);
 
   const listActions = useMemo<MessageActions>(() => {
+    // Someone else's chat: nothing in it is yours to change.
+    if (readOnly) return { canDeleteMessage: false, canDeleteReply: false };
     const extras = () => {
       const { toggles, toolIds, skillIds, filterIds } = getDraft(chatId);
       return { toggles, toolIds, skillIds, filterIds };
@@ -575,7 +590,7 @@ export default function ChatScreen() {
       canDeleteMessage: messageActions.canDeleteMessage,
       canDeleteReply: messageActions.canDeleteReply,
     };
-  }, [chatId, models.data, model, selected, messageActions, send, regenerate, continueReply, select, streaming, messages, temporary, noteId, toast]);
+  }, [chatId, models.data, model, selected, messageActions, send, regenerate, continueReply, select, streaming, messages, temporary, noteId, toast, readOnly]);
 
   // "Merge Responses": a model combines the shown answers; the result streams in and is kept on the shown reply.
   const [mergingId, setMergingId] = useState<string | null>(null);
@@ -632,9 +647,9 @@ export default function ChatScreen() {
       ) : (
         <ChatHeader
           title={temporary ? 'Temporary Chat' : chat?.title}
-          menu={menu}
+          menu={readOnly ? readOnlyMenu : menu}
           accessory={
-            chat ? (
+            chat && !readOnly ? (
               <>
                 {canSaveTemporary ? <IconButton icon="archive-box-arrow-down" label="Save Chat" onPress={() => void saveTemporary()} /> : null}
                 <IconButton icon="adjustments-horizontal" label="Controls" onPress={() => setControlsOpen(true)} />
@@ -676,7 +691,7 @@ export default function ChatScreen() {
             models={models.data}
             position={position}
             onStep={step}
-            onFollowUp={(text) => {
+            onFollowUp={readOnly ? undefined : (text) => {
               // Into the message box, or straight off (the web's setting).
               if (ui('insertFollowUpPrompt')) return updateDraft(chatId, (draft) => ({ ...draft, text }));
               const { toggles, toolIds, skillIds, filterIds } = getDraft(chatId);
@@ -690,7 +705,7 @@ export default function ChatScreen() {
             multiAsTabs={multiAsTabs}
             followReplies={ui('scrollOnResponseGeneration')}
             scrollOnBranchChange={ui('scrollOnBranchChange')}
-            onMerge={streaming ? undefined : (replyId, groups) => void merge(replyId, groups)}
+            onMerge={streaming || readOnly ? undefined : (replyId, groups) => void merge(replyId, groups)}
             mergingId={mergingId}
           />
           </EmbedActionsContext.Provider>
@@ -735,7 +750,13 @@ export default function ChatScreen() {
             <IconButton icon="x-mark" label="Don’t send the text you selected" size={16} color={palette.textMuted} onPress={() => setFromNote('')} />
           </View>
         ) : null}
-        {query.isError || notFound ? null : (
+        {readOnly ? (
+          <View style={styles.readOnly}>
+            <Text style={[styles.readOnlyText, { color: palette.textMuted }]}>
+              {`Read only: this is ${owner.data?.name ? `${owner.data.name}’s` : 'someone else’s'} chat.`}
+            </Text>
+          </View>
+        ) : query.isError || notFound ? null : (
           <Composer
             draftKey={chatId}
             model={model}
@@ -784,6 +805,8 @@ const styles = StyleSheet.create({
   message: { fontFamily: fonts.regular, fontSize: 15, textAlign: 'center' },
   retry: { alignSelf: 'stretch' },
   asking: { paddingHorizontal: 12, paddingTop: 6 },
+  readOnly: { paddingHorizontal: 24, paddingTop: 10, paddingBottom: 28, alignItems: 'center' },
+  readOnlyText: { fontFamily: fonts.regular, fontSize: 13, textAlign: 'center' },
   suggestions: { paddingHorizontal: 16, paddingBottom: 8, gap: 6 },
   suggestTitle: { fontFamily: fonts.medium, fontSize: 12 },
   suggestion: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12 },

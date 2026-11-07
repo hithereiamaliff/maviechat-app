@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createFolder, deleteFolder, folderChatsForExport, folderExportName, folderTree, getFolder, markFolderRead, updateFolder, type FolderItem } from './folders';
+import { createFolder, deleteFolder, folderChatsForExport, folderExportName, folderTree, getFolder, listFolderChatsForAll, listSharedFolders, markFolderRead, updateFolder, withSharedFolders, type FolderItem } from './folders';
 import { OwuiClient, type FetchLike } from './http';
 
 function recordingClient(answer: unknown) {
@@ -52,5 +52,32 @@ describe('folders', () => {
     expect(folderExportName('Work')).toBe('folder-Work-export.json');
     expect(folderExportName('a/b: c?')).toBe('folder-a_b_ c_-export.json');
     expect(folderExportName('  ')).toBe('folder-folder-export.json');
+  });
+
+  it('reads folders shared with you: whose, and read or write', async () => {
+    const { client, calls } = recordingClient([
+      { id: 's1', name: 'Team', user_id: 'u2', owner_name: 'Amy', permission: 'write', parent_id: null, created_at: 1, updated_at: 2 },
+      { id: 's2', name: 'Inside', user_id: 'u2', owner_name: 'Amy', permission: 'read', parent_id: 's1', created_at: 1, updated_at: 2 },
+      { nope: true },
+    ]);
+    const shared = await listSharedFolders(client);
+    expect(calls[0]?.url).toBe('https://chat.test/api/v1/folders/shared');
+    expect(shared.map((folder) => [folder.id, folder.owner_name, folder.permission])).toEqual([
+      ['s1', 'Amy', 'write'],
+      ['s2', 'Amy', 'read'],
+    ]);
+    const own: FolderItem[] = [{ id: 'f1', name: 'Mine', created_at: 1, updated_at: 1 }, { id: 's1', name: 'Team', created_at: 1, updated_at: 1 }];
+    const both = withSharedFolders(own, shared);
+    expect(both.map((folder) => folder.id)).toEqual(['f1', 's1', 's2']);
+    expect(folderTree(both).find((node) => node.id === 's1')?.children.map((node) => node.id)).toEqual(['s2']);
+  });
+
+  it('reads a page of a folder’s chats, everyone’s, with what you may do', async () => {
+    const { client, calls } = recordingClient({ chats: [{ id: 'c1', title: 'Hi', user_id: 'u2', owner_name: 'Amy', readonly: true, updated_at: 5, created_at: 1 }, {}], folder_permission: 'read', total: 11, has_more: true });
+    const page = await listFolderChatsForAll(client, 'f 1', 2);
+    expect(calls[0]?.url).toBe('https://chat.test/api/v1/folders/f%201/shared/chats?page=2');
+    expect(page.permission).toBe('read');
+    expect(page.hasMore).toBe(true);
+    expect(page.chats.map((chat) => [chat.id, chat.owner_name, chat.readonly])).toEqual([['c1', 'Amy', true]]);
   });
 });

@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -36,6 +36,10 @@
  * `--notes` asks a model for a note title (one short completion), makes a probe note the app's way (Markdown and the web editor's HTML), finds it, saves it
  * while a socket follows it (the note event and its time), renames, pins, keeps its sharing through
  * a save, and deletes it (src/notes-probe.ts).
+ * `--sharedfolders [--peer-env FILE]` shares an "APP PROBE:" folder with a second account (FILE: its
+ * OWUI_EMAIL and OWUI_PASSWORD; without it, an admin probe makes a throwaway user and deletes it
+ * after), to read then to write, and checks each side's view; all deleted after
+ * (src/shared-folders-probe.ts).
  * `--status` sets your status the app's way (a short name, an emoji kept as itself, cleared) and the
  * web's recent emoji list, each put back as it was (src/status-probe.ts).
  * `--a8` saves settings the app's way and puts them back exactly (src/a8-probe.ts), then tries
@@ -58,6 +62,8 @@ import {
   openSocketSession,
   OwuiClient,
   signIn,
+  addUser,
+  deleteUser,
   signOut,
   type Capabilities,
   type FeatureId,
@@ -82,6 +88,7 @@ import { probeMessages } from './messages-probe';
 import { probeModels } from './models-probe';
 import { probeNotes } from './notes-probe';
 import { probeStatus } from './status-probe';
+import { probeSharedFolders } from './shared-folders-probe';
 import { probeSearch } from './search-probe';
 import { probeNewChat } from './newchat-probe';
 import { probeA8Account } from './a8-account-probe';
@@ -128,6 +135,8 @@ const { values: args } = parseArgs({
     models: { type: 'boolean' },
     notes: { type: 'boolean' },
     status: { type: 'boolean' },
+    sharedfolders: { type: 'boolean' },
+    'peer-env': { type: 'string' },
     a8: { type: 'boolean' },
     m3: { type: 'boolean' },
     m3text: { type: 'boolean' },
@@ -435,6 +444,36 @@ async function main() {
         const modelsProbe = await probeModels({ client, capabilities });
         for (const result of modelsProbe.steps) results.push({ ...result, name: `Models: ${result.name}` });
         fixtures['write.models'] = modelsProbe.fixture;
+      }
+
+      if (args.sharedfolders) {
+        const peerEnv = loadEnvFile(args['peer-env'] ?? '') ?? {};
+        let peerEmail = peerEnv.OWUI_EMAIL;
+        let peerPassword = peerEnv.OWUI_PASSWORD;
+        // With no second account given, an admin probe makes one for this run and deletes it after.
+        let madePeer = '';
+        if ((!peerEmail || !peerPassword) && session.role === 'admin') {
+          const stamp = Date.now().toString(36);
+          peerEmail = `app-probe-peer-${stamp}@maviechat.invalid`;
+          peerPassword = `Probe-${stamp}-${Math.random().toString(36).slice(2, 10)}`;
+          madePeer = (await addUser(client, { name: 'APP PROBE peer', email: peerEmail, password: peerPassword, role: 'user' })).id;
+        }
+        try {
+          if (!peerEmail || !peerPassword) {
+            results.push({ name: 'Shared folders', ok: true, note: 'skipped: give --peer-env (a second account), or run as an admin' });
+          } else {
+            const peerSignIn = await signIn(anonymous, peerEmail, peerPassword);
+            if (peerSignIn.kind !== 'session') {
+              results.push({ name: 'Shared folders', ok: false, note: `the peer's sign-in answered "${peerSignIn.kind}"` });
+            } else {
+              const sharedProbe = await probeSharedFolders({ owner: client, ownerId: session.id, peer: anonymous.withToken(peerSignIn.session.token), peerId: peerSignIn.session.id });
+              for (const result of sharedProbe.steps) results.push({ ...result, name: `Shared folders: ${result.name}` });
+              fixtures['write.shared-folders'] = { ...sharedProbe.fixture, peer: madePeer ? 'made for the run' : 'given' };
+            }
+          }
+        } finally {
+          if (madePeer) await deleteUser(client, madePeer).catch(() => undefined);
+        }
       }
 
       if (args.status) {

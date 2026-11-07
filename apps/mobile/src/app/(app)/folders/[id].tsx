@@ -1,4 +1,4 @@
-import { getFolder, isAtLeast, listFolderChats, listFolders, updateFolder } from '@maviechat/owui-protocol';
+import { getFolder, isAtLeast, listFolderChats, listFolderChatsForAll, listFolders, updateFolder, type FolderChatsPage } from '@maviechat/owui-protocol';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -15,6 +15,7 @@ import { carryOver } from '@/features/chat/drafts';
 import { ModelPicker } from '@/features/chat/ModelPicker';
 import { useModelChoice } from '@/features/chat/useModelChoice';
 import { useSendMessage } from '@/features/chat/useSendMessage';
+import { useSharedFolders } from '@/features/folders/queries';
 import { useFolderActions } from '@/features/folders/useFolderActions';
 import { isUnread } from '@/features/sidebar/rows';
 import { emojiOfName, nameOfEmoji } from '@/lib/emoji';
@@ -34,7 +35,9 @@ const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((
 /**
  * A folder's page, as on the web: its icon (an emoji you pick, shown in the sidebar too), its
  * name (and from 0.12 its description), an input that starts chats inside it with the folder's
- * models, its chats, and its menu. Its picture, if it has one, shows faintly behind.
+ * models, its chats (everyone's: people it's shared with may write in it), and its menu. Its
+ * picture, if it has one, shows faintly behind. A folder shared with you to read shows its chats
+ * only.
  */
 export default function FolderScreen() {
   const palette = usePalette();
@@ -42,17 +45,22 @@ export default function FolderScreen() {
   const queryClient = useQueryClient();
   const params = useLocalSearchParams<{ id: string }>();
   const folderId = Array.isArray(params.id) ? (params.id[0] ?? '') : (params.id ?? '');
-  const { client } = useAuthed();
+  const { client, session } = useAuthed();
   const capabilities = useCapabilities();
   const foldersOn = capabilities?.feature('folders') ?? false;
   const newer = isAtLeast(capabilities?.version, '0.12.0');
   const folders = useQuery({ queryKey: ['folders'], queryFn: () => listFolders(client), enabled: foldersOn });
+  const shared = useSharedFolders(foldersOn);
   const detail = useQuery({ queryKey: ['folder', folderId], queryFn: () => getFolder(client, folderId), enabled: foldersOn && Boolean(folderId) });
+  // Everyone's chats, as the web lists a folder's (else yours alone, where a server lists only those).
   const chats = useInfiniteQuery({
-    queryKey: ['folder-chats', folderId, 'pages'],
-    queryFn: ({ pageParam }) => listFolderChats(client, folderId, pageParam),
+    queryKey: ['folder-chats', folderId, 'everyone'],
+    queryFn: ({ pageParam }): Promise<FolderChatsPage> =>
+      listFolderChatsForAll(client, folderId, pageParam).catch(() =>
+        listFolderChats(client, folderId, pageParam).then((list) => ({ chats: list, permission: 'write' as const, hasMore: list.length >= FOLDER_PAGE_SIZE })),
+      ),
     initialPageParam: 1,
-    getNextPageParam: (last, all) => (last.length >= FOLDER_PAGE_SIZE ? all.length + 1 : undefined),
+    getNextPageParam: (last, all) => (last.hasMore ? all.length + 1 : undefined),
     enabled: foldersOn && Boolean(folderId),
   });
   const folderModelIds = (detail.data?.data?.model_ids ?? []).filter((id): id is string => typeof id === 'string');
@@ -62,14 +70,18 @@ export default function FolderScreen() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [iconOpen, setIconOpen] = useState(false);
 
-  const folder = folders.data?.find((item) => item.id === folderId);
-  const missing = capabilities !== null && (!foldersOn || (folders.isSuccess && !folder));
+  const own = folders.data?.find((item) => item.id === folderId);
+  const sharedFolder = own ? undefined : shared.data?.find((item) => item.id === folderId);
+  const folder = own ?? sharedFolder;
+  const missing = capabilities !== null && (!foldersOn || (folders.isSuccess && shared.isFetched && !folder));
+  // Yours, or shared with you to write in: chats can start here, and it can be changed.
+  const writable = Boolean(own) || sharedFolder?.permission === 'write';
   const draftKey = `folder:${folderId}`;
   const model = choice.model;
   const description = newer && typeof detail.data?.data?.description === 'string' ? detail.data.data.description.trim() : '';
   const backgroundUrl = detail.data?.meta?.background_image_url;
   const background = typeof backgroundUrl === 'string' && backgroundUrl ? backgroundUrl : null;
-  const listed = chats.data?.pages.flat() ?? [];
+  const listed = chats.data?.pages.flatMap((page) => page.chats) ?? [];
   // The web's folder icon: an emoji's short name in `meta.icon` ('' for none).
   const savedIcon = typeof folder?.meta?.icon === 'string' ? folder.meta.icon : '';
   const icon = savedIcon ? emojiOfName(savedIcon) : '';
@@ -139,7 +151,7 @@ export default function FolderScreen() {
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
       <ChatHeader
         title={folder?.name}
-        menu={folder ? folderActions.items({ id: folder.id, name: folder.name }, { newChat: false, onDeleted: () => router.replace('/') }) : undefined}
+        menu={folder && writable ? folderActions.items({ id: folder.id, name: folder.name }, { newChat: false, shared: Boolean(sharedFolder), onDeleted: () => router.replace('/') }) : undefined}
       />
       <View style={styles.screen}>
         {background ? <ChatBackground uri={background} /> : null}
@@ -149,7 +161,7 @@ export default function FolderScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={icon ? `Folder icon ${icon}, change it` : 'Choose a folder icon'}
-                disabled={!folder}
+                disabled={!folder || !writable}
                 onPress={() => setIconOpen(true)}
                 style={({ pressed }) => [styles.icon, { backgroundColor: pressed ? palette.surfaceStrong : palette.surface }]}>
                 {icon ? <Text style={styles.iconEmoji}>{icon}</Text> : <Icon name="folder-open" size={24} color={palette.textMuted} />}
@@ -162,8 +174,14 @@ export default function FolderScreen() {
                   {description}
                 </Text>
               ) : null}
+              {sharedFolder ? (
+                <Text style={[styles.description, { color: palette.textMuted }]}>
+                  {`Shared with you by ${sharedFolder.owner_name || 'someone'}${sharedFolder.permission === 'write' ? '' : ', to read'}.`}
+                </Text>
+              ) : null}
             </View>
 
+            {writable ? (
             <Composer
               floating
               draftKey={draftKey}
@@ -176,6 +194,7 @@ export default function FolderScreen() {
               onStop={() => {}}
               streaming={false}
             />
+            ) : null}
 
             <View style={styles.chats}>
               <Text style={[styles.section, { color: palette.textFaint }]}>Chats</Text>
@@ -193,6 +212,11 @@ export default function FolderScreen() {
                     <Text style={[styles.chatTitle, { color: palette.text }]} numberOfLines={1}>
                       {chat.title || 'New Chat'}
                     </Text>
+                    {chat.user_id && chat.user_id !== session.user.id ? (
+                      <Text style={[styles.date, { color: palette.textFaint }]} numberOfLines={1}>
+                        {`by ${chat.owner_name || 'someone'}`}
+                      </Text>
+                    ) : null}
                     {chat.active ? (
                       <ActivityIndicator size="small" color={palette.textMuted} />
                     ) : isUnread(chat) ? (

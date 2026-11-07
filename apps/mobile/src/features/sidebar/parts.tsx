@@ -99,6 +99,7 @@ export function SidebarChatRow({
   pinned = false,
   mark,
   detail,
+  owner,
   onOpen,
   menu,
 }: {
@@ -112,7 +113,10 @@ export function SidebarChatRow({
   mark?: string;
   /** A line under the title (a search result's matching text). */
   detail?: ReactNode;
+  /** Someone else's chat (in a shared folder): their picture before the title, as on the web. */
+  owner?: { id: string; name: string };
   onOpen: () => void;
+  /** None: no menu (someone else's chat, to read). */
   menu: MenuItem[];
 }) {
   const palette = usePalette();
@@ -122,6 +126,11 @@ export function SidebarChatRow({
       onPress={onOpen}
       style={({ pressed }) => [styles.row, detail ? styles.rowTall : null, { paddingLeft: 12 + depth * 14 }, (current || pressed) && { backgroundColor: palette.sidebarActive }]}>
       {mark ? <View style={[styles.mark, { backgroundColor: mark }]} accessibilityLabel="Linked task status" /> : null}
+      {owner ? (
+        <View accessible accessibilityLabel={`${owner.name || 'Someone'}’s chat`}>
+          <UserAvatar name={owner.name || '?'} picture={`/api/v1/users/${encodeURIComponent(owner.id)}/profile/image`} size={16} />
+        </View>
+      ) : null}
       {detail ? (
         <View style={styles.titleBlock}>
           <Text style={[styles.titleText, { color: palette.text }]} numberOfLines={1}>
@@ -142,7 +151,7 @@ export function SidebarChatRow({
         <View style={[styles.dot, { backgroundColor: palette.unread }]} accessibilityLabel="Unread" />
       ) : null}
       {pinned ? <Icon name="bookmark" size={14} color={palette.textFaint} /> : null}
-      <MenuButton items={menu} label={`Options for ${title}`} size={18} color={palette.textMuted} />
+      {menu.length ? <MenuButton items={menu} label={`Options for ${title}`} size={18} color={palette.textMuted} /> : <View style={styles.noMenu} />}
     </Pressable>
   );
 }
@@ -220,6 +229,7 @@ const styles = StyleSheet.create({
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 6 },
   user: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8 },
   userText: { flex: 1 },
+  noMenu: { width: 36 },
   userName: { fontFamily: fonts.medium, fontSize: 15 },
   userStatus: { fontFamily: fonts.regular, fontSize: 12, marginTop: 1 },
   online: { position: 'absolute', right: -1, bottom: -1, width: 11, height: 11, borderRadius: 6, borderWidth: 2 },

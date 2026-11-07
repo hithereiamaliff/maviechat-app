@@ -3,8 +3,9 @@ import {
   CHAT_PAGE_SIZE,
   createNote,
   folderTree,
+  withSharedFolders,
+  type FolderChat,
   listChats,
-  listFolderChats,
   listFolders,
   listPinnedChats,
   noteTitle,
@@ -30,6 +31,7 @@ import { MenuButton, type MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
 import { useAccountsSheet, useOwuiAccountSignOut } from '@/features/accounts/AccountsSheet';
 import { statusLine, useSetStatus, useStatusSheet } from '@/features/sidebar/StatusSheet';
+import { folderChatsFirstPage, useSharedFolders } from '@/features/folders/queries';
 import { emojiOfName } from '@/lib/emoji';
 import { ModelAvatar } from '@/features/chat/ModelAvatar';
 import { usePinnedModels } from '@/features/chat/usePinnedModels';
@@ -100,6 +102,12 @@ export function Sidebar() {
   });
   const pinned = useQuery({ queryKey: ['chats', 'pinned'], queryFn: () => listPinnedChats(client) });
   const folders = useQuery({ queryKey: ['folders'], queryFn: () => listFolders(client), enabled: foldersOn });
+  // Folders other people share with you sit in the same tree, as on the web.
+  const shared = useSharedFolders(foldersOn);
+  const sharedById = useMemo(() => {
+    const own = new Set((folders.data ?? []).map((folder) => folder.id));
+    return new Map((shared.data ?? []).filter((folder) => !own.has(folder.id)).map((folder) => [folder.id, folder]));
+  }, [folders.data, shared.data]);
   // The server answers a page of 60 at a time; more come as you scroll, as on the web.
   const results = useInfiniteQuery({
     queryKey: ['chats', 'search', query],
@@ -123,7 +131,7 @@ export function Sidebar() {
     if (sidebar.isOpen) void queryClient.invalidateQueries({ queryKey: ['chats'] });
   }, [sidebar.isOpen, queryClient]);
 
-  const tree = useMemo(() => folderTree(folders.data ?? []), [folders.data]);
+  const tree = useMemo(() => folderTree(withSharedFolders(folders.data ?? [], [...sharedById.values()])), [folders.data, sharedById]);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const isExpanded = (folder: FolderNode) => expanded[folder.id] ?? folder.is_expanded ?? false;
   const folderActions = useFolderActions({
@@ -147,7 +155,8 @@ export function Sidebar() {
     return ids;
   }, [tree, expanded]);
   const folderChats = useQueries({
-    queries: openFolderIds.map((id) => ({ queryKey: ['folder-chats', id], queryFn: () => listFolderChats(client, id) })),
+    // Everyone's chats in the folder (people you share it with may write in it too), as the web lists them.
+    queries: openFolderIds.map((id) => ({ queryKey: ['folder-chats', id], queryFn: () => folderChatsFirstPage(client, id) })),
   });
 
   const rows = useMemo(
@@ -188,7 +197,8 @@ export function Sidebar() {
   const toggleFolder = (folder: FolderNode) => {
     const next = !isExpanded(folder);
     setExpanded((state) => ({ ...state, [folder.id]: next }));
-    setFolderExpanded(client, folder.id, next).catch(() => {});
+    // Open or closed is kept on the server for your own folders; a shared one's is the owner's to keep.
+    if (!sharedById.has(folder.id)) setFolderExpanded(client, folder.id, next).catch(() => {});
   };
   const openFolder = (folder: FolderNode) => {
     sidebar.close();
@@ -367,12 +377,22 @@ export function Sidebar() {
             />
           </Pressable>
         );
-      case 'folder':
+      case 'folder': {
         // As on the web: the row opens the folder's page, the chevron opens or closes it here.
+        const sharedFolder = sharedById.get(item.folder.id);
+        const folderMenu = !sharedFolder
+          ? folderActions.items(item.folder, {
+              onDeleted: () => {
+                if (item.folder.id === currentFolderId) router.replace('/');
+              },
+            })
+          : sharedFolder.permission === 'write'
+            ? folderActions.items(item.folder, { shared: true })
+            : [];
         return (
           <Pressable
             accessibilityRole="button"
-            accessibilityHint="Opens the folder"
+            accessibilityHint={sharedFolder ? `Opens the folder ${sharedFolder.owner_name || 'someone'} shares with you${sharedFolder.permission === 'read' ? ', to read' : ''}` : 'Opens the folder'}
             onPress={() => openFolder(item.folder)}
             style={({ pressed }) => [
               styles.row,
@@ -396,22 +416,18 @@ export function Sidebar() {
             <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
               {item.folder.name}
             </Text>
-            {item.folder.unread_count ? (
+            {sharedFolder ? <Icon name="users" size={13} color={palette.textFaint} /> : null}
+            {!sharedFolder && item.folder.unread_count ? (
               <Text style={[styles.badge, { backgroundColor: palette.surfaceStrong, color: palette.textMuted }]}>{item.folder.unread_count}</Text>
             ) : null}
-            <MenuButton
-              items={folderActions.items(item.folder, {
-                onDeleted: () => {
-                  if (item.folder.id === currentFolderId) router.replace('/');
-                },
-              })}
-              label={`Options for ${item.folder.name}`}
-              size={18}
-              color={palette.textMuted}
-            />
+            {folderMenu.length ? <MenuButton items={folderMenu} label={`Options for ${item.folder.name}`} size={18} color={palette.textMuted} /> : <View style={styles.noMenu} />}
           </Pressable>
         );
-      case 'chat':
+      }
+      case 'chat': {
+        // Someone else's chat (in a folder shared with you, or one you share): theirs to change, yours to read.
+        const owner = (item.chat as FolderChat).user_id;
+        const theirs = typeof owner === 'string' && owner !== '' && owner !== session.user.id;
         return (
           <SidebarChatRow
             title={item.chat.title || 'New Chat'}
@@ -421,8 +437,9 @@ export function Sidebar() {
             pinned={item.pinned}
             current={item.chat.id === currentChatId}
             detail={item.found ? <SearchSnippet chatId={item.chat.id} snippet={item.chat.snippet} search={query} /> : undefined}
+            owner={theirs ? { id: owner, name: (item.chat as FolderChat).owner_name ?? '' } : undefined}
             onOpen={() => openChat(item.chat.id)}
-            menu={[
+            menu={theirs ? [] : [
               { key: 'rename', label: 'Rename', icon: 'pencil', onPress: () => actions.rename(item.chat) },
               { key: 'unread', label: 'Mark as unread', icon: 'envelope', onPress: () => actions.markUnread(item.chat) },
               {
@@ -460,6 +477,7 @@ export function Sidebar() {
             ]}
           />
         );
+      }
     }
   };
 
@@ -518,4 +536,5 @@ const styles = StyleSheet.create({
   modelRow: { paddingLeft: 12, gap: 10 },
   badge: { overflow: 'hidden', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, fontFamily: fonts.medium, fontSize: 11, marginRight: 8 },
   folderEmoji: { fontSize: 15, width: 17, textAlign: 'center' },
+  noMenu: { width: 36 },
 });
