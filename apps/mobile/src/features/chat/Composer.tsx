@@ -23,9 +23,10 @@ import {
 } from '@maviechat/owui-protocol';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useImperativeHandle, useRef, useState, type ComponentRef, type Ref } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
+import { SideScroll } from '@/components/SideScroll';
 import { showPrompt } from '@/components/dialogs';
 import { useAnchoredMenu, type MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
@@ -391,7 +392,7 @@ export function Composer({
               <Icon name="puzzle-piece" size={17} color={palette.textMuted} />
             </Pressable>
           ) : null}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chips} contentContainerStyle={styles.chipsContent}>
+          <SideScroll showsHorizontalScrollIndicator={false} style={styles.chips} contentContainerStyle={styles.chipsContent}>
             {chipKeys.map((key) => (
               <Pressable
                 key={key}
@@ -427,7 +428,7 @@ export function Composer({
                 ) : null}
               </Pressable>
             ) : null}
-          </ScrollView>
+          </SideScroll>
           {knobModels.length ? (
             <Pressable accessibilityRole="button" accessibilityLabel="Model controls" onPress={() => setKnobsOpen(true)} hitSlop={6} style={styles.knobs}>
               <Icon name="adjustments-vertical" size={16} color={palette.textMuted} />

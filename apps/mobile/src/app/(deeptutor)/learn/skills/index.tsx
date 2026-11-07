@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { SideScroll } from '@/components/SideScroll';
 import { useToast } from '@/components/Toast';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { ResourceEditor, type ResourceDraft } from '@/features/deeptutor/personalization/ResourceEditor';
@@ -118,7 +119,7 @@ export default function Skills() {
         <Text style={[styles.intro, { color: palette.textMuted }]}>Playbooks the model opens when a chat needs one. They’re yours in every workspace; a workspace’s settings choose which its chats may use.</Text>
         <Button label="New Skill" onPress={() => setEditing('')} />
         {list.length ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+          <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
             {filters.map((item) => {
               const on = sameFilter(item.filter, shownFilter);
               return (
@@ -132,7 +133,7 @@ export default function Skills() {
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </SideScroll>
         ) : null}
         {skills.isLoading ? <ActivityIndicator style={styles.loading} color={palette.textMuted} /> : null}
         {skills.isError ? <Text style={[styles.empty, { color: palette.textMuted }]}>{`Couldn’t load your skills: ${describeError(skills.error)}`}</Text> : null}

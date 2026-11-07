@@ -7,6 +7,7 @@ import { memo, useContext, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { Modal } from '@/components/Modal';
+import { SideScroll } from '@/components/SideScroll';
 import { describeError } from '@/lib/errors';
 import { fonts, radius, usePalette, useSyntaxColors, type Palette, type SyntaxColors } from '@/theme';
 import { ArtifactsContext } from './ArtifactsContext';
@@ -124,7 +125,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, title, complete =
           <WebFrame html={diagram} initialHeight={200} />
         </View>
       ) : diff ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.diffScroll}>
+        <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.diffScroll}>
           <View style={styles.diffLines}>
             {shown.map((line, index) => {
               const kind = diffLineKind(line.map((span) => span.text).join(''));
@@ -135,9 +136,9 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, title, complete =
               );
             })}
           </View>
-        </ScrollView>
+        </SideScroll>
       ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+        <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
           <Text selectable style={[styles.code, { color: palette.text }]}>
             {shown.map((line, index) => (
               <Text key={index}>
@@ -146,7 +147,7 @@ export const CodeBlock = memo(function CodeBlock({ code, lang, title, complete =
               </Text>
             ))}
           </Text>
-        </ScrollView>
+        </SideScroll>
       )}
       {!collapsed && (running || run) ? (
         <View style={[styles.output, { borderTopColor: palette.border }]}>

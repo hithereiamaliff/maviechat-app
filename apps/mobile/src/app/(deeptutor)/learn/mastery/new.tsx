@@ -15,6 +15,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { SideScroll } from '@/components/SideScroll';
 import { useToast } from '@/components/Toast';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { useStartPathChat } from '@/features/deeptutor/learning/pathChat';
@@ -149,7 +150,7 @@ export default function NewMasteryPath() {
           <View style={styles.screen}>
             <View style={styles.pickerTop}>
               <Text style={[styles.note, { color: palette.textMuted }]}>Anything the tutor should read while it designs the outline. You can pick none.</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} keyboardShouldPersistTaps="handled">
+              <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} keyboardShouldPersistTaps="handled">
                 {TABS.map((item) => {
                   const on = item.key === tab;
                   const count = picked.filter((choice) => choice.tab === item.key).length;
@@ -164,7 +165,7 @@ export default function NewMasteryPath() {
                     </Pressable>
                   );
                 })}
-              </ScrollView>
+              </SideScroll>
               <View style={[styles.search, { backgroundColor: palette.surface, borderColor: palette.border }]}>
                 <Icon name="magnifying-glass" size={16} color={palette.textMuted} />
                 <TextInput

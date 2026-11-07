@@ -141,20 +141,21 @@ export function modelFormOf(model: WorkspaceModel): ModelForm {
   return { id: model.id, baseModelId: model.baseModelId ?? '', name: model.name, meta: { ...model.meta }, params: { ...model.params }, isActive: model.isActive };
 }
 
-function formBody(form: ModelForm): Tree {
+/** What a save sends for the model (the editor's JSON preview shows it). */
+export function modelFormBody(form: ModelForm): Tree {
   const body: Tree = { id: form.id, base_model_id: form.baseModelId || null, name: form.name.trim(), meta: pruneEmpty(form.meta), params: pruneEmpty(form.params), is_active: form.isActive };
   if (form.accessGrants !== undefined) body.access_grants = form.accessGrants;
   return body;
 }
 
 export async function createWorkspaceModel(client: OwuiClient, form: ModelForm): Promise<WorkspaceModel> {
-  const model = modelOf(await client.post<unknown>(`${base}/create`, formBody({ ...form, accessGrants: form.accessGrants ?? [] })));
+  const model = modelOf(await client.post<unknown>(`${base}/create`, modelFormBody({ ...form, accessGrants: form.accessGrants ?? [] })));
   if (!model) throw new Error('Open WebUI did not describe the new model');
   return model;
 }
 
 export async function updateWorkspaceModel(client: OwuiClient, form: ModelForm): Promise<WorkspaceModel> {
-  const model = modelOf(await client.post<unknown>(`${base}/model/update`, formBody(form)));
+  const model = modelOf(await client.post<unknown>(`${base}/model/update`, modelFormBody(form)));
   if (!model) throw new Error('Open WebUI did not describe the model');
   return model;
 }
@@ -170,6 +171,23 @@ export async function toggleWorkspaceModel(client: OwuiClient, id: string): Prom
 export async function setWorkspaceModelHidden(client: OwuiClient, id: string, hidden: boolean): Promise<WorkspaceModel> {
   const model = await getWorkspaceModel(client, id);
   return updateWorkspaceModel(client, { ...modelFormOf(model), meta: { ...model.meta, hidden } });
+}
+
+/** Switches a model on or off for everyone, read first so it only flips when it isn't already so. */
+export async function setWorkspaceModelActive(client: OwuiClient, id: string, on: boolean): Promise<void> {
+  const model = await getWorkspaceModel(client, id);
+  if (model.isActive !== on) await toggleWorkspaceModel(client, id);
+}
+
+/** Every model the list's search, view and tag find, page after page, as the web's "… All" actions gather them. */
+export async function listAllWorkspaceModels(client: OwuiClient, query: Omit<WorkspaceListQuery, 'page'> = {}): Promise<WorkspaceModel[]> {
+  const all: WorkspaceModel[] = [];
+  for (let page = 1; page <= 200; page += 1) {
+    const batch = await listWorkspaceModels(client, { ...query, page });
+    all.push(...batch.items);
+    if (!batch.items.length || all.length >= batch.total) break;
+  }
+  return all;
 }
 
 export async function deleteWorkspaceModel(client: OwuiClient, id: string): Promise<void> {
@@ -200,4 +218,47 @@ export function promptVariables(system: string): { chat: string[]; user: string[
   const user = new Set<string>();
   for (const match of system.matchAll(/\{\{\s*(chat|user)\.variables\.([a-z0-9_]+)/gi)) (match[1]?.toLowerCase() === 'chat' ? chat : user).add(match[2] ?? '');
   return { chat: [...chat].filter(Boolean), user: [...user].filter(Boolean) };
+}
+
+/** One model from an import file, made or changed the way the web's Workspace → Import JSON does it. */
+export interface ModelImport {
+  id: string;
+  name: string;
+  /**
+   * An older export's `{id, info}` for a model you have already: that model is changed to it (its
+   * sharing kept). Anything else is made as a new model, private until you share it.
+   */
+  update: boolean;
+  form: ModelForm;
+}
+
+/**
+ * Models from an exported JSON file, one or a list: the web's and the app's exports (rows with an
+ * id and a name), and older exports whose rows carry the model in `info` (which change a model of
+ * the same id that you have, in `existing`, and make the rest). New ones are made private, as the
+ * app's other imports are, where the web would keep the file's sharing. Entries without an id or
+ * a name are left out.
+ */
+export function modelsFromImport(json: unknown, existing: ReadonlySet<string>): { models: ModelImport[]; skipped: number } {
+  let skipped = 0;
+  const models = (Array.isArray(json) ? json : [json]).flatMap((raw): ModelImport[] => {
+    const item = record(raw);
+    const wrapped = typeof item.info === 'object' && item.info !== null && !Array.isArray(item.info);
+    const row = wrapped ? record(item.info) : item;
+    const id = (text(row.id) || text(item.id)).trim();
+    const name = (text(row.name) || text(item.name)).trim();
+    if (!id || !name) {
+      skipped += 1;
+      return [];
+    }
+    const update = wrapped && existing.has(id);
+    const form: ModelForm = { id, baseModelId: text(row.base_model_id), name, meta: record(row.meta), params: record(row.params), isActive: row.is_active !== false };
+    return [{ id, name, update, form: update ? form : { ...form, accessGrants: [] } }];
+  });
+  return { models, skipped };
+}
+
+/** Makes or changes one imported model. */
+export async function importWorkspaceModel(client: OwuiClient, item: ModelImport): Promise<WorkspaceModel> {
+  return item.update ? updateWorkspaceModel(client, item.form) : createWorkspaceModel(client, item.form);
 }

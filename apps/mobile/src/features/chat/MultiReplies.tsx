@@ -1,8 +1,8 @@
 import { type HistoryMessage, type MergedResponse, type ReplyGroup } from '@maviechat/owui-protocol';
 import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { ScrollView as GestureScrollView } from 'react-native-gesture-handler';
+import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View, type ScrollView } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { SideScroll } from '@/components/SideScroll';
 import { Markdown } from '@/markdown/Markdown';
 import { fonts, radius, usePalette } from '@/theme';
 
@@ -33,7 +33,7 @@ interface MultiRepliesProps {
 export function MultiReplies({ groups, replyId, messages, labelOf, tabs, renderReply, onSelect, merged, onMerge, merging, baseUrl, token }: MultiRepliesProps) {
   const palette = usePalette();
   const selected = Math.max(0, groups.findIndex((group) => group.shownId === replyId));
-  const pager = useRef<ComponentRef<typeof GestureScrollView>>(null);
+  const pager = useRef<ComponentRef<typeof ScrollView>>(null);
   // Until the pager has measured itself: the screen less the chat's side margins.
   const { width: screenWidth } = useWindowDimensions();
   const [measured, setMeasured] = useState(0);
@@ -64,7 +64,7 @@ export function MultiReplies({ groups, replyId, messages, labelOf, tabs, renderR
     <View style={styles.wrap}>
       {tabs ? (
         <>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabs, { borderBottomColor: palette.border }]}>
+          <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabs, { borderBottomColor: palette.border }]}>
             {groups.map((group, index) => {
               const message = messages[group.shownId];
               const on = index === selected;
@@ -81,14 +81,13 @@ export function MultiReplies({ groups, replyId, messages, labelOf, tabs, renderR
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </SideScroll>
           {current && currentMessage ? renderReply(currentMessage, current) : null}
         </>
       ) : (
         <>
-          <GestureScrollView
+          <SideScroll
             ref={pager}
-            horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
             contentOffset={{ x: selected * width, y: 0 }}
@@ -118,7 +117,7 @@ export function MultiReplies({ groups, replyId, messages, labelOf, tabs, renderR
                 </View>
               );
             })}
-          </GestureScrollView>
+          </SideScroll>
           {groups.length > 1 ? (
             <View style={styles.dots} accessibilityLabel={`Answer ${page + 1} of ${groups.length}`}>
               {groups.map((group, index) => (

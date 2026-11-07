@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { Modal } from '@/components/Modal';
+import { SideScroll } from '@/components/SideScroll';
 import { fonts, radius, usePalette } from '@/theme';
 import { parsePatch, splitPath, type PatchLine } from './patch';
 
@@ -123,13 +124,13 @@ function FileChanges({ file, open, onToggle }: { file: FileDiff; open: boolean; 
       {open && !file.patch ? <Text style={[styles.note, { color: palette.textMuted }]}>This change is too large to show line by line.</Text> : null}
       {open && file.patch ? (
         <>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.patchScroll}>
+          <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.patchScroll}>
             <View style={styles.patch}>
               {shown.map((line, index) => (
                 <PatchRow key={index} line={line} />
               ))}
             </View>
-          </ScrollView>
+          </SideScroll>
           {lines.length > shown.length ? (
             <Pressable accessibilityRole="button" onPress={() => setAll(true)} style={({ pressed }) => [styles.more, pressed && { backgroundColor: palette.surface }]}>
               <Text style={[styles.moreText, { color: palette.link }]}>Show all {lines.length} lines</Text>

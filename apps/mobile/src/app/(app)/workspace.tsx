@@ -1,6 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SideScroll } from '@/components/SideScroll';
 import { ChatHeader } from '@/features/chat/ChatHeader';
 import { KnowledgeTab } from '@/features/workspace/KnowledgeTab';
 import { ModelsTab } from '@/features/workspace/ModelsTab';
@@ -31,7 +32,7 @@ export default function Workspace() {
   const [picked, setPicked] = useState<Area | null>(null);
   const area = allowed.find((item) => item.key === picked)?.key ?? allowed[0]?.key ?? null;
   const tabs = (count?: number) => (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} accessibilityRole="tablist">
+    <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} accessibilityRole="tablist">
       {allowed.map((item) => {
         const on = item.key === area;
         return (
@@ -40,7 +41,7 @@ export default function Workspace() {
           </Pressable>
         );
       })}
-    </ScrollView>
+    </SideScroll>
   );
   const openWeb = () => void WebBrowser.openBrowserAsync(`${session.baseUrl}/workspace${area ? `/${area}` : ''}`);
 

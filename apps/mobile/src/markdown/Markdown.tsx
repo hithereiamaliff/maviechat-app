@@ -16,8 +16,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { Image } from 'expo-image';
 import { memo, useContext, useMemo, type ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, useColorScheme, View, type TextStyle } from 'react-native';
+import { Pressable, StyleSheet, Text, useColorScheme, View, type TextStyle } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
+import { SideScroll } from '@/components/SideScroll';
 import { useToast } from '@/components/Toast';
 import { shareFile } from '@/features/settings/exportFile';
 import { describeError } from '@/lib/errors';
@@ -243,7 +244,7 @@ function renderTable(table: Tokens.Table, key: string, context: Context): ReactN
   };
   return (
     <View key={key} style={styles.tableWrap}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <SideScroll showsHorizontalScrollIndicator={false}>
         <View style={[styles.table, { borderColor: palette.border }]}>
           <View style={[styles.tableRow, { backgroundColor: palette.surface, borderColor: palette.border }, table.rows.length === 0 && styles.lastRow]}>
             {table.header.map((cell, index) => (
@@ -262,7 +263,7 @@ function renderTable(table: Tokens.Table, key: string, context: Context): ReactN
             </View>
           ))}
         </View>
-      </ScrollView>
+      </SideScroll>
       <View style={styles.tableActions}>
         <SmallAction icon="clipboard-document" label="Copy" accessibilityLabel="Copy the table" color={palette.textMuted} onPress={() => context.copy(table.raw.trim())} />
         <SmallAction

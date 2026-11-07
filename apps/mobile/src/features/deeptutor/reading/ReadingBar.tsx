@@ -1,7 +1,8 @@
 import { clock } from '@maviechat/deeptutor-protocol';
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { SideScroll } from '@/components/SideScroll';
 import { useDtCollection, useDtMaterial } from '@/features/deeptutor/queries';
 import { fonts, radius, usePalette } from '@/theme';
 import { unitName } from './labels';
@@ -50,7 +51,7 @@ export function ReadingBar({ collectionId, materialId, cited, times = [] }: { co
         {missing ? null : <Icon name="chevron-right" size={14} color={palette.textFaint} />}
       </Pressable>
       {(cited.length || times.length) && current ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           <Text style={[styles.sub, { color: palette.textMuted }]}>Cited:</Text>
           {times.slice(0, 12).map((seconds) => (
             <Pressable
@@ -67,7 +68,7 @@ export function ReadingBar({ collectionId, materialId, cited, times = [] }: { co
               <Text style={[styles.chipText, { color: palette.link }]}>{`${unit === 'Page' ? 'p.' : `${unit} `}${locator}`}</Text>
             </Pressable>
           ))}
-        </ScrollView>
+        </SideScroll>
       ) : null}
       {place?.selection ? (
         <View style={[styles.passage, { backgroundColor: palette.surface }]}>

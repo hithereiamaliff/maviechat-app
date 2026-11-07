@@ -1,17 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import { OwuiClient, type FetchLike } from './http';
+import { customParamsOf, withCustomParams } from './params';
 import {
   builtinToolsMeta,
   builtinToolsOf,
   capabilitiesOf,
-  customParamsOf,
   defaultFeaturesOf,
   functionChoices,
   knowledgeMeta,
   knowledgeRefFrom,
   knowledgeRefsOf,
+  listServerVoices,
   modelParamsToSave,
   suggestionsMeta,
   suggestionsOf,
+  terminalIdOf,
+  ttsVoiceOf,
+  voiceSuggestions,
+  withTerminalAndVoice,
 } from './workspaceModelEditor';
 
 describe('the rest of a workspace model', () => {
@@ -64,5 +70,36 @@ describe('the rest of a workspace model', () => {
       { name: 'obj', value: '{"a":1}' },
     ]);
     expect(modelParamsToSave({ temperature: 0.2, stop: '</s>, END', seed: null, system: 'x' }, [{ name: ' mirostat_x ', value: '1' }, { name: '', value: 'ignored' }])).toEqual({ temperature: 0.2, stop: ['</s>', 'END'], system: 'x', custom_params: { mirostat_x: '1' } });
+  });
+
+  it('keeps custom parameters for a chat or your settings, by name, and drops them when none is named', () => {
+    expect(customParamsOf(null)).toEqual([]);
+    expect(customParamsOf({ custom_params: ['not', 'a', 'map'] })).toEqual([]);
+    const params = withCustomParams({ temperature: 1, custom_params: { old: '1' } }, [{ name: ' top_a ', value: '0.1' }, { name: 'top_a', value: '0.2' }, { name: ' ', value: 'x' }]);
+    expect(params).toEqual({ temperature: 1, custom_params: { top_a: '0.2' } });
+    expect(withCustomParams(params, [{ name: '', value: 'unnamed' }])).toEqual({ temperature: 1 });
+  });
+
+  it('saves the terminal and the voice as the web does: left out when empty, other speech settings kept', () => {
+    const meta = { description: 'd', terminalId: 'box', tts: { voice: 'alloy', speed: 1.2 } };
+    expect(terminalIdOf(meta)).toBe('box');
+    expect(ttsVoiceOf(meta)).toBe('alloy');
+    expect(withTerminalAndVoice(meta, ' ', '')).toEqual({ description: 'd', tts: { speed: 1.2 } });
+    expect(withTerminalAndVoice({ tts: { voice: 'alloy' } }, '', '')).toEqual({});
+    expect(withTerminalAndVoice({}, ' work ', ' nova ')).toEqual({ terminalId: 'work', tts: { voice: 'nova' } });
+    expect(terminalIdOf({})).toBe('');
+    expect(ttsVoiceOf({ tts: 'odd' })).toBe('');
+  });
+
+  it('lists the server’s voices and suggests the ones matching what’s typed', async () => {
+    const fetch: FetchLike = async () => new Response(JSON.stringify({ voices: [{ id: 'alloy', name: 'Alloy' }, { id: 'nova' }, { name: 'no id' }] }), { status: 200 });
+    const voices = await listServerVoices(new OwuiClient({ baseUrl: 'https://chat.test', token: 't', fetch }));
+    expect(voices).toEqual([
+      { id: 'alloy', name: 'Alloy' },
+      { id: 'nova', name: 'nova' },
+    ]);
+    expect(voiceSuggestions(voices, 'ALL')).toEqual([{ id: 'alloy', name: 'Alloy' }]);
+    expect(voiceSuggestions(voices, '')).toHaveLength(2);
+    expect(voiceSuggestions(voices, '', 1)).toHaveLength(1);
   });
 });

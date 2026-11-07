@@ -1,7 +1,8 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Button } from '@/components/Button';
+import { SideScroll } from '@/components/SideScroll';
 import { describeError } from '@/lib/errors';
 import { fonts, radius, usePalette } from '@/theme';
 
@@ -68,7 +69,7 @@ export function CatalogBrowser<T extends { id: string }>({
         style={[styles.search, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]}
       />
       {categories.length ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
+        <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
           {[['', -1] as const, ...categories].map(([key, count]) => {
             const on = category === key;
             return (
@@ -82,7 +83,7 @@ export function CatalogBrowser<T extends { id: string }>({
               </Pressable>
             );
           })}
-        </ScrollView>
+        </SideScroll>
       ) : null}
       {toggle ? (
         <View style={styles.toggle}>

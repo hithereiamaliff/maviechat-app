@@ -17,6 +17,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
+import { SideScroll } from '@/components/SideScroll';
 import { useToast } from '@/components/Toast';
 import { useDtBlockTypes, useDtEstimateBasis } from '@/features/deeptutor/queries';
 import { useDtAuthed } from '@/session/DeepTutorProvider';
@@ -55,7 +56,7 @@ function ChapterCard({
         <IconButton icon="trash" label={`Remove chapter ${number}`} size={18} onPress={onRemove} />
       </View>
       <TextInput value={draft.title} onChangeText={(title) => onChange({ title })} placeholder="Chapter title" placeholderTextColor={palette.textFaint} style={input} accessibilityLabel={`Chapter ${number} title`} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
+      <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
         {DT_CHAPTER_TYPES.map((type) => {
           const on = draft.contentType === type;
           return (
@@ -70,7 +71,7 @@ function ChapterCard({
             </Pressable>
           );
         })}
-      </ScrollView>
+      </SideScroll>
       <Text style={[styles.hint, { color: palette.textFaint }]}>{CHAPTER_TYPE_LABELS[draft.contentType as DtChapterType]?.hint ?? ''}</Text>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} style={styles.more} hitSlop={6}>
         <Text style={[styles.moreText, { color: palette.link }]}>{open ? 'Hide summary and objectives' : `Summary and objectives${draft.objectives.filter((line) => line.trim()).length ? ` · ${draft.objectives.filter((line) => line.trim()).length}` : ''}`}</Text>

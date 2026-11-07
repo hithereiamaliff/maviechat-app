@@ -1,7 +1,8 @@
 import { attachmentUrl, isImageItem, type FileItem } from '@maviechat/owui-protocol';
 import { Image } from 'expo-image';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { SideScroll } from '@/components/SideScroll';
 import { fonts, radius, usePalette } from '@/theme';
 
 function size(bytes: number | undefined): string {
@@ -32,7 +33,7 @@ export function AttachmentStrip({
   if (files.length === 0) return null;
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} keyboardShouldPersistTaps="handled">
+    <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} keyboardShouldPersistTaps="handled">
       {files.map((file, index) => {
         const uploading = file.status === 'uploading';
         const preview = (file.itemId && previews[file.itemId]) || attachmentUrl(file, baseUrl);
@@ -90,7 +91,7 @@ export function AttachmentStrip({
           </Pressable>
         );
       })}
-    </ScrollView>
+    </SideScroll>
   );
 }
 

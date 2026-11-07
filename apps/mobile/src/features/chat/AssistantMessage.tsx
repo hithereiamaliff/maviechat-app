@@ -19,11 +19,12 @@ import {
 } from '@maviechat/owui-protocol';
 import { Image } from 'expo-image';
 import { memo, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { MenuButton, type MenuItem } from '@/components/Menu';
 import { ReadAloudButton } from '@/components/ReadAloudButton';
+import { SideScroll } from '@/components/SideScroll';
 import { useToast } from '@/components/Toast';
 import { showPrompt } from '@/components/dialogs';
 import { useCapabilities, useUserSettings } from '@/lib/server';
@@ -256,7 +257,7 @@ export const AssistantMessage = memo(function AssistantMessage({
 
       {showActions && !streaming ? (
         // The web's order; on a narrow phone the row scrolls sideways.
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.actionsScroll} contentContainerStyle={styles.actions}>
+        <SideScroll showsHorizontalScrollIndicator={false} style={styles.actionsScroll} contentContainerStyle={styles.actions}>
           <BranchNav index={branch.index} count={branch.count} onStep={onStep} />
           {onEdit ? <IconButton icon="pencil" label="Edit" size={18} color={palette.textMuted} onPress={onEdit} /> : null}
           <IconButton
@@ -330,7 +331,7 @@ export const AssistantMessage = memo(function AssistantMessage({
               ))
             : null}
           {onDelete ? <IconButton icon="trash" label="Delete" size={18} color={palette.textMuted} onPress={onDelete} /> : null}
-        </ScrollView>
+        </SideScroll>
       ) : null}
 
       {onQuote ? <SelectTextSheet text={plainText(blocks)} visible={selecting} onClose={() => setSelecting(false)} onPrompt={onQuote} /> : null}

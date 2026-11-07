@@ -9,8 +9,13 @@ import {
   paramsFor,
   searchKnowledgeBases,
   searchKnowledgeFiles,
+  terminalLabel,
+  voiceSuggestions,
+  type CustomParam,
   type KnowledgeRef,
+  type ServerVoice,
   type SuggestedPrompt,
+  type TerminalServer,
   type WorkspaceCapability,
 } from '@maviechat/owui-protocol';
 import { useQuery } from '@tanstack/react-query';
@@ -18,6 +23,7 @@ import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { Modal } from '@/components/Modal';
+import { CustomParams } from '@/features/chat/controls/CustomParams';
 import { ParamRow } from '@/features/chat/controls/ParamRow';
 import { useDebounced } from '@/lib/useDebounced';
 import { useAuthed, useTools } from '@/lib/server';
@@ -57,8 +63,7 @@ function SwitchRow({ label, note, value, disabled, onChange }: { label: string; 
 }
 
 /** Its parameters (Default, or a value of its own) and custom ones by name. */
-export function ParamsSection({ params, setParams, custom, setCustom, readOnly }: { params: Record<string, unknown>; setParams: Setter<Record<string, unknown>>; custom: { name: string; value: string }[]; setCustom: Setter<{ name: string; value: string }[]>; readOnly: boolean }) {
-  const palette = usePalette();
+export function ParamsSection({ params, setParams, custom, setCustom, readOnly }: { params: Record<string, unknown>; setParams: Setter<Record<string, unknown>>; custom: CustomParam[]; setCustom: Setter<CustomParam[]>; readOnly: boolean }) {
   return (
     <Section title="Parameters" note="Left at Default, a chat uses the user’s or the server’s.">
       <View pointerEvents={readOnly ? 'none' : 'auto'} style={styles.gap}>
@@ -75,22 +80,7 @@ export function ParamsSection({ params, setParams, custom, setCustom, readOnly }
             }}
           />
         ))}
-        <Text style={[styles.label, { color: palette.text }]}>Custom parameters</Text>
-        <Text style={[styles.note, { color: palette.textMuted }]}>Sent to the model as they are; JSON is read where it’s valid.</Text>
-        {custom.map((item, index) => (
-          <View key={index} style={styles.customRow}>
-            <TextInput value={item.name} onChangeText={(name) => setCustom(custom.map((row, i) => (i === index ? { ...row, name } : row)))} placeholder="name" placeholderTextColor={palette.textFaint} autoCapitalize="none" autoCorrect={false} accessibilityLabel="Parameter name" style={[styles.input, styles.flex, styles.mono, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]} />
-            <TextInput value={item.value} onChangeText={(value) => setCustom(custom.map((row, i) => (i === index ? { ...row, value } : row)))} placeholder="value" placeholderTextColor={palette.textFaint} autoCapitalize="none" autoCorrect={false} accessibilityLabel="Parameter value" style={[styles.input, styles.flex, styles.mono, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]} />
-            <Pressable accessibilityRole="button" accessibilityLabel="Remove" onPress={() => setCustom(custom.filter((_, i) => i !== index))} hitSlop={8}>
-              <Icon name="x-mark" size={16} color={palette.textMuted} />
-            </Pressable>
-          </View>
-        ))}
-        {readOnly ? null : (
-          <Pressable accessibilityRole="button" onPress={() => setCustom([...custom, { name: '', value: '' }])} hitSlop={6}>
-            <Text style={[styles.link, { color: palette.link }]}>Add a Custom Parameter</Text>
-          </Pressable>
-        )}
+        <CustomParams rows={custom} onChange={setCustom} readOnly={readOnly} />
       </View>
     </Section>
   );
@@ -104,6 +94,9 @@ export function CapabilitiesSection({
   setFeatures,
   builtin,
   setBuiltin,
+  terminals,
+  terminalId,
+  setTerminalId,
   readOnly,
 }: {
   caps: Record<WorkspaceCapability, boolean>;
@@ -112,6 +105,10 @@ export function CapabilitiesSection({
   setFeatures: Setter<string[]>;
   builtin: Record<string, boolean>;
   setBuiltin: Setter<Record<string, boolean>>;
+  /** The systems (terminal servers) this account may use; the choice shows only when there are some. */
+  terminals: TerminalServer[];
+  terminalId: string;
+  setTerminalId: Setter<string>;
   readOnly: boolean;
 }) {
   const palette = usePalette();
@@ -129,6 +126,54 @@ export function CapabilitiesSection({
       {caps.builtin_tools
         ? BUILTIN_TOOLS.map((tool) => <SwitchRow key={tool.key} label={tool.label} value={builtin[tool.key] !== false} disabled={readOnly} onChange={(on) => setBuiltin({ ...builtin, [tool.key]: on })} />)
         : null}
+      {caps.terminal && terminals.length ? <TerminalChoice terminals={terminals} terminalId={terminalId} setTerminalId={setTerminalId} readOnly={readOnly} /> : null}
+    </Section>
+  );
+}
+
+/** The system new chats with the model start on (the web's Terminal choice): none, or one of the account's. */
+function TerminalChoice({ terminals, terminalId, setTerminalId, readOnly }: { terminals: TerminalServer[]; terminalId: string; setTerminalId: Setter<string>; readOnly: boolean }) {
+  const palette = usePalette();
+  // One saved that this account can't see is kept, and shown by its id.
+  const options = [{ id: '', label: 'None' }, ...terminals.map((terminal) => ({ id: terminal.id, label: terminalLabel(terminal) })), ...(terminalId && !terminals.some((terminal) => terminal.id === terminalId) ? [{ id: terminalId, label: terminalId }] : [])];
+  return (
+    <>
+      <Text style={[styles.sub, { color: palette.textMuted }]}>Terminal</Text>
+      <Text style={[styles.note, { color: palette.textMuted }]}>The system new chats with it work on, as if chosen in the input bar.</Text>
+      {options.map((option) => {
+        const on = option.id === terminalId;
+        return (
+          <Pressable key={option.id || 'none'} accessibilityRole="radio" accessibilityState={{ checked: on, disabled: readOnly }} disabled={readOnly} onPress={() => setTerminalId(option.id)} style={styles.switchRow} hitSlop={4}>
+            <Text style={[styles.label, styles.flex, { color: palette.text }]} numberOfLines={1}>
+              {option.label}
+            </Text>
+            {on ? <Icon name="check" size={16} color={palette.link} /> : null}
+          </Pressable>
+        );
+      })}
+    </>
+  );
+}
+
+/** The voice the web reads the model's answers aloud in: typed, or picked from the server's voices. */
+export function VoiceSection({ voice, setVoice, voices, readOnly }: { voice: string; setVoice: Setter<string>; voices: ServerVoice[]; readOnly: boolean }) {
+  const palette = usePalette();
+  const suggestions = voiceSuggestions(voices, voice).filter((item) => item.id !== voice.trim());
+  return (
+    <Section title="Voice" note={voice.trim() ? voice.trim() : 'The server’s, or each person’s own'}>
+      <Text style={[styles.note, { color: palette.textMuted }]}>The voice Read Aloud uses for its answers on the web, from the server’s speech settings. MavieChat reads aloud with your phone’s voices (Settings → Audio).</Text>
+      <TextInput value={voice} onChangeText={setVoice} editable={!readOnly} placeholder="e.g. alloy, echo, shimmer" placeholderTextColor={palette.textFaint} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" accessibilityLabel="Voice" style={[styles.input, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]} />
+      {!readOnly && suggestions.length ? (
+        <View style={styles.chips}>
+          {suggestions.map((item) => (
+            <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Use ${item.name}`} onPress={() => setVoice(item.id)} style={[styles.chip, { borderColor: palette.border }]}>
+              <Text style={[styles.chipText, { color: palette.text }]} numberOfLines={1}>
+                {item.name === item.id ? item.id : `${item.name} · ${item.id}`}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
     </Section>
   );
 }
@@ -325,8 +370,10 @@ const styles = StyleSheet.create({
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   customRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   input: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: 10, paddingVertical: 8, fontFamily: fonts.regular, fontSize: 14 },
-  mono: { fontFamily: fonts.mono, fontSize: 13 },
   prompt: { gap: 6, padding: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, maxWidth: '100%' },
+  chipText: { fontFamily: fonts.regular, fontSize: 13 },
   sheet: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   title: { flex: 1, textAlign: 'center', fontFamily: fonts.semibold, fontSize: 17 },

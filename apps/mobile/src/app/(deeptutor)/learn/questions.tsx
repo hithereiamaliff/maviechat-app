@@ -8,6 +8,7 @@ import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { Modal } from '@/components/Modal';
+import { SideScroll } from '@/components/SideScroll';
 import { useToast } from '@/components/Toast';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { correctKeys } from '@/features/deeptutor/practice/round';
@@ -120,7 +121,7 @@ export default function QuestionBank() {
           />
           {search ? <IconButton icon="x-mark" label="Clear search" size={16} color={palette.textMuted} onPress={() => setSearch('')} /> : null}
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
+        <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
           {filters.map((item) => {
             const selected = sameFilter(item, filter);
             return (
@@ -134,7 +135,7 @@ export default function QuestionBank() {
               </Pressable>
             );
           })}
-        </ScrollView>
+        </SideScroll>
         {stats.data ? (
           <Text style={[styles.counts, { color: palette.textFaint }]}>
             {`${stats.data.total} saved · ${stats.data.wrong} wrong · ${stats.data.bookmarked} bookmarked`}

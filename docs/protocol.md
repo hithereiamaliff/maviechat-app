@@ -97,7 +97,11 @@ This is a spec written from reading Open WebUI's source (v0.12.5, read 2026-11-0
 - `GET /api/v1/tools/`, with user valves at `/tools/id/{id}/valves/user[/update]`
 - `GET /api/v1/skills/`
 - `GET /api/v1/functions/`
-- Workspace models: `/api/v1/models/*`
+- Workspace models: `/api/v1/models/*`. A workspace model has a `base_model_id`; a row without one is an admin's setting for a provider model, which `/models/list` and `/models/export` leave out.
+  - **Import** (the web's Workspace → Import JSON, with `workspace.models_import`): model by model, `POST /models/create` for a row with an id and a name, and for an older export's `{id, info}` `POST /models/model/update` when you have that model (in `/api/models`), else create. A taken id is refused (401). The app makes new ones private (the web would keep the file's `access_grants`). `POST /models/import {models}` (admin page) creates or updates in one call and skips what it may not do without saying.
+  - **Actions** (the web's Enable All, Disable All, Show All, Hide All): every page the list's search, view and tag find, each toggled or saved with `meta.hidden`; the app reads each first and changes only the models you may change.
+  - **Editor extras:** `meta.terminalId` (a system from `GET /api/v1/terminals/`, offered with the terminal capability on), `meta.tts.voice` (the web's Read Aloud voice; other `tts` keys kept), both left out when empty. `GET /api/v1/audio/voices` → `{voices: [{id, name}]}` for the server's speech engine (none for the browser's).
+  - **Custom parameters** (`params.custom_params`, admins only on the web): a model's, a chat's (`chat.params`) and your settings' (`ui.params`). The server merges the model's with the request's (`merge_model_params`), reads each value as JSON where it can, and lays them over the other parameters.
 
 **User settings and info**
 - `GET /api/v1/users/user/settings` returns `{ui: {...}}`.

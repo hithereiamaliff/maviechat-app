@@ -18,6 +18,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { SideScroll } from '@/components/SideScroll';
 import { useToast } from '@/components/Toast';
 import { bookErrorText, DEPTH_LABELS } from '@/features/deeptutor/books/labels';
 import { useBookRefresh, useBookSocket } from '@/features/deeptutor/books/useBooks';
@@ -169,9 +170,9 @@ export default function NewBook() {
             <View style={styles.chips}>{DT_BOOK_DEPTHS.map((item) => chip(item === depth, DEPTH_LABELS[item].label, () => setDepth(item), DEPTH_LABELS[item].hint))}</View>
             <Text style={[styles.hint, { color: palette.textFaint }]}>{DEPTH_LABELS[depth].hint}</Text>
             <Text style={[styles.label, { color: palette.textMuted }]}>Language</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
+            <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
               {DT_BOOK_LANGUAGES.map((item) => chip(item.code === language, item.label, () => setLanguage(item.code)))}
-            </ScrollView>
+            </SideScroll>
             {language === 'auto' ? <Text style={[styles.hint, { color: palette.textFaint }]}>Written in the language you asked in.</Text> : null}
           </ScrollView>
         ) : (
@@ -180,12 +181,12 @@ export default function NewBook() {
               <Text style={[styles.note, { color: palette.textMuted }]}>
                 {`Anything DeepTutor should write from (up to ${DT_BOOK_SOURCES_MAX}). Knowledge bases are also searched while each page is written. You can pick none.`}
               </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
+              <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
                 {TABS.map((item) => {
                   const count = picked.filter((choice) => choice.tab === item.key).length;
                   return chip(item.key === tab, count ? `${item.label} · ${count}` : item.label, () => setTab(item.key));
                 })}
-              </ScrollView>
+              </SideScroll>
               <View style={[styles.search, { backgroundColor: palette.surface, borderColor: palette.border }]}>
                 <Icon name="magnifying-glass" size={16} color={palette.textMuted} />
                 <TextInput

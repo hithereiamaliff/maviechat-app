@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { MenuButton } from '@/components/Menu';
 import { Modal } from '@/components/Modal';
+import { SideScroll } from '@/components/SideScroll';
 import { useToast } from '@/components/Toast';
 import { shareFile, stampedName } from '@/features/settings/exportFile';
 import { editorStyles, SheetHeader, SheetLoading } from '@/features/workspace/EditorParts';
@@ -205,12 +206,12 @@ function FeedbackList({ header }: { header: ReactNode }) {
           <View style={styles.top}>
             {header}
             <View style={styles.row}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={styles.flex}>
+              <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={styles.flex}>
                 <Chip label="Every model" on={!model} onPress={() => setModel('')} />
                 {(models.data ?? []).map((id) => (
                   <Chip key={id} label={id} on={model === id} onPress={() => setModel(id)} />
                 ))}
-              </ScrollView>
+              </SideScroll>
               <MenuButton
                 label="Export"
                 icon="arrow-down-tray"

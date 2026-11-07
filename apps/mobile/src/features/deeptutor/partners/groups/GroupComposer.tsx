@@ -1,7 +1,8 @@
 import { resolveMentions, type DtGroupMember } from '@maviechat/deeptutor-protocol';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
+import { SideScroll } from '@/components/SideScroll';
 import { useGrowingInput } from '@/lib/useGrowingInput';
 import { fonts, radius, usePalette } from '@/theme';
 import { PartnerFace } from '../PartnerFace';
@@ -65,7 +66,7 @@ export function GroupComposer({
     <View style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 8) }]}>
       {note ? <Text style={[styles.note, { color: palette.textMuted }]}>{note}</Text> : null}
       {offered.length ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offers} keyboardShouldPersistTaps="always">
+        <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offers} keyboardShouldPersistTaps="always">
           {[{ id: 'all', name: 'all', emoji: '👥', color: '', avatar: '', description: '', running: false } as DtGroupMember, ...offered].map((member) => (
             <Pressable
               key={member.id}
@@ -77,7 +78,7 @@ export function GroupComposer({
               <Text style={[styles.offerText, { color: palette.text }]}>{member.id === 'all' ? 'Everyone' : member.name}</Text>
             </Pressable>
           ))}
-        </ScrollView>
+        </SideScroll>
       ) : null}
       {quote ? (
         <View style={[styles.quote, { borderColor: palette.border, backgroundColor: palette.surface }]}>

@@ -8,6 +8,9 @@ import {
   getModelDefaults,
   knowledgeMeta,
   knowledgeRefsOf,
+  listServerVoices,
+  listTerminals,
+  modelFormBody,
   modelFormOf,
   modelIdFromName,
   modelParamsToSave,
@@ -15,10 +18,15 @@ import {
   suggestionsMeta,
   suggestionsOf,
   tagNames,
+  terminalIdOf,
+  ttsVoiceOf,
   updateWorkspaceModel,
+  withTerminalAndVoice,
+  type ModelForm,
   type ModelItem,
   type WorkspaceModel,
 } from '@maviechat/owui-protocol';
+import * as Clipboard from 'expo-clipboard';
 import { useQuery } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
@@ -34,7 +42,7 @@ import { usePictureMaker } from '@/features/settings/PictureMaker';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useModels } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
-import { AttachmentsSection, CapabilitiesSection, ParamsSection, SuggestionsSection } from './ModelSections';
+import { AttachmentsSection, CapabilitiesSection, ParamsSection, Section, SuggestionsSection, VoiceSection } from './ModelSections';
 import { useWorkspaceModel, useWorkspaceRefresh } from './queries';
 
 /** What the editor opens on: a new model, one to change, or a copy of one. */
@@ -117,6 +125,11 @@ function Form({ target, model, defaults, onClose }: { target: ModelEditorTarget;
   const [defaultFilterIds, setDefaultFilterIds] = useState(() => ids('defaultFilterIds'));
   const [actionIds, setActionIds] = useState(() => ids('actionIds'));
   const [prompts, setPrompts] = useState(() => suggestionsOf(meta0));
+  const [terminalId, setTerminalId] = useState(() => terminalIdOf(meta0));
+  const [voice, setVoice] = useState(() => ttsVoiceOf(meta0));
+  // What the editor offers: the systems this account may use, and the server's voices (none when it can't say).
+  const terminals = useQuery({ queryKey: ['workspace', 'terminals'], queryFn: () => listTerminals(client), staleTime: 5 * 60_000 });
+  const voices = useQuery({ queryKey: ['workspace', 'voices'], queryFn: () => listServerVoices(client).catch(() => []), staleTime: 5 * 60_000 });
   const [choosingBase, setChoosingBase] = useState(false);
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
@@ -147,13 +160,11 @@ function Form({ target, model, defaults, onClose }: { target: ModelEditorTarget;
     if (tag && !tags.includes(tag)) setTags([...tags, tag]);
     setNewTag('');
   };
-  const save = async () => {
-    if (!ready) return setProblem(taken ? 'A model has that id already.' : 'It needs a name, an id and a base model.');
-    setBusy(true);
-    setProblem('');
-    try {
-      const start = model ? modelFormOf(model) : { id: '', baseModelId: '', name: '', meta: {}, params: {}, isActive: true };
-      const meta = {
+  /** The model as it would be saved: what the editor started from, with every change made here. */
+  const formNow = (): ModelForm => {
+    const start = model ? modelFormOf(model) : { id: '', baseModelId: '', name: '', meta: {}, params: {}, isActive: true };
+    const meta = withTerminalAndVoice(
+      {
         ...start.meta,
         description: description.trim() || null,
         tags: tags.map((tag) => ({ name: tag })),
@@ -169,10 +180,21 @@ function Form({ target, model, defaults, onClose }: { target: ModelEditorTarget;
         defaultFilterIds: defaultFilterIds.filter((key) => filterIds.includes(key)),
         actionIds,
         suggestion_prompts: suggestionsMeta(prompts),
-      };
-      const form = { ...start, id: modelId.trim(), baseModelId: baseId, name: name.trim(), meta, params: modelParamsToSave({ ...params, system: system.trim() ? system : null }, custom) };
+      },
+      terminalId,
+      voice,
+    );
+    const form = { ...start, id: modelId.trim(), baseModelId: baseId, name: name.trim(), meta, params: modelParamsToSave({ ...params, system: system.trim() ? system : null }, custom) };
+    return editing ? form : { ...form, isActive: true, accessGrants: [] };
+  };
+  const save = async () => {
+    if (!ready) return setProblem(taken ? 'A model has that id already.' : 'It needs a name, an id and a base model.');
+    setBusy(true);
+    setProblem('');
+    try {
+      const form = formNow();
       if (editing) await updateWorkspaceModel(client, form);
-      else await createWorkspaceModel(client, { ...form, isActive: true, accessGrants: [] });
+      else await createWorkspaceModel(client, form);
       refresh();
       toast(editing ? 'Model saved' : 'Model made (private)');
       onClose();
@@ -312,7 +334,7 @@ function Form({ target, model, defaults, onClose }: { target: ModelEditorTarget;
           ) : null}
         </View>
         <ParamsSection params={params} setParams={setParams} custom={custom} setCustom={setCustom} readOnly={readOnly} />
-        <CapabilitiesSection caps={caps} setCaps={setCaps} features={features} setFeatures={setFeatures} builtin={builtin} setBuiltin={setBuiltin} readOnly={readOnly} />
+        <CapabilitiesSection caps={caps} setCaps={setCaps} features={features} setFeatures={setFeatures} builtin={builtin} setBuiltin={setBuiltin} terminals={terminals.data ?? []} terminalId={terminalId} setTerminalId={setTerminalId} readOnly={readOnly} />
         <AttachmentsSection
           knowledge={knowledge}
           setKnowledge={setKnowledge}
@@ -329,9 +351,31 @@ function Form({ target, model, defaults, onClose }: { target: ModelEditorTarget;
           readOnly={readOnly}
         />
         <SuggestionsSection prompts={prompts} setPrompts={setPrompts} readOnly={readOnly} />
+        <VoiceSection voice={voice} setVoice={setVoice} voices={voices.data ?? []} readOnly={readOnly} />
+        <Section title="JSON Preview" note="What Save sends, as on the web">
+          <JsonPreview body={modelFormBody(formNow())} />
+        </Section>
         <Text style={[styles.note, { color: palette.textFaint }]}>{editing ? 'Its sharing stays as it is.' : 'New models are private: only you (and admins) can use them.'}</Text>
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+/** The model as Save sends it, to read or copy; a picture's data is shortened here (not in what's saved). */
+function JsonPreview({ body }: { body: Record<string, unknown> }) {
+  const palette = usePalette();
+  const toast = useToast();
+  const json = JSON.stringify(body, null, 2);
+  const shown = json.replace(/"data:([\w/+.-]+);base64,[A-Za-z0-9+/=]{48,}"/g, (whole, type: string) => `"data:${type};base64,… (${Math.round(whole.length / 1365)} KB)"`);
+  return (
+    <View style={styles.field}>
+      <Text selectable style={[styles.json, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]}>
+        {shown}
+      </Text>
+      <Pressable accessibilityRole="button" onPress={() => void Clipboard.setStringAsync(json).then(() => toast('JSON copied'))} hitSlop={6} style={styles.copy}>
+        <Text style={[styles.action, { color: palette.link }]}>Copy JSON</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -363,4 +407,6 @@ const styles = StyleSheet.create({
   tag: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
   tagText: { fontFamily: fonts.regular, fontSize: 13 },
   system: { minHeight: 180, fontFamily: fonts.mono, fontSize: 13, lineHeight: 19, textAlignVertical: 'top' },
+  json: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, padding: 10, fontFamily: fonts.mono, fontSize: 12, lineHeight: 17 },
+  copy: { alignSelf: 'flex-start' },
 });

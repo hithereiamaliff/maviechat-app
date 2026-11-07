@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
 import { Modal } from '@/components/Modal';
+import { SideScroll } from '@/components/SideScroll';
 import { fonts, radius, usePalette } from '@/theme';
 
 /** A chip in the composer's row of things going with the next message. */
@@ -20,7 +21,7 @@ export function DtExtrasStrip({ chips }: { chips: ExtraChip[] }) {
   const palette = usePalette();
   if (chips.length === 0) return null;
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} keyboardShouldPersistTaps="handled">
+    <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} keyboardShouldPersistTaps="handled">
       {chips.map((chip) =>
         chip.image ? (
           <View key={chip.key} style={styles.thumbWrap}>
@@ -41,7 +42,7 @@ export function DtExtrasStrip({ chips }: { chips: ExtraChip[] }) {
           </View>
         ),
       )}
-    </ScrollView>
+    </SideScroll>
   );
 }
 

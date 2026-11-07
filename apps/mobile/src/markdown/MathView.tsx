@@ -1,7 +1,8 @@
 import type { MathSvg } from '@maviechat/owui-markdown/src/math';
 import { memo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
+import { SideScroll } from '@/components/SideScroll';
 import { fonts, radius, usePalette } from '@/theme';
 
 type Convert = (tex: string, display: boolean) => MathSvg | null;
@@ -39,9 +40,9 @@ export const BlockMath = memo(function BlockMath({ tex, color }: { tex: string; 
   }
   const ex = exFor(16);
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.block} contentContainerStyle={styles.blockContent}>
+    <SideScroll showsHorizontalScrollIndicator={false} style={styles.block} contentContainerStyle={styles.blockContent}>
       <SvgXml xml={math.svg} width={math.width * ex} height={math.height * ex} color={color} accessibilityLabel={tex} />
-    </ScrollView>
+    </SideScroll>
   );
 });
 

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { SideScroll } from '@/components/SideScroll';
 import { useToast } from '@/components/Toast';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { PracticeCard } from '@/features/deeptutor/practice/PracticeCard';
@@ -111,7 +112,7 @@ export default function Practice() {
             </View>
             {summary.isError ? <Text style={[styles.note, { color: palette.danger }]}>{`Couldn't load practice: ${describeError(summary.error)}`}</Text> : null}
             {categories.data && categories.data.length > 0 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+              <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
                 {[{ id: undefined, name: 'All' }, ...categories.data].map((category) => {
                   const selected = category.id === categoryId;
                   return (
@@ -125,7 +126,7 @@ export default function Practice() {
                     </Pressable>
                   );
                 })}
-              </ScrollView>
+              </SideScroll>
             ) : null}
             {summary.isLoading ? (
               <ActivityIndicator style={styles.loading} color={palette.textMuted} />

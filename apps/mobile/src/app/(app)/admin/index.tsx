@@ -1,6 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SideScroll } from '@/components/SideScroll';
 import { EvaluationsTab } from '@/features/admin/EvaluationsTab';
 import { FunctionsTab } from '@/features/admin/FunctionsTab';
 import { DefaultsTab, GroupsTab } from '@/features/admin/GroupsTabs';
@@ -29,7 +30,7 @@ export default function AdminPanel() {
   // Functions only where the server has plugins on, as on the web.
   const shownTabs = capabilities?.feature('functions') ? [...TABS, { key: 'functions' as const, label: 'Functions' }] : TABS;
   const tabs = (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} accessibilityRole="tablist">
+    <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} accessibilityRole="tablist">
       {shownTabs.map((item) => {
         const on = item.key === tab;
         return (
@@ -38,7 +39,7 @@ export default function AdminPanel() {
           </Pressable>
         );
       })}
-    </ScrollView>
+    </SideScroll>
   );
 
   return (

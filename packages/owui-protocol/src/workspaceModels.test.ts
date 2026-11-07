@@ -4,12 +4,17 @@ import {
   cloneForm,
   createWorkspaceModel,
   getWorkspaceModel,
+  importWorkspaceModel,
+  listAllWorkspaceModels,
   listParams,
   listWorkspaceModels,
+  modelFormBody,
   modelFormOf,
+  modelsFromImport,
   modelIdFromName,
   promptVariables,
   pruneEmpty,
+  setWorkspaceModelActive,
   setWorkspaceModelHidden,
   toggleWorkspaceModel,
   updateWorkspaceModel,
@@ -78,5 +83,53 @@ describe('workspace models', () => {
     expect(pruneEmpty({ a: '', b: [], c: {}, d: null, e: false, f: 0, g: 'x' })).toEqual({ e: false, f: 0, g: 'x' });
     expect(modelIdFromName('  My Tutor_v2! ')).toBe('my-tutorv2');
     expect(promptVariables(MODEL.params.system)).toEqual({ chat: ['level'], user: ['nickname'] });
+  });
+
+  it('switches a model on only when it is off, after reading it', async () => {
+    const off = recordingClient(MODEL, { ...MODEL, is_active: true });
+    await setWorkspaceModelActive(off.client, 'tutor', true);
+    expect(off.calls.map((call) => `${call.method} ${call.url}`)).toEqual(['GET https://chat.test/api/v1/models/model?id=tutor', 'POST https://chat.test/api/v1/models/model/toggle?id=tutor']);
+    const on = recordingClient({ ...MODEL, is_active: true });
+    await setWorkspaceModelActive(on.client, 'tutor', true);
+    expect(on.calls).toHaveLength(1);
+  });
+
+  it('gathers every page the list finds, with its search', async () => {
+    const page = (ids: string[], total: number) => ({ items: ids.map((id) => ({ ...MODEL, id })), total });
+    const { client, calls } = recordingClient(page(['a', 'b'], 3), page(['c'], 3));
+    const all = await listAllWorkspaceModels(client, { query: 'tu', tag: 'study' });
+    expect(all.map((model) => model.id)).toEqual(['a', 'b', 'c']);
+    expect(calls.map((call) => new URL(call.url).searchParams.get('page'))).toEqual(['1', '2']);
+    expect(new URL(calls[0]?.url ?? '').searchParams.get('query')).toBe('tu');
+  });
+
+  it('reads import files as the web does: rows are made private; older `info` rows change a model you have', () => {
+    const file = [
+      { id: 'tutor', name: 'Tutor', base_model_id: 'gpt-x', meta: { description: 'd' }, params: { temperature: 0.3 }, is_active: false, access_grants: [{ principal_type: 'user', principal_id: '*', permission: 'read' }] },
+      { id: 'mine', info: { id: 'mine', name: 'Mine', base_model_id: 'gpt-x', meta: {}, params: {} } },
+      { id: 'other', info: { name: 'Other', base_model_id: 'gpt-x' } },
+      { id: 'no-name' },
+      'junk',
+    ];
+    const { models, skipped } = modelsFromImport(file, new Set(['mine', 'tutor']));
+    expect(skipped).toBe(2);
+    expect(models.map((item) => [item.id, item.update])).toEqual([
+      ['tutor', false],
+      ['mine', true],
+      ['other', false],
+    ]);
+    expect(models[0]?.form).toEqual({ id: 'tutor', baseModelId: 'gpt-x', name: 'Tutor', meta: { description: 'd' }, params: { temperature: 0.3 }, isActive: false, accessGrants: [] });
+    expect(models[1]?.form.accessGrants).toBeUndefined();
+    expect(modelsFromImport({ id: 'one', name: 'One' }, new Set()).models).toHaveLength(1);
+  });
+
+  it('imports by making new models or changing the one you have', async () => {
+    const { models } = modelsFromImport([{ id: 'n', name: 'N', base_model_id: 'b' }, { id: 'mine', info: { id: 'mine', name: 'Mine', meta: { a: 1 }, params: {} } }], new Set(['mine']));
+    const { client, calls } = recordingClient({ ...MODEL, id: 'n' }, { ...MODEL, id: 'mine' });
+    for (const item of models) await importWorkspaceModel(client, item);
+    expect(calls.map((call) => call.url)).toEqual(['https://chat.test/api/v1/models/create', 'https://chat.test/api/v1/models/model/update']);
+    expect(calls[0]?.body).toMatchObject({ id: 'n', base_model_id: 'b', access_grants: [] });
+    expect(calls[1]?.body).not.toHaveProperty('access_grants');
+    expect(modelFormBody({ id: 'x', baseModelId: '', name: ' X ', meta: { description: '' }, params: {}, isActive: true })).toEqual({ id: 'x', base_model_id: null, name: 'X', meta: {}, params: {}, is_active: true });
   });
 });

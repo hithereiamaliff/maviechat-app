@@ -3,10 +3,11 @@ import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { MenuButton } from '@/components/Menu';
+import { SideScroll } from '@/components/SideScroll';
 import { capabilityName } from '@/features/deeptutor/chat/capabilities';
 import { opensNatively } from '@/features/deeptutor/learning/ways';
 import { startChatWith } from '@/features/deeptutor/chat/extras';
@@ -97,11 +98,11 @@ export default function ChatHistory() {
           />
           {search ? <IconButton icon="x-mark" label="Clear search" size={16} color={palette.textMuted} onPress={() => setSearch('')} /> : null}
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
+        <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
           {STATUSES.map((item) => chip(item.key === status, item.label, () => setStatus(item.key)))}
           <View style={[styles.divider, { backgroundColor: palette.border }]} />
           {KINDS.map((item) => chip(item.key === kind, item.label, () => setKind(item.key)))}
-        </ScrollView>
+        </SideScroll>
       </View>
       <FlashList
         data={shown}

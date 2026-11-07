@@ -1,4 +1,4 @@
-import { attachmentName, paramsFor, withParam, withSystemPrompt, type ChatHistory, type ModelItem } from '@maviechat/owui-protocol';
+import { attachmentName, customParamsOf, paramsFor, withCustomParams, withParam, withSystemPrompt, type ChatHistory, type ModelItem } from '@maviechat/owui-protocol';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -8,6 +8,7 @@ import { Modal } from '@/components/Modal';
 import { useCapabilities } from '@/lib/server';
 import { useStoredState } from '@/lib/storedState';
 import { fonts, radius, usePalette } from '@/theme';
+import { CustomParams } from './CustomParams';
 import { OverviewList } from './OverviewList';
 import { ParamRow } from './ParamRow';
 import { ValvesPanel } from './ValvesPanel';
@@ -48,6 +49,8 @@ function ControlsBody({ onClose, params: initialParams, files: initialFiles, onC
   // Edited here while the sheet is open; the chat gets them a moment after each change.
   const [params, setParams] = useState(initialParams);
   const [files, setFiles] = useState(initialFiles);
+  // Admins' custom parameters, as rows (one being named isn't saved yet).
+  const [custom, setCustom] = useState(() => customParamsOf(initialParams));
   const pending = useRef<ControlChanges | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const changed = useRef(onChange);
@@ -76,7 +79,8 @@ function ControlsBody({ onClose, params: initialParams, files: initialFiles, onC
   const controls = allowed('chat.controls');
   const hasOverview = Boolean(overview && Object.keys(overview.history.messages).length > 0);
   const shown = !controls ? 'overview' : tab === 'overview' && hasOverview ? 'overview' : 'controls';
-  const specs = paramsFor(capabilities?.isAdmin ?? false);
+  const admin = capabilities?.isAdmin ?? false;
+  const specs = paramsFor(admin);
   const common = specs.filter((spec) => !spec.ollama);
   const ollama = specs.filter((spec) => spec.ollama);
   const paramRow = (spec: (typeof specs)[number]) => (
@@ -142,6 +146,15 @@ function ControlsBody({ onClose, params: initialParams, files: initialFiles, onC
                 <Section id="ollama" title="For Ollama Models" initiallyOpen={false} nested>
                   {ollama.map(paramRow)}
                 </Section>
+              ) : null}
+              {admin ? (
+                <CustomParams
+                  rows={custom}
+                  onChange={(rows) => {
+                    setCustom(rows);
+                    apply({ params: withCustomParams(params, rows) });
+                  }}
+                />
               ) : null}
             </Section>
           ) : null}

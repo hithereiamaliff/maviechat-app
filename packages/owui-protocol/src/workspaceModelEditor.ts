@@ -1,6 +1,6 @@
 import type { OwuiClient } from './http';
 import type { KnowledgeChoice } from './knowledge';
-import { stopTokens } from './params';
+import { stopTokens, withCustomParams, type CustomParam } from './params';
 import type { FunctionItem } from './valves';
 
 /*
@@ -181,13 +181,8 @@ export function suggestionsMeta(prompts: SuggestedPrompt[] | null): Tree[] | nul
   return prompts.filter((prompt) => prompt.content.trim()).map((prompt) => ({ content: prompt.content, title: [prompt.title, prompt.subtitle] }));
 }
 
-/** Custom parameters, as text (the server reads JSON where it can and merges them in). */
-export function customParamsOf(params: Tree): { name: string; value: string }[] {
-  return Object.entries(record(params.custom_params)).map(([name, value]) => ({ name, value: typeof value === 'string' ? value : JSON.stringify(value) }));
-}
-
 /** Parameters as the model keeps them: stop sequences as a list, custom ones by name, empties dropped. */
-export function modelParamsToSave(params: Tree, custom: { name: string; value: string }[]): Tree {
+export function modelParamsToSave(params: Tree, custom: CustomParam[]): Tree {
   const out: Tree = {};
   for (const [key, value] of Object.entries(params)) if (value !== null && value !== undefined && value !== '') out[key] = value;
   if ('stop' in out) {
@@ -195,8 +190,51 @@ export function modelParamsToSave(params: Tree, custom: { name: string; value: s
     if (stop) out.stop = stop;
     else delete out.stop;
   }
-  const named = custom.filter((item) => item.name.trim());
-  if (named.length) out.custom_params = Object.fromEntries(named.map((item) => [item.name.trim(), item.value]));
-  else delete out.custom_params;
-  return out;
+  return withCustomParams(out, custom);
+}
+
+/** The system (terminal server) the model comes with in new chats (`meta.terminalId`), or ''. */
+export const terminalIdOf = (meta: Tree): string => text(meta.terminalId);
+
+/** The voice the web reads the model's answers aloud in (`meta.tts.voice`), or ''. */
+export const ttsVoiceOf = (meta: Tree): string => text(record(meta.tts).voice);
+
+/**
+ * `meta` with the model's terminal and voice, as the web's editor saves them: each left out when
+ * empty (a voice's other `tts` settings are kept, and `tts` goes once nothing is left in it).
+ */
+export function withTerminalAndVoice(meta: Tree, terminalId: string, voice: string): Tree {
+  const next: Tree = { ...meta };
+  if (terminalId.trim()) next.terminalId = terminalId.trim();
+  else delete next.terminalId;
+  const tts: Tree = { ...record(meta.tts) };
+  if (voice.trim()) tts.voice = voice.trim();
+  else delete tts.voice;
+  if (Object.keys(tts).length) next.tts = tts;
+  else delete next.tts;
+  return next;
+}
+
+export interface ServerVoice {
+  id: string;
+  name: string;
+}
+
+/**
+ * The voices the server's text-to-speech offers (`GET /api/v1/audio/voices`), for a model's voice.
+ * The server asks its speech provider; with none set up, or none listed, there are none.
+ */
+export async function listServerVoices(client: OwuiClient): Promise<ServerVoice[]> {
+  const body = record(await client.get<unknown>('/api/v1/audio/voices'));
+  return list(body.voices).flatMap((raw) => {
+    const row = record(raw);
+    const id = text(row.id);
+    return id ? [{ id, name: text(row.name) || id }] : [];
+  });
+}
+
+/** Voices matching what's typed (id or name), as the web suggests them: up to eight. */
+export function voiceSuggestions(voices: ServerVoice[], typed: string, limit = 8): ServerVoice[] {
+  const query = typed.trim().toLowerCase();
+  return voices.filter((voice) => !query || voice.id.toLowerCase().includes(query) || voice.name.toLowerCase().includes(query)).slice(0, limit);
 }

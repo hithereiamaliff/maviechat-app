@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Icon } from '@/components/Icon';
 import { Modal } from '@/components/Modal';
+import { SideScroll } from '@/components/SideScroll';
 import { useToast } from '@/components/Toast';
 import { describeError } from '@/lib/errors';
 import { openServerFile } from '@/lib/openServerFile';
@@ -19,7 +20,7 @@ export function FolderPath({ path, onOpen }: { path: { id: string; name: string 
   const palette = usePalette();
   const steps = [{ id: '', name: 'All files' }, ...path];
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={local.path}>
+    <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={local.path}>
       {steps.map((step, index) => {
         const last = index === steps.length - 1;
         return (
@@ -33,7 +34,7 @@ export function FolderPath({ path, onOpen }: { path: { id: string; name: string 
           </View>
         );
       })}
-    </ScrollView>
+    </SideScroll>
   );
 }
 

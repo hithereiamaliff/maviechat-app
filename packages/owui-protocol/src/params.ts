@@ -149,6 +149,31 @@ export function withParam(params: Record<string, unknown>, key: string, value: u
   return next;
 }
 
+/** A custom parameter as it's edited: its name, and its value as text. */
+export interface CustomParam {
+  name: string;
+  value: string;
+}
+
+/**
+ * Custom parameters (`custom_params`: admins add them by name, as on the web), as text. The server
+ * reads each value as JSON where it can, and merges them in over the others.
+ */
+export function customParamsOf(params: Record<string, unknown> | null | undefined): CustomParam[] {
+  const custom = params?.custom_params;
+  if (typeof custom !== 'object' || custom === null || Array.isArray(custom)) return [];
+  return Object.entries(custom).map(([name, value]) => ({ name, value: typeof value === 'string' ? value : JSON.stringify(value) }));
+}
+
+/** The parameters with these custom ones (those with a name; a later one of the same name wins), or with none. */
+export function withCustomParams(params: Record<string, unknown>, custom: CustomParam[]): Record<string, unknown> {
+  const next = { ...params };
+  const named = custom.filter((item) => item.name.trim());
+  if (named.length) next.custom_params = Object.fromEntries(named.map((item) => [item.name.trim(), item.value]));
+  else delete next.custom_params;
+  return next;
+}
+
 /** The chat's own system prompt; an empty one leaves the user's default in charge. */
 export function withSystemPrompt(params: Record<string, unknown>, system: string): Record<string, unknown> {
   return withParam(params, 'system', system.trim() ? system : undefined);

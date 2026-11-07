@@ -1,9 +1,10 @@
-import { paramsFor, withParam, type UserSettings } from '@maviechat/owui-protocol';
+import { customParamsOf, paramsFor, withCustomParams, withParam, type CustomParam, type UserSettings } from '@maviechat/owui-protocol';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
+import { CustomParams } from '@/features/chat/controls/CustomParams';
 import { ParamRow } from '@/features/chat/controls/ParamRow';
 import { useCapabilities, useUserSettings } from '@/lib/server';
 import { useCanSaveSettings, useSaveUiSettings } from '@/lib/uiSettings';
@@ -13,18 +14,20 @@ import { Note, SectionTitle } from './rows';
 interface Draft {
   system: string;
   params: Record<string, unknown>;
+  /** Custom parameters (admins), as rows: one without a name isn't saved. */
+  custom: CustomParam[];
 }
 
 /** What's saved, as edited here: stop sequences are kept as a list and edited as one line. */
 function fromSettings(ui: UserSettings['ui']): Draft {
   const params = { ...((ui?.params as Record<string, unknown> | undefined) ?? {}) };
   if (Array.isArray(params.stop)) params.stop = params.stop.map(String).join(', ');
-  return { system: typeof ui?.system === 'string' ? ui.system : '', params };
+  return { system: typeof ui?.system === 'string' ? ui.system : '', params, custom: customParamsOf(params) };
 }
 
 /** As the web saves them: an empty prompt is no prompt, and stop sequences are a list. */
 function toSettings(draft: Draft): Record<string, unknown> {
-  const params = { ...draft.params };
+  const params = withCustomParams(draft.params, draft.custom);
   if (typeof params.stop === 'string') {
     const stops = params.stop
       .split(',')
@@ -104,6 +107,7 @@ export function PromptAndParams() {
               {specs.map((spec) => (
                 <ParamRow key={spec.key} spec={spec} value={shown.params[spec.key]} onChange={(value) => edit({ params: withParam(shown.params, spec.key, value) })} />
               ))}
+              {admin ? <CustomParams rows={shown.custom} onChange={(custom) => edit({ custom })} readOnly={!canSave} /> : null}
             </View>
           ) : null}
         </>

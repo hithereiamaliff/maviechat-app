@@ -1,7 +1,8 @@
 import { errorText, type MessageWithParts, type OtherPart, type Part, type ToolPart } from '@maviechat/opencode-protocol';
 import { memo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
+import { SideScroll } from '@/components/SideScroll';
 import { Markdown } from '@/markdown/Markdown';
 import { fonts, radius, usePalette } from '@/theme';
 
@@ -97,11 +98,11 @@ export function ToolCard({ part }: { part: ToolPart }) {
         {running ? <ActivityIndicator size="small" color={palette.textMuted} /> : failed ? <Icon name="exclamation-triangle" size={16} color={palette.danger} /> : detail ? <Icon name={open ? 'chevron-up' : 'chevron-down'} size={14} color={palette.textFaint} /> : null}
       </Pressable>
       {open && detail ? (
-        <ScrollView horizontal style={[styles.output, { borderTopColor: palette.border, backgroundColor: palette.codeBackground }]}>
+        <SideScroll style={[styles.output, { borderTopColor: palette.border, backgroundColor: palette.codeBackground }]}>
           <Text selectable style={[styles.mono, { color: failed ? palette.danger : palette.text }]}>
             {shorten(detail, MAX_OUTPUT)}
           </Text>
-        </ScrollView>
+        </SideScroll>
       ) : null}
     </View>
   );

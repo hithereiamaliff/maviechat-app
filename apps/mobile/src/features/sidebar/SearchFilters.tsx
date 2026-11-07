@@ -1,7 +1,8 @@
 import { folderSearch, listFolders, listTags, tagSearch, typedFilter, typedTag, withFilterWord, withTagSearch } from '@maviechat/owui-protocol';
 import { useQuery } from '@tanstack/react-query';
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
+import { SideScroll } from '@/components/SideScroll';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, usePalette } from '@/theme';
 
@@ -48,7 +49,7 @@ export function SearchFilters({ value, onChange }: { value: string; onChange: (v
   );
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="always" contentContainerStyle={styles.row}>
+    <SideScroll showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="always" contentContainerStyle={styles.row}>
       {typing === null && typingFolder === null ? FLAGS.map((flag) => chip(flag.words, flag.label, has(flag.words), () => toggle(flag.words))) : null}
       {shownTags.map((tag) => {
         const on = has(tagSearch(tag));
@@ -59,7 +60,7 @@ export function SearchFilters({ value, onChange }: { value: string; onChange: (v
         const on = has(word);
         return chip(`folder-${folder.id}`, folder.name, on, () => (on ? onChange(words.filter((item) => item !== word).join(' ')) : onChange(withFilterWord(value, word))), 'folder');
       })}
-    </ScrollView>
+    </SideScroll>
   );
 }
 

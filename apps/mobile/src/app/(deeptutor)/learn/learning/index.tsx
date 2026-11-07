@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
+import { SideScroll } from '@/components/SideScroll';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { KIND_ICONS, KIND_LABELS, LEARNING_WAYS, openActivity, startWay, waysFor } from '@/features/deeptutor/learning/ways';
 import { sessionDate, useDtAuthStatus, useDtLearningIndex, useDtModules } from '@/features/deeptutor/queries';
@@ -69,7 +70,7 @@ export default function AllLearning() {
     <View style={[styles.screen, { backgroundColor: palette.background }]}>
       <DtHeader title="All Learning" accessory={ways.length ? <IconButton icon="plus" label="New Learning Activity" onPress={() => router.push('/learn/learning/new')} /> : undefined} />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} />}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
+        <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} keyboardShouldPersistTaps="handled">
           {shownFilters.map((item) => {
             const on = item.key === filter;
             return (
@@ -86,7 +87,7 @@ export default function AllLearning() {
               </Pressable>
             );
           })}
-        </ScrollView>
+        </SideScroll>
         <View style={[styles.search, { backgroundColor: palette.surface, borderColor: palette.border }]}>
           <Icon name="magnifying-glass" size={16} color={palette.textMuted} />
           <TextInput
