@@ -57,6 +57,12 @@ export interface SocketSession {
    * Sent once the socket has joined; until then the latest requests wait.
    */
   markRead(chatId: string): void;
+  /**
+   * Follows a note: its changes (`events:note`, from the web or another device, with only what
+   * changed) come to `listener` until the returned function is called. The server keeps the socket
+   * in the note's room until it disconnects; after a reconnect the note is joined again.
+   */
+  watchNote(noteId: string, listener: (change: unknown) => void): () => void;
   close(): void;
 }
 
@@ -119,6 +125,20 @@ export function openSocketSession(options: SocketSessionOptions): SocketSession 
     }, seconds * 1000);
   };
 
+  // Notes followed, joined again after a reconnect. 0.11 joins a note's room with `join-note`, 0.12
+  // with `note:join` (and leaves with `note:leave`); each ignores the other's, so both go.
+  const notes = new Map<string, Set<(change: unknown) => void>>();
+  const joinNote = (noteId: string) => {
+    const payload = { note_id: noteId, auth: { token: options.token } };
+    socket.emit('join-note', payload);
+    socket.emit('note:join', payload);
+  };
+  const onNote = (payload: unknown) => {
+    const id = typeof payload === 'object' && payload !== null ? (payload as { id?: unknown }).id : undefined;
+    if (typeof id !== 'string') return;
+    for (const listener of notes.get(id) ?? []) listener(payload);
+  };
+
   // The server ignores events from a socket that hasn't joined yet, so reads wait for the join.
   const unsentReads = new Set<string>();
   const flushReads = () => {
@@ -146,6 +166,7 @@ export function openSocketSession(options: SocketSessionOptions): SocketSession 
         }
         setStatus('joined');
         flushReads();
+        for (const noteId of notes.keys()) joinNote(noteId);
         if (!settled) {
           settled = true;
           resolveJoined(ack);
@@ -174,6 +195,7 @@ export function openSocketSession(options: SocketSessionOptions): SocketSession 
   socket.on('disconnect', onDisconnect);
   socket.on('connect_error', onConnectError);
   socket.on('events', onEvents);
+  socket.on('events:note', onNote);
 
   function close() {
     if (closed) return;
@@ -184,6 +206,7 @@ export function openSocketSession(options: SocketSessionOptions): SocketSession 
     socket.off('disconnect', onDisconnect);
     socket.off('connect_error', onConnectError);
     socket.off('events', onEvents);
+    socket.off('events:note', onNote);
     socket.disconnect();
     setStatus('closed');
     if (!settled) {
@@ -208,6 +231,19 @@ export function openSocketSession(options: SocketSessionOptions): SocketSession 
       if (closed) return;
       unsentReads.add(chatId);
       if (status === 'joined' && socket.connected) flushReads();
+    },
+    watchNote(noteId, listener) {
+      const listeners = notes.get(noteId) ?? new Set<(change: unknown) => void>();
+      const first = listeners.size === 0;
+      listeners.add(listener);
+      notes.set(noteId, listeners);
+      if (first && !closed && status === 'joined' && socket.connected) joinNote(noteId);
+      return () => {
+        listeners.delete(listener);
+        if (listeners.size) return;
+        notes.delete(noteId);
+        if (!closed && socket.connected) socket.emit('note:leave', { note_id: noteId });
+      };
     },
     close,
   };

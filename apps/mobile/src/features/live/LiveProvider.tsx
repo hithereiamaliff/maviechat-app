@@ -25,6 +25,8 @@ interface LiveContextValue {
   markRead(chatId: string): void;
   /** Runs Python on the phone (Pyodide, as the web runs it in the browser), sharing state with the code interpreter's runs. */
   runPython(code: string): Promise<CodeOutput>;
+  /** Follows a note's changes from the web or another device (`events:note`) until the returned function is called. */
+  watchNote(noteId: string, listener: (change: unknown) => void): () => void;
 }
 
 /** The web waits this long before saying the connection was lost, so brief drops pass silently. */
@@ -68,6 +70,8 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
   const toast = useToast();
   const viewing = useRef<string | null>(currentChatId);
   const socketRef = useRef<SocketSession | null>(null);
+  // Notes followed, kept here so a socket opened later (or again) follows them too.
+  const noteWatches = useRef(new Set<{ noteId: string; listener: (change: unknown) => void; stop?: () => void }>());
   const [status, setStatus] = useState<SocketStatus | 'idle'>('idle');
   const lostTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const warnedLost = useRef(false);
@@ -144,8 +148,14 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
     });
     socketRef.current = socket;
     const stop = socket.onChatEvent((event, reply) => streams.handle(event, reply));
+    const watches = noteWatches.current;
+    for (const watch of watches) watch.stop = socket.watchNote(watch.noteId, watch.listener);
     return () => {
       stop();
+      for (const watch of watches) {
+        watch.stop?.();
+        watch.stop = undefined;
+      }
       if (lostTimer.current) clearTimeout(lostTimer.current);
       lostTimer.current = null;
       socket.close();
@@ -174,6 +184,15 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
 
   const runPython = useCallback((code: string) => python.run({ code }), [python]);
 
+  const watchNote = useCallback((noteId: string, listener: (change: unknown) => void) => {
+    const watch: { noteId: string; listener: (change: unknown) => void; stop?: () => void } = { noteId, listener, stop: socketRef.current?.watchNote(noteId, listener) };
+    noteWatches.current.add(watch);
+    return () => {
+      watch.stop?.();
+      noteWatches.current.delete(watch);
+    };
+  }, []);
+
   const value = useMemo<LiveContextValue>(
     () => ({
       status,
@@ -189,8 +208,9 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
       },
       markRead,
       runPython,
+      watchNote,
     }),
-    [status, streams, markRead, runPython],
+    [status, streams, markRead, runPython, watchNote],
   );
 
   const finish = (answers: Record<string, AskUserAnswer> | null) => {

@@ -10,7 +10,7 @@ import { grantsOf, type AccessGrant } from './workspaceModels';
  * says so when the answer keeps less than it sent. Write needs read beside it, as the web sends.
  */
 
-export type AccessArea = 'models' | 'knowledge' | 'prompts' | 'skills' | 'tools' | 'folders';
+export type AccessArea = 'models' | 'knowledge' | 'prompts' | 'skills' | 'tools' | 'folders' | 'notes';
 
 export interface AccessEntry {
   type: 'user' | 'group';
@@ -87,6 +87,8 @@ function accessRequest(area: AccessArea, id: string, grants: AccessGrant[]): { p
       return { path: `/api/v1/tools/id/${key}/access/update`, body: { access_grants: grants } };
     case 'folders':
       return { path: `/api/v1/folders/${key}/access/update`, body: { access_grants: grants } };
+    case 'notes':
+      return { path: `/api/v1/notes/${key}/access/update`, body: { access_grants: grants } };
   }
 }
 

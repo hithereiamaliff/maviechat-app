@@ -157,6 +157,37 @@ describe('openSocketSession', () => {
     expect(fake.pendingAcks).toHaveLength(2);
   });
 
+  it('follows a note: joins its room once signed in, again after a reconnect, and passes only its changes', async () => {
+    const { fake, session } = open();
+    const seen: unknown[] = [];
+    const stop = session.watchNote('n1', (change) => seen.push(change));
+    const joins = () => fake.emitted.filter((e) => e.event === 'join-note').map((e) => e.args[0]);
+    expect(joins()).toEqual([]);
+    fake.serverConnects();
+    fake.pendingAcks[0]?.ack(null, { id: 'u1', name: 'Test' });
+    await session.joined;
+    expect(joins()).toEqual([{ note_id: 'n1', auth: { token: 'jwt' } }]);
+    // 0.12's name for the same join goes too.
+    expect(fake.emitted.filter((e) => e.event === 'note:join').map((e) => e.args[0])).toEqual([{ note_id: 'n1', auth: { token: 'jwt' } }]);
+    session.watchNote('n1', () => undefined);
+    expect(joins()).toHaveLength(1);
+    fake.fire('events:note', { id: 'n1', title: 'T' });
+    fake.fire('events:note', { id: 'n2', title: 'Other' });
+    fake.fire('events:note', 'junk');
+    expect(seen).toEqual([{ id: 'n1', title: 'T' }]);
+    fake.fire('disconnect');
+    fake.serverConnects();
+    fake.pendingAcks[1]?.ack(null, { id: 'u1', name: 'Test' });
+    expect(joins()).toHaveLength(2);
+    stop();
+    expect(fake.emitted.filter((e) => e.event === 'note:leave').map((e) => e.args[0])).toEqual([]);
+    fake.fire('events:note', { id: 'n1', title: 'Again' });
+    expect(seen).toHaveLength(1);
+    const stopLast = session.watchNote('n3', () => undefined);
+    stopLast();
+    expect(fake.emitted.filter((e) => e.event === 'note:leave').map((e) => e.args[0])).toEqual([{ note_id: 'n3' }]);
+  });
+
   it('passes chat events to listeners and ignores malformed ones', () => {
     const { fake, session } = open();
     const seen: ChatEventEnvelope[] = [];

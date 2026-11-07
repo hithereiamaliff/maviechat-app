@@ -41,6 +41,8 @@ interface MarkdownProps {
   foldCode?: boolean;
   /** Being written: new words fade in (the web's "Fade Effect for Streaming Text"). */
   fadeIn?: boolean;
+  /** Checklist boxes can be ticked (a note's): called with the box's place among the text's boxes, from 0. */
+  onToggleTask?: (index: number) => void;
 }
 
 interface Context {
@@ -60,10 +62,12 @@ interface Context {
   fade: { token: Token; start: number; state: StreamFade } | null;
   /** A chosen chat direction for text (none: automatic). */
   textDir?: TextStyle;
+  /** Tickable checklist boxes, counted in the order they're drawn (the text's order). */
+  tasks?: { toggle: (index: number) => void; next: number };
 }
 
 /** Renders markdown as native views (no web view). */
-export const Markdown = memo(function Markdown({ text, muted = false, sources, baseUrl, token, foldCode = false, fadeIn = false }: MarkdownProps) {
+export const Markdown = memo(function Markdown({ text, muted = false, sources, baseUrl, token, foldCode = false, fadeIn = false, onToggleTask }: MarkdownProps) {
   const palette = usePalette();
   const dark = useColorScheme() === 'dark';
   const toast = useToast();
@@ -87,6 +91,7 @@ export const Markdown = memo(function Markdown({ text, muted = false, sources, b
     dark,
     fade: tail && fadeState ? { ...tail, state: fadeState } : null,
     textDir: direction.text,
+    tasks: onToggleTask ? { toggle: onToggleTask, next: 0 } : undefined,
   };
   return <View style={direction.view}>{tokens.map((block, index) => renderBlock(block, `${index}`, context))}</View>;
 });
@@ -217,9 +222,7 @@ function renderList(list: Tokens.List, key: string, context: Context): ReactNode
       {list.items.map((item, index) => (
         <View key={`${key}.${index}`} style={styles.listItem}>
           {item.task ? (
-            <View style={[styles.checkbox, { borderColor: context.palette.textMuted }]}>
-              {item.checked ? <Icon name="check" size={12} color={context.color} strokeWidth={2.5} /> : null}
-            </View>
+            renderCheckbox(Boolean(item.checked), context)
           ) : (
             <Text style={[styles.bullet, { color: context.palette.textMuted }]}>{list.ordered ? `${start + index}.` : '•'}</Text>
           )}
@@ -231,6 +234,24 @@ function renderList(list: Tokens.List, key: string, context: Context): ReactNode
         </View>
       ))}
     </View>
+  );
+}
+
+/** A checklist box: drawn, or (in a note) a button that ticks it. */
+function renderCheckbox(checked: boolean, context: Context): ReactNode {
+  const box = (
+    <View style={[styles.checkbox, { borderColor: context.palette.textMuted }]}>
+      {checked ? <Icon name="check" size={12} color={context.color} strokeWidth={2.5} /> : null}
+    </View>
+  );
+  const tasks = context.tasks;
+  if (!tasks) return box;
+  const index = tasks.next;
+  tasks.next += 1;
+  return (
+    <Pressable accessibilityRole="checkbox" accessibilityState={{ checked }} hitSlop={8} onPress={() => tasks.toggle(index)}>
+      {box}
+    </Pressable>
   );
 }
 

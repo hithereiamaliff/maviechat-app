@@ -1,14 +1,16 @@
 import { groupByTime, type ChatListItem, type FolderNode } from '@maviechat/owui-protocol';
 
 export type SidebarRow =
-  | { type: 'header'; key: string; label: string; addFolder?: boolean }
+  | { type: 'header'; key: string; label: string; addFolder?: boolean; addNote?: boolean }
   /** `found`: a search result, shown with the text it matched. */
   | { type: 'chat'; key: string; chat: ChatListItem; depth: number; pinned: boolean; found?: true }
   /** Searching: a new chat with the search's words in the message box (the web's "Start a new conversation"). */
   | { type: 'newChatWith'; key: string; text: string }
   | { type: 'folder'; key: string; folder: FolderNode; depth: number; expanded: boolean }
   | { type: 'note'; key: string; label: string; depth: number }
-  | { type: 'model'; key: string; id: string; name: string };
+  | { type: 'model'; key: string; id: string; name: string }
+  /** A note pinned to the sidebar (the web's Notes section). */
+  | { type: 'pinnedNote'; key: string; id: string; title: string };
 
 interface BuildInput {
   /** `text`: the search's words without its filters. */
@@ -16,6 +18,8 @@ interface BuildInput {
   pinned: ChatListItem[];
   /** Models kept in the sidebar (the web's Models section), in their order. */
   pinnedModels?: { id: string; name: string }[];
+  /** Notes pinned to the sidebar (the web's Notes section), shown while notes are on. */
+  pinnedNotes?: { id: string; title: string }[];
   folders: FolderNode[];
   /** Folders are on for this account: their heading shows (with New Folder) even before there are any. */
   foldersOn?: boolean;
@@ -45,6 +49,11 @@ export function buildSidebarRows(input: BuildInput): SidebarRow[] {
   if (input.pinnedModels?.length) {
     rows.push({ type: 'header', key: 'h-models', label: 'Models' });
     for (const model of input.pinnedModels) rows.push({ type: 'model', key: `model-${model.id}`, id: model.id, name: model.name });
+  }
+
+  if (input.pinnedNotes?.length) {
+    rows.push({ type: 'header', key: 'h-notes', label: 'Notes', addNote: true });
+    for (const note of input.pinnedNotes) rows.push({ type: 'pinnedNote', key: `note-${note.id}`, id: note.id, title: note.title });
   }
 
   if (input.pinned.length > 0) {

@@ -1,16 +1,19 @@
 import {
   canUseWorkspace,
   CHAT_PAGE_SIZE,
+  createNote,
   folderTree,
   listChats,
   listFolderChats,
   listFolders,
   listPinnedChats,
+  noteTitle,
   searchChats,
   searchText,
   SEARCH_PAGE_SIZE,
   setFolderExpanded,
   sidebarShortcuts,
+  toggleNotePinned,
   type FolderNode,
   type ShortcutId,
 } from '@maviechat/owui-protocol';
@@ -22,6 +25,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
 import { MenuButton, type MenuItem } from '@/components/Menu';
+import { useToast } from '@/components/Toast';
 import { useAccountsSheet, useOwuiAccountSignOut } from '@/features/accounts/AccountsSheet';
 import { ModelAvatar } from '@/features/chat/ModelAvatar';
 import { usePinnedModels } from '@/features/chat/usePinnedModels';
@@ -31,6 +35,8 @@ import { useTagsSheet } from '@/features/chats/TagsSheet';
 import { useChatActions } from '@/features/chats/useChatActions';
 import { switchToDeepTutor, switchToOpenCode } from '@/features/deeptutor/switch';
 import { useFolderActions } from '@/features/folders/useFolderActions';
+import { useNotesOn, usePinnedNotes } from '@/features/notes/queries';
+import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useServerConfig, useSessionUser, useUserSettings } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
@@ -43,7 +49,7 @@ import { SearchSnippet } from './SearchSnippet';
 import { buildSidebarRows, isUnread, type SidebarRow } from './rows';
 import { useSidebar } from './SidebarContext';
 
-/** The pages the web can pin under Search: Workspace opens here; the rest open on the web. */
+/** The pages the web can pin under Search: Notes and Workspace open here; the rest open on the web. */
 const SHORTCUTS: Record<ShortcutId, { label: string; icon: IconName; path: string }> = {
   notes: { label: 'Notes', icon: 'document-text', path: '/notes' },
   workspace: { label: 'Workspace', icon: 'squares-2x2', path: '/workspace' },
@@ -102,6 +108,9 @@ export function Sidebar() {
     return results.data.pages.flat().filter((chat) => !seen.has(chat.id) && Boolean(seen.add(chat.id)));
   }, [results.data]);
   const pinnedModels = usePinnedModels();
+  const toast = useToast();
+  const notesOn = useNotesOn();
+  const pinnedNotes = usePinnedNotes();
 
   // Refresh when the sidebar opens; socket-driven updates arrive with sending (next slice).
   useEffect(() => {
@@ -141,6 +150,7 @@ export function Sidebar() {
         search: { active: searching, results: found, loading: results.isFetching, text: searchText(query) },
         pinned: pinned.data ?? [],
         pinnedModels: pinnedModels.visible.map((model) => ({ id: model.id, name: model.name ?? model.id })),
+        pinnedNotes: notesOn ? (pinnedNotes.data ?? []).map((note) => ({ id: note.id, title: noteTitle(note) })) : [],
         folders: foldersOn ? tree : [],
         foldersOn,
         isExpanded: (folder) => expanded[folder.id] ?? folder.is_expanded ?? false,
@@ -148,7 +158,7 @@ export function Sidebar() {
         chats: chats.data?.pages.flat() ?? [],
         chatsLoading: chats.isLoading,
       }),
-    [searching, found, results.isFetching, query, pinned.data, pinnedModels.visible, foldersOn, tree, expanded, folderChats, openFolderIds, chats.data, chats.isLoading],
+    [searching, found, results.isFetching, query, pinned.data, pinnedModels.visible, notesOn, pinnedNotes.data, foldersOn, tree, expanded, folderChats, openFolderIds, chats.data, chats.isLoading],
   );
 
   const openChat = (id: string) => {
@@ -191,6 +201,29 @@ export function Sidebar() {
     sidebar.close();
     router.push('/workspace');
   };
+  const openNotes = () => {
+    sidebar.close();
+    router.push('/notes');
+  };
+  const openNote = (id: string) => {
+    sidebar.close();
+    router.push({ pathname: '/notes/[id]', params: { id } });
+  };
+  const unpinNote = (id: string) =>
+    void toggleNotePinned(client, id).then(
+      () => void queryClient.invalidateQueries({ queryKey: ['notes'] }),
+      (error: unknown) => toast(`Couldn’t unpin it: ${describeError(error)}`, 'error'),
+    );
+  // The Notes section's +, as on the web: a note named "New Note", opened to write in.
+  const newNote = () =>
+    void createNote(client, { title: 'New Note' }).then(
+      (note) => {
+        void queryClient.invalidateQueries({ queryKey: ['notes'] });
+        sidebar.close();
+        router.push({ pathname: '/notes/[id]', params: { id: note.id, new: '1' } });
+      },
+      (error: unknown) => toast(`Couldn’t make a note: ${describeError(error)}`, 'error'),
+    );
   // The user's own order, once their settings have loaded (so a customised list never flashes the defaults).
   const shortcuts =
     capabilities && !settings.isPending
@@ -273,7 +306,12 @@ export function Sidebar() {
   const renderRow = ({ item }: { item: SidebarRow }) => {
     switch (item.type) {
       case 'header':
-        return <SidebarHeading label={item.label} action={item.addFolder ? { icon: 'plus', label: 'New Folder', onPress: folderActions.newFolder } : undefined} />;
+        return (
+          <SidebarHeading
+            label={item.label}
+            action={item.addFolder ? { icon: 'plus', label: 'New Folder', onPress: folderActions.newFolder } : item.addNote ? { icon: 'plus', label: 'New Note', onPress: newNote } : undefined}
+          />
+        );
       case 'note':
         return <SidebarNote label={item.label} depth={item.depth} />;
       case 'newChatWith':
@@ -292,6 +330,21 @@ export function Sidebar() {
             <MenuButton
               items={[{ key: 'unpin', label: 'Hide from Sidebar', icon: 'bookmark-slash', onPress: () => pinnedModels.toggle(item.id) }]}
               label={`Options for ${item.name}`}
+              size={18}
+              color={palette.textMuted}
+            />
+          </Pressable>
+        );
+      case 'pinnedNote':
+        return (
+          <Pressable accessibilityRole="button" accessibilityHint="Opens the note" onPress={() => openNote(item.id)} style={({ pressed }) => [styles.row, styles.modelRow, pressed && { backgroundColor: palette.sidebarActive }]}>
+            <Icon name="document-text" size={18} color={palette.textMuted} />
+            <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <MenuButton
+              items={[{ key: 'unpin', label: 'Unpin from Sidebar', icon: 'bookmark-slash', onPress: () => unpinNote(item.id) }]}
+              label={`Options for ${item.title}`}
               size={18}
               color={palette.textMuted}
             />
@@ -400,8 +453,8 @@ export function Sidebar() {
               key={id}
               icon={SHORTCUTS[id].icon}
               label={SHORTCUTS[id].label}
-              hint={id === 'workspace' ? undefined : 'Opens on the web'}
-              onPress={() => (id === 'workspace' ? openWorkspace() : openOnWeb(SHORTCUTS[id].path))}
+              hint={id === 'workspace' || id === 'notes' ? undefined : 'Opens on the web'}
+              onPress={() => (id === 'workspace' ? openWorkspace() : id === 'notes' ? openNotes() : openOnWeb(SHORTCUTS[id].path))}
             />
           ))
         : null}

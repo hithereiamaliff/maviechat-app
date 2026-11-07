@@ -32,7 +32,7 @@ const base = {
 
 const summary = (rows: ReturnType<typeof buildSidebarRows>) =>
   rows.map((row) =>
-    row.type === 'chat' ? `${'  '.repeat(row.depth)}${row.chat.id}` : row.type === 'folder' ? `${'  '.repeat(row.depth)}[${row.folder.name}]` : row.type === 'model' ? `<${row.name}>` : row.type === 'newChatWith' ? `new:${row.text}` : `${row.type}:${row.label}`,
+    row.type === 'chat' ? `${'  '.repeat(row.depth)}${row.chat.id}` : row.type === 'folder' ? `${'  '.repeat(row.depth)}[${row.folder.name}]` : row.type === 'model' ? `<${row.name}>` : row.type === 'pinnedNote' ? `{${row.title}}` : row.type === 'newChatWith' ? `new:${row.text}` : `${row.type}:${row.label}`,
   );
 
 describe('buildSidebarRows', () => {
@@ -65,6 +65,13 @@ describe('buildSidebarRows', () => {
     const rows = buildSidebarRows({ ...base, pinnedModels: [{ id: 'gpt', name: 'GPT' }], pinned: [chat('p1', sec(2026, 9, 1))], chats: [] });
     expect(summary(rows)).toEqual(['header:Models', '<GPT>', 'header:Pinned', 'p1']);
     expect(summary(buildSidebarRows({ ...base, pinnedModels: [{ id: 'gpt', name: 'GPT' }], chats: [], search: { active: true, results: [], loading: false } }))).toEqual(['note:No chats found']);
+  });
+
+  it('puts pinned notes under Notes, after the models, with New Note on the heading', () => {
+    const rows = buildSidebarRows({ ...base, pinnedModels: [{ id: 'gpt', name: 'GPT' }], pinnedNotes: [{ id: 'n1', title: 'Shopping' }], pinned: [chat('p1', sec(2026, 9, 1))], chats: [] });
+    expect(summary(rows)).toEqual(['header:Models', '<GPT>', 'header:Notes', '{Shopping}', 'header:Pinned', 'p1']);
+    expect(rows.find((row) => row.key === 'h-notes')).toMatchObject({ addNote: true });
+    expect(summary(buildSidebarRows({ ...base, pinnedNotes: [], chats: [] }))).not.toContain('header:Notes');
   });
 
   it('keeps the Folders heading, with New Folder, while folders are on and there are none yet', () => {

@@ -7,3 +7,4 @@ export * from './lexer';
 export { isClosedCodeBlock } from './fences';
 export * from './html';
 export * from './speech';
+export * from './noteHtml';

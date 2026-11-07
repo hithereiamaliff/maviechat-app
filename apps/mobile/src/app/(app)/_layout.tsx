@@ -52,6 +52,8 @@ export default function AppLayout() {
           }}>
           <Stack.Screen name="connection" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="workspace" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+          <Stack.Screen name="notes/index" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+          <Stack.Screen name="notes/[id]" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="knowledge/[id]" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="admin/index" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="admin/user" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
