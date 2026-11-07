@@ -6,6 +6,7 @@ import { PushSetup } from '@/features/notifications/PushSetup';
 import { Sidebar } from '@/features/sidebar/Sidebar';
 import { SpaceDrawer } from '@/features/sidebar/SpaceDrawer';
 import { signedOutRoute } from '@/features/welcome/entry';
+import { setLinkServer } from '@/lib/serverLinks';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useOpenCode } from '@/session/OpenCodeProvider';
 import { useSession } from '@/session/SessionProvider';
@@ -27,6 +28,14 @@ export default function AppLayout() {
   useEffect(() => {
     if (showing) void saveSpace('owui');
   }, [showing]);
+
+  // Links to this account's server open in the app while you're in this space (see lib/serverLinks).
+  const linkBase = showing && state.status === 'signed-in' ? state.session.baseUrl : null;
+  const linkToken = showing && state.status === 'signed-in' ? state.session.token : null;
+  useEffect(() => {
+    setLinkServer(linkBase && linkToken ? { baseUrl: linkBase, token: linkToken } : null);
+    return () => setLinkServer(null);
+  }, [linkBase, linkToken]);
 
   if (launch === 'pending') return null;
   if (launch === 'deeptutor') return <Redirect href="/learn" />;
@@ -55,6 +64,7 @@ export default function AppLayout() {
           <Stack.Screen name="notes/index" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="notes/[id]" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="knowledge/[id]" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
+          <Stack.Screen name="s/[id]" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="admin/index" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="admin/user" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="admin/group" options={{ animation: 'slide_from_right', gestureEnabled: true }} />

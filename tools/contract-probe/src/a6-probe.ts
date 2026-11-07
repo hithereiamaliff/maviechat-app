@@ -115,6 +115,9 @@ export async function probeA6(input: A6Input): Promise<{ steps: WriteStep[]; fix
         const url = sharedChatUrl(input.baseUrl, shareId);
         const opened = await getSharedChat(client, shareId);
         if (opened.title !== 'APP PROBE: A6' || !chatPlainText(opened).includes('Kuala Lumpur')) throw new Error('the link shows something else');
+        // The app's shared chat page clones by this id and names the sharer from this.
+        if (opened.id !== shareId) throw new Error('the shared chat’s id isn’t its share id');
+        if (opened.user_id !== input.userId) throw new Error('the shared chat doesn’t name who shared it');
         const start = await getShareAccess(client, id);
         if (shareVisibility(start) !== 'private') throw new Error(`a new link is ${shareVisibility(start)}`);
         // Shared with yourself (a named person) and read back; then made public, which the server

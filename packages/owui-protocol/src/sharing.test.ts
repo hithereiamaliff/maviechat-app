@@ -8,6 +8,7 @@ import {
   cleanTagName,
   cloneChat,
   cloneSharedChat,
+  getSharedChat,
   exportFileName,
   forkChat,
   getShareAccess,
@@ -136,5 +137,11 @@ describe('downloads', () => {
     expect(exportFileName(chat.title, 'txt')).toBe('chat-Taxes 2026 27.txt');
     expect(exportFileName('', 'json')).toBe('chat-export-chat.json');
     expect(exportFileName(chat.title, 'pdf')).toBe('chat-Taxes 2026 27.pdf');
+  });
+
+  it('reads a chat shared by link, for reading', async () => {
+    const { client, calls } = recordingClient({ id: 's 1', title: 'Shared', chat: { history: { messages: {}, currentId: null } }, updated_at: 1, created_at: 1 });
+    expect((await getSharedChat(client, 's 1')).title).toBe('Shared');
+    expect(calls[0]?.url).toBe('https://x.test/api/v1/chats/share/s%201');
   });
 });

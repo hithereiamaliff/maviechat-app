@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -29,7 +30,9 @@ export default function Workspace() {
   const { session } = useAuthed();
   const capabilities = useCapabilities();
   const allowed = AREAS.filter((area) => (capabilities?.isAdmin || capabilities?.can(`workspace.${area.key}`)) && (area.key !== 'tools' || capabilities?.feature('tools')));
-  const [picked, setPicked] = useState<Area | null>(null);
+  // A link to a Workspace area (`/workspace/prompts`) opens on its tab.
+  const { area: linked } = useLocalSearchParams<{ area?: string }>();
+  const [picked, setPicked] = useState<Area | null>(() => AREAS.find((item) => item.key === linked)?.key ?? null);
   const area = allowed.find((item) => item.key === picked)?.key ?? allowed[0]?.key ?? null;
   const tabs = (count?: number) => (
     <SideScroll showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs} accessibilityRole="tablist">
