@@ -1,10 +1,10 @@
 import { EMOJI_GROUPS, EMOJI_LINES } from './emoji.generated';
 
 /*
- * Emoji as Open WebUI names them: a status keeps an emoji's first short name ("grinning"), and the
- * web's picker remembers recent ones by code points ("1F600"), both from the same emoji list the
- * app carries (emoji-datasource). Skin tones aren't in it; an emoji it doesn't have travels as
- * itself, which the web shows as it is.
+ * Emoji as Open WebUI names them: a status and a folder's icon keep an emoji's first short name
+ * ("grinning"), and the web's picker remembers recent ones by code points ("1F600"), both from the
+ * same emoji list the app carries (emoji-datasource). Skin tones aren't in it; an emoji it doesn't
+ * have travels as itself, which the web shows as it is.
  */
 
 export interface Emoji {
@@ -49,8 +49,8 @@ function emojiTable() {
   return table;
 }
 
-/** The emoji a status keeps (a short name, with or without colons), or what it holds when that's no name. */
-export function statusEmoji(saved: string): string {
+/** The emoji a short name stands for (a status's or a folder's icon, with or without colons), or the text itself when it's no name. */
+export function emojiOfName(saved: string): string {
   const name = saved.trim().replace(/^:(.+):$/, '$1');
   return emojiTable().byName.get(name)?.char ?? saved.trim();
 }
@@ -62,8 +62,8 @@ export function findEmoji(char: string): Emoji | undefined {
   return byCode.get(codeOf(plain)) ?? byCode.get(codeOf(plain.replace(VARIATION, '')));
 }
 
-/** What a status saves for an emoji: its short name, so the web shows it; else the emoji itself. */
-export function statusShortName(char: string): string {
+/** What a status or a folder's icon saves for an emoji: its short name, so the web shows it; else the emoji itself. */
+export function nameOfEmoji(char: string): string {
   return findEmoji(char)?.names[0] ?? char;
 }
 

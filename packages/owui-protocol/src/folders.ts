@@ -30,7 +30,7 @@ export function setFolderExpanded(client: OwuiClient, id: string, expanded: bool
 
 /** How the folder looks. */
 export interface FolderMeta {
-  /** An emoji's short code, from the web's icon picker. */
+  /** The folder's icon: an emoji's short name (`grinning`), as the web's picker saves it; '' for none. */
   icon?: string | null;
   /** A picture behind the folder's page: a data URL, or null for none. */
   background_image_url?: string | null;

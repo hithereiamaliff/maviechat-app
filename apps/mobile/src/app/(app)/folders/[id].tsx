@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
+import { EmojiPicker } from '@/components/EmojiPicker';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
 import { ChatBackground } from '@/features/chat/ChatBackground';
@@ -16,6 +17,8 @@ import { useModelChoice } from '@/features/chat/useModelChoice';
 import { useSendMessage } from '@/features/chat/useSendMessage';
 import { useFolderActions } from '@/features/folders/useFolderActions';
 import { isUnread } from '@/features/sidebar/rows';
+import { emojiOfName, nameOfEmoji } from '@/lib/emoji';
+import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
 
@@ -29,9 +32,9 @@ function day(seconds: number): string {
 const sameIds = (a: string[], b: string[]) => a.length === b.length && a.every((id, index) => b[index] === id);
 
 /**
- * A folder's page, as on the web: its name (and from 0.12 its description), an input that starts
- * chats inside it with the folder's models, its chats, and its menu. Its picture, if it has one,
- * shows faintly behind.
+ * A folder's page, as on the web: its icon (an emoji you pick, shown in the sidebar too), its
+ * name (and from 0.12 its description), an input that starts chats inside it with the folder's
+ * models, its chats, and its menu. Its picture, if it has one, shows faintly behind.
  */
 export default function FolderScreen() {
   const palette = usePalette();
@@ -57,6 +60,7 @@ export default function FolderScreen() {
   const { send } = useSendMessage();
   const folderActions = useFolderActions();
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [iconOpen, setIconOpen] = useState(false);
 
   const folder = folders.data?.find((item) => item.id === folderId);
   const missing = capabilities !== null && (!foldersOn || (folders.isSuccess && !folder));
@@ -66,6 +70,19 @@ export default function FolderScreen() {
   const backgroundUrl = detail.data?.meta?.background_image_url;
   const background = typeof backgroundUrl === 'string' && backgroundUrl ? backgroundUrl : null;
   const listed = chats.data?.pages.flat() ?? [];
+  // The web's folder icon: an emoji's short name in `meta.icon` ('' for none).
+  const savedIcon = typeof folder?.meta?.icon === 'string' ? folder.meta.icon : '';
+  const icon = savedIcon ? emojiOfName(savedIcon) : '';
+  const setIcon = (picked: string | null) => {
+    updateFolder(client, folderId, { meta: { icon: picked ? nameOfEmoji(picked) : '' } }).then(
+      () => {
+        toast(picked ? 'Folder icon changed' : 'Folder icon removed');
+        void queryClient.invalidateQueries({ queryKey: ['folders'] });
+        void queryClient.invalidateQueries({ queryKey: ['folder', folderId] });
+      },
+      (error: unknown) => toast(`Couldn’t change the folder’s icon: ${describeError(error)}`, 'error'),
+    );
+  };
 
   // The web of 0.11 keeps the models last picked on a folder's page as the folder's own; from 0.12 they're set in its form.
   const pickModels = (ids: string[]) => {
@@ -129,7 +146,14 @@ export default function FolderScreen() {
         <KeyboardAvoidingView behavior="padding" style={styles.screen}>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
             <View style={styles.greeting}>
-              <Icon name="folder-open" size={30} color={palette.textMuted} />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={icon ? `Folder icon ${icon}, change it` : 'Choose a folder icon'}
+                disabled={!folder}
+                onPress={() => setIconOpen(true)}
+                style={({ pressed }) => [styles.icon, { backgroundColor: pressed ? palette.surfaceStrong : palette.surface }]}>
+                {icon ? <Text style={styles.iconEmoji}>{icon}</Text> : <Icon name="folder-open" size={24} color={palette.textMuted} />}
+              </Pressable>
               <Text style={[styles.title, { color: palette.text }]} numberOfLines={2}>
                 {folder?.name ?? ''}
               </Text>
@@ -197,6 +221,7 @@ export default function FolderScreen() {
         onClose={() => setPickerOpen(false)}
       />
       {folderActions.element}
+      <EmojiPicker visible={iconOpen} selected={icon || undefined} onClose={() => setIconOpen(false)} onPick={setIcon} />
     </View>
   );
 }
@@ -205,6 +230,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { flexGrow: 1, paddingTop: 32, paddingBottom: 48, gap: 20 },
   greeting: { paddingHorizontal: 24, gap: 8, alignItems: 'center' },
+  icon: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  iconEmoji: { fontSize: 28 },
   title: { fontFamily: fonts.semibold, fontSize: 24, textAlign: 'center' },
   description: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   chats: { paddingHorizontal: 16, gap: 6 },

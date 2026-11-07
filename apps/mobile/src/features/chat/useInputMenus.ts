@@ -21,7 +21,7 @@ import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { useToast } from '@/components/Toast';
-import { emojiForShortName } from '@/lib/emoji';
+import { emojiForShortName, emojiOfName } from '@/lib/emoji';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useKnowledgeSearch, useModels, usePrompts, useSessionUser, useUserSettings } from '@/lib/server';
 import { attachPageToDraft } from './attachPage';
@@ -163,6 +163,7 @@ export function useInputMenus({ draftKey, text, cursor, focused, setText, onPick
           key: `f-${folder.id}`,
           section: 'Folders',
           icon: 'folder',
+          glyph: typeof folder.meta?.icon === 'string' && folder.meta.icon ? emojiOfName(folder.meta.icon) : undefined,
           title: folder.name,
           onPick: () => {
             place('');

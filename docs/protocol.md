@@ -83,7 +83,7 @@ This is a spec written from reading Open WebUI's source (v0.12.5, read 2026-11-0
 - Tags: `GET|POST|DELETE /{id}/tags`.
 - Import: `POST /import`.
 
-**Folders:** `GET|POST /api/v1/folders/`, `/{id}`, `/{id}/update`, `/{id}/update/parent`, `/{id}/read`, `DELETE /{id}`.
+**Folders:** `GET|POST /api/v1/folders/`, `/{id}`, `/{id}/update`, `/{id}/update/parent`, `/{id}/read`, `DELETE /{id}`. A folder's icon is `meta.icon`, an emoji's short name (`tada`, as for a status; '' for none), set with `/{id}/update {meta: {icon}}` (the server merges `meta`) and carried by the folder list too (`--folders` probe ✓ on 0.11.3 and 0.12.5).
 
 **Files**
 - Upload: `POST /api/v1/files/?process=` with multipart `file` plus `metadata` JSON. Images use `process=false`.

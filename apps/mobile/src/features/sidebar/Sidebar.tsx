@@ -30,6 +30,7 @@ import { MenuButton, type MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
 import { useAccountsSheet, useOwuiAccountSignOut } from '@/features/accounts/AccountsSheet';
 import { statusLine, useSetStatus, useStatusSheet } from '@/features/sidebar/StatusSheet';
+import { emojiOfName } from '@/lib/emoji';
 import { ModelAvatar } from '@/features/chat/ModelAvatar';
 import { usePinnedModels } from '@/features/chat/usePinnedModels';
 import { useFolderPicker } from '@/features/chats/FolderPicker';
@@ -387,7 +388,11 @@ export function Sidebar() {
               style={styles.chevron}>
               <Icon name={item.expanded ? 'chevron-down' : 'chevron-right'} size={12} color={palette.textMuted} strokeWidth={2} />
             </Pressable>
-            <Icon name={item.expanded ? 'folder-open' : 'folder'} size={17} color={palette.textMuted} />
+            {typeof item.folder.meta?.icon === 'string' && item.folder.meta.icon ? (
+              <Text style={styles.folderEmoji}>{emojiOfName(item.folder.meta.icon)}</Text>
+            ) : (
+              <Icon name={item.expanded ? 'folder-open' : 'folder'} size={17} color={palette.textMuted} />
+            )}
             <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
               {item.folder.name}
             </Text>
@@ -512,4 +517,5 @@ const styles = StyleSheet.create({
   chevron: { width: 22, height: 30, alignItems: 'center', justifyContent: 'center' },
   modelRow: { paddingLeft: 12, gap: 10 },
   badge: { overflow: 'hidden', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, fontFamily: fonts.medium, fontSize: 11, marginRight: 8 },
+  folderEmoji: { fontSize: 15, width: 17, textAlign: 'center' },
 });

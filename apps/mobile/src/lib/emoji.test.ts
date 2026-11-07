@@ -1,22 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { emojiChar, emojiForShortName, emojiGroups, findEmoji, firstEmoji, recentEmoji, searchEmoji, statusEmoji, statusShortName, withRecent } from './emoji';
+import { emojiChar, emojiForShortName, emojiGroups, findEmoji, firstEmoji, recentEmoji, searchEmoji, emojiOfName, nameOfEmoji, withRecent } from './emoji';
 
 describe('emoji as Open WebUI names them', () => {
   it('shows a status’s short name as its emoji, and anything else as it is', () => {
-    expect(statusEmoji('grinning')).toBe('😀');
-    expect(statusEmoji(':+1:')).toBe('👍');
-    expect(statusEmoji('🫠')).toBe('🫠');
-    expect(statusEmoji('not_a_name')).toBe('not_a_name');
+    expect(emojiOfName('grinning')).toBe('😀');
+    expect(emojiOfName(':+1:')).toBe('👍');
+    expect(emojiOfName('🫠')).toBe('🫠');
+    expect(emojiOfName('not_a_name')).toBe('not_a_name');
   });
 
   it('saves an emoji by its first short name, skin tone left off; one without a name as itself', () => {
-    expect(statusShortName('😀')).toBe('grinning');
-    expect(statusShortName('👍🏽')).toBe('+1');
-    expect(statusShortName('❤')).toBe('heart');
-    expect(statusShortName('❤️')).toBe('heart');
-    expect(statusShortName('🇲🇾')).toBe('flag-my');
-    expect(statusShortName('#️⃣')).toBe('hash');
-    expect(statusShortName('x')).toBe('x');
+    expect(nameOfEmoji('😀')).toBe('grinning');
+    expect(nameOfEmoji('👍🏽')).toBe('+1');
+    expect(nameOfEmoji('❤')).toBe('heart');
+    expect(nameOfEmoji('❤️')).toBe('heart');
+    expect(nameOfEmoji('🇲🇾')).toBe('flag-my');
+    expect(nameOfEmoji('#️⃣')).toBe('hash');
+    expect(nameOfEmoji('x')).toBe('x');
   });
 
   it('finds the emoji the keyboard typed, joined sequences and flags whole', () => {

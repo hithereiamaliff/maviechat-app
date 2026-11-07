@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { Modal } from '@/components/Modal';
+import { emojiOfName } from '@/lib/emoji';
 import { useAuthed } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
 import { useChatActions, type ChatRef } from './useChatActions';
@@ -61,11 +62,18 @@ function FolderSheet({
         <ScrollView contentContainerStyle={styles.list}>
           <Row icon="x-mark" label="No folder" depth={0} onPress={() => onPick(null)} />
           {rows.map(({ folder, depth }) => (
-            <Row key={folder.id} icon="folder" label={folder.name} depth={depth} onPress={() => onPick({ id: folder.id, name: folder.name })} />
+            <Row
+              key={folder.id}
+              icon="folder"
+              glyph={typeof folder.meta?.icon === 'string' && folder.meta.icon ? emojiOfName(folder.meta.icon) : undefined}
+              label={folder.name}
+              depth={depth}
+              onPress={() => onPick({ id: folder.id, name: folder.name })}
+            />
           ))}
           {folders.isLoading ? <ActivityIndicator style={styles.loading} color={palette.textMuted} /> : null}
           {!folders.isLoading && rows.length === 0 ? (
-            <Text style={[styles.empty, { color: palette.textMuted }]}>No folders yet. Create one on the web for now.</Text>
+            <Text style={[styles.empty, { color: palette.textMuted }]}>No folders yet. Make one with the + beside Folders in the sidebar.</Text>
           ) : null}
         </ScrollView>
       </View>
@@ -73,14 +81,14 @@ function FolderSheet({
   );
 }
 
-function Row({ icon, label, depth, onPress }: { icon: 'folder' | 'x-mark'; label: string; depth: number; onPress: () => void }) {
+function Row({ icon, glyph, label, depth, onPress }: { icon: 'folder' | 'x-mark'; glyph?: string; label: string; depth: number; onPress: () => void }) {
   const palette = usePalette();
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.row, { paddingLeft: 12 + depth * 18 }, pressed && { backgroundColor: palette.surfaceStrong }]}>
-      <Icon name={icon} size={18} color={palette.textMuted} />
+      {glyph ? <Text style={styles.glyph}>{glyph}</Text> : <Icon name={icon} size={18} color={palette.textMuted} />}
       <Text style={[styles.label, { color: palette.text }]} numberOfLines={1}>
         {label}
       </Text>
@@ -105,6 +113,7 @@ const styles = StyleSheet.create({
   list: { paddingHorizontal: 8, paddingBottom: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44, paddingRight: 12, borderRadius: radius.md },
   label: { flex: 1, fontFamily: fonts.regular, fontSize: 15 },
+  glyph: { fontSize: 16, width: 18, textAlign: 'center' },
   loading: { marginVertical: 16 },
   empty: { fontFamily: fonts.regular, fontSize: 14, textAlign: 'center', marginVertical: 16, paddingHorizontal: 16 },
 });

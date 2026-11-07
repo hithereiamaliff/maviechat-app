@@ -31,7 +31,8 @@ interface FoldersInput {
 /**
  * Folders in the test account, with no model calls: an "APP PROBE:" folder made with settings
  * and read back; renamed and changed, with the keys left out kept (the server merges `data` and
- * `meta`); a folder made inside it, holding a probe chat; marked read; exported (the inner
+ * `meta`); its icon set (an emoji's short name, in the folder list too) and taken off; a folder
+ * made inside it, holding a probe chat; marked read; exported (the inner
  * folder's chat comes too); its sharing saved empty; then deleted keeping its chats, and the
  * chat checked to be out of any folder. The chat is deleted, or archived where the account may
  * not delete chats (and then moved out before the folder goes, since the server refuses to
@@ -80,6 +81,19 @@ export async function probeFolders(input: FoldersInput): Promise<{ steps: WriteS
       if (read.data?.system_prompt !== 'APP PROBE' || read.data?.description !== 'APP PROBE') throw new Error('data was replaced, not merged');
       if (!read.meta || !('background_image_url' in read.meta)) throw new Error('meta lost its key');
       return 'merged';
+    });
+
+    await check('its icon: an emoji’s short name, in the folder list too; taken off with empty', async () => {
+      await updateFolder(client, topId, { meta: { icon: 'tada' } });
+      const read = await getFolder(client, topId);
+      const listed = (await listFolders(client)).find((item) => item.id === topId);
+      fixture.icon = { read: read.meta?.icon === 'tada', listed: listed?.meta?.icon === 'tada', otherMetaKept: Boolean(read.meta && 'background_image_url' in read.meta) };
+      if (read.meta?.icon !== 'tada') throw new Error('the icon wasn’t kept');
+      if (listed?.meta?.icon !== 'tada') throw new Error('the folder list didn’t carry the icon');
+      if (!read.meta || !('background_image_url' in read.meta)) throw new Error('setting the icon dropped another meta key');
+      await updateFolder(client, topId, { meta: { icon: '' } });
+      if ((await getFolder(client, topId)).meta?.icon) throw new Error('the icon stayed');
+      return 'kept, listed with the folder, other meta kept; taken off';
     });
 
     await check('a folder made inside it, holding a probe chat', async () => {
