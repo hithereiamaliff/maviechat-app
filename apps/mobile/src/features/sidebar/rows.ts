@@ -2,13 +2,17 @@ import { groupByTime, type ChatListItem, type FolderNode } from '@maviechat/owui
 
 export type SidebarRow =
   | { type: 'header'; key: string; label: string; addFolder?: boolean }
-  | { type: 'chat'; key: string; chat: ChatListItem; depth: number; pinned: boolean }
+  /** `found`: a search result, shown with the text it matched. */
+  | { type: 'chat'; key: string; chat: ChatListItem; depth: number; pinned: boolean; found?: true }
+  /** Searching: a new chat with the search's words in the message box (the web's "Start a new conversation"). */
+  | { type: 'newChatWith'; key: string; text: string }
   | { type: 'folder'; key: string; folder: FolderNode; depth: number; expanded: boolean }
   | { type: 'note'; key: string; label: string; depth: number }
   | { type: 'model'; key: string; id: string; name: string };
 
 interface BuildInput {
-  search: { active: boolean; results: ChatListItem[] | undefined; loading: boolean };
+  /** `text`: the search's words without its filters. */
+  search: { active: boolean; results: ChatListItem[] | undefined; loading: boolean; text?: string };
   pinned: ChatListItem[];
   /** Models kept in the sidebar (the web's Models section), in their order. */
   pinnedModels?: { id: string; name: string }[];
@@ -27,9 +31,14 @@ export function buildSidebarRows(input: BuildInput): SidebarRow[] {
   const rows: SidebarRow[] = [];
 
   if (input.search.active) {
+    if (input.search.text) rows.push({ type: 'newChatWith', key: 'search-new-chat', text: input.search.text });
     if (input.search.loading && !input.search.results) rows.push({ type: 'note', key: 'search-loading', label: 'Searching…', depth: 0 });
     else if (input.search.results?.length === 0) rows.push({ type: 'note', key: 'search-empty', label: 'No chats found', depth: 0 });
-    for (const chat of input.search.results ?? []) rows.push({ type: 'chat', key: `search-${chat.id}`, chat, depth: 0, pinned: false });
+    // Dated, as the web shows results, each with the text it matched.
+    for (const section of groupByTime(input.search.results ?? [], input.now)) {
+      rows.push({ type: 'header', key: `hs-${section.group.key}`, label: section.group.label });
+      for (const chat of section.items) rows.push({ type: 'chat', key: `search-${chat.id}`, chat, depth: 0, pinned: false, found: true });
+    }
     return rows;
   }
 

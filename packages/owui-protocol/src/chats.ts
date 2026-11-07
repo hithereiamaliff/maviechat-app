@@ -62,6 +62,12 @@ export function searchChats(client: OwuiClient, text: string, page = 1): Promise
   return client.get<ChatListItem[]>('/api/v1/chats/search', { query: { text, page } });
 }
 
+/** A chat's text that matches a search (0.12+, whose search list leaves snippets out), or null. */
+export async function chatSearchSnippet(client: OwuiClient, id: string, text: string): Promise<string | null> {
+  const snippet = await client.get<unknown>(`${chatPath(id)}/search/snippet`, { query: { text } });
+  return typeof snippet === 'string' && snippet.trim() ? snippet : null;
+}
+
 export function listFolderChats(client: OwuiClient, folderId: string, page = 1): Promise<ChatListItem[]> {
   return client.get<ChatListItem[]>(`/api/v1/chats/folder/${encodeURIComponent(folderId)}/list`, { query: { page } });
 }

@@ -7,6 +7,8 @@ import {
   listFolders,
   listPinnedChats,
   searchChats,
+  searchText,
+  SEARCH_PAGE_SIZE,
   setFolderExpanded,
   sidebarShortcuts,
   type FolderNode,
@@ -37,6 +39,7 @@ import { useSession } from '@/session/SessionProvider';
 import { fonts, radius, usePalette } from '@/theme';
 import { SidebarAction, SidebarChatRow, SidebarHeading, SidebarNote, SidebarPanel, SidebarSearch, SidebarUser, sidebarStyles } from './parts';
 import { SearchFilters } from './SearchFilters';
+import { SearchSnippet } from './SearchSnippet';
 import { buildSidebarRows, isUnread, type SidebarRow } from './rows';
 import { useSidebar } from './SidebarContext';
 
@@ -85,7 +88,19 @@ export function Sidebar() {
   });
   const pinned = useQuery({ queryKey: ['chats', 'pinned'], queryFn: () => listPinnedChats(client) });
   const folders = useQuery({ queryKey: ['folders'], queryFn: () => listFolders(client), enabled: foldersOn });
-  const results = useQuery({ queryKey: ['chats', 'search', query], queryFn: () => searchChats(client, query), enabled: searching });
+  // The server answers a page of 60 at a time; more come as you scroll, as on the web.
+  const results = useInfiniteQuery({
+    queryKey: ['chats', 'search', query],
+    queryFn: ({ pageParam }) => searchChats(client, query, pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (last, all) => (last.length >= SEARCH_PAGE_SIZE ? all.length + 1 : undefined),
+    enabled: searching,
+  });
+  const found = useMemo(() => {
+    if (!results.data) return undefined;
+    const seen = new Set<string>();
+    return results.data.pages.flat().filter((chat) => !seen.has(chat.id) && Boolean(seen.add(chat.id)));
+  }, [results.data]);
   const pinnedModels = usePinnedModels();
 
   // Refresh when the sidebar opens; socket-driven updates arrive with sending (next slice).
@@ -123,7 +138,7 @@ export function Sidebar() {
   const rows = useMemo(
     () =>
       buildSidebarRows({
-        search: { active: searching, results: results.data, loading: results.isFetching },
+        search: { active: searching, results: found, loading: results.isFetching, text: searchText(query) },
         pinned: pinned.data ?? [],
         pinnedModels: pinnedModels.visible.map((model) => ({ id: model.id, name: model.name ?? model.id })),
         folders: foldersOn ? tree : [],
@@ -133,7 +148,7 @@ export function Sidebar() {
         chats: chats.data?.pages.flat() ?? [],
         chatsLoading: chats.isLoading,
       }),
-    [searching, results.data, results.isFetching, pinned.data, pinnedModels.visible, foldersOn, tree, expanded, folderChats, openFolderIds, chats.data, chats.isLoading],
+    [searching, found, results.isFetching, query, pinned.data, pinnedModels.visible, foldersOn, tree, expanded, folderChats, openFolderIds, chats.data, chats.isLoading],
   );
 
   const openChat = (id: string) => {
@@ -143,6 +158,12 @@ export function Sidebar() {
   const newChat = () => {
     sidebar.close();
     router.replace('/');
+  };
+  // The search's words in a new chat's message box (nothing is sent).
+  const newChatWith = (text: string) => {
+    sidebar.close();
+    setSearch(null);
+    router.replace({ pathname: '/', params: { q: text } });
   };
   const leaveIfCurrent = (id: string) => () => {
     if (id === currentChatId) router.replace('/');
@@ -255,6 +276,8 @@ export function Sidebar() {
         return <SidebarHeading label={item.label} action={item.addFolder ? { icon: 'plus', label: 'New Folder', onPress: folderActions.newFolder } : undefined} />;
       case 'note':
         return <SidebarNote label={item.label} depth={item.depth} />;
+      case 'newChatWith':
+        return <SidebarAction icon="pencil-square" label={`New chat with “${item.text}”`} hint="Puts these words in a new chat’s message box" onPress={() => newChatWith(item.text)} />;
       case 'model':
         return (
           <Pressable
@@ -323,6 +346,7 @@ export function Sidebar() {
             unread={isUnread(item.chat)}
             pinned={item.pinned}
             current={item.chat.id === currentChatId}
+            detail={item.found ? <SearchSnippet chatId={item.chat.id} snippet={item.chat.snippet} search={query} /> : undefined}
             onOpen={() => openChat(item.chat.id)}
             menu={[
               { key: 'rename', label: 'Rename', icon: 'pencil', onPress: () => actions.rename(item.chat) },
@@ -391,11 +415,13 @@ export function Sidebar() {
           keyboardShouldPersistTaps="handled"
           onEndReachedThreshold={0.5}
           onEndReached={() => {
-            if (!searching && chats.hasNextPage && !chats.isFetchingNextPage) void chats.fetchNextPage();
+            if (searching) {
+              if (results.hasNextPage && !results.isFetchingNextPage) void results.fetchNextPage();
+            } else if (chats.hasNextPage && !chats.isFetchingNextPage) void chats.fetchNextPage();
           }}
           refreshing={false}
           onRefresh={() => void queryClient.invalidateQueries({ queryKey: ['chats'] })}
-          ListFooterComponent={chats.isFetchingNextPage ? <ActivityIndicator style={sidebarStyles.more} color={palette.textMuted} /> : null}
+          ListFooterComponent={(searching ? results.isFetchingNextPage : chats.isFetchingNextPage) ? <ActivityIndicator style={sidebarStyles.more} color={palette.textMuted} /> : null}
           contentContainerStyle={sidebarStyles.listContent}
         />
       </View>

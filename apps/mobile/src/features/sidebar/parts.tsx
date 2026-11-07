@@ -98,6 +98,7 @@ export function SidebarChatRow({
   unread = false,
   pinned = false,
   mark,
+  detail,
   onOpen,
   menu,
 }: {
@@ -109,6 +110,8 @@ export function SidebarChatRow({
   pinned?: boolean;
   /** A colour before the title (DeepTutor: the status of the task the chat is linked to). */
   mark?: string;
+  /** A line under the title (a search result's matching text). */
+  detail?: ReactNode;
   onOpen: () => void;
   menu: MenuItem[];
 }) {
@@ -117,11 +120,22 @@ export function SidebarChatRow({
     <Pressable
       accessibilityRole="button"
       onPress={onOpen}
-      style={({ pressed }) => [styles.row, { paddingLeft: 12 + depth * 14 }, (current || pressed) && { backgroundColor: palette.sidebarActive }]}>
+      style={({ pressed }) => [styles.row, detail ? styles.rowTall : null, { paddingLeft: 12 + depth * 14 }, (current || pressed) && { backgroundColor: palette.sidebarActive }]}>
       {mark ? <View style={[styles.mark, { backgroundColor: mark }]} accessibilityLabel="Linked task status" /> : null}
-      <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
-        {title}
-      </Text>
+      {detail ? (
+        <View style={styles.titleBlock}>
+          <Text style={[styles.titleText, { color: palette.text }]} numberOfLines={1}>
+            {title}
+          </Text>
+          <Text style={[styles.detail, { color: palette.textMuted }]} numberOfLines={2}>
+            {detail}
+          </Text>
+        </View>
+      ) : (
+        <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>
+          {title}
+        </Text>
+      )}
       {busy ? (
         <ActivityIndicator size="small" color={palette.textMuted} />
       ) : !current && unread ? (
@@ -183,6 +197,10 @@ const styles = StyleSheet.create({
   note: { fontFamily: fonts.regular, fontSize: 13, paddingVertical: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, paddingRight: 0, borderRadius: radius.md },
   title: { flex: 1, fontFamily: fonts.regular, fontSize: 14 },
+  rowTall: { paddingVertical: 6 },
+  titleBlock: { flex: 1, gap: 2 },
+  titleText: { fontFamily: fonts.regular, fontSize: 14 },
+  detail: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 16 },
   dot: { width: 7, height: 7, borderRadius: 4 },
   mark: { width: 8, height: 8, borderRadius: 2 },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 6 },

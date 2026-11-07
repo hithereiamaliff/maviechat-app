@@ -98,6 +98,8 @@ interface ComposerProps {
   onFork?: () => void;
   /** A saved chat's `/compact` command, where the server has context compaction on. */
   onCompact?: () => void;
+  /** `/status`, once the chat has messages. */
+  onStatus?: () => void;
 }
 
 const NO_TOGGLES: Record<ToggleKey, boolean> = { webSearch: false, imageGeneration: false, codeInterpreter: false };
@@ -126,6 +128,7 @@ export function Composer({
   onTemporary,
   onFork,
   onCompact,
+  onStatus,
 }: ComposerProps) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
@@ -214,6 +217,7 @@ export function Composer({
     onTemporary,
     onFork,
     onCompact,
+    onStatus,
   });
 
   // Like the web, a model brings its own default toggles, tools, skills, filters and system when you start with it.

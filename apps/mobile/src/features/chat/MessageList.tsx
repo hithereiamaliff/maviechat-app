@@ -54,6 +54,8 @@ export interface MessageActions {
 export interface MessageListHandle {
   /** Brings a message into view (Overview). */
   scrollToMessage(id: string): void;
+  /** The chat's first message into view (the chat menu's Scroll to Top). */
+  scrollToTop(): void;
 }
 
 interface MessageListProps {
@@ -125,6 +127,10 @@ export function MessageList({
         if (index < 0) return;
         following.current = false;
         list.current?.scrollToIndex({ index, animated: true, viewPosition: 0 });
+      },
+      scrollToTop: () => {
+        following.current = false;
+        list.current?.scrollToOffset({ offset: 0, animated: true });
       },
     }),
     [messages],

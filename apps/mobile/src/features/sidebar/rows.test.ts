@@ -32,7 +32,7 @@ const base = {
 
 const summary = (rows: ReturnType<typeof buildSidebarRows>) =>
   rows.map((row) =>
-    row.type === 'chat' ? `${'  '.repeat(row.depth)}${row.chat.id}` : row.type === 'folder' ? `${'  '.repeat(row.depth)}[${row.folder.name}]` : row.type === 'model' ? `<${row.name}>` : `${row.type}:${row.label}`,
+    row.type === 'chat' ? `${'  '.repeat(row.depth)}${row.chat.id}` : row.type === 'folder' ? `${'  '.repeat(row.depth)}[${row.folder.name}]` : row.type === 'model' ? `<${row.name}>` : row.type === 'newChatWith' ? `new:${row.text}` : `${row.type}:${row.label}`,
   );
 
 describe('buildSidebarRows', () => {
@@ -81,14 +81,15 @@ describe('buildSidebarRows', () => {
     expect(summary(open)).toContain('note:Loading…');
   });
 
-  it('shows only results while searching', () => {
+  it('shows only results while searching, dated, after a new chat with the words', () => {
     const rows = buildSidebarRows({
       ...base,
       pinned: [chat('p1', 1)],
       chats: [chat('a', 1)],
-      search: { active: true, results: [chat('hit', 1)], loading: false },
+      search: { active: true, results: [chat('hit', sec(2026, 10, 1), { snippet: 'the budget' }), chat('old', sec(2026, 7, 2))], loading: false, text: 'budget' },
     });
-    expect(summary(rows)).toEqual(['hit']);
+    expect(summary(rows)).toEqual(['new:budget', 'header:Today', 'hit', 'header:August', 'old']);
+    expect(rows.find((row) => row.type === 'chat' && row.chat.id === 'hit')).toMatchObject({ found: true, chat: { snippet: 'the budget' } });
     expect(summary(buildSidebarRows({ ...base, chats: [], search: { active: true, results: [], loading: false } }))).toEqual([
       'note:No chats found',
     ]);

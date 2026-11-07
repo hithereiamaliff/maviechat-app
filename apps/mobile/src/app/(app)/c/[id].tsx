@@ -4,9 +4,12 @@ import {
   branchArtifacts,
   combineQueued,
   compactChat,
+  contextUsage,
+  contextUsageLabel,
   createChat,
   forkChat,
   isTemporaryChatId,
+  listChatTasks,
   messageBlocks,
   mergeInput,
   mergeResponses,
@@ -139,6 +142,7 @@ export default function ChatScreen() {
     if (copy) router.replace(`/c/${copy}`);
   };
   const menu: MenuItem[] = [
+    ...(messages.length > 1 ? [{ key: 'top', label: 'Scroll to Top', icon: 'arrow-up' as const, onPress: () => list.current?.scrollToTop() }] : []),
     // As on the web, only when the chat has some; the latest version first.
     ...(artifacts.length ? [{ key: 'artifacts', label: 'Artifacts', icon: 'cube' as const, onPress: () => setArtifactAt(artifacts.length - 1) }] : []),
     ...((chat && !temporary
@@ -315,6 +319,24 @@ export default function ChatScreen() {
     } catch (error) {
       toast(`Couldn't compact the chat: ${describeError(error)}`, 'error');
     }
+  };
+
+  // `/status`, as the web shows it: the context the chat uses (the server's figure while
+  // compaction is on, else the web's estimate), queued messages, what's running, the chat's id.
+  const showStatus = async () => {
+    const system = typeof settings.data?.ui?.system === 'string' ? settings.data.ui.system : '';
+    const usage = contextUsage(history, system, (chat as { context_usage?: unknown } | undefined)?.context_usage);
+    const running = temporary ? (streaming ? 1 : 0) : await listChatTasks(client, chatId).then((ids) => ids.length).catch(() => (streaming ? 1 : 0));
+    const lines = [
+      `Context: ${contextUsageLabel(usage)}`,
+      ...(queue.length ? [`Queued messages: ${queue.length}`] : []),
+      `Running: ${running ? (running === 1 ? 'a reply' : `${running} tasks`) : 'nothing'}`,
+      `Chat ID: ${temporary ? 'none (a temporary chat)' : chatId}`,
+    ];
+    Alert.alert('Status', lines.join('\n'), [
+      ...(temporary ? [] : [{ text: 'Copy Chat ID', onPress: () => void Clipboard.setStringAsync(chatId).then(() => toast('Copied to clipboard')) }]),
+      { text: 'OK', style: 'cancel' as const },
+    ]);
   };
 
   const onSend = async (message: OutgoingMessage) => {
@@ -614,6 +636,7 @@ export default function ChatScreen() {
             temporary={temporary}
             onFork={chat && !temporary && actions.canClone ? () => void fork() : undefined}
             onCompact={chat && !temporary && compactionOn ? () => void compact() : undefined}
+            onStatus={history?.currentId ? () => void showStatus() : undefined}
           />
         )}
       </KeyboardAvoidingView>

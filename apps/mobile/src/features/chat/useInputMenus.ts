@@ -1,6 +1,5 @@
 import {
   applyInputVariables,
-  attachWebAddress,
   fillBuiltinVariables,
   inputVariables,
   isWebAddress,
@@ -13,7 +12,6 @@ import {
   pickerModels,
   replaceTrigger,
   skillMention,
-  uuidv4,
   type InputVariable,
   type MenuTrigger,
   type SavedPrompt,
@@ -25,7 +23,8 @@ import { useState } from 'react';
 import { useToast } from '@/components/Toast';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useKnowledgeSearch, useModels, usePrompts, useSessionUser, useUserSettings } from '@/lib/server';
-import { getDraft, patchFile, removeFile, updateDraft } from './drafts';
+import { attachPageToDraft } from './attachPage';
+import { getDraft, updateDraft } from './drafts';
 import type { MenuEntry } from './MentionMenu';
 
 interface Options {
@@ -42,6 +41,8 @@ interface Options {
   onFork?: () => void;
   /** A saved chat's `/compact`, where the admin turned context compaction on. */
   onCompact?: () => void;
+  /** `/status`: what the chat uses and has running, once it has messages. */
+  onStatus?: () => void;
 }
 
 /**
@@ -50,7 +51,7 @@ interface Options {
  * for the server to add); `$` for skills alone; `@` for a model to talk to, knowledge, folders and
  * web pages; `#` for knowledge and web pages.
  */
-export function useInputMenus({ draftKey, text, cursor, focused, setText, onPickModel, onTemporary, onFork, onCompact }: Options) {
+export function useInputMenus({ draftKey, text, cursor, focused, setText, onPickModel, onTemporary, onFork, onCompact, onStatus }: Options) {
   const { client } = useAuthed();
   const toast = useToast();
   const capabilities = useCapabilities();
@@ -99,14 +100,7 @@ export function useInputMenus({ draftKey, text, cursor, focused, setText, onPick
 
   const attachWeb = async (url: string) => {
     place('');
-    const itemId = uuidv4();
-    updateDraft(draftKey, (draft) => ({ ...draft, files: [...draft.files, { type: 'text', id: null, url, name: url, status: 'uploading', itemId }] }));
-    try {
-      patchFile(draftKey, itemId, { ...(await attachWebAddress(client, url)), itemId });
-    } catch (error) {
-      removeFile(draftKey, itemId);
-      toast(`Couldn't attach that page: ${describeError(error)}`, 'error');
-    }
+    await attachPageToDraft(client, draftKey, url).catch((error: unknown) => toast(`Couldn't attach that page: ${describeError(error)}`, 'error'));
   };
 
   const entries: MenuEntry[] = [];
@@ -125,6 +119,7 @@ export function useInputMenus({ draftKey, text, cursor, focused, setText, onPick
       ...(onTemporary ? [{ id: 'temporary', title: 'Temporary', subtitle: 'Turn temporary chat on or off', run: onTemporary }] : []),
       ...(onCompact ? [{ id: 'compact', title: 'Compact', subtitle: 'Summarise the chat so far, to make room', run: onCompact }] : []),
       ...(onFork ? [{ id: 'fork', title: 'Fork', subtitle: 'Carry on in a copy of this chat', run: onFork }] : []),
+      ...(onStatus ? [{ id: 'status', title: 'Status', subtitle: 'What this chat uses and has running', run: onStatus }] : []),
     ].filter((command) => command.id.startsWith(query.toLowerCase()));
     for (const command of commands) {
       entries.push({
@@ -139,7 +134,9 @@ export function useInputMenus({ draftKey, text, cursor, focused, setText, onPick
                 ? 'rectangle-stack'
                 : command.id === 'compact'
                   ? 'bars-arrow-up'
-                  : 'eye-slash',
+                  : command.id === 'status'
+                    ? 'information-circle'
+                    : 'eye-slash',
         title: `/${command.id}`,
         subtitle: command.subtitle,
         onPick: () => {

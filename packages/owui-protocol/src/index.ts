@@ -12,6 +12,8 @@ export * from './auth';
 export * from './capabilities';
 export * from './chatgpt';
 export * from './chats';
+export * from './chatSearch';
+export * from './chatStatus';
 export * from './code';
 export * from './completions';
 export * from './data';

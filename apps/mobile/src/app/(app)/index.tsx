@@ -8,6 +8,7 @@ import { IconButton } from '@/components/IconButton';
 import { useToast } from '@/components/Toast';
 import { Banners } from '@/features/chat/Banners';
 import { ChatBackground, useChatBackground } from '@/features/chat/ChatBackground';
+import { attachPageToDraft } from '@/features/chat/attachPage';
 import { ChatHeader } from '@/features/chat/ChatHeader';
 import { chatLinkFrom, type ChatLink } from '@/features/chat/chatLink';
 import { Composer, type ComposerHandle, type OutgoingMessage } from '@/features/chat/Composer';
@@ -19,7 +20,8 @@ import { Suggestions } from '@/features/chat/Suggestions';
 import { useModelChoice } from '@/features/chat/useModelChoice';
 import { useSendMessage } from '@/features/chat/useSendMessage';
 import { openLink } from '@/lib/links';
-import { useCapabilities, useServerConfig, useSessionUser } from '@/lib/server';
+import { describeError } from '@/lib/errors';
+import { useAuthed, useCapabilities, useServerConfig, useSessionUser } from '@/lib/server';
 import { useInterface } from '@/lib/uiSettings';
 import { fonts, usePalette } from '@/theme';
 
@@ -71,6 +73,14 @@ function NewChat({ link }: { link: ChatLink }) {
   // defaults are in (the input bar sets those first), so they aren't replaced. Nothing is sent.
   const linkText = useRef(false);
   const linkSwitches = useRef(false);
+  // A link's pages (`load-url`, `youtube`) are attached once, as the web attaches them on load.
+  const { client } = useAuthed();
+  const linkPages = useRef(false);
+  useEffect(() => {
+    if (linkPages.current || !link.pages.length) return;
+    linkPages.current = true;
+    for (const url of link.pages) void attachPageToDraft(client, NEW_CHAT, url).catch((error: unknown) => toast(`Couldn't attach that page: ${describeError(error)}`, 'error'));
+  }, [link, client, toast]);
   useEffect(() => {
     if (linkText.current || link.text === null) return;
     linkText.current = true;
