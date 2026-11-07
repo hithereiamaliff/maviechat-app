@@ -5,6 +5,7 @@ import { deliveryProblem } from '@/features/notifications/iosDelivery';
 import { disablePush, enablePush, owuiAccountOf, sendTestPush, usePushState } from '@/features/notifications/push';
 import { describePushError, isRelayServer } from '@/features/notifications/relay';
 import { watchForTest, type TestWatch } from '@/features/notifications/testWatch';
+import { ANDROID, DEVICE, SYSTEM_SETTINGS } from '@/lib/device';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useOpenCode } from '@/session/OpenCodeProvider';
 import { useSession } from '@/session/SessionProvider';
@@ -136,7 +137,7 @@ export function NotificationSettings() {
       {problem ? <Text style={[styles.note, { color: palette.danger }]}>{problem}</Text> : null}
       {blocked ? (
         <Pressable accessibilityRole="button" onPress={() => void Linking.openSettings()} hitSlop={6}>
-          <Text style={[styles.note, { color: palette.link }]}>Notifications are off for MavieChat in iOS Settings. Open Settings</Text>
+          <Text style={[styles.note, { color: palette.link }]}>Notifications are off for MavieChat in {SYSTEM_SETTINGS}. Open Settings</Text>
         </Pressable>
       ) : null}
       {enabled && iosProblem ? (
@@ -146,17 +147,17 @@ export function NotificationSettings() {
       ) : null}
       {waitingForServer ? (
         <Text style={[styles.note, { color: palette.textMuted }]}>
-          {"This iPhone is ready, but Open WebUI hasn't reported any replies to MavieChat's notification service yet. An admin adds its webhook once, in Open WebUI's Settings: Admin → System → General → Events → Webhooks."}
+          {`This ${DEVICE} is ready, but Open WebUI hasn't reported any replies to MavieChat's notification service yet. An admin adds its webhook once, in Open WebUI's Settings: Admin → System → General → Events → Webhooks.`}
         </Text>
       ) : null}
       {relayServed ? (
         <Text style={[styles.note, { color: palette.textFaint }]}>
-          {"When a reply finishes or fails, MavieChat's notification service notifies this iPhone with the chat title and the start of the reply. Open WebUI tells it about every reply; DeepTutor's replies are handed to it as they start."}
+          {`When a reply finishes or fails, MavieChat's notification service notifies this ${DEVICE} with the chat title and the start of the reply. Open WebUI tells it about every reply; DeepTutor's replies are handed to it as they start.`}
         </Text>
       ) : null}
       {openCodePaired ? (
         <Text style={[styles.note, { color: palette.textFaint }]}>
-          {'For OpenCode sessions you start from this iPhone, the paired machine notifies it when they finish or fail, or need your approval or an answer, with the session title. Sessions started at the terminal don’t notify.'}
+          {`For OpenCode sessions you start from this ${DEVICE}, the paired machine notifies it when they finish or fail, or need your approval or an answer, with the session title. Sessions started at the terminal don’t notify.`}
         </Text>
       ) : null}
       <Text style={[styles.note, { color: palette.textFaint }]}>{'While MavieChat is open, every chat and session gets a banner except the one on screen.'}</Text>
@@ -177,11 +178,11 @@ export function NotificationSettings() {
 function describeTest(state: TestState): string {
   switch (state.step) {
     case 'waiting':
-      return 'Sent. Waiting for it to reach this iPhone…';
+      return `Sent. Waiting for it to reach this ${DEVICE}…`;
     case 'arrived':
-      return `Arrived on this iPhone at ${state.at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', second: '2-digit' })}. No banner? A Focus such as Do Not Disturb may be on.`;
+      return `Arrived on this ${DEVICE} at ${state.at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', second: '2-digit' })}. No banner? ${ANDROID ? 'Do Not Disturb' : 'A Focus such as Do Not Disturb'} may be on.`;
     case 'missing':
-      return "Sent, but it hasn't reached this iPhone after 20 seconds. Check the connection, then try again.";
+      return `Sent, but it hasn't reached this ${DEVICE} after 20 seconds. Check the connection, then try again.`;
     case 'failed':
       return state.message;
   }

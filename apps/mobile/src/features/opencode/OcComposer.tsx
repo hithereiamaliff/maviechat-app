@@ -1,11 +1,12 @@
 import { OcHttpError, type Agent } from '@maviechat/opencode-protocol';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { MenuTrigger } from '@/components/Menu';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { fonts, radius, usePalette } from '@/theme';
 import { describeOcError } from './errors';

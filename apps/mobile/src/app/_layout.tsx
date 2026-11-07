@@ -9,10 +9,11 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { DialogHost } from '@/components/DialogHost';
 import { ToastProvider } from '@/components/Toast';
 import { prepareLaunchSpace } from '@/features/deeptutor/launch';
 import { NotificationRoot } from '@/features/notifications/NotificationRoot';
@@ -65,6 +66,7 @@ export default function RootLayout() {
                     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.background } }} />
                     <NotificationRoot />
                     <UpdatePrompt />
+                    {Platform.OS === 'android' ? <DialogHost /> : null}
                   </OpenCodeProvider>
                 </DeepTutorProvider>
               </SessionProvider>

@@ -1,9 +1,10 @@
 import { DT_HIGHLIGHT_COLORS, type DtAnnotation, type DtBookmark, type DtMaterialDetail } from '@maviechat/deeptutor-protocol';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { fonts, radius, usePalette } from '@/theme';
 import { HIGHLIGHT_LABELS, HIGHLIGHT_TINTS, unitName } from './labels';
 

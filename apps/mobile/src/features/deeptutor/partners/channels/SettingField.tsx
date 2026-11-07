@@ -1,7 +1,8 @@
 import { linesToList, shownSetting, type DtChannelField } from '@maviechat/deeptutor-protocol';
 import { useState } from 'react';
-import { ActionSheetIOS, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { showActionSheet } from '@/components/dialogs';
 import { fonts, radius, usePalette } from '@/theme';
 
 /** Our words for the settings every chat app has; the rest keep DeepTutor's. */
@@ -53,7 +54,7 @@ export function SettingField({ field, config, onChange }: { field: DtChannelFiel
             accessibilityRole="button"
             accessibilityLabel={`${label}: ${String(value ?? '')}`}
             onPress={() =>
-              ActionSheetIOS.showActionSheetWithOptions({ title: label, options: [...field.options, 'Cancel'], cancelButtonIndex: field.options.length }, (index) => {
+              showActionSheet({ title: label, options: [...field.options, 'Cancel'], cancelButtonIndex: field.options.length }, (index) => {
                 const picked = field.options[index];
                 if (picked !== undefined) onChange(field.path, picked);
               })

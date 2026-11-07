@@ -1,7 +1,8 @@
 import { formValue, settingShown, settingValues, type SettingEdits, type SettingField, type SettingOption, type SettingSection } from '@maviechat/owui-protocol';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { Group, Note, SectionTitle, SwitchRow } from '@/features/settings/rows';
 import { Chip } from '@/features/workspace/ListControls';
 import { fonts, radius, usePalette } from '@/theme';

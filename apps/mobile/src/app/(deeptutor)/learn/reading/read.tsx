@@ -22,11 +22,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
-import { ActionSheetIOS, ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Icon } from '@/components/Icon';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { showActionSheet, showPrompt } from '@/components/dialogs';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { useDtAnnotations, useDtBookmarks, useDtCollection, useDtMaterial, useDtTranscript, useDtUnit } from '@/features/deeptutor/queries';
 import { failureText, unitName } from '@/features/deeptutor/reading/labels';
@@ -263,20 +264,20 @@ export default function Reader() {
     ]);
 
   const translate = (passage: string) =>
-    ActionSheetIOS.showActionSheetWithOptions({ title: 'Translate into', options: [...TRANSLATE_LANGUAGES, 'Cancel'], cancelButtonIndex: TRANSLATE_LANGUAGES.length }, (index) => {
+    showActionSheet({ title: 'Translate into', options: [...TRANSLATE_LANGUAGES, 'Cancel'], cancelButtonIndex: TRANSLATE_LANGUAGES.length }, (index) => {
       const language = TRANSLATE_LANGUAGES[index];
       if (language) void ask(collectionId, PASSAGE_PROMPTS.translate(language), passage);
     });
 
   const noteFor = (onNote: (note: string) => void, initial = '') =>
-    Alert.prompt('Note', undefined, [{ text: 'Cancel', style: 'cancel' }, { text: 'Save', onPress: (value?: string) => (value?.trim() ? onNote(value.trim()) : undefined) }], 'plain-text', initial);
+    showPrompt('Note', undefined, [{ text: 'Cancel', style: 'cancel' }, { text: 'Save', onPress: (value?: string) => (value?.trim() ? onNote(value.trim()) : undefined) }], 'plain-text', initial);
 
   // Long-press on a paragraph, as DeepTutor's selection card offers.
   const blockAction = (block: DtTextBlock, marks: DtAnnotation[]) => {
     const passage = (markdown ? markdownQuote(block.text) : block.text).slice(0, 2000);
     const first = marks[0];
     const options = [first ? 'Edit Highlight' : 'Highlight', first ? 'Edit Note…' : 'Add a Note…', 'Ask the Tutor', 'Explain', 'Translate…', 'Guide Me Through It', 'Copy', 'Cancel'];
-    ActionSheetIOS.showActionSheetWithOptions({ options, cancelButtonIndex: options.length - 1, title: passage.length > 140 ? `${passage.slice(0, 140)}…` : passage }, (index) => {
+    showActionSheet({ options, cancelButtonIndex: options.length - 1, title: passage.length > 140 ? `${passage.slice(0, 140)}…` : passage }, (index) => {
       if (index === 0) return first ? setMark(first) : void highlight(block);
       if (index === 1) return noteFor((note) => (first ? void updateMark(first, { note, color: first.color }) : void highlight(block, note)), first?.note ?? '');
       if (index === 2) return openReadingChat(collectionId, passage);
@@ -302,7 +303,7 @@ export default function Reader() {
     setChosen({ material: materialId, locator: segment.locator });
     setTimeSeconds(segment.start);
     const options = ['Play From Here', 'Add a Note…', 'Ask the Tutor', 'Explain', 'Copy', 'Cancel'];
-    ActionSheetIOS.showActionSheetWithOptions({ options, cancelButtonIndex: options.length - 1 }, (index) => {
+    showActionSheet({ options, cancelButtonIndex: options.length - 1 }, (index) => {
       if (index === 0) return pickSegment(segment);
       if (index === 1)
         return noteFor((note) =>
@@ -328,7 +329,7 @@ export default function Reader() {
 
   const others = (collection.data?.collection.materials ?? []).filter((item) => item.id !== materialId && item.status === 'ready');
   const switchTo = () =>
-    ActionSheetIOS.showActionSheetWithOptions({ title: 'Open another file', options: [...others.map((item) => item.title), 'Cancel'], cancelButtonIndex: others.length }, (index) => {
+    showActionSheet({ title: 'Open another file', options: [...others.map((item) => item.title), 'Cancel'], cancelButtonIndex: others.length }, (index) => {
       const next = others[index];
       if (next) router.setParams({ material: next.id, locator: '', t: '' });
     });

@@ -23,8 +23,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
-import { ActionSheetIOS, Alert, Platform, Share } from 'react-native';
+import { Alert, Share } from 'react-native';
 import { useToast } from '@/components/Toast';
+import { showActionSheet, showPrompt } from '@/components/dialogs';
 import { useAuthed, useCapabilities, useModels } from '@/lib/server';
 import { useSession } from '@/session/SessionProvider';
 import { chatPdfHtml } from './chatPdf';
@@ -128,7 +129,7 @@ export function useChatActions() {
 
     /** As the web's Download: the chat export (.json), plain text (.txt) or a PDF document. */
     download(chat: ChatRef) {
-      ActionSheetIOS.showActionSheetWithOptions(
+      showActionSheet(
         { title: 'Download', options: ['Chat Export (.json)', 'Plain Text (.txt)', 'PDF Document (.pdf)', 'Cancel'], cancelButtonIndex: 3 },
         (index) => {
           if (index === 0) void downloadAs(chat, 'json');
@@ -149,8 +150,7 @@ export function useChatActions() {
     },
 
     rename(chat: ChatRef) {
-      if (Platform.OS !== 'ios') return;
-      Alert.prompt(
+      showPrompt(
         'Rename chat',
         undefined,
         [

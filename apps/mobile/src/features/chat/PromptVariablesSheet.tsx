@@ -1,9 +1,10 @@
 import type { InputVariable } from '@maviechat/owui-protocol';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { fonts, radius, usePalette } from '@/theme';
 
 const KEYBOARDS: Record<string, KeyboardTypeOptions> = { email: 'email-address', url: 'url', tel: 'phone-pad', number: 'decimal-pad', range: 'decimal-pad' };

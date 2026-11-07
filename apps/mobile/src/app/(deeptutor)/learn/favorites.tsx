@@ -7,6 +7,7 @@ import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { MenuButton } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { startChatWith } from '@/features/deeptutor/chat/extras';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { sessionDate, useDtNotebooks } from '@/features/deeptutor/queries';
@@ -27,7 +28,7 @@ export default function Favorites() {
   const refresh = () => void queryClient.invalidateQueries({ queryKey: [DT_QUERY_ROOT, session.baseUrl, 'notebooks'] });
 
   const create = () =>
-    Alert.prompt('New Notebook', 'A name for it.', [
+    showPrompt('New Notebook', 'A name for it.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Create',
@@ -45,7 +46,7 @@ export default function Favorites() {
     ]);
 
   const rename = (notebook: DtNotebook) =>
-    Alert.prompt(
+    showPrompt(
       'Rename Notebook',
       undefined,
       [

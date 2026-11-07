@@ -13,10 +13,11 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActionSheetIOS, ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { showActionSheet, showPrompt } from '@/components/dialogs';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { GroupComposer, withQuote, type Quote } from '@/features/deeptutor/partners/groups/GroupComposer';
 import { GroupRoundView, type RoundActions } from '@/features/deeptutor/partners/groups/GroupRoundView';
@@ -96,11 +97,11 @@ export default function GroupDiscussion() {
     onAskAnother: (seat: DtGroupSeat) => {
       const others = members.filter((member) => member.id !== seat.partnerId);
       if (!others.length) return;
-      ActionSheetIOS.showActionSheetWithOptions({ title: `Who should ${seat.name} ask?`, options: [...others.map((member) => member.name), 'Cancel'], cancelButtonIndex: others.length }, (index) => {
+      showActionSheet({ title: `Who should ${seat.name} ask?`, options: [...others.map((member) => member.name), 'Cancel'], cancelButtonIndex: others.length }, (index) => {
         const target = others[index];
         if (!target) return;
         const excerpt = seat.reply.answer.trim().replace(/\s+/g, ' ').slice(0, 400);
-        Alert.prompt(
+        showPrompt(
           `${seat.name} asks ${target.name}`,
           'Change the question if you like.',
           [
@@ -133,7 +134,7 @@ export default function GroupDiscussion() {
     },
     onSummarise: (round) => {
       const who = answeredBy(round);
-      ActionSheetIOS.showActionSheetWithOptions({ title: 'Who sums it up?', options: [...who.map(([, name]) => name), 'Cancel'], cancelButtonIndex: who.length }, (index) => {
+      showActionSheet({ title: 'Who sums it up?', options: [...who.map(([, name]) => name), 'Cancel'], cancelButtonIndex: who.length }, (index) => {
         const picked = who[index];
         if (picked && !chat.summarise(round.turnId, picked[0])) toast('Not connected yet. Try again in a moment.');
       });

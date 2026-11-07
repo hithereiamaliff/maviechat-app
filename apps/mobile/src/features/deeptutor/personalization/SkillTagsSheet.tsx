@@ -1,9 +1,11 @@
 import { cleanTag, createSkillTag, deleteSkillTag, renameSkillTag, tagProblem } from '@maviechat/deeptutor-protocol';
 import { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { describeError } from '@/lib/errors';
 import { useDtAuthed } from '@/session/DeepTutorProvider';
 import { fonts, radius, usePalette } from '@/theme';
@@ -30,7 +32,7 @@ export function SkillTagsSheet({ visible, tags, counts, onChanged, onClose }: { 
     }
   };
   const rename = (tag: string) =>
-    Alert.prompt(
+    showPrompt(
       `Rename “${tag}”`,
       counts[tag] ? `The ${counts[tag] === 1 ? 'skill' : `${counts[tag]} skills`} with it change too.` : undefined,
       (value) => {

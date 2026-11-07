@@ -1,7 +1,8 @@
 import { addMemory, cleanMemoryPath, deleteMemory, updateMemory, type Memory, type MemoryType } from '@maviechat/owui-protocol';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { describeError } from '@/lib/errors';
 import { useAuthed } from '@/lib/server';

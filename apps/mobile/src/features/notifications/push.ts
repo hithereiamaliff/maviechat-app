@@ -1,8 +1,10 @@
 import { deleteNotificationTarget, OwuiClient, uuidv4 } from '@maviechat/owui-protocol';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
+import { AndroidImportance } from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { useSyncExternalStore } from 'react';
+import { Platform } from 'react-native';
 import type { StoredSession } from '@/session/stored-session';
 import { isRelayServer, legacyTargetId, registerWithRelay, testThroughRelay, unregisterFromRelay, type RelayAnswer } from './relay';
 
@@ -90,7 +92,27 @@ export async function pushTokenIfOn(): Promise<string | null> {
   return (await freshToken) ?? current.pushToken ?? null;
 }
 
+let androidChannel: Promise<unknown> | null = null;
+
+/**
+ * Android shows a notification only through a channel, and asks for permission (Android 13 and
+ * later) and gives a push token only once one exists. Expo's docs say its push service uses the
+ * channel `default` when a message names none, as the relay's and the gateway's don't; this sets
+ * that channel up, with a name for Android's settings and high importance, so it shows as a banner.
+ */
+function androidChannelReady(): Promise<unknown> {
+  androidChannel ??= Notifications.setNotificationChannelAsync('default', {
+    name: 'Replies and requests',
+    description: 'A reply finished or failed, or OpenCode needs your approval or an answer.',
+    importance: AndroidImportance.HIGH,
+  }).catch(() => {
+    androidChannel = null;
+  });
+  return androidChannel;
+}
+
 async function expoPushToken(): Promise<string> {
+  if (Platform.OS === 'android') await androidChannelReady();
   const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId;
   return (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : {})).data;
 }
@@ -114,6 +136,7 @@ export const owuiAccountOf = (session: StoredSession): OwuiAccount => ({ session
 export async function enablePush(owuiAccounts: OwuiAccount[], { ask }: { ask: boolean }): Promise<PushStatus> {
   const served = relayAccounts(owuiAccounts);
   const current = await loadState();
+  if (Platform.OS === 'android') await androidChannelReady();
   let permission = await Notifications.getPermissionsAsync();
   if (!permission.granted && ask && permission.canAskAgain) permission = await Notifications.requestPermissionsAsync();
   if (!permission.granted) {

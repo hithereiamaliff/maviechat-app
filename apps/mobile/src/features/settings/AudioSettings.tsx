@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { IconButton } from '@/components/IconButton';
+import { DEVICE } from '@/lib/device';
 import { setDevicePrefs, useDevicePrefs } from '@/lib/devicePrefs';
 import { speakText, stopReading, useReadingAloud } from '@/lib/readAloud';
 import { useCapabilities, useUserSettings } from '@/lib/server';
@@ -10,7 +11,7 @@ import { useCanSaveSettings, useSaveUiSettings } from '@/lib/uiSettings';
 import { fonts, usePalette } from '@/theme';
 import { ActionRow, Group, Note, rowStyles, SectionTitle, SwitchRow } from './rows';
 import { VoicePicker } from './VoicePicker';
-import { voiceSample } from './voices';
+import { voiceName, voiceSample } from './voices';
 
 interface ReadAloudControls {
   rate: number;
@@ -35,7 +36,7 @@ function ReadAloudSettings({ rate, onRate, autoPlay, onAutoPlay, editable, note 
     <ScrollView contentContainerStyle={rowStyles.content}>
       <SectionTitle title="Read Aloud" />
       <Group>
-        <ActionRow label="Voice" value={voice?.name ?? 'Phone default'} onPress={() => setPicking(true)} />
+        <ActionRow label="Voice" value={voice ? voiceName(voice) : 'Phone default'} onPress={() => setPicking(true)} />
         <View style={styles.speed}>
           <Text style={[styles.label, { color: editable ? palette.text : palette.textMuted }]}>Speed</Text>
           <IconButton icon="minus" label="Slower" size={18} disabled={!editable || rate <= lowest} onPress={() => onRate(stepSpeechRate(rate, -1))} />
@@ -85,8 +86,8 @@ export function OwuiAudioSettings() {
       editable={canSave}
       note={
         canSave
-          ? 'Voices differ from device to device, so the voice is kept on this iPhone (DeepTutor uses it too). Speed and reading replies when they finish are saved with your account, so the web app follows them.'
-          : 'Your admin doesn’t let this account change its settings. The voice is kept on this iPhone.'
+          ? `Voices differ from device to device, so the voice is kept on this ${DEVICE} (DeepTutor uses it too). Speed and reading replies when they finish are saved with your account, so the web app follows them.`
+          : `Your admin doesn’t let this account change its settings. The voice is kept on this ${DEVICE}.`
       }
     />
   );
@@ -102,7 +103,7 @@ export function DtAudioSettings() {
       autoPlay={prefs.deepTutorAutoPlay}
       onAutoPlay={(on) => setDevicePrefs({ deepTutorAutoPlay: on })}
       editable
-      note="Kept on this iPhone. The voice is the one Open WebUI’s Read Aloud uses too."
+      note={`Kept on this ${DEVICE}. The voice is the one Open WebUI’s Read Aloud uses too.`}
     />
   );
 }

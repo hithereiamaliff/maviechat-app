@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
+import { DEVICE } from '@/lib/device';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useSession } from '@/session/SessionProvider';
 import { saveSpace } from '@/session/storage';
@@ -14,7 +15,7 @@ export function useDtSignOut(): () => void {
   const who = state.status === 'signed-in' ? state.session.account.username : 'DeepTutor';
   const owuiSignedIn = useSession().state.status === 'signed-in';
   return () =>
-    Alert.alert(`Sign out of ${who}?`, 'MavieChat forgets this DeepTutor account on this iPhone. Your Open WebUI sign-in stays as it is.', [
+    Alert.alert(`Sign out of ${who}?`, `MavieChat forgets this DeepTutor account on this ${DEVICE}. Your Open WebUI sign-in stays as it is.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign Out',

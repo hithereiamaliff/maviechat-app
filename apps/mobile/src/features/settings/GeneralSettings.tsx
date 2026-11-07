@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { DEVICE } from '@/lib/device';
 import { fonts, radius, usePalette } from '@/theme';
 import { setThemePreference, THEME_CHOICES, useThemePreference } from '@/theme/preference';
 import { NotificationSettings } from './NotificationSettings';
@@ -38,7 +39,7 @@ export function GeneralSettings({ note, notifications = true, children }: { note
         })}
       </View>
       <Text style={[styles.note, { color: palette.textFaint }]}>
-        {`Saved on this iPhone for both Open WebUI and DeepTutor, as the web apps save it per browser. ${note}`.trim()}
+        {`Saved on this ${DEVICE} for both Open WebUI and DeepTutor, as the web apps save it per browser. ${note}`.trim()}
       </Text>
       {notifications ? <NotificationSettings /> : null}
       {children}

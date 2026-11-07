@@ -1,9 +1,10 @@
 import { DT_COLLECTION_COLORS } from '@maviechat/deeptutor-protocol';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, useColorScheme, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, useColorScheme, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { fonts, radius, usePalette } from '@/theme';
 import { COLLECTION_COLORS } from './labels';
 

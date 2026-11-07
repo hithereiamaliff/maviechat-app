@@ -1,8 +1,9 @@
 import { accessRights, accessStateOf, droppedGrants, getUserInfo, grantsFromState, listShareGroups, searchUsers, updateAccess, type AccessArea, type AccessGrant, type AccessState } from '@maviechat/owui-protocol';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { describeError } from '@/lib/errors';
 import { useDebounced } from '@/lib/useDebounced';

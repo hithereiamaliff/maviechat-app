@@ -23,6 +23,7 @@ import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { MenuButton, MenuTrigger, type MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { AccessSheet, type AccessTarget } from '@/features/workspace/AccessSheet';
 import { AddPagesSheet, AddTextSheet, FolderPath, FolderPicker, KnowledgeFileSheet } from '@/features/workspace/KnowledgeParts';
 import { KnowledgeSheet, type KnowledgeSheetTarget } from '@/features/workspace/KnowledgeSheet';
@@ -110,7 +111,7 @@ export default function KnowledgeScreen() {
     void uploads.send(result.assets.map((asset) => ({ uri: asset.uri, name: asset.name, type: asset.mimeType ?? 'application/octet-stream', size: asset.size ?? null, folderId })));
   };
   const newFolder = () =>
-    Alert.prompt(
+    showPrompt(
       'New Folder',
       path.length ? `In ${path[path.length - 1]?.name ?? 'this folder'}` : undefined,
       [
@@ -181,7 +182,7 @@ export default function KnowledgeScreen() {
             label: 'Rename',
             icon: 'pencil' as const,
             onPress: () =>
-              Alert.prompt(
+              showPrompt(
                 'Rename Folder',
                 undefined,
                 [
@@ -218,7 +219,7 @@ export default function KnowledgeScreen() {
             label: 'Rename',
             icon: 'pencil' as const,
             onPress: () =>
-              Alert.prompt(
+              showPrompt(
                 'Rename File',
                 undefined,
                 [

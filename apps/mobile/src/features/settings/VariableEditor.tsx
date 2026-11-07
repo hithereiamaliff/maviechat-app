@@ -1,7 +1,8 @@
 import { VARIABLE_KEY, VARIABLE_VALUE_LIMIT, variableTag, type Variable } from '@maviechat/owui-protocol';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { Modal } from '@/components/Modal';
 import { fonts, radius, usePalette } from '@/theme';
 
 /**

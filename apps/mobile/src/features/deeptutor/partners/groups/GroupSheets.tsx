@@ -1,8 +1,9 @@
 import { deleteGroupSession, unpinGroupMessage, updatePartnerGroup, type DtGroupSession, type DtPartner, type DtPartnerGroup } from '@maviechat/deeptutor-protocol';
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { IconButton } from '@/components/IconButton';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { describeError } from '@/lib/errors';
 import { useDtAuthed } from '@/session/DeepTutorProvider';

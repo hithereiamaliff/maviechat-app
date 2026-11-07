@@ -13,9 +13,10 @@ import {
 } from '@maviechat/owui-protocol';
 import * as Clipboard from 'expo-clipboard';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities } from '@/lib/server';

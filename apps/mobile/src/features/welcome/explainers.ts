@@ -1,3 +1,4 @@
+import { DEVICE } from '@/lib/device';
 /** A welcome-screen explainer: what something is, in plain words, and what to do next. */
 export interface Explainer {
   title: string;
@@ -78,7 +79,7 @@ export const EXPLAINERS: Record<ExplainerKey, Explainer> = {
       },
       {
         heading: 'What you need',
-        text: 'A machine running OpenCode and the MavieChat gateway, which pairs this iPhone once with a link and only reaches the project folders you allow.',
+        text: `A machine running OpenCode and the MavieChat gateway, which pairs this ${DEVICE} once with a link and only reaches the project folders you allow.`,
       },
     ],
     action: { label: 'Pair a Machine', route: '/pair' },

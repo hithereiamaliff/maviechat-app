@@ -19,10 +19,11 @@ import {
 } from '@maviechat/owui-protocol';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { Group, Note, SectionTitle, SwitchRow } from '@/features/settings/rows';
 import { editorStyles, Field, SheetHeader } from '@/features/workspace/EditorParts';

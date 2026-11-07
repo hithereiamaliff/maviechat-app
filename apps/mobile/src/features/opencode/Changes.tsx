@@ -1,8 +1,9 @@
 import type { FileDiff, SessionChanges } from '@maviechat/opencode-protocol';
 import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { fonts, radius, usePalette } from '@/theme';
 import { parsePatch, splitPath, type PatchLine } from './patch';
 

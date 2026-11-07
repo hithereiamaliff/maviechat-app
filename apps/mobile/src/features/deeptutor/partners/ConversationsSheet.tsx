@@ -1,7 +1,8 @@
 import type { DtPartnerSession } from '@maviechat/deeptutor-protocol';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
+import { Modal } from '@/components/Modal';
 import { describeError } from '@/lib/errors';
 import { fonts, radius, usePalette } from '@/theme';
 import { channelLabel, shortWhen } from './labels';

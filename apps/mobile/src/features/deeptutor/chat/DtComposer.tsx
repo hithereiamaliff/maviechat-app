@@ -1,9 +1,10 @@
 import { importSourceName, sameSelection, sessionTitle, type DtChatTool, type DtKnowledgeBase, type DtLlmOption, type DtLlmSelection } from '@maviechat/deeptutor-protocol';
 import { useImperativeHandle, useRef, useState, type ComponentRef, type ReactNode, type Ref } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
 import { useAnchoredMenu, type MenuItem } from '@/components/Menu';
+import { Modal } from '@/components/Modal';
 import { updateDraft, useDraftText } from '@/features/chat/drafts';
 import { useImportedChats } from '@/features/deeptutor/personalization/queries';
 import { useDtAttachmentLimits, useDtNotebooks, useDtSessions } from '@/features/deeptutor/queries';

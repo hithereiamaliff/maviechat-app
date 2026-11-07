@@ -1,7 +1,8 @@
 import { terminalLabel, type FeatureToggles, type TerminalServer, type ToggleKey, type ToolItem } from '@maviechat/owui-protocol';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { fonts, radius, usePalette } from '@/theme';
 
 export const TOGGLE_INFO: Record<ToggleKey, { label: string; hint: string; icon: IconName }> = {

@@ -1,8 +1,10 @@
 import { deleteMemoryFact, describeMemoryRef, editMemoryFact, MEMORY_FACT_MAX, type DtMemoryEntry, type DtMemoryLayer } from '@maviechat/deeptutor-protocol';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { useDtSessions } from '@/features/deeptutor/queries';
 import { describeError } from '@/lib/errors';
 import { useDtAuthed } from '@/session/DeepTutorProvider';
@@ -50,7 +52,7 @@ export function FactSheet({
 
   const reword = () => {
     if (!entry) return;
-    Alert.prompt(
+    showPrompt(
       'Reword the fact',
       `Its sources stay the same. ${MEMORY_FACT_MAX} characters at most.`,
       (value) => {

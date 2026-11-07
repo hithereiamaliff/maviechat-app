@@ -1,6 +1,7 @@
 import { dateKey, type DateKey } from '@maviechat/deeptutor-protocol';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal } from '@/components/Modal';
 import { fonts, radius, usePalette } from '@/theme';
 import { monthOf, MonthGrid } from './MonthGrid';
 

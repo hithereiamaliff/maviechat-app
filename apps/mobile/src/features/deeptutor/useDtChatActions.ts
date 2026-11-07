@@ -2,6 +2,7 @@ import { deleteSession, organizeSession, renameSession } from '@maviechat/deeptu
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert } from 'react-native';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { describeError } from '@/lib/errors';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 import { useDtLive } from './chat/DtLiveProvider';
@@ -19,7 +20,7 @@ export function useDtChatActions() {
   };
 
   const rename = (id: string, current: string) =>
-    Alert.prompt(
+    showPrompt(
       'Rename chat',
       undefined,
       [

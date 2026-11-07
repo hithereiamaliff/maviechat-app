@@ -1,12 +1,14 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { signOutWebView } from '@/features/deeptutor/webSignIn';
 import { leaveRelay } from '@/features/notifications/push';
+import { DEVICE } from '@/lib/device';
 import { serverHost, type AccountEntry, type AccountSpace } from '@/session/accounts';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useOpenCode } from '@/session/OpenCodeProvider';
@@ -87,8 +89,8 @@ function AccountsList({ space, onClose }: { space: AccountSpace; onClose: () => 
     Alert.alert(
       space === 'opencode' ? `Remove ${entry.name}?` : `Sign out of ${entry.login}?`,
       space === 'opencode'
-        ? 'MavieChat forgets it on this iPhone, and the machine unpairs this iPhone once none of its accounts are left.'
-        : 'MavieChat forgets this account on this iPhone. You can add it again later.',
+        ? `MavieChat forgets it on this ${DEVICE}, and the machine unpairs this ${DEVICE} once none of its accounts are left.`
+        : `MavieChat forgets this account on this ${DEVICE}. You can add it again later.`,
       [
       { text: 'Cancel', style: 'cancel' },
       {

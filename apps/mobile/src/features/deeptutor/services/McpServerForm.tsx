@@ -1,9 +1,10 @@
 import { isSecretRef, mcpConfigOf, mcpDraftOf, mcpNameProblem, mcpRefusal, saveMcpServer, testMcpServer, type DtMcpDraft, type DtMcpServer, type DtMcpTool } from '@maviechat/deeptutor-protocol';
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { describeError } from '@/lib/errors';
 import { useDtAuthed } from '@/session/DeepTutorProvider';

@@ -3,6 +3,7 @@ import { uuidv4 } from '@maviechat/owui-protocol';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ANDROID, DEVICE } from '@/lib/device';
 import { accountsIn, activeAccount, dropAccount, markSignedOut, putAccount, sameServer, setActive, type AccountEntry } from './accounts';
 import { ocAccountName, parseStoredOcSession, type StoredOcSession } from './opencode-session';
 import { OC_QUERY_ROOT } from './queryRoots';
@@ -42,10 +43,10 @@ const OC = 'opencode';
 const nowMs = () => Date.now();
 const readSecret = async (id: string) => parseStoredOcSession(await loadAccountSecret(id));
 const clearOcQueries = (queryClient: QueryClient) => queryClient.removeQueries({ queryKey: [OC_QUERY_ROOT] });
-const deviceName = () => (Constants.deviceName ? String(Constants.deviceName) : 'iPhone').slice(0, 80);
+const deviceName = () => (Constants.deviceName ? String(Constants.deviceName) : ANDROID ? 'Android phone' : 'iPhone').slice(0, 80);
 const clientOf = (session: StoredOcSession, timeoutMs?: number) => new OcClient({ gatewayUrl: session.gatewayUrl, token: session.token, login: session.login.id, timeoutMs });
 
-export const unpairedNotice = (machine: string) => `This iPhone isn't paired with ${machine} any more. Pair it again.`;
+export const unpairedNotice = (machine: string) => `This ${DEVICE} isn't paired with ${machine} any more. Pair it again.`;
 
 /** The OpenCode machines this phone is paired with, beside the Open WebUI and DeepTutor sign-ins. */
 export function OpenCodeProvider({ children }: { children: ReactNode }) {

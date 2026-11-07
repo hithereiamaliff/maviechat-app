@@ -15,8 +15,9 @@ import {
 } from '@maviechat/owui-protocol';
 import { useQuery } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { ParamRow } from '@/features/chat/controls/ParamRow';
 import { useDebounced } from '@/lib/useDebounced';
 import { useAuthed, useTools } from '@/lib/server';

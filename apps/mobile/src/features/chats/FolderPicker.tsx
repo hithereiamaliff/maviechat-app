@@ -1,9 +1,10 @@
 import { folderTree, listFolders, type FolderNode } from '@maviechat/owui-protocol';
 import { useQuery } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { useAuthed } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
 import { useChatActions, type ChatRef } from './useChatActions';

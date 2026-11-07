@@ -7,6 +7,7 @@ import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { setViewingChat } from '@/features/notifications/presence';
 import { pushTokenIfOn } from '@/features/notifications/push';
 import { ChangesBar, ChangesSheet } from '@/features/opencode/Changes';
@@ -79,7 +80,7 @@ export default function OpenCodeSession() {
       label: 'Rename',
       icon: 'pencil' as const,
       onPress: () =>
-        Alert.prompt(
+        showPrompt(
           'Rename Session',
           undefined,
           (value) => {

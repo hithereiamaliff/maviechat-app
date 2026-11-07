@@ -1,7 +1,8 @@
 import { createWorkspaceKnowledge, updateWorkspaceKnowledge, type WorkspaceKnowledge } from '@maviechat/owui-protocol';
 import { useState } from 'react';
-import { Modal, ScrollView, Text, TextInput } from 'react-native';
+import { ScrollView, Text, TextInput } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { describeError } from '@/lib/errors';
 import { useAuthed } from '@/lib/server';

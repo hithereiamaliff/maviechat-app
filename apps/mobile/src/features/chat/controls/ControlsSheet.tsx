@@ -1,9 +1,10 @@
 import { attachmentName, paramsFor, withParam, withSystemPrompt, type ChatHistory, type ModelItem } from '@maviechat/owui-protocol';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
+import { Modal } from '@/components/Modal';
 import { useCapabilities } from '@/lib/server';
 import { useStoredState } from '@/lib/storedState';
 import { fonts, radius, usePalette } from '@/theme';

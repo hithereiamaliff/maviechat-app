@@ -20,3 +20,5 @@ jobs:
       - run: npm run check
       - name: iOS JavaScript bundle
         run: npm run bundle
+      - name: Android JavaScript bundle
+        run: npm run bundle:android

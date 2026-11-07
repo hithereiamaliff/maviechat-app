@@ -2,9 +2,10 @@ import { getSharedValves, getSharedValvesSpec, updateSharedValves, valveFields, 
 import { useQuery } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { ValveRow } from '@/features/chat/controls/ValvesPanel';
 import { describeError } from '@/lib/errors';

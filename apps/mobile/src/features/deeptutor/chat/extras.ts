@@ -2,6 +2,7 @@ import type { DtAttachmentLimits } from '@maviechat/deeptutor-protocol';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useToast } from '@/components/Toast';
+import { SYSTEM_SETTINGS } from '@/lib/device';
 import { isPhoto, photo, PHOTO_OPTIONS, readAsDataUrl, type Picked } from '@/lib/pickedFiles';
 import { NO_EXTRAS, type DtExtras } from './extrasModel';
 import { setStoredState, useStoredState } from '@/lib/storedState';
@@ -81,7 +82,7 @@ export function useDtAttach(draftKey: string, limits: DtAttachmentLimits) {
     takePhoto: async () => {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        toast('Camera access is off for MavieChat in iOS Settings.', 'error');
+        toast(`Camera access is off for MavieChat in ${SYSTEM_SETTINGS}.`, 'error');
         return;
       }
       const result = await ImagePicker.launchCameraAsync(PHOTO_OPTIONS);

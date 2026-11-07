@@ -1,8 +1,10 @@
 import { isTemporaryChatId, openSocketSession, type AskUserAnswer, type AskUserQuestion, type SocketSession, type SocketStatus } from '@maviechat/owui-protocol';
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Alert, AppState, Modal, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, AppState, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { AskUserCard } from '@/features/chat/AskUserCard';
 import { patchChatRow } from '@/features/chats/cache';
 import { setViewingChat } from '@/features/notifications/presence';
@@ -35,9 +37,8 @@ function confirm(title: string, message: string): Promise<boolean> {
 }
 
 function prompt(title: string, message: string, _placeholder?: string, value?: string): Promise<string | false> {
-  if (Platform.OS !== 'ios') return Promise.resolve(false);
   return new Promise((resolve) =>
-    Alert.prompt(
+    showPrompt(
       title,
       message,
       [

@@ -94,6 +94,19 @@ export function languageTitle(tag: string): string {
   return `${name} (${REGIONS[region.toUpperCase()] ?? region.toUpperCase()})`;
 }
 
+/**
+ * The name to show. iOS names its voices ("Samantha"); Android gives codes such as
+ * `en-us-x-sfg-local` or `en-us-x-iom#male_1-network`, which read here as "Voice SFG" and
+ * "Voice IOM (male 1, online)".
+ */
+export function voiceName(voice: Pick<PhoneVoice, 'name'>): string {
+  const match = /^[a-z]{2,3}(?:-[a-z0-9]{2,4})?-x-([a-z0-9]+)(?:#([a-z0-9_]+))?-(local|network)$/i.exec(voice.name);
+  if (!match) return voice.name;
+  const [, code = '', variant, where] = match;
+  const notes = [variant?.replace(/_/g, ' '), where === 'network' ? 'online' : null].filter(Boolean);
+  return `Voice ${code.toUpperCase()}${notes.length ? ` (${notes.join(', ')})` : ''}`;
+}
+
 /** Enhanced and premium voices are downloads that sound better: say so in the list. */
 export function voiceQuality(voice: Pick<PhoneVoice, 'identifier' | 'quality'>): string | null {
   if (voice.identifier.includes('.premium.')) return 'Premium';

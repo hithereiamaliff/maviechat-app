@@ -21,11 +21,13 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
-import { ActionSheetIOS, ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { showActionSheet } from '@/components/dialogs';
 import { useDtLlmOptions } from '@/features/deeptutor/queries';
 import { describeError } from '@/lib/errors';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
@@ -67,7 +69,7 @@ function useSaver(partnerId: string) {
 }
 
 function pick(title: string, options: string[], onPick: (index: number) => void) {
-  ActionSheetIOS.showActionSheetWithOptions({ title, options: [...options, 'Cancel'], cancelButtonIndex: options.length }, (index) => {
+  showActionSheet({ title, options: [...options, 'Cancel'], cancelButtonIndex: options.length }, (index) => {
     if (index < options.length) onPick(index);
   });
 }

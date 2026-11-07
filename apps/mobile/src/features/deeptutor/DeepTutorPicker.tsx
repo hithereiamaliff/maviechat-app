@@ -1,5 +1,6 @@
 import type { DtSessionSummary } from '@maviechat/deeptutor-protocol';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal } from '@/components/Modal';
 import { fonts, usePalette } from '@/theme';
 import { SessionList } from './SessionList';
 

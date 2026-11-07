@@ -1,9 +1,10 @@
 import * as Haptics from 'expo-haptics';
 import { useRef, useState, type ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View, type HostInstance } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View, type HostInstance } from 'react-native';
 import { fonts, radius, usePalette } from '@/theme';
 import { Icon, type IconName } from './Icon';
 import { IconButton } from './IconButton';
+import { Modal } from './Modal';
 
 export interface MenuItem {
   key: string;

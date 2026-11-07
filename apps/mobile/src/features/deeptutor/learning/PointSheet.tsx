@@ -1,10 +1,12 @@
 import { overridePoint, type DtKnowledgePoint } from '@maviechat/deeptutor-protocol';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { sessionDate, useDtPointReport } from '@/features/deeptutor/queries';
 import { describeError } from '@/lib/errors';
 import { Markdown } from '@/markdown/Markdown';
@@ -55,7 +57,7 @@ function PointBody({ pathId, point, onClose, onStudy }: { pathId: string; point:
     }
   };
   const markKnown = () =>
-    Alert.prompt(
+    showPrompt(
       'I already know this',
       'The point counts as mastered and the path moves on. A note is optional.',
       [

@@ -1,11 +1,12 @@
 import { createPartner, DtHttpError, PARTNER_COLORS, PARTNER_LANGUAGES, sameSelection, type DtLlmSelection } from '@maviechat/deeptutor-protocol';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActionSheetIOS, ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
+import { showActionSheet } from '@/components/dialogs';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { FacePicker, PARTNER_EMOJIS } from '@/features/deeptutor/partners/FacePicker';
 import { useDtSkillNames, useDtSouls, usePartnersRefresh } from '@/features/deeptutor/partners/queries';
@@ -44,7 +45,7 @@ export default function NewPartner() {
   const ready = name.trim().length > 0 && (soulMode === 'library' ? Boolean(chosenSoul) : custom.trim().length > 0) && !busy;
 
   const pickLanguage = () =>
-    ActionSheetIOS.showActionSheetWithOptions({ title: 'Reply language', options: [...PARTNER_LANGUAGES.map((item) => item.label), 'Cancel'], cancelButtonIndex: PARTNER_LANGUAGES.length }, (index) => {
+    showActionSheet({ title: 'Reply language', options: [...PARTNER_LANGUAGES.map((item) => item.label), 'Cancel'], cancelButtonIndex: PARTNER_LANGUAGES.length }, (index) => {
       const picked = PARTNER_LANGUAGES[index];
       if (picked) setLanguage(picked.code);
     });

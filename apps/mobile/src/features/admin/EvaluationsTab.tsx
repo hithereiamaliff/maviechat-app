@@ -1,8 +1,9 @@
 import { deleteFeedback, exportFeedback, feedbackCsv, feedbackModels, getArenaEnabled, getFeedback, getLeaderboard, getModelHistory, listFeedback, setArenaEnabled, type Feedback, type LeaderboardEntry } from '@maviechat/owui-protocol';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { MenuButton } from '@/components/Menu';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { shareFile, stampedName } from '@/features/settings/exportFile';
 import { editorStyles, SheetHeader, SheetLoading } from '@/features/workspace/EditorParts';

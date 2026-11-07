@@ -26,12 +26,14 @@ import {
 } from '@maviechat/deeptutor-protocol';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { showAlert } from '@/components/dialogs';
 import { describeError } from '@/lib/errors';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 import { fonts, radius, usePalette } from '@/theme';
@@ -183,7 +185,7 @@ function EditorBody({ target, calendars, onClose }: { target: EditorTarget; cale
     if (!editing?.recurring) return void save('all');
     // A repeat that changed can't apply to one date alone.
     const repeatChanged = eventChanges(occurrenceInput(editing), inputOf(draft, keptRule)).rrule !== undefined;
-    Alert.alert('Change a repeating event', 'Which dates should change?', [
+    showAlert('Change a repeating event', 'Which dates should change?', [
       ...(repeatChanged ? [] : [{ text: 'This Event', onPress: () => void save('this') }]),
       { text: 'This and Following', onPress: () => void save('following') },
       { text: 'All Events', onPress: () => void save('all') },

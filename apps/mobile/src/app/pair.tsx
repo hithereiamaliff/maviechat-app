@@ -1,12 +1,14 @@
 import { parsePairingLink } from '@maviechat/opencode-protocol';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AvoidKeyboard } from '@/components/AvoidKeyboard';
 import { Button } from '@/components/Button';
 import { IconButton } from '@/components/IconButton';
 import { TextField } from '@/components/TextField';
 import { describeOcError } from '@/features/opencode/errors';
+import { DEVICE } from '@/lib/device';
 import { serverHost } from '@/session/accounts';
 import { useOpenCode } from '@/session/OpenCodeProvider';
 import { useSession } from '@/session/SessionProvider';
@@ -58,7 +60,7 @@ export default function Pair() {
   const back = () => (router.canGoBack() ? router.back() : router.replace(owuiSignedIn ? '/' : '/welcome'));
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <AvoidKeyboard style={styles.flex}>
       <ScrollView
         style={{ backgroundColor: palette.background }}
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 48, paddingBottom: insets.bottom + 24 }]}
@@ -66,7 +68,7 @@ export default function Pair() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: palette.text }]}>OpenCode</Text>
           <Text style={[styles.subtitle, { color: palette.textMuted }]}>
-            {fromLink ? `Pair this iPhone with ${serverHost(params.url ?? '')}? Only do this for a machine you run.` : 'Pair this iPhone with a machine that runs OpenCode and the MavieChat gateway.'}
+            {fromLink ? `Pair this ${DEVICE} with ${serverHost(params.url ?? '')}? Only do this for a machine you run.` : `Pair this ${DEVICE} with a machine that runs OpenCode and the MavieChat gateway.`}
           </Text>
         </View>
 
@@ -74,7 +76,7 @@ export default function Pair() {
           {fromLink ? null : (
             <>
               <Text style={[styles.help, { color: palette.textMuted }]}>
-                {'On the machine, run `maviechat-gateway pair` (with Docker: `docker exec -it maviechat-gateway maviechat-gateway pair`). Open the link it prints on this iPhone, or paste it here.'}
+                {'On the machine, run `maviechat-gateway pair` (with Docker: `docker exec -it maviechat-gateway maviechat-gateway pair`). Open the link it prints on this ' + DEVICE + ', or paste it here.'}
               </Text>
               <TextField label="Pairing link" value={link} onChangeText={setLink} placeholder="maviechat://pair?…" autoCapitalize="none" autoCorrect={false} keyboardType="url" />
               <Text style={[styles.or, { color: palette.textFaint }]}>or</Text>
@@ -91,13 +93,13 @@ export default function Pair() {
         </View>
 
         <Text style={[styles.footer, { color: palette.textMuted }]}>
-          The machine keeps OpenCode’s own password; this iPhone gets its own key, which you can revoke there at any time.
+          The machine keeps OpenCode’s own password; this {DEVICE} gets its own key, which you can revoke there at any time.
         </Text>
       </ScrollView>
       <View style={[styles.back, { top: insets.top + 4 }]}>
         <IconButton icon="chevron-left" label="Back" onPress={back} />
       </View>
-    </KeyboardAvoidingView>
+    </AvoidKeyboard>
   );
 }
 

@@ -1,7 +1,8 @@
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AvoidKeyboard } from '@/components/AvoidKeyboard';
 import { Button } from '@/components/Button';
 import { IconButton } from '@/components/IconButton';
 import { TextField } from '@/components/TextField';
@@ -59,7 +60,7 @@ export default function DeepTutorLogin() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <AvoidKeyboard style={styles.flex}>
       <ScrollView
         style={{ backgroundColor: palette.background }}
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 48, paddingBottom: insets.bottom + 24 }]}
@@ -144,7 +145,7 @@ export default function DeepTutorLogin() {
         </View>
       ) : null}
       {accountsSheet.element}
-    </KeyboardAvoidingView>
+    </AvoidKeyboard>
   );
 }
 

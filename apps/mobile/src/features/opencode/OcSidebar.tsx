@@ -6,10 +6,12 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, View } from 'react-native';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { useAccountsSheet } from '@/features/accounts/AccountsSheet';
 import { switchToDeepTutor, switchToOpenWebUI } from '@/features/deeptutor/switch';
 import { SidebarAction, SidebarChatRow, SidebarNote, SidebarPanel, SidebarSearch, SidebarUser, sidebarStyles } from '@/features/sidebar/parts';
 import { useSidebar } from '@/features/sidebar/SidebarContext';
+import { DEVICE } from '@/lib/device';
 import { useDebounced } from '@/lib/useDebounced';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useOcAuthed, useOpenCode } from '@/session/OpenCodeProvider';
@@ -55,7 +57,7 @@ export function OcSidebar() {
       label: 'Rename',
       icon: 'pencil',
       onPress: () =>
-        Alert.prompt(
+        showPrompt(
           'Rename Session',
           undefined,
           (title) => {
@@ -133,7 +135,7 @@ export function OcSidebar() {
       icon: 'arrow-right-start-on-rectangle',
       destructive: true,
       onPress: () =>
-        Alert.alert(`Remove ${accountName}?`, 'MavieChat forgets it on this iPhone, and the machine unpairs this iPhone once none of its accounts are left.', [
+        Alert.alert(`Remove ${accountName}?`, `MavieChat forgets it on this ${DEVICE}, and the machine unpairs this ${DEVICE} once none of its accounts are left.`, [
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Remove',

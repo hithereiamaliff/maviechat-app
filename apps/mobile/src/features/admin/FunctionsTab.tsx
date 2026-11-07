@@ -2,9 +2,10 @@ import { deleteAdminFunction, exportAdminFunctions, FUNCTION_TYPE_LABELS, getAdm
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
 import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { MenuButton, type MenuItem } from '@/components/Menu';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { fileNameOf, shareFile, stampedName } from '@/features/settings/exportFile';
 import { editorStyles, SheetHeader, SheetLoading } from '@/features/workspace/EditorParts';

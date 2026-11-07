@@ -1,8 +1,9 @@
 import { editableTexts, type HistoryMessage } from '@maviechat/owui-protocol';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
+import { Modal } from '@/components/Modal';
 import { fonts, radius, usePalette } from '@/theme';
 
 interface ReplyEditorProps {

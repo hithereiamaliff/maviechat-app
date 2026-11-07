@@ -1,9 +1,11 @@
 import { createCalendar, deleteCalendar, updateCalendar, type DtCalendar, type DtLayerId, type DtLayerToggles } from '@maviechat/deeptutor-protocol';
 import { useQueryClient } from '@tanstack/react-query';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { MenuButton } from '@/components/Menu';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { describeError } from '@/lib/errors';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
@@ -35,7 +37,7 @@ export function CalendarsSheet({ visible, onClose, calendars, layers, onLayers }
   const fail = (what: string) => (error: unknown) => toast(`Couldn't ${what}: ${describeError(error)}`, 'error');
 
   const add = () =>
-    Alert.prompt('New Calendar', 'A name for it.', [
+    showPrompt('New Calendar', 'A name for it.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Add',
@@ -49,7 +51,7 @@ export function CalendarsSheet({ visible, onClose, calendars, layers, onLayers }
       },
     ]);
   const rename = (calendar: DtCalendar) =>
-    Alert.prompt(
+    showPrompt(
       'Rename Calendar',
       undefined,
       [

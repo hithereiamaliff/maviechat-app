@@ -17,11 +17,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActionSheetIOS, ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { MenuButton, type MenuItem } from '@/components/Menu';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { showActionSheet, showPrompt } from '@/components/dialogs';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { sessionDate, useDtCollection, useDtCollectionChats, useDtLibrary, useDtSupportedFormats } from '@/features/deeptutor/queries';
 import { CollectionSheet } from '@/features/deeptutor/reading/CollectionSheet';
@@ -98,7 +100,7 @@ export default function ReadingCollection() {
   };
 
   const addLinks = () =>
-    Alert.prompt(
+    showPrompt(
       'Add Links',
       'Web pages and YouTube or Bilibili videos. Paste one or more.',
       [
@@ -116,7 +118,7 @@ export default function ReadingCollection() {
     );
 
   const add = () =>
-    ActionSheetIOS.showActionSheetWithOptions({ title: 'Add to the collection', options: ['Upload Files', 'Add Links', 'From Your Library', 'Cancel'], cancelButtonIndex: 3 }, (index) => {
+    showActionSheet({ title: 'Add to the collection', options: ['Upload Files', 'Add Links', 'From Your Library', 'Cancel'], cancelButtonIndex: 3 }, (index) => {
       if (index === 0) void upload();
       if (index === 1) addLinks();
       if (index === 2) setPicking(true);
@@ -125,7 +127,7 @@ export default function ReadingCollection() {
   const fileMenu = (material: DtMaterial) => {
     const stuck = material.status === 'failed' || isPreparing(material);
     const options = [...(stuck && material.kind !== 'file' ? ['Try Again'] : []), 'Remove From Collection', 'Delete From Library', 'Cancel'];
-    ActionSheetIOS.showActionSheetWithOptions(
+    showActionSheet(
       { title: material.title, message: material.status === 'failed' ? failureText(material) : undefined, options, cancelButtonIndex: options.length - 1, destructiveButtonIndex: options.length - 2 },
       (index) => {
         const choice = options[index];

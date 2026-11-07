@@ -1,5 +1,6 @@
 import { splitFrontMatter } from '@maviechat/deeptutor-protocol';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal } from '@/components/Modal';
 import { describeError } from '@/lib/errors';
 import { Markdown } from '@/markdown/Markdown';
 import { fonts, usePalette } from '@/theme';

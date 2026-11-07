@@ -4,11 +4,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconButton } from '@/components/IconButton';
 import { MenuButton } from '@/components/Menu';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { capabilityName } from '@/features/deeptutor/chat/capabilities';
 import { startChatWith } from '@/features/deeptutor/chat/extras';
 import { sessionDate, useDtNotebook } from '@/features/deeptutor/queries';
@@ -46,7 +48,7 @@ export default function NotebookScreen() {
   const fail = (what: string) => (error: unknown) => toast(`Couldn't ${what}: ${describeError(error)}`, 'error');
 
   const renameNotebook = () =>
-    Alert.prompt(
+    showPrompt(
       'Rename Notebook',
       undefined,
       [
@@ -83,7 +85,7 @@ export default function NotebookScreen() {
     ]);
 
   const renameRecord = (record: DtRecord) =>
-    Alert.prompt(
+    showPrompt(
       'Rename',
       undefined,
       [

@@ -2,8 +2,9 @@ import { linkSessionTasks, sessionLinks, setTaskStatusLink, type DtTaskBoard } f
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { useDtTaskBoard } from '@/features/deeptutor/queries';
 import { describeError } from '@/lib/errors';

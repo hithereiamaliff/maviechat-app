@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { MenuButton } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { useImportedChats, usePersonalizationRefresh } from '@/features/deeptutor/personalization/queries';
 import { sessionDate } from '@/features/deeptutor/queries';
@@ -29,7 +30,7 @@ export default function ImportedGroup() {
   const chats = (group?.chats ?? []).filter((chat) => !needle || chat.title.toLowerCase().includes(needle) || lastWords(chat).toLowerCase().includes(needle));
 
   const rename = (chat: DtImportedChat) =>
-    Alert.prompt(
+    showPrompt(
       'Rename',
       undefined,
       (value) => {

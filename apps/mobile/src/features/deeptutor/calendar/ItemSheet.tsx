@@ -15,9 +15,11 @@ import {
 } from '@maviechat/deeptutor-protocol';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { showAlert } from '@/components/dialogs';
 import { dueLabel, STATUS_LABELS } from '@/features/deeptutor/tasks/TaskSheet';
 import { describeError } from '@/lib/errors';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
@@ -73,7 +75,7 @@ function ItemBody({ item, onClose, onEditEvent, onEditTask, taskTitle }: ItemShe
         })
         .catch((error: unknown) => toast(`Couldn't delete it: ${describeError(error)}`, 'error'));
     if (occurrence.recurring) {
-      Alert.alert('Delete a repeating event', 'Which dates should go?', [
+      showAlert('Delete a repeating event', 'Which dates should go?', [
         { text: 'This Event', style: 'destructive', onPress: () => run('this') },
         { text: 'This and Following', style: 'destructive', onPress: () => run('following') },
         { text: 'All Events', style: 'destructive', onPress: () => run('all') },

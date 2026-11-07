@@ -21,6 +21,7 @@ import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { useAnchoredMenu, type MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { updateDraft } from '@/features/chat/drafts';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { MapEditor } from '@/features/deeptutor/learning/MapEditor';
@@ -88,7 +89,7 @@ export default function MasteryPathPage() {
     }
   };
   const rename = () =>
-    Alert.prompt(
+    showPrompt(
       'Rename Path',
       'Leave it empty to go back to the name DeepTutor gave it.',
       [

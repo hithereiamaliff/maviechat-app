@@ -1,9 +1,10 @@
 import { addGroupMembers, addUser, createAdminGroup, getDefaultPermissions, listAdminUsers, updateUser, USER_ROLES, type AdminUserDetail, type UserRole } from '@maviechat/owui-protocol';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { editorStyles as styles, Field, SheetHeader } from '@/features/workspace/EditorParts';
 import { Chip } from '@/features/workspace/ListControls';

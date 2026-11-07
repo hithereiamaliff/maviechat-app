@@ -1,10 +1,11 @@
 import { createTask, DT_TASK_NOTE_MAX, DT_TASK_STATUSES, DT_TASK_TITLE_MAX, fromDateKey, updateTask, type DtTaskBoard, type DtTaskCard, type DtTaskStatus } from '@maviechat/deeptutor-protocol';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { DatePicker } from '@/features/deeptutor/calendar/Pickers';
 import { describeError } from '@/lib/errors';

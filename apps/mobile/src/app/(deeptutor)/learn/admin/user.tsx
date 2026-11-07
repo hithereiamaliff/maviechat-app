@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { initials, PRESET_NAMES, useAdminUsers, useUserGrants } from '@/features/deeptutor/admin/queries';
 import { describeError } from '@/lib/errors';
@@ -54,7 +55,7 @@ export default function UserScreen() {
       { text: 'Make Ordinary', style: 'destructive', onPress: () => void run(() => setUserRole(client, username, 'user'), `${username} is an ordinary account from their next sign-in`) },
     ]);
   const resetPassword = () =>
-    Alert.prompt(
+    showPrompt(
       `New password for ${username}`,
       `At least 8 characters. They’re asked to change it when they next sign in; a sign-in they already have keeps working (up to ${SIGN_IN_DAYS} days).`,
       (value) => {
@@ -66,7 +67,7 @@ export default function UserScreen() {
       'secure-text',
     );
   const remove = () =>
-    Alert.prompt(
+    showPrompt(
       `Delete ${username}?`,
       `Their account and picture are deleted for good; what they made stays on the server. A sign-in they already have keeps working until it expires (up to ${SIGN_IN_DAYS} days). Type their username to delete it.`,
       (value) => {

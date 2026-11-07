@@ -1,11 +1,13 @@
 import * as Speech from 'expo-speech';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { Modal } from '@/components/Modal';
+import { ANDROID } from '@/lib/device';
 import { setDevicePrefs, useDevicePrefs } from '@/lib/devicePrefs';
 import { speakText, stopReading } from '@/lib/readAloud';
 import { fonts, radius, usePalette } from '@/theme';
-import { voiceQuality, voiceSample, voiceSections, type PhoneVoice } from './voices';
+import { voiceName, voiceQuality, voiceSample, voiceSections, type PhoneVoice } from './voices';
 
 const phoneLocale = () => Intl.DateTimeFormat().resolvedOptions().locale;
 
@@ -89,11 +91,13 @@ function VoiceList({ rate, onClose }: { rate: number; onClose: () => void }) {
             query.trim() ? undefined : <Row title="Phone default" hint="The phone’s voice for each reply’s language" selected={!chosen} onPress={() => pick(null)} />
           }
           renderSectionHeader={({ section }) => <Text style={[styles.section, { color: palette.textMuted }]}>{section.title}</Text>}
-          renderItem={({ item }) => <Row title={item.name} badge={voiceQuality(item)} selected={chosen?.identifier === item.identifier} onPress={() => pick(item)} />}
+          renderItem={({ item }) => <Row title={voiceName(item)} badge={voiceQuality(item)} selected={chosen?.identifier === item.identifier} onPress={() => pick(item)} />}
           ListEmptyComponent={<Text style={[styles.empty, { color: palette.textFaint }]}>{query.trim() ? 'No voices match.' : 'This phone has no voices to offer.'}</Text>}
           ListFooterComponent={
             <Text style={[styles.footer, { color: palette.textFaint }]}>
-              More voices, and better-sounding downloads of these: iPhone Settings → Accessibility → Spoken Content → Voices.
+              {ANDROID
+                ? 'More voices: in Android Settings, search for “text-to-speech” and open the voice engine’s settings.'
+                : 'More voices, and better-sounding downloads of these: iPhone Settings → Accessibility → Spoken Content → Voices.'}
             </Text>
           }
         />

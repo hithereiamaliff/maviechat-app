@@ -1,7 +1,8 @@
 import { deleteMcpServer, mcpRefusal, mcpUsage, setMcpServerEnabled, testMcpServer, type DtMcpServer, type DtMcpTool } from '@maviechat/deeptutor-protocol';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { Button } from '@/components/Button';
+import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { describeError } from '@/lib/errors';
 import { useDtAuthed } from '@/session/DeepTutorProvider';

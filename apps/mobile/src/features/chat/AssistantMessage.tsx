@@ -18,12 +18,13 @@ import {
 } from '@maviechat/owui-protocol';
 import { Image } from 'expo-image';
 import { memo, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { MenuButton, type MenuItem } from '@/components/Menu';
 import { ReadAloudButton } from '@/components/ReadAloudButton';
 import { useToast } from '@/components/Toast';
+import { showPrompt } from '@/components/dialogs';
 import { useCapabilities, useUserSettings } from '@/lib/server';
 import { copyReply } from '@/lib/copy';
 import { useInterface } from '@/lib/uiSettings';
@@ -124,26 +125,22 @@ export const AssistantMessage = memo(function AssistantMessage({
         { key: 'again', label: 'Try Again', icon: 'arrow-path', onPress: () => onRegenerate() },
         { key: 'details', label: 'Add Details', icon: 'bars-arrow-down', onPress: () => onRegenerate('Add Details') },
         { key: 'concise', label: 'More Concise', icon: 'bars-arrow-up', onPress: () => onRegenerate('More Concise') },
-        ...(Platform.OS === 'ios'
-          ? [
+        {
+          key: 'suggest',
+          label: 'Suggest a change',
+          icon: 'chat-bubble-bottom-center-text',
+          onPress: () =>
+            showPrompt('Suggest a change', undefined, [
+              { text: 'Cancel', style: 'cancel' },
               {
-                key: 'suggest',
-                label: 'Suggest a change',
-                icon: 'chat-bubble-bottom-center-text' as const,
-                onPress: () =>
-                  Alert.prompt('Suggest a change', undefined, [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Regenerate',
-                      onPress: (value?: string) => {
-                        const prompt = value?.trim();
-                        if (prompt) onRegenerate(prompt);
-                      },
-                    },
-                  ]),
+                text: 'Regenerate',
+                onPress: (value?: string) => {
+                  const prompt = value?.trim();
+                  if (prompt) onRegenerate(prompt);
+                },
               },
-            ]
-          : []),
+            ]),
+        },
       ]
     : [];
 

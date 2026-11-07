@@ -9,6 +9,7 @@ import { Button } from '@/components/Button';
 import { TextField } from '@/components/TextField';
 import { useToast } from '@/components/Toast';
 import { shareFile } from '@/features/settings/exportFile';
+import { ANDROID } from '@/lib/device';
 import { describeSignInError } from '@/session/errors';
 import { useSession, type SignInOutcome } from '@/session/SessionProvider';
 import { fonts, radius, usePalette } from '@/theme';
@@ -130,7 +131,7 @@ function Enroll({ client, challenge, email, onBack, onConfirmed }: { client: Owu
   return (
     <View style={styles.form}>
       <Text style={[styles.title, { color: palette.text }]}>Set up two-step sign-in</Text>
-      <Text style={[styles.body, { color: palette.textMuted }]}>This server asks for a code from an authenticator app each time you sign in. Add it to the iPhone’s Passwords or to an authenticator app, then enter the code it shows.</Text>
+      <Text style={[styles.body, { color: palette.textMuted }]}>This server asks for a code from an authenticator app each time you sign in. {ANDROID ? 'Add it to an authenticator app' : 'Add it to the iPhone’s Passwords or to an authenticator app'}, then enter the code it shows.</Text>
       {setup.isLoading ? <ActivityIndicator color={palette.textMuted} /> : null}
       {setup.isError ? <Text style={[styles.body, { color: palette.danger }]}>{describeSignInError(setup.error)}</Text> : null}
       {key ? (

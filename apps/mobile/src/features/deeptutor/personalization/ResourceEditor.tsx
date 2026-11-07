@@ -1,7 +1,8 @@
 import { cleanTag, joinFrontMatter, resourceNameProblem, slugifyName, splitFrontMatter, tagProblem } from '@maviechat/deeptutor-protocol';
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { Modal } from '@/components/Modal';
 import { describeError } from '@/lib/errors';
 import { fonts, radius, usePalette } from '@/theme';
 

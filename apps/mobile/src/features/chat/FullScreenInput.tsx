@@ -1,6 +1,7 @@
-import { Modal, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { IconButton } from '@/components/IconButton';
+import { Modal } from '@/components/Modal';
 import { fonts, usePalette } from '@/theme';
 
 interface FullScreenInputProps {

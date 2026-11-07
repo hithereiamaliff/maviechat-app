@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { languageTitle, voiceQuality, voiceSample, voiceSections, type PhoneVoice } from './voices';
+import { languageTitle, voiceName, voiceQuality, voiceSample, voiceSections, type PhoneVoice } from './voices';
 
 const voice = (name: string, language: string, extra: Partial<PhoneVoice> = {}): PhoneVoice => ({ identifier: `com.apple.voice.compact.${language}.${name}`, name, quality: 'Default', language, ...extra });
 
@@ -11,6 +11,15 @@ describe('voices', () => {
     expect(languageTitle('ja')).toBe('Japanese');
     expect(languageTitle('xx-YY')).toBe('xx-YY');
     expect(languageTitle('en-ZZ')).toBe('English (ZZ)');
+  });
+
+  it('keeps iOS voice names, and makes Android’s codes readable', () => {
+    expect(voiceName({ name: 'Samantha' })).toBe('Samantha');
+    expect(voiceName({ name: 'Eddy (English (US))' })).toBe('Eddy (English (US))');
+    expect(voiceName({ name: 'en-us-x-sfg-local' })).toBe('Voice SFG');
+    expect(voiceName({ name: 'en-us-x-iom#male_1-network' })).toBe('Voice IOM (male 1, online)');
+    expect(voiceName({ name: 'cmn-cn-x-ccc-network' })).toBe('Voice CCC (online)');
+    expect(voiceName({ name: '' })).toBe('');
   });
 
   it('marks the better downloads', () => {
