@@ -56,7 +56,8 @@ function Editor({ target, onClose, onSaved }: { target: AccessTarget; onClose: (
     setBusy(true);
     try {
       const sent = grantsFromState(state);
-      const kept = await updateAccess(client, target.area, target.id, sent);
+      // A model with no saved row gets one: its name keeps it from being renamed to its id.
+      const kept = await updateAccess(client, target.area, target.id, sent, target.area === 'models' ? target.name : undefined);
       onSaved();
       toast(droppedGrants(sent, kept).length ? 'Saved, but some of it wasn’t kept: your account may not share that way.' : 'Sharing saved', droppedGrants(sent, kept).length ? 'error' : undefined);
       onClose();

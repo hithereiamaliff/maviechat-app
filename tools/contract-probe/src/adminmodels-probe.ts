@@ -1,5 +1,8 @@
 import {
+  createWorkspaceModel,
   defaultSuggestionsOf,
+  deleteAllModels,
+  deleteKindOf,
   deleteWorkspaceModel,
   exportAdminModel,
   exportAdminModels,
@@ -15,10 +18,12 @@ import {
   saveDefaultSuggestions,
   saveModelsConfig,
   sameSuggestions,
+  setAdminModelPublic,
   translatedLanguages,
   withListedOrder,
   withModelDefaults,
   withModelOrder,
+  type AdminModel,
   type Capabilities,
   type OwuiClient,
 } from '@maviechat/owui-protocol';
@@ -40,7 +45,7 @@ const modelSettings = (config: Tree) => JSON.stringify(MODEL_KEYS.map((key) => c
  * throwaway model, changing it by a second import, exporting it, deleting it. The models settings
  * and the suggestions are put back exactly. Prints counts, never other settings' values.
  */
-export async function probeAdminModels({ client, capabilities, baseUrl }: { client: OwuiClient; capabilities: Capabilities; baseUrl: string }): Promise<{ steps: WriteStep[]; fixture: Record<string, unknown> }> {
+export async function probeAdminModels({ client, capabilities, baseUrl, peer }: { client: OwuiClient; capabilities: Capabilities; baseUrl: string; peer: OwuiClient | null }): Promise<{ steps: WriteStep[]; fixture: Record<string, unknown> }> {
   const steps: WriteStep[] = [];
   const fixture: Record<string, unknown> = {};
   const check = async (name: string, run: () => Promise<string>) => {
@@ -198,6 +203,82 @@ export async function probeAdminModels({ client, capabilities, baseUrl }: { clie
         return `as before (${suggestionsBefore.prompts === null ? 'built-in' : suggestionsBefore.prompts.length})`;
       });
     }
+  }
+
+  // Part 2: who may use a model with no saved row, Reset (and what a user then sees), Reset All.
+  const accessId = `app-probe-access-${stamp}`;
+  let madeAccess = false;
+  try {
+    await check('who may use it, for a model with no saved row: made under its own name, public, then private', async () => {
+      const unsaved: AdminModel = { id: accessId, name: 'APP PROBE access', ownedBy: '', preset: false, hasRow: false, isActive: true, hidden: false, accessGrants: [], available: true, tags: [] };
+      madeAccess = true;
+      await setAdminModelPublic(client, unsaved, true);
+      const made = record(await client.get<unknown>('/api/v1/models/model', { query: { id: accessId } }));
+      if (made.name !== 'APP PROBE access') throw new Error(`the row was named ${JSON.stringify(made.name)}`);
+      if (!list(made.access_grants).some((grant) => record(grant).principal_id === '*')) throw new Error('not public');
+      const back = await setAdminModelPublic(client, { ...unsaved, hasRow: true }, false);
+      if (back.some((grant) => grant.principal_id === '*')) throw new Error('still public');
+      return 'row made with the name given; public, then private';
+    });
+  } finally {
+    if (madeAccess) await deleteWorkspaceModel(client, accessId).catch(() => undefined);
+  }
+
+  // Reset on a model a connection serves: back it up, reset, save settings for it as if it had
+  // none, make it public, then put its row back exactly (or none, as it had).
+  const served = (await listAdminModels(client)).find((model) => model.available && !model.preset && model.ownedBy !== 'arena');
+  if (!served) {
+    steps.push({ name: 'Reset of a served model', ok: true, note: 'skipped: no connection serves a model here' });
+  } else {
+    const original = served.hasRow ? await exportAdminModel(client, served) : null;
+    const peerSees = async () => (peer ? list(record(await peer.get<unknown>('/api/models')).data).some((item) => record(item).id === served.id) : null);
+    let touched = false;
+    try {
+      await check(`Reset of a served model (${served.hasRow ? 'saved' : 'never saved'}): users lose it; settings saved for it keep it private; Make Public brings it back`, async () => {
+        if (deleteKindOf(served) !== (served.hasRow ? 'reset' : null)) throw new Error('the wrong delete kind');
+        const sawBefore = await peerSees();
+        touched = true;
+        if (served.hasRow) await deleteWorkspaceModel(client, served.id);
+        const reset = (await listAdminModels(client)).find((model) => model.id === served.id);
+        if (!reset || reset.hasRow || !reset.available) throw new Error('not reset to no saved settings');
+        const sawReset = await peerSees();
+        if (sawReset === true) throw new Error('a user still sees a model with no saved settings');
+        await createWorkspaceModel(client, { id: served.id, baseModelId: '', name: 'APP PROBE edited', meta: { description: 'made by the probe' }, params: {}, isActive: true, accessGrants: [] });
+        const edited = (await listAdminModels(client)).find((model) => model.id === served.id);
+        if (!edited?.hasRow || edited.name !== 'APP PROBE edited' || edited.preset) throw new Error('its settings weren’t saved as a connection’s model');
+        if ((await peerSees()) === true) throw new Error('a user sees it while it’s private');
+        await setAdminModelPublic(client, edited, true);
+        const sawPublic = await peerSees();
+        if (sawPublic === false) throw new Error('a user doesn’t see it once public');
+        return peer ? `a user saw it ${sawBefore ? 'before' : 'not even before'}, not after Reset nor while private, and does once public` : 'reset, saved and public (give --peer-env to check what a user sees)';
+      });
+    } finally {
+      if (touched) {
+        await check('the served model’s settings put back exactly', async () => {
+          await deleteWorkspaceModel(client, served.id).catch(() => undefined);
+          if (original) await importAdminModels(client, [original]);
+          const now = served.hasRow ? await exportAdminModel(client, served) : null;
+          const pick = (row: Tree | null) => (row ? JSON.stringify([row.name, row.base_model_id ?? null, row.meta, row.params, row.is_active, list(row.access_grants).map((grant) => [record(grant).principal_type, record(grant).principal_id, record(grant).permission]).sort()]) : 'none');
+          if (pick(now) !== pick(original)) throw new Error('they differ from before');
+          return original ? 'as before' : 'none saved, as before';
+        });
+      }
+    }
+  }
+
+  // Reset All deletes every saved model on the server, so it runs only where none is saved.
+  const savedNow = await exportAdminModels(client);
+  if (savedNow.length) {
+    steps.push({ name: 'Reset All', ok: true, note: `skipped: ${savedNow.length} saved models here (it runs only where none is)` });
+  } else {
+    await check('Reset All: every saved model deleted', async () => {
+      await importAdminModels(client, [{ id: `app-probe-all-${stamp}`, name: 'APP PROBE reset all', base_model_id: null, meta: {}, params: {} }]);
+      if ((await exportAdminModels(client)).length !== 1) throw new Error('the throwaway wasn’t saved');
+      await deleteAllModels(client);
+      const left = await exportAdminModels(client);
+      if (left.length) throw new Error(`${left.length} left`);
+      return 'the throwaway saved, then none left';
+    });
   }
   return { steps, fixture };
 }

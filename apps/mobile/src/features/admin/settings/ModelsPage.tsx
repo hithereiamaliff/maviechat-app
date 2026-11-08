@@ -1,32 +1,42 @@
 import {
+  adminModelTags,
+  deleteAllModels,
+  deleteKindOf,
+  deleteWorkspaceModel,
   exportAdminModel,
   exportAdminModels,
   fullModelOrder,
   getModelsConfig,
   idsOf,
   importAdminModels,
+  inAdminView,
   inModelOrder,
+  isPublicModel,
   listAdminModels,
   rowsFromImport,
   saveModelsConfig,
   setAdminModelActive,
   setAdminModelHidden,
+  setAdminModelPublic,
   withListedModel,
   type AdminModel,
+  type AdminModelView,
   type OwuiClient,
 } from '@maviechat/owui-protocol';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { MenuButton, type MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
 import { ModelAvatar } from '@/features/chat/ModelAvatar';
+import { usePinnedModels } from '@/features/chat/usePinnedModels';
 import { fileNameOf, shareFile, stampedName } from '@/features/settings/exportFile';
 import { ActionRow, Group, Note } from '@/features/settings/rows';
 import { AccessSheet, type AccessTarget } from '@/features/workspace/AccessSheet';
 import { pickTextFile, plural } from '@/features/workspace/EditorParts';
 import { Chip } from '@/features/workspace/ListControls';
+import { ModelEditor, type ModelEditorTarget } from '@/features/workspace/ModelEditor';
 import { eachFew, failures } from '@/lib/eachFew';
 import { describeError } from '@/lib/errors';
 import { useAuthed } from '@/lib/server';
@@ -34,12 +44,21 @@ import { fonts, radius, usePalette } from '@/theme';
 import { ModelDefaultsSheet } from './ModelDefaultsSheet';
 import { ModelOrderSheet } from './ModelOrderSheet';
 
-type View_ = 'all' | 'on' | 'off' | 'hidden';
-const VIEWS: { key: View_; label: string }[] = [
+/** The web's views (0.11's and 0.12's together). */
+const VIEWS: { key: AdminModelView; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'on', label: 'On' },
   { key: 'off', label: 'Off' },
+  { key: 'visible', label: 'Visible' },
   { key: 'hidden', label: 'Hidden' },
+  { key: 'public', label: 'Public' },
+  { key: 'private', label: 'Private' },
+  { key: 'default', label: 'New Chats' },
+  { key: 'pinned', label: 'Pinned' },
+  { key: 'available', label: 'Available' },
+  { key: 'unavailable', label: 'Unavailable' },
+  { key: 'base', label: 'Base' },
+  { key: 'workspace', label: 'Workspace' },
 ];
 
 /** The web's Actions menu's "… All", for the models the list shows. */
@@ -92,10 +111,12 @@ const BULK: Record<Bulk, { label: string; icon: 'check-circle' | 'minus-circle' 
 };
 
 /**
- * Every model on the server, for admins, in the order everyone's pickers show them: on or off for
- * everyone, hidden from pickers, what new chats start with, what's pinned for everyone, who may
- * use a model with a saved row; the defaults every model starts with, the order, import and
- * export, and the web's "… All" actions. Each change reads the server first and changes only itself.
+ * Every model on the server, for admins, in the order everyone's pickers show them (with saved
+ * settings of models no connection offers now): the web's views and tags; on or off for everyone,
+ * hidden from pickers, what new chats start with, what's pinned for everyone, public or who may
+ * use it; edit (a connection's model's own settings too), clone, reset or delete; the defaults
+ * every model starts with, the order, import and export, the web's "… All" actions and Reset All.
+ * Each change reads the server first and changes only itself.
  */
 export function ModelsPage() {
   const palette = usePalette();
@@ -105,31 +126,37 @@ export function ModelsPage() {
   const models = useQuery({ queryKey: ['admin', 'models'], queryFn: () => listAdminModels(client), staleTime: 15_000 });
   const config = useQuery({ queryKey: ['admin', 'models-config'], queryFn: () => getModelsConfig(client), staleTime: 0 });
   const [query, setQuery] = useState('');
-  const [view, setView] = useState<View_>('all');
+  const [view, setView] = useState<AdminModelView>('all');
+  const [tag, setTag] = useState('');
   const [sharing, setSharing] = useState<AccessTarget | null>(null);
+  const [editor, setEditor] = useState<ModelEditorTarget | null>(null);
+  const mine = usePinnedModels();
   const [sheet, setSheet] = useState<'defaults' | 'order' | null>(null);
   const [working, setWorking] = useState<Bulk | 'import' | null>(null);
   const defaults = idsOf(config.data?.DEFAULT_MODELS);
   const pinned = idsOf(config.data?.DEFAULT_PINNED_MODELS);
   const all = models.data ?? [];
   const ordered = config.data ? inModelOrder(all, fullModelOrder(config.data, all.map((model) => model.id))) : all;
+  const tags = adminModelTags(all);
+  const activeTag = tags.includes(tag) ? tag : '';
   const wanted = query.trim().toLowerCase();
-  const filtered = Boolean(wanted) || view !== 'all';
+  const filtered = Boolean(wanted) || view !== 'all' || Boolean(activeTag);
   const shown = ordered
-    .filter((model) => (view === 'on' ? model.isActive : view === 'off' ? !model.isActive : view === 'hidden' ? model.hidden : true))
+    .filter((model) => inAdminView(model, view, { defaults, pinned }))
+    .filter((model) => !activeTag || model.tags.includes(activeTag))
     .filter((model) => !wanted || `${model.name} ${model.id}`.toLowerCase().includes(wanted));
   const refresh = () => {
     void queryClient.invalidateQueries({ queryKey: ['admin'] });
     void queryClient.invalidateQueries({ queryKey: ['models'] });
     void queryClient.invalidateQueries({ queryKey: ['config'] });
   };
-  const run = (done: string, work: () => Promise<unknown>) =>
+  const run = (done: string, work: () => Promise<unknown>, failed = 'Couldn’t save') =>
     void work().then(
       () => {
         refresh();
         toast(done);
       },
-      (error: unknown) => toast(`Couldn’t save: ${describeError(error)}`, 'error'),
+      (error: unknown) => toast(`${failed}: ${describeError(error)}`, 'error'),
     );
   const listed = (model: AdminModel, key: 'DEFAULT_MODELS' | 'DEFAULT_PINNED_MODELS', on: boolean, done: string) => run(done, async () => saveModelsConfig(client, withListedModel(await getModelsConfig(client), key, model.id, on)));
 
@@ -217,23 +244,84 @@ export function ModelsPage() {
     ]);
   };
 
+  const edit = (model: AdminModel) => setEditor(model.preset ? { kind: 'edit', id: model.id } : { kind: 'base', id: model.id, name: model.name, saved: model.hasRow });
+  const askDelete = (model: AdminModel, kind: 'reset' | 'delete') => {
+    const ask =
+      kind === 'reset'
+        ? { title: `Reset ${model.name}?`, message: 'Its settings saved here go: its name, picture, prompt, parameters, sharing, and whether it’s on or hidden. With nothing saved, only admins see it, until settings are saved for it again (Edit, or Who May Use It).', button: 'Reset', done: `${model.name} reset` }
+        : model.preset
+          ? { title: `Delete ${model.name}?`, message: 'Everyone it’s shared with loses it, and it leaves anyone’s defaults. Chats keep what it said.', button: 'Delete', done: `${model.name} deleted` }
+          : { title: `Delete ${model.name}’s settings?`, message: 'No connection offers it now. Its saved settings go; if a connection offers it again, it starts with none, seen only by admins until settings are saved.', button: 'Delete', done: `${model.name}’s settings deleted` };
+    Alert.alert(ask.title, ask.message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: ask.button, style: 'destructive', onPress: () => run(ask.done, () => deleteWorkspaceModel(client, model.id), kind === 'reset' ? 'Couldn’t reset it' : 'Couldn’t delete it') },
+    ]);
+  };
+  const confirmResetAll = (count: number) =>
+    Alert.alert('Delete them all?', `${plural(count, 'saved model')} go for good, for everyone. There’s no way back.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete All', style: 'destructive', onPress: () => run('Every saved model deleted', () => deleteAllModels(client), 'Couldn’t delete them') },
+    ]);
+  const askResetAll = async () => {
+    let count: number;
+    try {
+      count = (await exportAdminModels(client)).length;
+    } catch (error) {
+      return toast(`Couldn’t read the saved models: ${describeError(error)}`, 'error');
+    }
+    if (!count) return toast('No model has saved settings.');
+    Alert.alert(
+      `Delete all ${plural(count, 'saved model')}?`,
+      'Every workspace model, everyone’s, and every setting saved for the connections’ models: names, pictures, prompts, parameters, sharing, on or off. The connections’ models stay, with nothing saved, seen only by admins until settings are saved again. This can’t be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Export First', onPress: () => void exportAll() },
+        { text: 'Delete All…', style: 'destructive', onPress: () => confirmResetAll(count) },
+      ],
+    );
+  };
+
   const actions: MenuItem[] = [
     { key: 'import', label: working === 'import' ? 'Importing…' : 'Import…', icon: 'arrow-up-tray', onPress: () => void (working ? undefined : importModels()) },
     { key: 'export', label: 'Export All', icon: 'arrow-down-tray', onPress: () => void exportAll() },
     ...(Object.keys(BULK) as Bulk[]).map((kind) => ({ key: `bulk-${kind}`, label: working === kind ? 'Working…' : BULK[kind].label, icon: BULK[kind].icon, onPress: () => void (working ? undefined : askBulk(kind)) })),
+    { key: 'reset-all', label: 'Reset All…', icon: 'trash', destructive: true, onPress: () => void askResetAll() },
   ];
-  const menuFor = (model: AdminModel): MenuItem[] => [
-    { key: 'hide', label: model.hidden ? 'Show in Pickers' : 'Hide from Pickers', icon: model.hidden ? 'eye' : 'eye-slash', onPress: () => run(model.hidden ? `${model.name} shown` : `${model.name} hidden from everyone’s picker`, () => setAdminModelHidden(client, model, !model.hidden)) },
-    defaults.includes(model.id)
-      ? { key: 'default', label: 'Stop Starting Chats With It', icon: 'chat-bubble-left', onPress: () => listed(model, 'DEFAULT_MODELS', false, `New chats no longer start with ${model.name}`) }
-      : { key: 'default', label: 'Start New Chats With It', icon: 'chat-bubble-left', onPress: () => listed(model, 'DEFAULT_MODELS', true, `New chats start with ${model.name}`) },
-    pinned.includes(model.id)
-      ? { key: 'pin', label: 'Unpin for Everyone', icon: 'bookmark-slash', onPress: () => listed(model, 'DEFAULT_PINNED_MODELS', false, `${model.name} unpinned`) }
-      : { key: 'pin', label: 'Pin for Everyone', icon: 'bookmark', onPress: () => listed(model, 'DEFAULT_PINNED_MODELS', true, `${model.name} pinned for everyone`) },
-    ...(model.hasRow ? [{ key: 'share', label: 'Who May Use It…', icon: 'users' as const, onPress: () => setSharing({ area: 'models', id: model.id, name: model.name, grants: model.accessGrants }) }] : []),
-    { key: 'link', label: 'Copy Link', icon: 'link', onPress: () => void Clipboard.setStringAsync(`${session.baseUrl}/?model=${encodeURIComponent(model.id)}`).then(() => toast('Link copied')) },
-    ...(model.hasRow ? [{ key: 'export', label: 'Export', icon: 'arrow-down-tray' as const, onPress: () => void exportOne(model) }] : []),
-  ];
+  const menuFor = (model: AdminModel): MenuItem[] => {
+    const kind = deleteKindOf(model);
+    const everyone = isPublicModel(model);
+    const kept = mine.isPinned(model.id);
+    return [
+      { key: 'edit', label: 'Edit…', icon: 'pencil-square', onPress: () => edit(model) },
+      { key: 'clone', label: 'Clone', icon: 'rectangle-stack', onPress: () => setEditor(model.preset ? { kind: 'clone', id: model.id } : { kind: 'build', id: model.id, name: model.name, saved: model.hasRow }) },
+      { key: 'hide', label: model.hidden ? 'Show in Pickers' : 'Hide from Pickers', icon: model.hidden ? 'eye' : 'eye-slash', onPress: () => run(model.hidden ? `${model.name} shown` : `${model.name} hidden from everyone’s picker`, () => setAdminModelHidden(client, model, !model.hidden)) },
+      defaults.includes(model.id)
+        ? { key: 'default', label: 'Stop Starting Chats With It', icon: 'chat-bubble-left', onPress: () => listed(model, 'DEFAULT_MODELS', false, `New chats no longer start with ${model.name}`) }
+        : { key: 'default', label: 'Start New Chats With It', icon: 'chat-bubble-left', onPress: () => listed(model, 'DEFAULT_MODELS', true, `New chats start with ${model.name}`) },
+      pinned.includes(model.id)
+        ? { key: 'pin', label: 'Unpin for Everyone', icon: 'bookmark-slash', onPress: () => listed(model, 'DEFAULT_PINNED_MODELS', false, `${model.name} unpinned`) }
+        : { key: 'pin', label: 'Pin for Everyone', icon: 'bookmark', onPress: () => listed(model, 'DEFAULT_PINNED_MODELS', true, `${model.name} pinned for everyone`) },
+      ...(model.isActive
+        ? [
+            {
+              key: 'sidebar',
+              label: kept ? 'Hide from Sidebar' : 'Keep in Sidebar',
+              icon: 'star' as const,
+              onPress: () => {
+                mine.toggle(model.id);
+                toast(kept ? `${model.name} left your sidebar` : `${model.name} is kept in your sidebar`);
+              },
+            },
+          ]
+        : []),
+      // A model with nothing saved gets a row for its sharing, under its own name.
+      { key: 'public', label: everyone ? 'Make Private' : 'Make Public', icon: everyone ? 'lock-closed' : 'globe-alt', onPress: () => run(everyone ? `${model.name} isn’t for everyone now` : `Everyone may use ${model.name} now`, () => setAdminModelPublic(client, model, !everyone)) },
+      { key: 'share', label: 'Who May Use It…', icon: 'users', onPress: () => setSharing({ area: 'models', id: model.id, name: model.name, grants: model.accessGrants }) },
+      { key: 'link', label: 'Copy Link', icon: 'link', onPress: () => void Clipboard.setStringAsync(`${session.baseUrl}/?model=${encodeURIComponent(model.id)}`).then(() => toast('Link copied')) },
+      ...(model.hasRow ? [{ key: 'export', label: 'Export', icon: 'arrow-down-tray' as const, onPress: () => void exportOne(model) }] : []),
+      ...(kind ? [{ key: 'delete', label: kind === 'reset' ? 'Reset…' : 'Delete…', icon: kind === 'reset' ? ('arrow-path' as const) : ('trash' as const), destructive: true, onPress: () => askDelete(model, kind) }] : []),
+    ];
+  };
 
   return (
     <View style={styles.page}>
@@ -255,30 +343,38 @@ export function ModelsPage() {
         <TextInput value={query} onChangeText={setQuery} placeholder="Search models" placeholderTextColor={palette.textFaint} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" accessibilityLabel="Search models" style={[styles.search, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]} />
         <MenuButton label="Model actions" size={22} color={palette.textMuted} items={actions} />
       </View>
-      <View style={styles.chips}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.views}>
         {VIEWS.map((item) => (
           <Chip key={item.key} label={item.label} on={view === item.key} onPress={() => setView(item.key)} />
         ))}
-      </View>
+      </ScrollView>
+      {tags.length ? (
+        <View style={styles.chips}>
+          {tags.map((name) => (
+            <Chip key={name} label={`#${name}`} on={activeTag === name} onPress={() => setTag(activeTag === name ? '' : name)} />
+          ))}
+        </View>
+      ) : null}
       {models.isLoading ? <ActivityIndicator color={palette.textMuted} /> : null}
       {models.isError ? <Note>{`Couldn’t load the models: ${describeError(models.error)}`}</Note> : null}
       {models.data && !shown.length ? <Note>Nothing matches.</Note> : null}
       {shown.map((model) => (
-        <View key={model.id} style={[styles.item, { borderColor: palette.border, opacity: model.isActive ? 1 : 0.6 }]}>
+        <Pressable key={model.id} accessibilityRole="button" accessibilityHint="Opens its settings" onPress={() => edit(model)} style={({ pressed }) => [styles.item, { borderColor: palette.border, opacity: model.isActive ? 1 : 0.6, backgroundColor: pressed ? palette.surface : 'transparent' }]}>
           <ModelAvatar modelId={model.id} size={34} rounded={9} />
           <View style={styles.text}>
             <Text style={[styles.name, { color: palette.text }]} numberOfLines={1}>
               {model.name}
             </Text>
             <Text style={[styles.meta, { color: palette.textFaint }]} numberOfLines={1}>
-              {[model.id, model.preset ? 'workspace' : model.ownedBy, model.hidden ? 'hidden' : '', defaults.includes(model.id) ? 'new chats' : '', pinned.includes(model.id) ? 'pinned' : '', model.hasRow && !model.preset ? (model.accessGrants.some((grant) => grant.principal_id === '*') ? 'everyone' : model.accessGrants.length ? 'shared' : 'not shared') : ''].filter(Boolean).join(' · ')}
+              {[model.id, model.preset ? 'workspace' : model.available ? model.ownedBy : 'not offered now', model.hidden ? 'hidden' : '', defaults.includes(model.id) ? 'new chats' : '', pinned.includes(model.id) ? 'pinned' : '', model.hasRow && !model.preset ? (model.accessGrants.some((grant) => grant.principal_id === '*') ? 'everyone' : model.accessGrants.length ? 'shared' : 'not shared') : ''].filter(Boolean).join(' · ')}
             </Text>
           </View>
           <Switch accessibilityLabel={`${model.name} on`} value={model.isActive} onValueChange={(on) => run(on ? `${model.name} is on` : `${model.name} is off for everyone`, () => setAdminModelActive(client, model, on))} />
           <MenuButton label={`Options for ${model.name}`} size={18} color={palette.textMuted} items={menuFor(model)} />
-        </View>
+        </Pressable>
       ))}
       <AccessSheet target={sharing} onClose={() => setSharing(null)} onSaved={refresh} />
+      <ModelEditor target={editor} onClose={() => setEditor(null)} onSaved={refresh} />
       <ModelDefaultsSheet visible={sheet === 'defaults'} onClose={() => setSheet(null)} />
       <ModelOrderSheet visible={sheet === 'order'} models={all} onClose={() => setSheet(null)} onSaved={refresh} />
     </View>
@@ -290,6 +386,7 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   search: { flex: 1, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 9, fontFamily: fonts.regular, fontSize: 15 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  views: { flexDirection: 'row', gap: 8, paddingRight: 8 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg },
   text: { flex: 1, gap: 2 },
   name: { fontFamily: fonts.semibold, fontSize: 15 },

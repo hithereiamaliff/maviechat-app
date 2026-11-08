@@ -115,7 +115,7 @@ export function AdminSettings() {
             <SectionTitle title="AI" />
             <Group>
               <ActionRow label="Connections" hint="OpenAI-compatible and Ollama servers, their keys and models" onPress={() => setPage('connections')} />
-              <ActionRow label="Models" hint="On or off, hidden, what new chats start with, pinned, who may use them" onPress={() => setPage('models')} />
+              <ActionRow label="Models" hint="On or off, sharing, settings, defaults for every model, order, import and export" onPress={() => setPage('models')} />
               <ActionRow label="Sub-agents" hint="Helpers models can hand parts of a task to" onPress={() => setPage('subagents')} />
             </Group>
           </View>

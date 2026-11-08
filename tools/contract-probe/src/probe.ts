@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels [--peer-env FILE]] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -545,7 +545,14 @@ async function main() {
       }
 
       if (args.adminmodels && capabilities) {
-        const adminModelsProbe = await probeAdminModels({ client, capabilities, baseUrl });
+        // A second account (--peer-env) shows what a user sees after Reset and Make Public.
+        const peerEnv = loadEnvFile(args['peer-env'] ?? '') ?? {};
+        let peer: OwuiClient | null = null;
+        if (peerEnv.OWUI_EMAIL && peerEnv.OWUI_PASSWORD) {
+          const peerSignIn = await signIn(anonymous, peerEnv.OWUI_EMAIL, peerEnv.OWUI_PASSWORD);
+          if (peerSignIn.kind === 'session') peer = anonymous.withToken(peerSignIn.session.token);
+        }
+        const adminModelsProbe = await probeAdminModels({ client, capabilities, baseUrl, peer });
         for (const result of adminModelsProbe.steps) results.push({ ...result, name: `Admin models: ${result.name}` });
         fixtures['write.adminmodels'] = adminModelsProbe.fixture;
       }

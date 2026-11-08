@@ -1,3 +1,4 @@
+import { updateAccess } from './access';
 import type { OwuiClient } from './http';
 import { customParamsOf, PARAM_SPECS, type CustomParam } from './params';
 import {
@@ -14,7 +15,7 @@ import {
   type SuggestedPrompt,
   type WorkspaceCapability,
 } from './workspaceModelEditor';
-import { grantsOf, setWorkspaceModelHidden, type AccessGrant } from './workspaceModels';
+import { grantsOf, setWorkspaceModelHidden, tagNames, type AccessGrant } from './workspaceModels';
 
 /*
  * Admin → Models (Open WebUI 0.11.3): every model on the server, from the providers and the
@@ -41,19 +42,23 @@ export interface AdminModel {
   isActive: boolean;
   hidden: boolean;
   accessGrants: AccessGrant[];
+  /** A connection offers it now (or it's a workspace model); else only its saved row is left. */
+  available: boolean;
+  tags: string[];
 }
 
 const items = (body: unknown): Tree[] => list(record(body).data).map(record);
 
 /**
  * Every model, as the web's admin list builds it: the models in use, then the providers' own
- * list (asking each provider), each with its saved row laid over.
+ * list (asking each provider), each with its saved row laid over; then, as 0.12's list has them,
+ * saved rows of models no connection offers now (unavailable), so they can be found and deleted.
  */
 export async function listAdminModels(client: OwuiClient): Promise<AdminModel[]> {
   const [active, provider, rows] = await Promise.all([client.get<unknown>('/api/models'), client.get<unknown>('/api/models/base'), client.get<unknown>('/api/v1/models/base')]);
   const saved = new Map(list(rows).map((row) => [text(record(row).id), record(row)]));
   const seen = new Set<string>();
-  return [...items(active), ...items(provider)].flatMap((item) => {
+  const offered = [...items(active), ...items(provider)].flatMap((item): AdminModel[] => {
     const id = text(item.id);
     if (!id || seen.has(id)) return [];
     seen.add(id);
@@ -71,9 +76,84 @@ export async function listAdminModels(client: OwuiClient): Promise<AdminModel[]>
         isActive: row ? row.is_active !== false : info.is_active !== false,
         hidden: meta.hidden === true,
         accessGrants: grantsOf(row?.access_grants ?? info.access_grants),
+        available: true,
+        tags: tagNames(meta.tags),
       },
     ];
   });
+  const away = [...saved.entries()].flatMap(([id, row]): AdminModel[] => {
+    if (!id || seen.has(id)) return [];
+    const meta = record(row.meta);
+    return [{ id, name: text(row.name) || id, ownedBy: '', preset: Boolean(text(row.base_model_id)), hasRow: true, isActive: row.is_active !== false, hidden: meta.hidden === true, accessGrants: grantsOf(row.access_grants), available: false, tags: tagNames(meta.tags) }];
+  });
+  return [...offered, ...away];
+}
+
+/** Everyone signed in may use it (a grant to every user). */
+export const isPublicModel = (model: { accessGrants: readonly AccessGrant[] }): boolean => model.accessGrants.some((grant) => grant.principal_type === 'user' && grant.principal_id === '*');
+
+/** The web's views of the admin list (0.11's and 0.12's together). */
+export type AdminModelView = 'all' | 'on' | 'off' | 'visible' | 'hidden' | 'public' | 'private' | 'default' | 'pinned' | 'available' | 'unavailable' | 'base' | 'workspace';
+
+/** Whether a model is in a view; `default` and `pinned` are what new chats start with and what's pinned for everyone. */
+export function inAdminView(model: AdminModel, view: AdminModelView, lists: { defaults: readonly string[]; pinned: readonly string[] }): boolean {
+  switch (view) {
+    case 'on':
+      return model.isActive;
+    case 'off':
+      return !model.isActive;
+    case 'visible':
+      return !model.hidden;
+    case 'hidden':
+      return model.hidden;
+    case 'public':
+      return isPublicModel(model);
+    case 'private':
+      return !isPublicModel(model);
+    case 'default':
+      return lists.defaults.includes(model.id);
+    case 'pinned':
+      return lists.pinned.includes(model.id);
+    case 'available':
+      return model.available || model.preset;
+    case 'unavailable':
+      return !model.available && !model.preset;
+    case 'base':
+      return !model.preset;
+    case 'workspace':
+      return model.preset;
+    default:
+      return true;
+  }
+}
+
+/** The tags the models carry, once each, by name (the web's tag filter). */
+export const adminModelTags = (models: readonly AdminModel[]): string[] => [...new Set(models.flatMap((model) => model.tags))].sort((a, b) => a.localeCompare(b));
+
+/**
+ * Makes a model public (everyone signed in may use it) or not, keeping who else it's shared with:
+ * its grants read fresh where it has a saved row; one without gets a row under its own name.
+ */
+export async function setAdminModelPublic(client: OwuiClient, model: AdminModel, on: boolean): Promise<AccessGrant[]> {
+  const grants = model.hasRow ? grantsOf(record(await client.get<unknown>('/api/v1/models/model', { query: { id: model.id } })).access_grants) : [];
+  const others = grants.filter((grant) => !(grant.principal_type === 'user' && grant.principal_id === '*'));
+  return updateAccess(client, 'models', model.id, on ? [...others, { principal_type: 'user', principal_id: '*', permission: 'read' }] : others, model.name);
+}
+
+/**
+ * What deleting a model's saved row does (0.12's Delete or Reset): a connection's model it offers
+ * now goes back to no saved settings (Reset); a workspace model, or the row of a model no
+ * connection offers, goes (Delete); a model with nothing saved has nothing to delete.
+ */
+export function deleteKindOf(model: AdminModel): 'reset' | 'delete' | null {
+  if (!model.hasRow) return null;
+  return !model.preset && model.available ? 'reset' : 'delete';
+}
+
+/** Deletes every saved model (admins): every workspace model, everyone's, and every saved setting of the connections' models. */
+export async function deleteAllModels(client: OwuiClient): Promise<void> {
+  const ok = await client.delete<unknown>('/api/v1/models/delete/all');
+  if (ok !== true) throw new Error('the server didn’t delete them');
 }
 
 /** Switches a model on or off for everyone: reads it first, flips only if needed; a provider model without a row gets one. */

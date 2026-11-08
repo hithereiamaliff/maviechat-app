@@ -1,13 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { OwuiClient, type FetchLike } from './http';
+import type { AccessGrant } from './workspaceModels';
 import {
+  adminModelTags,
   defaultSuggestionsOf,
+  deleteAllModels,
+  deleteKindOf,
   exportAdminModel,
   exportAdminModels,
   fullModelOrder,
   idsOf,
   importAdminModels,
+  inAdminView,
   inModelOrder,
+  isPublicModel,
   listAdminModels,
   modelDefaultsChanges,
   modelDefaultsOf,
@@ -17,6 +23,7 @@ import {
   saveModelsConfig,
   sameSuggestions,
   setAdminModelActive,
+  setAdminModelPublic,
   translatedLanguages,
   withListedModel,
   withListedOrder,
@@ -52,9 +59,9 @@ describe('admin models', () => {
 
   it('makes a row for a provider model switched for the first time, else flips only if needed', async () => {
     const fresh = routedClient({ 'GET /api/v1/models/model': { id: 'gpt-b', is_active: false } });
-    await setAdminModelActive(fresh.client, { id: 'gpt-a', name: 'GPT A', ownedBy: 'openai', preset: false, hasRow: false, isActive: true, hidden: false, accessGrants: [] }, false);
+    await setAdminModelActive(fresh.client, { id: 'gpt-a', name: 'GPT A', ownedBy: 'openai', preset: false, hasRow: false, isActive: true, hidden: false, accessGrants: [], available: true, tags: [] }, false);
     expect(fresh.calls[0]).toMatchObject({ method: 'POST', url: 'https://chat.test/api/v1/models/create', body: { id: 'gpt-a', base_model_id: null, is_active: false, access_grants: [] } });
-    await setAdminModelActive(fresh.client, { id: 'gpt-b', name: 'GPT B', ownedBy: 'openai', preset: false, hasRow: true, isActive: true, hidden: false, accessGrants: [] }, false);
+    await setAdminModelActive(fresh.client, { id: 'gpt-b', name: 'GPT B', ownedBy: 'openai', preset: false, hasRow: true, isActive: true, hidden: false, accessGrants: [], available: true, tags: [] }, false);
     expect(fresh.calls.slice(1).map((call) => call.method)).toEqual(['GET']);
   });
 
@@ -226,6 +233,76 @@ describe('admin models', () => {
       expect(calls[0]?.url).toBe('https://chat.test/api/v1/models/export?ids=a');
       expect(await exportAdminModel(client, { id: 'gpt-a', preset: false })).toEqual({ id: 'gpt-a', name: 'GPT A' });
       await expect(exportAdminModel(client, { id: 'missing', preset: false })).rejects.toThrow();
+    });
+  });
+
+  describe('part 2: views, sharing, delete', () => {
+    const everyone: AccessGrant = { principal_type: 'user', principal_id: '*', permission: 'read' };
+    const group: AccessGrant = { principal_type: 'group', principal_id: 'g1', permission: 'read' };
+    const model = (id: string, more: Partial<Parameters<typeof inAdminView>[0]> = {}) => ({ id, name: id.toUpperCase(), ownedBy: 'openai', preset: false, hasRow: true, isActive: true, hidden: false, accessGrants: [] as AccessGrant[], available: true, tags: [] as string[], ...more });
+
+    it('lists saved rows no connection offers now, after the rest, with their tags', async () => {
+      const { client } = routedClient({
+        'GET /api/models': { data: [{ id: 'gpt-a', name: 'GPT A', owned_by: 'openai' }] },
+        'GET /api/models/base': { data: [] },
+        'GET /api/v1/models/base': [
+          { id: 'gpt-a', name: 'GPT A', is_active: true, meta: { tags: [{ name: 'fast' }] }, access_grants: [everyone] },
+          { id: 'gone', name: 'Gone', is_active: false, meta: { hidden: true, tags: ['old'] }, access_grants: [] },
+        ],
+      });
+      const models = await listAdminModels(client);
+      expect(models.map((item) => [item.id, item.available, item.isActive, item.hidden, item.tags])).toEqual([
+        ['gpt-a', true, true, false, ['fast']],
+        ['gone', false, false, true, ['old']],
+      ]);
+      expect(adminModelTags(models)).toEqual(['fast', 'old']);
+      expect(isPublicModel(models[0] as Parameters<typeof isPublicModel>[0])).toBe(true);
+    });
+
+    it('sorts models into the web’s views', () => {
+      const lists = { defaults: ['a'], pinned: ['b'] };
+      const all = [model('a', { accessGrants: [everyone] }), model('b', { isActive: false, hidden: true }), model('c', { preset: true, available: false }), model('d', { available: false })];
+      const ids = (view: Parameters<typeof inAdminView>[1]) => all.filter((item) => inAdminView(item, view, lists)).map((item) => item.id);
+      expect(ids('all')).toEqual(['a', 'b', 'c', 'd']);
+      expect(ids('on')).toEqual(['a', 'c', 'd']);
+      expect(ids('off')).toEqual(['b']);
+      expect(ids('visible')).toEqual(['a', 'c', 'd']);
+      expect(ids('hidden')).toEqual(['b']);
+      expect(ids('public')).toEqual(['a']);
+      expect(ids('private')).toEqual(['b', 'c', 'd']);
+      expect(ids('default')).toEqual(['a']);
+      expect(ids('pinned')).toEqual(['b']);
+      expect(ids('available')).toEqual(['a', 'b', 'c']);
+      expect(ids('unavailable')).toEqual(['d']);
+      expect(ids('base')).toEqual(['a', 'b', 'd']);
+      expect(ids('workspace')).toEqual(['c']);
+    });
+
+    it('makes a model public or private keeping its other shares, reading them fresh; one without a row is named', async () => {
+      const saved = routedClient({ 'GET /api/v1/models/model': { id: 'a', access_grants: [group] }, 'POST /api/v1/models/model/access/update': { access_grants: [group, everyone] } });
+      expect(await setAdminModelPublic(saved.client, model('a'), true)).toEqual([group, everyone]);
+      expect(saved.calls[1]?.body).toEqual({ id: 'a', name: 'A', access_grants: [group, everyone] });
+      const back = routedClient({ 'GET /api/v1/models/model': { id: 'a', access_grants: [group, everyone] }, 'POST /api/v1/models/model/access/update': { access_grants: [group] } });
+      await setAdminModelPublic(back.client, model('a'), false);
+      expect(back.calls[1]?.body).toEqual({ id: 'a', name: 'A', access_grants: [group] });
+      const fresh = routedClient({ 'POST /api/v1/models/model/access/update': { access_grants: [everyone] } });
+      await setAdminModelPublic(fresh.client, model('new', { hasRow: false }), true);
+      expect(fresh.calls.map((call) => call.method)).toEqual(['POST']);
+      expect(fresh.calls[0]?.body).toEqual({ id: 'new', name: 'NEW', access_grants: [everyone] });
+    });
+
+    it('resets a connection’s model it offers now, deletes the rest, and has nothing for one never saved', () => {
+      expect(deleteKindOf(model('a'))).toBe('reset');
+      expect(deleteKindOf(model('a', { available: false }))).toBe('delete');
+      expect(deleteKindOf(model('w', { preset: true }))).toBe('delete');
+      expect(deleteKindOf(model('n', { hasRow: false }))).toBeNull();
+    });
+
+    it('deletes every saved model, and fails unless the server says so', async () => {
+      const ok = routedClient({ 'DELETE /api/v1/models/delete/all': true });
+      await deleteAllModels(ok.client);
+      expect(ok.calls[0]).toMatchObject({ method: 'DELETE', url: 'https://chat.test/api/v1/models/delete/all' });
+      await expect(deleteAllModels(routedClient({ 'DELETE /api/v1/models/delete/all': false }).client)).rejects.toThrow();
     });
   });
 });

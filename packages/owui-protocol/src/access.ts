@@ -72,11 +72,12 @@ export function accessRights(capabilities: Capabilities, area: AccessArea): Acce
   };
 }
 
-function accessRequest(area: AccessArea, id: string, grants: AccessGrant[]): { path: string; body: Record<string, unknown> } {
+function accessRequest(area: AccessArea, id: string, grants: AccessGrant[], name?: string): { path: string; body: Record<string, unknown> } {
   const key = encodeURIComponent(id);
   switch (area) {
     case 'models':
-      return { path: '/api/v1/models/model/access/update', body: { id, access_grants: grants } };
+      // A model no admin saved anything for gets a row here, named by `name` (else its id).
+      return { path: '/api/v1/models/model/access/update', body: { id, ...(name ? { name } : {}), access_grants: grants } };
     case 'knowledge':
       return { path: `/api/v1/knowledge/${key}/access/update`, body: { access_grants: grants } };
     case 'prompts':
@@ -92,9 +93,12 @@ function accessRequest(area: AccessArea, id: string, grants: AccessGrant[]): { p
   }
 }
 
-/** Saves who may use an item; answers with the grants the server kept. */
-export async function updateAccess(client: OwuiClient, area: AccessArea, id: string, grants: AccessGrant[]): Promise<AccessGrant[]> {
-  const { path, body } = accessRequest(area, id, grants);
+/**
+ * Saves who may use an item; answers with the grants the server kept. For a model, `name` names
+ * the row the server makes when none is saved yet (a connection's model), so it keeps its name.
+ */
+export async function updateAccess(client: OwuiClient, area: AccessArea, id: string, grants: AccessGrant[], name?: string): Promise<AccessGrant[]> {
+  const { path, body } = accessRequest(area, id, grants, name);
   const answer = await client.post<unknown>(path, body);
   const kept = typeof answer === 'object' && answer !== null && !Array.isArray(answer) ? (answer as Record<string, unknown>).access_grants : undefined;
   return kept === undefined ? grants : grantsOf(kept);

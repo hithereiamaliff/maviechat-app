@@ -45,8 +45,25 @@ import { fonts, radius, usePalette } from '@/theme';
 import { AttachmentsSection, CapabilitiesSection, ParamsSection, Section, SuggestionsSection, VoiceSection } from './ModelSections';
 import { useWorkspaceModel, useWorkspaceRefresh } from './queries';
 
-/** What the editor opens on: a new model, one to change, or a copy of one. */
-export type ModelEditorTarget = { kind: 'new' } | { kind: 'edit'; id: string } | { kind: 'clone'; id: string };
+/**
+ * What the editor opens on: a new model, one to change, or a copy of one; for admins also a
+ * connection's model (`base`: its own settings, saved here, with no model under it) and a new
+ * workspace model built on one, copying its settings (`build`: the admin list's Clone). For those
+ * two, `saved` says whether settings are saved for it already (else there's nothing to load).
+ */
+export type ModelEditorTarget =
+  | { kind: 'new' }
+  | { kind: 'edit'; id: string }
+  | { kind: 'clone'; id: string }
+  | { kind: 'base'; id: string; name: string; saved: boolean }
+  | { kind: 'build'; id: string; name: string; saved: boolean };
+
+/** The model to load first, if any. */
+const loadIdOf = (target: ModelEditorTarget | null): string | null => {
+  if (!target || target.kind === 'new') return null;
+  if (target.kind === 'base' || target.kind === 'build') return target.saved ? target.id : null;
+  return target.id;
+};
 
 const DEFAULT_PICTURE = '/static/favicon.png';
 const PHOTO: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.7, base64: true, preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible };
@@ -65,9 +82,9 @@ function baseChoices(models: ModelItem[], admin: boolean, chosen: string): Model
  * id (new ones only), the base model, description, tags and system prompt. Everything else the
  * model has (parameters, capabilities, knowledge, tools…) is kept as it is; new ones are private.
  */
-export function ModelEditor({ target, onClose }: { target: ModelEditorTarget | null; onClose: () => void }) {
+export function ModelEditor({ target, onClose, onSaved }: { target: ModelEditorTarget | null; onClose: () => void; onSaved?: () => void }) {
   const palette = usePalette();
-  const id = target && target.kind !== 'new' ? target.id : null;
+  const id = loadIdOf(target);
   const model = useWorkspaceModel(id);
   const { client } = useAuthed();
   // The admin's defaults for every model, which a model's own capabilities start from.
@@ -82,13 +99,13 @@ export function ModelEditor({ target, onClose }: { target: ModelEditorTarget | n
           </Pressable>
         </View>
       ) : (
-        <Form key={`${target.kind}:${id ?? ''}`} target={target} model={model.data ?? null} defaults={defaults.data ?? {}} onClose={onClose} />
+        <Form key={`${target.kind}:${'id' in target ? target.id : ''}`} target={target} model={model.data ?? null} defaults={defaults.data ?? {}} onClose={onClose} onSaved={onSaved} />
       )}
     </Modal>
   );
 }
 
-function Form({ target, model, defaults, onClose }: { target: ModelEditorTarget; model: WorkspaceModel | null; defaults: Record<string, unknown>; onClose: () => void }) {
+function Form({ target, model, defaults, onClose, onSaved }: { target: ModelEditorTarget; model: WorkspaceModel | null; defaults: Record<string, unknown>; onClose: () => void; onSaved?: () => void }) {
   const palette = usePalette();
   const toast = useToast();
   const { client, session } = useAuthed();
@@ -96,12 +113,18 @@ function Form({ target, model, defaults, onClose }: { target: ModelEditorTarget;
   const models = useModels();
   const refresh = useWorkspaceRefresh();
   const picture = usePictureMaker();
-  const editing = target.kind === 'edit';
+  // A connection's own model is changed in place, with no model under it; a copy is a new one.
+  const own = target.kind === 'base';
+  const copying = target.kind === 'clone' || target.kind === 'build';
+  const editing = target.kind === 'edit' || own;
   const readOnly = editing && model !== null && !model.writeAccess;
-  const [name, setName] = useState(model ? (target.kind === 'clone' ? `${model.name} (Clone)` : model.name) : '');
-  const [modelId, setModelId] = useState(model ? (target.kind === 'clone' ? `${model.id}-clone` : model.id) : '');
+  const sourceName = model?.name ?? (target.kind === 'base' || target.kind === 'build' ? target.name : '');
+  const sourceId = model?.id ?? (target.kind === 'new' ? '' : target.id);
+  const [name, setName] = useState(target.kind === 'new' ? '' : copying ? `${sourceName} (Clone)` : sourceName);
+  const [modelId, setModelId] = useState(target.kind === 'new' ? '' : copying ? `${sourceId}-clone` : sourceId);
   const [idTouched, setIdTouched] = useState(target.kind !== 'new');
-  const [baseId, setBaseId] = useState(model?.baseModelId ?? '');
+  // The admin list's Clone of a connection's model builds on that model.
+  const [baseId, setBaseId] = useState(target.kind === 'build' ? target.id : own ? '' : (model?.baseModelId ?? ''));
   const [description, setDescription] = useState(model?.description ?? '');
   const [tags, setTags] = useState<string[]>(model ? tagNames(model.meta.tags) : []);
   const [newTag, setNewTag] = useState('');
@@ -138,7 +161,7 @@ function Form({ target, model, defaults, onClose }: { target: ModelEditorTarget;
   const base = (models.data ?? []).find((item) => item.id === baseId);
   const variables = promptVariables(system);
   const taken = !editing && (models.data ?? []).some((item) => item.id === modelId.trim());
-  const ready = Boolean(name.trim() && modelId.trim() && baseId) && !taken && !readOnly;
+  const ready = Boolean(name.trim() && modelId.trim() && (baseId || own)) && !taken && !readOnly;
 
   const pickPhoto = async (camera: boolean) => {
     try {
@@ -184,19 +207,23 @@ function Form({ target, model, defaults, onClose }: { target: ModelEditorTarget;
       terminalId,
       voice,
     );
-    const form = { ...start, id: modelId.trim(), baseModelId: baseId, name: name.trim(), meta, params: modelParamsToSave({ ...params, system: system.trim() ? system : null }, custom) };
+    const form = { ...start, id: modelId.trim(), baseModelId: own ? '' : baseId, name: name.trim(), meta, params: modelParamsToSave({ ...params, system: system.trim() ? system : null }, custom) };
+    // A connection's model with nothing saved gets its first row: on, as it was, and private (as
+    // before: with no row only admins see it).
+    if (own && !target.saved) return { ...form, isActive: true, accessGrants: [] };
     return editing ? form : { ...form, isActive: true, accessGrants: [] };
   };
   const save = async () => {
-    if (!ready) return setProblem(taken ? 'A model has that id already.' : 'It needs a name, an id and a base model.');
+    if (!ready) return setProblem(taken ? 'A model has that id already.' : own ? 'It needs a name.' : 'It needs a name, an id and a base model.');
     setBusy(true);
     setProblem('');
     try {
       const form = formNow();
-      if (editing) await updateWorkspaceModel(client, form);
+      if (editing && !(own && !target.saved)) await updateWorkspaceModel(client, form);
       else await createWorkspaceModel(client, form);
       refresh();
-      toast(editing ? 'Model saved' : 'Model made (private)');
+      onSaved?.();
+      toast(own ? 'Settings saved' : editing ? 'Model saved' : 'Model made (private)');
       onClose();
     } catch (error) {
       setProblem(describeError(error));
@@ -214,7 +241,7 @@ function Form({ target, model, defaults, onClose }: { target: ModelEditorTarget;
           <Text style={[styles.action, { color: palette.link }]}>{readOnly ? 'Done' : 'Cancel'}</Text>
         </Pressable>
         <Text style={[styles.title, { color: palette.text }]} accessibilityRole="header" numberOfLines={1}>
-          {editing ? (model?.name ?? 'Model') : target.kind === 'clone' ? 'Copy of a Model' : 'New Model'}
+          {editing ? (model?.name ?? sourceName) || 'Model' : copying ? 'Copy of a Model' : 'New Model'}
         </Text>
         {readOnly ? (
           <View style={styles.placeholder} />
@@ -228,10 +255,17 @@ function Form({ target, model, defaults, onClose }: { target: ModelEditorTarget;
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {readOnly ? <Text style={[styles.note, { color: palette.textMuted }]}>Shared with you to use: only its owner (or someone they let) can change it.</Text> : null}
+        {own ? (
+          <Text style={[styles.note, { color: palette.textMuted }]}>
+            {target.saved
+              ? 'A model from a connection: these are the settings saved for it here, which everyone who may use it gets.'
+              : 'A model from a connection, with nothing saved for it yet: saving makes its settings here. It stays private (only admins see it) until you share it.'}
+          </Text>
+        ) : null}
         {problem ? <Text style={[styles.note, styles.problem, { color: palette.danger, borderColor: palette.danger }]}>{problem}</Text> : null}
         <View style={styles.identity}>
           <Pressable ref={pictureRef} accessibilityRole="button" accessibilityLabel="Change the picture" disabled={readOnly} onPress={openPictureMenu}>
-            {image ? <Image source={{ uri: image.startsWith('data:') ? image : `${session.baseUrl}${image}` }} style={styles.picture} /> : model ? <ModelAvatar modelId={model.id} size={64} rounded={16} /> : <View style={[styles.picture, { backgroundColor: palette.surfaceStrong }]} />}
+            {image ? <Image source={{ uri: image.startsWith('data:') ? image : `${session.baseUrl}${image}` }} style={styles.picture} /> : model || own ? <ModelAvatar modelId={model?.id ?? sourceId} size={64} rounded={16} /> : <View style={[styles.picture, { backgroundColor: palette.surfaceStrong }]} />}
           </Pressable>
           <View style={styles.flex}>
             <TextInput
@@ -264,6 +298,7 @@ function Form({ target, model, defaults, onClose }: { target: ModelEditorTarget;
           </View>
         </View>
         {pictureMenu}
+        {own ? null : (
         <View style={styles.field}>
           <Text style={[styles.label, { color: palette.text }]}>Base model</Text>
           <Pressable accessibilityRole="button" disabled={readOnly} onPress={() => setChoosingBase(!choosingBase)} style={[styles.input, styles.choice, { borderColor: palette.border, backgroundColor: palette.surface }]}>
@@ -294,6 +329,7 @@ function Form({ target, model, defaults, onClose }: { target: ModelEditorTarget;
             </View>
           ) : null}
         </View>
+        )}
         <View style={styles.field}>
           <Text style={[styles.label, { color: palette.text }]}>Description</Text>
           <TextInput value={description} onChangeText={setDescription} editable={!readOnly} multiline placeholder="What it’s for (shown under its name)" placeholderTextColor={palette.textFaint} accessibilityLabel="Description" style={[styles.input, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]} />
