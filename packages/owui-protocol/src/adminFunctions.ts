@@ -90,7 +90,7 @@ export async function exportAdminFunctions(client: OwuiClient, { valves = false 
 
 /**
  * A new function from its code. **The server runs it to save it** (and installs its
- * requirements): the app doesn't offer this; probes use it on the scratch instance only.
+ * requirements): the app's editor asks first; probes write functions on the scratch servers only.
  */
 export async function createAdminFunction(client: OwuiClient, input: { id: string; name: string; description: string; content: string }): Promise<AdminFunction> {
   return functionFrom(await client.post<unknown>('/api/v1/functions/create', { id: input.id, name: input.name, content: input.content, meta: { description: input.description } }));

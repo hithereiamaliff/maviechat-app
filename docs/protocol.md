@@ -104,6 +104,13 @@ This is a spec written from reading Open WebUI's source (v0.12.5, read 2026-11-0
   - **Default and removal:** `PUT /targets/{id}/default`; `DELETE` → `{ok: true}`, 404 the second time.
   - **Test:** `POST /targets/{id}/test` really posts (400 "Webhook delivery failed" when the address refuses). The probe only tries a target that doesn't exist (400 "Notification target not found").
   - **What goes out:** a finished chat posts its title, the whole reply and a link. Slack, Google Chat, Discord and Teams get their own format; any other address gets the event's data as JSON.
+- **Writing tools and functions** (`--codeedit` probe ✓ on both scratch servers; never run against production, since saving runs the code):
+  - **Creating:** `POST /api/v1/{tools|functions}/create` with `{id, name, meta: {description}, content[, access_grants]}`. The id must be a Python identifier.
+  - **Updating:** `POST …/id/{id}/update` with `{id, name, meta: {description}, content}`. The server loads the code, reads its docstring header into `meta.manifest` (and `has_user_valves` for tools, the type for functions), and installs `requirements`. Code that won't load answers 400 and the old code stays.
+  - **Sharing:** a tool update without `access_grants` leaves sharing as it is. 0.12 adds tool history and an optional `commit_message`.
+  - **Load from a link:** `POST …/load/url {url}` (admins) answers `{name, content}`. A `github.com/…/blob/{branch}/…` link becomes `raw…/refs/heads/{branch}/…`, so a tag 404s. The name comes from the file name, or the folder for `main.py`/`__init__.py`.
+  - **Formatting:** `POST /api/v1/utils/code/format {code}` (admins, black) answers `{code}`, or 400 for code that doesn't parse.
+  - **The editor:** CodeMirror 6 bundled offline (`npm run code-editor` → `features/code/editorPage.generated.ts`; packages in `scripts/code-editor/packages.json`, notices in About).
 - **Chat Variables** (0.11.3 and 0.12.5; `--chatvars` probe ✓, filling in checked on the 0.12.5 echo model):
   - **The form:** a model's system prompt asks for `{{chat.variables.key | type:prop=value:…}}`. The server lists them in `info.meta.chat_variables_schema.fields` (`key`, `type` (text by default), `required`, and when given `default`, `label`, `placeholder`, `options`, `min`, `max`, `step`, `minlength`, `maxlength`).
   - **Several models:** the web merges the chosen models' fields by key (required if any requires it). A key asked for differently is a conflict that stops the message.

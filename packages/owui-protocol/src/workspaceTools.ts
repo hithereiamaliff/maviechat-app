@@ -5,8 +5,8 @@ import { grantsOf, type AccessGrant, type WorkspaceView } from './workspaceModel
 /*
  * Workspace tools (Open WebUI 0.11.3): Python a model can call, with settings ("valves") shared
  * by everyone who uses the tool. Saving a tool runs its code on the server (and may install
- * Python packages there), so the app reads tools, their valves and sharing, and leaves writing
- * code to the web. The list comes whole; it's searched and sorted here, as the web does.
+ * Python packages there), so the app's code editor asks before it saves (codeItems.ts). The list
+ * comes whole; it's searched and sorted here, as the web does.
  */
 
 type Tree = Record<string, unknown>;
@@ -102,7 +102,7 @@ export async function exportWorkspaceTools(client: OwuiClient): Promise<unknown[
 
 /**
  * A new tool from its code. **The server runs the code to save it** (and installs its
- * requirements): the app doesn't offer this; probes use it on the scratch instance only.
+ * requirements): the app's editor asks first; probes write tools on the scratch servers only.
  */
 export async function createWorkspaceTool(client: OwuiClient, input: { id: string; name: string; description: string; content: string; accessGrants?: AccessGrant[] }): Promise<WorkspaceTool> {
   return toolFrom(await client.post<unknown>(`${base}/create`, { id: input.id, name: input.name, meta: { description: input.description }, content: input.content, access_grants: input.accessGrants ?? [] }));

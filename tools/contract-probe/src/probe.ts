@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--chatvars] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -59,6 +59,9 @@
  * saved chat keeping its values, and (on the echo model) the instructions filled in from a
  * temporary chat's values, a saved chat's, and none for an unknown option; all deleted after
  * (src/chatvars-probe.ts).
+ * `--codeedit` (admins, scratch servers only: saving runs code) makes a tool and a filter, saves
+ * their code, has broken code refused with the old kept, tries the formatter and a link, and
+ * deletes them (src/codeedit-probe.ts).
  * `--a8` saves settings the app's way and puts them back exactly (src/a8-probe.ts), then tries
  * memories, the profile, your variables, a refused password change and an API key (src/a8-account-probe.ts),
  * and the data controls: export, import, shared chats and files (src/a8-data-probe.ts).
@@ -109,6 +112,7 @@ import { probeWebhooks } from './webhooks-probe';
 import { probeEventHooks } from './eventhooks-probe';
 import { probeUiDefaults } from './uidefaults-probe';
 import { probeChatVars } from './chatvars-probe';
+import { probeCodeEdit } from './codeedit-probe';
 import { probeStatus } from './status-probe';
 import { probeSharedFolders } from './shared-folders-probe';
 import { probeSearch } from './search-probe';
@@ -162,6 +166,7 @@ const { values: args } = parseArgs({
     eventhooks: { type: 'boolean' },
     uidefaults: { type: 'boolean' },
     chatvars: { type: 'boolean' },
+    codeedit: { type: 'boolean' },
     sharedfolders: { type: 'boolean' },
     'peer-env': { type: 'string' },
     a8: { type: 'boolean' },
@@ -537,6 +542,12 @@ async function main() {
         const chatVarsProbe = await probeChatVars({ client });
         for (const result of chatVarsProbe.steps) results.push({ ...result, name: `Chat Variables: ${result.name}` });
         fixtures['write.chatvars'] = chatVarsProbe.fixture;
+      }
+
+      if (args.codeedit && capabilities) {
+        const codeProbe = await probeCodeEdit({ client, capabilities, baseUrl });
+        for (const result of codeProbe.steps) results.push({ ...result, name: `Code editor: ${result.name}` });
+        fixtures['write.codeedit'] = codeProbe.fixture;
       }
 
       if (args.notes && capabilities) {

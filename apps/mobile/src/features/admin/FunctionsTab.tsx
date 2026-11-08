@@ -1,12 +1,14 @@
-import { deleteAdminFunction, exportAdminFunctions, FUNCTION_TYPE_LABELS, getAdminFunction, listAdminFunctions, setFunctionActive, setFunctionGlobal, type AdminFunction } from '@maviechat/owui-protocol';
+import { deleteAdminFunction, exportAdminFunctions, FUNCTION_TEMPLATE, FUNCTION_TYPE_LABELS, getAdminFunction, listAdminFunctions, setFunctionActive, setFunctionGlobal, type AdminFunction } from '@maviechat/owui-protocol';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, FlatList, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { MenuButton, type MenuItem } from '@/components/Menu';
 import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { CodeEditorSheet, type CodeTarget } from '@/features/code/CodeEditorSheet';
+import { useCodeImport } from '@/features/code/useCodeImport';
 import { fileNameOf, shareFile, stampedName } from '@/features/settings/exportFile';
 import { editorStyles, SheetHeader, SheetLoading } from '@/features/workspace/EditorParts';
 import { Chip } from '@/features/workspace/ListControls';
@@ -17,23 +19,26 @@ import { fonts, radius, usePalette } from '@/theme';
 
 const TYPES = ['all', 'pipe', 'filter', 'action', 'event'] as const;
 
-const openOnWeb = (baseUrl: string, id: string | null) => void WebBrowser.openBrowserAsync(id ? `${baseUrl}/admin/functions/edit?id=${encodeURIComponent(id)}` : `${baseUrl}/admin/functions/create`);
 
 /**
  * Admin → Functions: pipes (models of their own), filters, actions and event handlers. Switch one
  * on or off, apply a filter or action to every model, its shared settings, its code, export,
- * delete. New ones, edits and imports open the web's editor (saving runs the code on the server).
+ * delete. New ones (from a template), edits and imports (a link, an export file) go through the
+ * code editor, which asks first: saving runs the code on the server.
  */
 export function FunctionsTab({ tabs }: { tabs: ReactNode }) {
   const palette = usePalette();
   const toast = useToast();
-  const { client, session } = useAuthed();
+  const { client } = useAuthed();
   const queryClient = useQueryClient();
   const functions = useQuery({ queryKey: ['admin', 'functions'], queryFn: () => listAdminFunctions(client), staleTime: 15_000 });
   const [query, setQuery] = useState('');
   const [type, setType] = useState<(typeof TYPES)[number]>('all');
   const [valves, setValves] = useState<ValvesTarget | null>(null);
   const [showing, setShowing] = useState<string | null>(null);
+  const [editing, setEditing] = useState<CodeTarget | null>(null);
+  // Edit Code in a function's code sheet: the editor opens once that sheet has gone.
+  const editNextRef = useRef<string | null>(null);
   const wanted = query.trim().toLowerCase();
   const items = [...(functions.data ?? [])]
     .filter((fn) => type === 'all' || fn.type === type)
@@ -44,6 +49,7 @@ export function FunctionsTab({ tabs }: { tabs: ReactNode }) {
     void queryClient.invalidateQueries({ queryKey: ['models'] });
     void queryClient.invalidateQueries({ queryKey: ['functions'] });
   };
+  const imports = useCodeImport('functions', setEditing, refresh);
   const run = (done: string, work: () => Promise<unknown>) =>
     void work().then(
       () => {
@@ -73,7 +79,7 @@ export function FunctionsTab({ tabs }: { tabs: ReactNode }) {
       ? [{ key: 'global', label: fn.isGlobal ? 'Only Models That Choose It' : 'Apply to Every Model', icon: 'squares-2x2' as const, onPress: () => run(fn.isGlobal ? `${fn.name} applies only where chosen` : `${fn.name} applies to every model`, () => setFunctionGlobal(client, fn.id, !fn.isGlobal)) }]
       : []),
     { key: 'code', label: 'View Code', icon: 'code-bracket', onPress: () => setShowing(fn.id) },
-    { key: 'edit', label: 'Edit on the Web', icon: 'globe-alt', onPress: () => openOnWeb(session.baseUrl, fn.id) },
+    { key: 'edit', label: 'Edit Code', icon: 'pencil', onPress: () => setEditing({ kind: 'functions', id: fn.id }) },
     ...(fn.fundingUrl ? [{ key: 'fund', label: 'Support the Author', icon: 'link' as const, onPress: () => void WebBrowser.openBrowserAsync(fn.fundingUrl) }] : []),
     { key: 'export', label: 'Export', icon: 'arrow-down-tray', onPress: () => void exportFunctions(fn) },
     { key: 'delete', label: 'Delete', icon: 'trash', destructive: true, onPress: () => remove(fn) },
@@ -85,13 +91,14 @@ export function FunctionsTab({ tabs }: { tabs: ReactNode }) {
       <View style={styles.row}>
         <TextInput value={query} onChangeText={setQuery} placeholder="Search functions" placeholderTextColor={palette.textFaint} autoCapitalize="none" autoCorrect={false} clearButtonMode="while-editing" accessibilityLabel="Search functions" style={[styles.search, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]} />
         <View>
-          <Button label="New" onPress={() => openOnWeb(session.baseUrl, null)} />
+          <Button label="New" onPress={() => setEditing({ kind: 'functions', id: null, name: '', description: '', content: FUNCTION_TEMPLATE })} />
         </View>
         <MenuButton
           label="Import and export"
           color={palette.textMuted}
           items={[
-            { key: 'import', label: 'Import on the Web', icon: 'globe-alt', onPress: () => void WebBrowser.openBrowserAsync(`${session.baseUrl}/admin/functions`) },
+            { key: 'link', label: 'Import From Link…', icon: 'link', onPress: imports.fromLink },
+            { key: 'import', label: 'Import File…', icon: 'arrow-up-tray', onPress: imports.fromFile },
             { key: 'export', label: 'Export All', icon: 'arrow-down-tray', onPress: () => void exportFunctions(null) },
           ]}
         />
@@ -138,23 +145,36 @@ export function FunctionsTab({ tabs }: { tabs: ReactNode }) {
         )}
       />
       <SharedValvesSheet target={valves} onClose={() => setValves(null)} />
-      <FunctionCode id={showing} onClose={() => setShowing(null)} />
+      <FunctionCode
+        id={showing}
+        onClose={() => setShowing(null)}
+        onEdit={(id) => {
+          editNextRef.current = id;
+          setShowing(null);
+        }}
+        onDismiss={() => {
+          const id = editNextRef.current;
+          editNextRef.current = null;
+          if (id) setEditing({ kind: 'functions', id });
+        }}
+      />
+      <CodeEditorSheet target={editing} onClose={() => setEditing(null)} onSaved={refresh} />
     </View>
   );
 }
 
-/** A function's code, read-only, with the way to its editor on the web. */
-function FunctionCode({ id, onClose }: { id: string | null; onClose: () => void }) {
+/** A function's code, read-only, with Edit Code (`onEdit`, once this sheet has gone: `onDismiss`). */
+function FunctionCode({ id, onClose, onEdit, onDismiss }: { id: string | null; onClose: () => void; onEdit: (id: string) => void; onDismiss: () => void }) {
   return (
-    <Modal visible={id !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      {id ? <CodeView id={id} onClose={onClose} /> : null}
+    <Modal visible={id !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose} onDismiss={onDismiss}>
+      {id ? <CodeView id={id} onClose={onClose} onEdit={onEdit} /> : null}
     </Modal>
   );
 }
 
-function CodeView({ id, onClose }: { id: string; onClose: () => void }) {
+function CodeView({ id, onClose, onEdit }: { id: string; onClose: () => void; onEdit: (id: string) => void }) {
   const palette = usePalette();
-  const { client, session } = useAuthed();
+  const { client } = useAuthed();
   const fn = useQuery({ queryKey: ['admin', 'function', id], queryFn: () => getAdminFunction(client, id), staleTime: 0 });
   if (!(fn.data && fn.isFetchedAfterMount)) return <SheetLoading error={fn.isError ? fn.error : null} onClose={onClose} />;
   return (
@@ -164,9 +184,8 @@ function CodeView({ id, onClose }: { id: string; onClose: () => void }) {
         <Text selectable style={[editorStyles.mono, styles.code, { color: palette.text, backgroundColor: palette.surface, borderColor: palette.border }]}>
           {fn.data.content ?? ''}
         </Text>
-        <Text style={[editorStyles.note, { color: palette.textMuted }]}>Saving a function runs its code on the server, so its code is changed on the web.</Text>
         <View style={styles.start}>
-          <Button label="Edit on the Web" variant="secondary" onPress={() => openOnWeb(session.baseUrl, id)} />
+          <Button label="Edit Code" variant="secondary" onPress={() => onEdit(id)} />
         </View>
       </ScrollView>
     </View>

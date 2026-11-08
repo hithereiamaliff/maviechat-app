@@ -26,9 +26,18 @@
     "ref:sync": "bash scripts/ref-sync.sh",
     "icons": "node scripts/gen-icons.mjs",
     "emoji": "node scripts/gen-emoji.mjs",
+    "code-editor": "node scripts/gen-code-editor.mjs",
     "licenses": "node scripts/check-licenses.mjs --write"
   },
   "devDependencies": {
+    "@codemirror/autocomplete": "6.20.4",
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/lang-python": "6.2.1",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/search": "6.7.2",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.15",
+    "@lezer/highlight": "1.2.5",
     "@types/node": "^22.20.5",
     "jscpd": "^5.4.2",
     "tsx": "^4.23.15",

@@ -1,0 +1,18 @@
+[
+  "@codemirror/autocomplete",
+  "@codemirror/commands",
+  "@codemirror/lang-python",
+  "@codemirror/language",
+  "@codemirror/search",
+  "@codemirror/state",
+  "@codemirror/streamparser",
+  "@codemirror/view",
+  "@lezer/common",
+  "@lezer/highlight",
+  "@lezer/lr",
+  "@lezer/python",
+  "@marijn/find-cluster-break",
+  "crelt",
+  "style-mod",
+  "w3c-keyname"
+]

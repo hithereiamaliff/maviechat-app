@@ -56,6 +56,78 @@
     ]
   },
   {
+    "name": "@codemirror/autocomplete",
+    "version": "6.20.4",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      81
+    ]
+  },
+  {
+    "name": "@codemirror/commands",
+    "version": "6.11.1",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      81
+    ]
+  },
+  {
+    "name": "@codemirror/lang-python",
+    "version": "6.2.1",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      81
+    ]
+  },
+  {
+    "name": "@codemirror/language",
+    "version": "6.13.1",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      81
+    ]
+  },
+  {
+    "name": "@codemirror/search",
+    "version": "6.7.2",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      81
+    ]
+  },
+  {
+    "name": "@codemirror/state",
+    "version": "6.7.6",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      81
+    ]
+  },
+  {
+    "name": "@codemirror/streamparser",
+    "version": "6.0.0",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      81
+    ]
+  },
+  {
+    "name": "@codemirror/view",
+    "version": "6.43.15",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      81
+    ]
+  },
+  {
     "name": "@expo-google-fonts/inter",
     "version": "0.4.2",
     "license": "MIT AND OFL-1.1",
@@ -159,6 +231,51 @@
     "license": "MIT",
     "texts": [
       8
+    ]
+  },
+  {
+    "name": "@lezer/common",
+    "version": "1.5.5",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      82
+    ]
+  },
+  {
+    "name": "@lezer/highlight",
+    "version": "1.2.5",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      82
+    ]
+  },
+  {
+    "name": "@lezer/lr",
+    "version": "1.4.12",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      82
+    ]
+  },
+  {
+    "name": "@lezer/python",
+    "version": "1.1.19",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      83
+    ]
+  },
+  {
+    "name": "@marijn/find-cluster-break",
+    "version": "1.0.4",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      84
     ]
   },
   {
@@ -433,7 +550,7 @@
     "license": "BSL-1.0",
     "via": "React Native",
     "texts": [
-      91
+      98
     ]
   },
   {
@@ -467,6 +584,15 @@
     "license": "MIT",
     "texts": [
       26
+    ]
+  },
+  {
+    "name": "crelt",
+    "version": "1.0.7",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      85
     ]
   },
   {
@@ -507,7 +633,7 @@
     "license": "BSD-2-Clause",
     "via": "expo-image",
     "texts": [
-      88
+      95
     ]
   },
   {
@@ -572,7 +698,7 @@
     "license": "BSD-3-Clause",
     "via": "React Native",
     "texts": [
-      92
+      99
     ]
   },
   {
@@ -846,7 +972,7 @@
     "license": "MIT",
     "via": "React Native",
     "texts": [
-      94
+      101
     ]
   },
   {
@@ -855,7 +981,7 @@
     "license": "MIT",
     "via": "React Native",
     "texts": [
-      95
+      102
     ]
   },
   {
@@ -864,7 +990,7 @@
     "license": "Apache-2.0",
     "via": "React Native",
     "texts": [
-      96
+      103
     ]
   },
   {
@@ -897,7 +1023,7 @@
     "license": "BSD-3-Clause",
     "via": "React Native",
     "texts": [
-      93
+      100
     ]
   },
   {
@@ -965,7 +1091,7 @@
     "license": "BSD-2-Clause",
     "via": "expo-image",
     "texts": [
-      87
+      94
     ]
   },
   {
@@ -974,8 +1100,8 @@
     "license": "BSD-3-Clause",
     "via": "expo-image",
     "texts": [
-      85,
-      86
+      92,
+      93
     ]
   },
   {
@@ -1137,7 +1263,7 @@
     "license": "MIT",
     "via": "expo-updates",
     "texts": [
-      89
+      96
     ]
   },
   {
@@ -1274,7 +1400,7 @@
     "license": "MIT",
     "via": "expo-image",
     "texts": [
-      81
+      88
     ]
   },
   {
@@ -1283,7 +1409,7 @@
     "license": "MIT",
     "via": "expo-image",
     "texts": [
-      82
+      89
     ]
   },
   {
@@ -1292,7 +1418,7 @@
     "license": "MIT",
     "via": "expo-image",
     "texts": [
-      83
+      90
     ]
   },
   {
@@ -1301,7 +1427,7 @@
     "license": "MIT",
     "via": "expo-image",
     "texts": [
-      84
+      91
     ]
   },
   {
@@ -1335,7 +1461,7 @@
     "license": "BSD-3-Clause",
     "via": "React Native",
     "texts": [
-      97
+      104
     ]
   },
   {
@@ -1360,7 +1486,7 @@
     "license": "Public domain",
     "via": "expo-updates",
     "texts": [
-      90
+      97
     ]
   },
   {
@@ -1381,11 +1507,29 @@
     ]
   },
   {
+    "name": "style-mod",
+    "version": "4.1.4",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      86
+    ]
+  },
+  {
     "name": "typescript",
     "version": "6.0.3",
     "license": "Apache-2.0",
     "texts": [
       75
+    ]
+  },
+  {
+    "name": "w3c-keyname",
+    "version": "2.2.8",
+    "license": "MIT",
+    "via": "the code editor",
+    "texts": [
+      87
     ]
   },
   {

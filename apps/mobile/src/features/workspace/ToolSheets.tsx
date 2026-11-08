@@ -17,16 +17,19 @@ import { useWorkspaceTool } from './queries';
 /** The web's editor for a tool, signed in (saving runs the tool's code on the server, so code is written there). */
 export const openToolOnWeb = (baseUrl: string, id: string | null) => void WebBrowser.openBrowserAsync(id ? `${baseUrl}/workspace/tools/edit?id=${encodeURIComponent(id)}` : `${baseUrl}/workspace/tools/create`);
 
-/** A tool as it is: what it's for, its header (author, version, what it installs), and its code for those who may change it. */
-export function ToolSheet({ id, onClose }: { id: string | null; onClose: () => void }) {
+/**
+ * A tool as it is: what it's for, its header (author, version, what it installs), and its code
+ * for those who may change it, with Edit Code (`onEdit`, once this sheet has gone: `onDismiss`).
+ */
+export function ToolSheet({ id, onClose, onEdit, onDismiss }: { id: string | null; onClose: () => void; onEdit?: (id: string) => void; onDismiss?: () => void }) {
   return (
-    <Modal visible={id !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      {id ? <ToolView id={id} onClose={onClose} /> : null}
+    <Modal visible={id !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose} onDismiss={onDismiss}>
+      {id ? <ToolView id={id} onClose={onClose} onEdit={onEdit} /> : null}
     </Modal>
   );
 }
 
-function ToolView({ id, onClose }: { id: string; onClose: () => void }) {
+function ToolView({ id, onClose, onEdit }: { id: string; onClose: () => void; onEdit?: (id: string) => void }) {
   const palette = usePalette();
   const { session } = useAuthed();
   const tool = useWorkspaceTool(id);
@@ -57,8 +60,11 @@ function ToolView({ id, onClose }: { id: string; onClose: () => void }) {
                 {item.content ?? ''}
               </Text>
             </View>
-            <Text style={[styles.note, { color: palette.textMuted }]}>Saving a tool runs its code on the server, so its code is changed on the web.</Text>
-            <Button label="Edit on the Web" variant="secondary" onPress={() => openToolOnWeb(session.baseUrl, item.id)} />
+            {onEdit ? (
+              <Button label="Edit Code" variant="secondary" onPress={() => onEdit(item.id)} />
+            ) : (
+              <Button label="Edit on the Web" variant="secondary" onPress={() => openToolOnWeb(session.baseUrl, item.id)} />
+            )}
           </>
         ) : (
           <Text style={[styles.note, { color: palette.textMuted }]}>Shared with you to use: only its owner (or someone they let) sees and changes its code.</Text>

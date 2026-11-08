@@ -13,6 +13,7 @@ export * from './capabilities';
 export * from './chatgpt';
 export * from './chatVariables';
 export * from './chats';
+export * from './codeItems';
 export * from './chatSearch';
 export * from './chatStatus';
 export * from './code';
