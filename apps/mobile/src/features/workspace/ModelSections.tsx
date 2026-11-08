@@ -63,9 +63,23 @@ function SwitchRow({ label, note, value, disabled, onChange }: { label: string; 
 }
 
 /** Its parameters (Default, or a value of its own) and custom ones by name. */
-export function ParamsSection({ params, setParams, custom, setCustom, readOnly }: { params: Record<string, unknown>; setParams: Setter<Record<string, unknown>>; custom: CustomParam[]; setCustom: Setter<CustomParam[]>; readOnly: boolean }) {
+export function ParamsSection({
+  params,
+  setParams,
+  custom,
+  setCustom,
+  readOnly,
+  note = 'Left at Default, a chat uses the user’s or the server’s.',
+}: {
+  params: Record<string, unknown>;
+  setParams: Setter<Record<string, unknown>>;
+  custom: CustomParam[];
+  setCustom: Setter<CustomParam[]>;
+  readOnly: boolean;
+  note?: string;
+}) {
   return (
-    <Section title="Parameters" note="Left at Default, a chat uses the user’s or the server’s.">
+    <Section title="Parameters" note={note}>
       <View pointerEvents={readOnly ? 'none' : 'auto'} style={styles.gap}>
         {paramsFor(true).map((spec) => (
           <ParamRow
@@ -98,6 +112,7 @@ export function CapabilitiesSection({
   terminalId,
   setTerminalId,
   readOnly,
+  note = 'What it can do, and what new chats with it start with.',
 }: {
   caps: Record<WorkspaceCapability, boolean>;
   setCaps: Setter<Record<WorkspaceCapability, boolean>>;
@@ -110,11 +125,12 @@ export function CapabilitiesSection({
   terminalId: string;
   setTerminalId: Setter<string>;
   readOnly: boolean;
+  note?: string;
 }) {
   const palette = usePalette();
   const offered = DEFAULT_FEATURES.filter((item) => caps[item.key]);
   return (
-    <Section title="Capabilities" note="What it can do, and what new chats with it start with.">
+    <Section title="Capabilities" note={note}>
       {MODEL_CAPABILITIES.filter((item) => item.key !== 'file_context' || caps.file_upload).map((item) => (
         <SwitchRow key={item.key} label={item.label} note={item.note || undefined} value={caps[item.key]} disabled={readOnly} onChange={(on) => setCaps({ ...caps, [item.key]: on })} />
       ))}
@@ -326,11 +342,25 @@ export function KnowledgePicker({ visible, chosen, onPick, onClose }: { visible:
 }
 
 /** Prompts offered on a new chat with it: the server's, or its own. */
-export function SuggestionsSection({ prompts, setPrompts, readOnly }: { prompts: SuggestedPrompt[] | null; setPrompts: Setter<SuggestedPrompt[] | null>; readOnly: boolean }) {
+export function SuggestionsSection({
+  prompts,
+  setPrompts,
+  readOnly,
+  summary,
+  toggle = { label: 'Its own suggestions', note: 'Off: the server’s default ones.' },
+}: {
+  prompts: SuggestedPrompt[] | null;
+  setPrompts: Setter<SuggestedPrompt[] | null>;
+  readOnly: boolean;
+  /** Under the title; by default what a model has. */
+  summary?: string;
+  /** The switch between a list and none of its own (null: always a list). */
+  toggle?: { label: string; note: string } | null;
+}) {
   const palette = usePalette();
   return (
-    <Section title="Suggested prompts" note={prompts === null ? 'The server’s, for now.' : `${prompts.length} of its own.`}>
-      <SwitchRow label="Its own suggestions" note="Off: the server’s default ones." value={prompts !== null} disabled={readOnly} onChange={(on) => setPrompts(on ? [] : null)} />
+    <Section title="Suggested prompts" note={summary ?? (prompts === null ? 'The server’s, for now.' : `${prompts.length} of its own.`)}>
+      {toggle ? <SwitchRow label={toggle.label} note={toggle.note} value={prompts !== null} disabled={readOnly} onChange={(on) => setPrompts(on ? [] : null)} /> : null}
       {(prompts ?? []).map((prompt, index) => (
         <View key={index} style={[styles.prompt, { borderColor: palette.border }]}>
           <View style={styles.customRow}>

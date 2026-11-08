@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -55,6 +55,10 @@
  * `--uidefaults` (admins) saves everyone's Interface defaults the app's way over the admin
  * config, checks the rest of it, `/api/config` and your merged settings, takes one away, clears
  * them, then puts the defaults back exactly; a non-admin gets the refusal (src/uidefaults-probe.ts).
+ * `--adminmodels` (admins, scratch servers only: it changes everyone's settings, then puts them
+ * back) saves the model order, the defaults for every model and everyone's prompt suggestions the
+ * app's way, imports, exports and deletes a throwaway model; a non-admin gets the refusal
+ * (src/adminmodels-probe.ts).
  * `--chatvars` makes a throwaway model whose system prompt asks for chat variables: its form, a
  * saved chat keeping its values, and (on the echo model) the instructions filled in from a
  * temporary chat's values, a saved chat's, and none for an unknown option; all deleted after
@@ -111,6 +115,7 @@ import { probeOAuth } from './oauth-probe';
 import { probeWebhooks } from './webhooks-probe';
 import { probeEventHooks } from './eventhooks-probe';
 import { probeUiDefaults } from './uidefaults-probe';
+import { probeAdminModels } from './adminmodels-probe';
 import { probeChatVars } from './chatvars-probe';
 import { probeCodeEdit } from './codeedit-probe';
 import { probeStatus } from './status-probe';
@@ -165,6 +170,7 @@ const { values: args } = parseArgs({
     webhooks: { type: 'boolean' },
     eventhooks: { type: 'boolean' },
     uidefaults: { type: 'boolean' },
+    adminmodels: { type: 'boolean' },
     chatvars: { type: 'boolean' },
     codeedit: { type: 'boolean' },
     sharedfolders: { type: 'boolean' },
@@ -536,6 +542,12 @@ async function main() {
         const uiDefaultsProbe = await probeUiDefaults({ client, capabilities });
         for (const result of uiDefaultsProbe.steps) results.push({ ...result, name: `Interface defaults: ${result.name}` });
         fixtures['write.uidefaults'] = uiDefaultsProbe.fixture;
+      }
+
+      if (args.adminmodels && capabilities) {
+        const adminModelsProbe = await probeAdminModels({ client, capabilities });
+        for (const result of adminModelsProbe.steps) results.push({ ...result, name: `Admin models: ${result.name}` });
+        fixtures['write.adminmodels'] = adminModelsProbe.fixture;
       }
 
       if (args.chatvars) {

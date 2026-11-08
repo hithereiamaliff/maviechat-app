@@ -22,6 +22,7 @@ import { useToast } from '@/components/Toast';
 import { ModelAvatar } from '@/features/chat/ModelAvatar';
 import { usePinnedModels } from '@/features/chat/usePinnedModels';
 import { fileNameOf, shareFile, stampedName } from '@/features/settings/exportFile';
+import { eachFew, failures } from '@/lib/eachFew';
 import { describeError } from '@/lib/errors';
 import { useDebounced } from '@/lib/useDebounced';
 import { useAuthed, useCapabilities, useModels } from '@/lib/server';
@@ -82,27 +83,6 @@ const BULK: Record<Bulk, { label: string; icon: 'check-circle' | 'minus-circle' 
     run: (client, model) => setWorkspaceModelHidden(client, model.id, true),
   },
 };
-
-/** Runs `work` on each item, a few at a time, and says which failed and why. */
-async function eachFew<T>(items: T[], work: (item: T) => Promise<unknown>, nameOf: (item: T) => string): Promise<string[]> {
-  const failed: string[] = [];
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const item = items[next] as T;
-      next += 1;
-      try {
-        await work(item);
-      } catch (error) {
-        failed.push(`${nameOf(item)}: ${describeError(error)}`);
-      }
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(4, items.length) }, worker));
-  return failed;
-}
-
-const failures = (failed: string[]) => `${failed[0]}${failed.length > 1 ? ` (and ${failed.length - 1} more)` : ''}`;
 
 /** Workspace models: search, whose, tag, order; each with what it builds on, whether it's off or hidden, and what you may do. */
 export function ModelsTab({ tabs }: { tabs: (count?: number) => ReactNode }) {
