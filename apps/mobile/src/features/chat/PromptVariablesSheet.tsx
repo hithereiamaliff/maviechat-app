@@ -17,22 +17,37 @@ const HINTS: Record<string, string> = {
   color: '#RRGGBB',
 };
 
-/** The values a saved prompt asks for before it goes in the input, as the web's form asks them. */
-export function PromptVariablesSheet({ variables, onCancel, onInsert }: { variables: InputVariable[] | null; onCancel: () => void; onInsert: (values: Record<string, string>) => void }) {
+interface SheetText {
+  /** The sheet's title ("Fill In the Prompt" for a prompt). */
+  title?: string;
+  /** Its button ("Insert" for a prompt). */
+  action?: string;
+  /** Ready only once something is filled in (a model's chat variables, as the web asks for them). */
+  atLeastOne?: boolean;
+  /** A line under the title. */
+  note?: string;
+}
+
+/**
+ * The values a saved prompt asks for before it goes in the input, as the web's form asks them;
+ * and, with its own title and button, a model's chat variables.
+ */
+export function PromptVariablesSheet({ variables, onCancel, onInsert, ...text }: { variables: InputVariable[] | null; onCancel: () => void; onInsert: (values: Record<string, string>) => void } & SheetText) {
   return (
     <Modal visible={variables !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onCancel}>
-      {variables ? <Form variables={variables} onCancel={onCancel} onInsert={onInsert} /> : null}
+      {variables ? <Form variables={variables} onCancel={onCancel} onInsert={onInsert} {...text} /> : null}
     </Modal>
   );
 }
 
 const label = (name: string) => name.replace(/[_-]+/g, ' ').replace(/^\w/, (letter) => letter.toUpperCase());
 
-function Form({ variables, onCancel, onInsert }: { variables: InputVariable[]; onCancel: () => void; onInsert: (values: Record<string, string>) => void }) {
+function Form({ variables, onCancel, onInsert, title = 'Fill In the Prompt', action = 'Insert', atLeastOne = false, note }: { variables: InputVariable[]; onCancel: () => void; onInsert: (values: Record<string, string>) => void } & SheetText) {
   const palette = usePalette();
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(variables.map((variable) => [variable.name, variable.default ?? (variable.type === 'checkbox' ? 'false' : '')])));
   const set = (name: string, value: string) => setValues((current) => ({ ...current, [name]: value }));
-  const ready = variables.every((variable) => !variable.required || (values[variable.name] ?? '').trim() !== '');
+  const filled = (variable: InputVariable) => (values[variable.name] ?? '').trim() !== '' && !(variable.type === 'checkbox' && atLeastOne && values[variable.name] === 'false');
+  const ready = variables.every((variable) => !variable.required || filled(variable)) && (!atLeastOne || variables.some(filled));
   const input = [styles.input, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }];
 
   return (
@@ -42,14 +57,15 @@ function Form({ variables, onCancel, onInsert }: { variables: InputVariable[]; o
           <Text style={[styles.link, { color: palette.link }]}>Cancel</Text>
         </Pressable>
         <Text style={[styles.title, { color: palette.text }]} accessibilityRole="header">
-          Fill In the Prompt
+          {title}
         </Text>
         <View style={styles.spacer} />
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        {note ? <Text style={[styles.hint, { color: palette.textMuted }]}>{note}</Text> : null}
         {variables.map((variable, index) => (
           <View key={variable.name} style={styles.field}>
-            <Text style={[styles.fieldLabel, { color: palette.textMuted }]}>{`${label(variable.name)}${variable.required ? ' · required' : ''}`}</Text>
+            <Text style={[styles.fieldLabel, { color: palette.textMuted }]}>{`${variable.label ?? label(variable.name)}${variable.required ? ' · required' : ''}`}</Text>
             {variable.type === 'select' && variable.options.length ? (
               variable.options.map((option) => {
                 const on = values[variable.name] === option;
@@ -66,7 +82,7 @@ function Form({ variables, onCancel, onInsert }: { variables: InputVariable[]; o
                 );
               })
             ) : variable.type === 'checkbox' ? (
-              <Switch value={values[variable.name] === 'true'} onValueChange={(on) => set(variable.name, on ? 'true' : 'false')} accessibilityLabel={label(variable.name)} />
+              <Switch value={values[variable.name] === 'true'} onValueChange={(on) => set(variable.name, on ? 'true' : 'false')} accessibilityLabel={variable.label ?? label(variable.name)} />
             ) : (
               <TextInput
                 value={values[variable.name] ?? ''}
@@ -79,7 +95,7 @@ function Form({ variables, onCancel, onInsert }: { variables: InputVariable[]; o
                 autoFocus={index === 0}
                 textAlignVertical={variable.type === 'textarea' ? 'top' : 'center'}
                 style={[input, variable.type === 'textarea' && styles.textarea]}
-                accessibilityLabel={label(variable.name)}
+                accessibilityLabel={variable.label ?? label(variable.name)}
               />
             )}
             {variable.type === 'range' && (variable.min !== undefined || variable.max !== undefined) ? (
@@ -89,7 +105,7 @@ function Form({ variables, onCancel, onInsert }: { variables: InputVariable[]; o
         ))}
       </ScrollView>
       <View style={[styles.footer, { borderTopColor: palette.border }]}>
-        <Button label="Insert" onPress={() => onInsert(values)} disabled={!ready} />
+        <Button label={action} onPress={() => onInsert(values)} disabled={!ready} />
       </View>
     </KeyboardAvoidingView>
   );

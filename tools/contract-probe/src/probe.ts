@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--chatvars] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -55,6 +55,10 @@
  * `--uidefaults` (admins) saves everyone's Interface defaults the app's way over the admin
  * config, checks the rest of it, `/api/config` and your merged settings, takes one away, clears
  * them, then puts the defaults back exactly; a non-admin gets the refusal (src/uidefaults-probe.ts).
+ * `--chatvars` makes a throwaway model whose system prompt asks for chat variables: its form, a
+ * saved chat keeping its values, and (on the echo model) the instructions filled in from a
+ * temporary chat's values, a saved chat's, and none for an unknown option; all deleted after
+ * (src/chatvars-probe.ts).
  * `--a8` saves settings the app's way and puts them back exactly (src/a8-probe.ts), then tries
  * memories, the profile, your variables, a refused password change and an API key (src/a8-account-probe.ts),
  * and the data controls: export, import, shared chats and files (src/a8-data-probe.ts).
@@ -104,6 +108,7 @@ import { probeOAuth } from './oauth-probe';
 import { probeWebhooks } from './webhooks-probe';
 import { probeEventHooks } from './eventhooks-probe';
 import { probeUiDefaults } from './uidefaults-probe';
+import { probeChatVars } from './chatvars-probe';
 import { probeStatus } from './status-probe';
 import { probeSharedFolders } from './shared-folders-probe';
 import { probeSearch } from './search-probe';
@@ -156,6 +161,7 @@ const { values: args } = parseArgs({
     webhooks: { type: 'boolean' },
     eventhooks: { type: 'boolean' },
     uidefaults: { type: 'boolean' },
+    chatvars: { type: 'boolean' },
     sharedfolders: { type: 'boolean' },
     'peer-env': { type: 'string' },
     a8: { type: 'boolean' },
@@ -525,6 +531,12 @@ async function main() {
         const uiDefaultsProbe = await probeUiDefaults({ client, capabilities });
         for (const result of uiDefaultsProbe.steps) results.push({ ...result, name: `Interface defaults: ${result.name}` });
         fixtures['write.uidefaults'] = uiDefaultsProbe.fixture;
+      }
+
+      if (args.chatvars) {
+        const chatVarsProbe = await probeChatVars({ client });
+        for (const result of chatVarsProbe.steps) results.push({ ...result, name: `Chat Variables: ${result.name}` });
+        fixtures['write.chatvars'] = chatVarsProbe.fixture;
       }
 
       if (args.notes && capabilities) {

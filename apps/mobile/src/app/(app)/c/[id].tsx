@@ -2,6 +2,7 @@ import {
   artifactIndex,
   awaitingYou,
   branchArtifacts,
+  chatVariablesOf,
   combineQueued,
   compactChat,
   contextUsage,
@@ -26,6 +27,7 @@ import {
   plainText,
   resolveToolCall,
   savedTemporaryChat,
+  saveChatVariables,
   saveMessage,
   selectBranch,
   speechRate,
@@ -344,12 +346,27 @@ export default function ChatScreen() {
     const at = atModelId ? models.data?.find((item) => item.id === atModelId) : undefined;
     return at ? { model: at, models: [at] } : { model, models: selected };
   };
-  const deliver = async ({ text, files, toggles, toolIds, skillIds, filterIds, atModelId }: OutgoingMessage, parentId: string | null) => {
+  const deliver = async ({ text, files, toggles, toolIds, skillIds, filterIds, atModelId, chatVariables }: OutgoingMessage, parentId: string | null) => {
     const target = targets(atModelId);
     if (!target.model) return false;
-    const result = await send({ chatId, parentId, content: withSelection(text), files, model: target.model, models: target.models, toggles, toolIds, skillIds, filterIds });
+    // A temporary chat's chat variables go with each message (a saved chat's stay on the server).
+    const variables = chatVariables ?? getDraft(chatId).chatVariables;
+    const result = await send({ chatId, parentId, content: withSelection(text), files, model: target.model, models: target.models, toggles, toolIds, skillIds, filterIds, chatVariables: variables });
     if (result) select(result.replyId);
     return Boolean(result);
+  };
+
+  // A saved chat keeps its chat variables on the server, which fills them into the model's instructions.
+  const saveVariables = async (values: Record<string, string>) => {
+    try {
+      const kept = await saveChatVariables(client, chatId, { ...chatVariablesOf(chat), ...values });
+      queryClient.setQueryData<ChatRecord>(['chat', chatId], (old) => (old ? { ...old, variables: kept } : old));
+      toast('Chat variables saved');
+      return true;
+    } catch (error) {
+      toast(`Couldn’t save them: ${describeError(error)}`, 'error');
+      return false;
+    }
   };
 
   // `/fork`: carry on in a new chat holding the conversation up to the shown message, as the web does.
@@ -439,11 +456,11 @@ export default function ChatScreen() {
     const ids = new Set(items.map((item) => item.id));
     updateDraft(chatId, (draft) => ({ ...draft, queue: draft.queue.filter((item) => !ids.has(item.id)) }));
     const { prompt, files } = combineQueued(items);
-    const { toggles, toolIds, skillIds, filterIds, atModel } = getDraft(chatId);
+    const { toggles, toolIds, skillIds, filterIds, atModel, chatVariables } = getDraft(chatId);
     const at = atModel ? models.data?.find((item) => item.id === atModel) : undefined;
     const target = at ? { model: at, models: [at] } : { model, models: selected };
     if (!target.model) return;
-    void send({ chatId, parentId: lastId, content: noteId ? withNoteSelection(prompt, fromNote) : prompt, files, model: target.model, models: target.models, toggles, toolIds, skillIds, filterIds })
+    void send({ chatId, parentId: lastId, content: noteId ? withNoteSelection(prompt, fromNote) : prompt, files, model: target.model, models: target.models, toggles, toolIds, skillIds, filterIds, chatVariables })
       .then((result) => {
         if (result) {
           select(result.replyId);
@@ -538,8 +555,8 @@ export default function ChatScreen() {
     // Someone else's chat: nothing in it is yours to change.
     if (readOnly) return { canDeleteMessage: false, canDeleteReply: false };
     const extras = () => {
-      const { toggles, toolIds, skillIds, filterIds } = getDraft(chatId);
-      return { toggles, toolIds, skillIds, filterIds };
+      const { toggles, toolIds, skillIds, filterIds, chatVariables } = getDraft(chatId);
+      return { toggles, toolIds, skillIds, filterIds, chatVariables };
     };
     const modelOf = (reply: HistoryMessage) => models.data?.find((item) => item.id === reply.model) ?? model;
     return {
@@ -771,6 +788,7 @@ export default function ChatScreen() {
             onFork={chat && !temporary && actions.canClone && !noteId ? () => void fork() : undefined}
             onCompact={chat && !temporary && compactionOn ? () => void compact() : undefined}
             onStatus={history?.currentId ? () => void showStatus() : undefined}
+            chatVariables={chat && !temporary ? { values: chatVariablesOf(chat), save: saveVariables } : undefined}
           />
         )}
       </KeyboardAvoidingView>

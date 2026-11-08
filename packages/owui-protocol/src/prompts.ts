@@ -92,6 +92,8 @@ export function fillBuiltinVariables(content: string, context: BuiltinContext): 
 /** A variable a prompt asks you for, and how (its type and settings, as written after `|`). */
 export interface InputVariable {
   name: string;
+  /** Its own label (a model's chat variable may have one); otherwise the name is shown. */
+  label?: string;
   /** text (default), textarea, select, number, range, checkbox, date, time, datetime-local, month, week, email, url, tel, color, … */
   type: string;
   placeholder?: string;

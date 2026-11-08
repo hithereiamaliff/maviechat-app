@@ -1,4 +1,4 @@
-import { filesPending, modelAuthor, promptSuggestions } from '@maviechat/owui-protocol';
+import { chatVariablesForm, filesPending, modelAuthor, promptSuggestions } from '@maviechat/owui-protocol';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -101,7 +101,7 @@ function NewChat({ link }: { link: ChatLink }) {
   const suggestions = useMemo(() => promptSuggestions(infoModel, config.data), [infoModel, config.data]);
   const insertSuggestion = ui('insertSuggestionPrompt');
 
-  const start = async ({ text, files, toggles, toolIds, skillIds, filterIds, atModelId }: OutgoingMessage) => {
+  const start = async ({ text, files, toggles, toolIds, skillIds, filterIds, atModelId, chatVariables }: OutgoingMessage) => {
     // A model picked with `@` answers alone (as on the web).
     const at = atModelId ? choice.models.find((item) => item.id === atModelId) : undefined;
     if (!model) {
@@ -119,6 +119,7 @@ function NewChat({ link }: { link: ChatLink }) {
       toolIds,
       skillIds,
       filterIds,
+      chatVariables,
       temporary,
       params: chatParams,
     });
@@ -147,7 +148,14 @@ function NewChat({ link }: { link: ChatLink }) {
       toast(connectFirst(waiting), 'error');
       return;
     }
-    void start({ text, files, toggles, toolIds, skillIds, filterIds });
+    // The models' chat variables come first too: the suggestion waits in the box while the form is filled in.
+    const variables = chatVariablesForm(choice.selected, draft.chatVariables);
+    if (variables.conflicts.length || variables.missing || variables.empty) {
+      updateDraft(NEW_CHAT, (current) => ({ ...current, text }));
+      composer.current?.openChatVariables();
+      return;
+    }
+    void start({ text, files, toggles, toolIds, skillIds, filterIds, chatVariables: draft.chatVariables });
   };
 
   // In the middle of the page (the default), or at the bottom as in a chat (the "chat" landing mode).

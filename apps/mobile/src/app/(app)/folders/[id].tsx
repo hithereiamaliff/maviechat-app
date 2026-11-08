@@ -106,7 +106,7 @@ export default function FolderScreen() {
     );
   };
 
-  const start = async ({ text, files, toggles, toolIds, skillIds, filterIds, atModelId }: OutgoingMessage) => {
+  const start = async ({ text, files, toggles, toolIds, skillIds, filterIds, atModelId, chatVariables }: OutgoingMessage) => {
     const at = atModelId ? choice.models.find((item) => item.id === atModelId) : undefined;
     if (!model) {
       toast(choice.loading ? 'Loading models…' : 'No model is available to this account.', 'error');
@@ -123,6 +123,7 @@ export default function FolderScreen() {
       toolIds,
       skillIds,
       filterIds,
+      chatVariables,
       folderId,
     });
     if (!result) return false;

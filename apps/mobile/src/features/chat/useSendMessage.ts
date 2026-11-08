@@ -44,6 +44,11 @@ interface Extras {
   toolIds?: string[];
   skillIds?: string[];
   filterIds?: string[];
+  /**
+   * The chat's values for its models' chat variables, sent for a new or temporary chat. A saved
+   * chat keeps its own and the server reads them, so for one these are left out.
+   */
+  chatVariables?: Record<string, unknown>;
 }
 
 export interface SendInput extends Extras {
@@ -204,6 +209,7 @@ export function useSendMessage() {
         regenerationPrompt: job.regenerationPrompt,
         continueMessageId: job.continueMessageId,
         folderId: job.chatId === null && !job.temporary ? job.folderId : undefined,
+        chatVariables: job.chatId === null || job.temporary ? job.chatVariables : undefined,
         // A temporary chat sends everything; when continuing, the reply so far too.
         temporaryMessages: job.temporary ? temporaryChatMessages(branchPath(turn.history, job.continueMessageId ?? turn.userMessage.id), system) : undefined,
       });
@@ -257,32 +263,32 @@ export function useSendMessage() {
   );
 
   const send = useCallback(
-    async ({ chatId, parentId, content, model, models, files = [], temporary = false, toggles, toolIds, skillIds, filterIds, folderId, params }: SendInput): Promise<Sent | null> => {
+    async ({ chatId, parentId, content, model, models, files = [], temporary = false, toggles, toolIds, skillIds, filterIds, chatVariables, folderId, params }: SendInput): Promise<Sent | null> => {
       const text = content.trim();
       if (!text && files.length === 0) return null;
       const turn = buildTurn({ history: historyOf(chatId), content: text, models: models?.length ? models : [model], files, parentId });
-      return dispatch({ chatId, temporary: temporary || isTemporaryChatId(chatId), turn, model, toggles, toolIds, skillIds, filterIds, folderId, params: chatId === null ? params : undefined });
+      return dispatch({ chatId, temporary: temporary || isTemporaryChatId(chatId), turn, model, toggles, toolIds, skillIds, filterIds, chatVariables, folderId, params: chatId === null ? params : undefined });
     },
     [dispatch, historyOf],
   );
 
   const regenerate = useCallback(
-    async ({ chatId, userMessageId, model, modelIdx, prompt, toggles, toolIds, skillIds, filterIds }: RegenerateInput): Promise<Sent | null> => {
+    async ({ chatId, userMessageId, model, modelIdx, prompt, toggles, toolIds, skillIds, filterIds, chatVariables }: RegenerateInput): Promise<Sent | null> => {
       const history = historyOf(chatId);
       if (!history.messages[userMessageId]) return null;
       const turn = buildRegenerateTurn({ history, userMessageId, model, modelIdx });
-      return dispatch({ chatId, temporary: isTemporaryChatId(chatId), turn, model, toggles, toolIds, skillIds, filterIds, regenerationPrompt: prompt });
+      return dispatch({ chatId, temporary: isTemporaryChatId(chatId), turn, model, toggles, toolIds, skillIds, filterIds, chatVariables, regenerationPrompt: prompt });
     },
     [dispatch, historyOf],
   );
 
   /** "Continue Response": the last reply carries on where it stopped, in place. */
   const continueReply = useCallback(
-    async ({ chatId, messageId, model, toggles, toolIds, skillIds, filterIds }: ContinueInput): Promise<Sent | null> => {
+    async ({ chatId, messageId, model, toggles, toolIds, skillIds, filterIds, chatVariables }: ContinueInput): Promise<Sent | null> => {
       const history = historyOf(chatId);
       if (!history.messages[messageId]) return null;
       const turn = buildContinueTurn({ history, messageId });
-      return dispatch({ chatId, temporary: isTemporaryChatId(chatId), turn, model, toggles, toolIds, skillIds, filterIds, continueMessageId: messageId });
+      return dispatch({ chatId, temporary: isTemporaryChatId(chatId), turn, model, toggles, toolIds, skillIds, filterIds, chatVariables, continueMessageId: messageId });
     },
     [dispatch, historyOf],
   );

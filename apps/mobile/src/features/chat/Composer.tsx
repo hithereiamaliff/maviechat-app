@@ -3,6 +3,8 @@ import {
   availableToggles,
   canUseTerminal,
   chatTerminals,
+  chatVariableInputs,
+  chatVariablesForm,
   saveToolApprovalMode,
   defaultFilterIds,
   defaultSkillIds,
@@ -23,7 +25,7 @@ import {
 } from '@maviechat/owui-protocol';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useImperativeHandle, useRef, useState, type ComponentRef, type Ref } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { SideScroll } from '@/components/SideScroll';
@@ -64,11 +66,15 @@ export interface OutgoingMessage {
   filterIds?: string[];
   /** Picked with `@`: this model alone answers, instead of the chat's models. */
   atModelId?: string;
+  /** A new or temporary chat's values for its models' chat variables (a saved chat keeps its own). */
+  chatVariables?: Record<string, unknown>;
 }
 
 /** Lets a screen put the cursor in the input (e.g. after inserting a suggestion). */
 export interface ComposerHandle {
   focus: () => void;
+  /** The models' Chat Variables form (or why it can't be filled in). */
+  openChatVariables: () => void;
 }
 
 interface ComposerProps {
@@ -102,6 +108,11 @@ interface ComposerProps {
   onCompact?: () => void;
   /** `/status`, once the chat has messages. */
   onStatus?: () => void;
+  /**
+   * A saved chat's own values for its models' chat variables, and how to keep changed ones. A new
+   * or temporary chat keeps them with its draft and sends them with each message instead.
+   */
+  chatVariables?: { values: Record<string, unknown>; save: (values: Record<string, string>) => Promise<boolean> };
 }
 
 const NO_TOGGLES: Record<ToggleKey, boolean> = { webSearch: false, imageGeneration: false, codeInterpreter: false };
@@ -131,6 +142,7 @@ export function Composer({
   onFork,
   onCompact,
   onStatus,
+  chatVariables: savedVariables,
 }: ComposerProps) {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
@@ -160,10 +172,11 @@ export function Composer({
   const [knobsOpen, setKnobsOpen] = useState(false);
   const [attachMode, setAttachMode] = useState<AttachMode | null>(null);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [variablesOpen, setVariablesOpen] = useState(false);
   const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
   const notesOn = capabilities?.feature('notes', true) ?? false;
   const input = useRef<ComponentRef<typeof TextInput>>(null);
-  useImperativeHandle(ref, () => ({ focus: () => input.current?.focus() }), []);
+  useImperativeHandle(ref, () => ({ focus: () => input.current?.focus(), openChatVariables: () => openChatVariables() }));
   const allModels = useModels();
   const atModel = draft.atModel ? allModels.data?.find((item) => item.id === draft.atModel) : undefined;
 
@@ -172,6 +185,10 @@ export function Composer({
   const account = terminalAccount(session.baseUrl, session.user.id);
   const chosenSystemId = useChosenTerminal(account);
   const answering = atModel ? [atModel] : models?.length ? models : [model];
+  // The answering models' chat variables (the web's Chat Variables): a saved chat's own values, else the draft's.
+  const variableValues = savedVariables?.values ?? draft.chatVariables;
+  const variablesForm = chatVariablesForm(answering, variableValues);
+  const showVariables = variablesForm.fields.length > 0 || variablesForm.conflicts.length > 0;
   const systems = answering.some(canUseTerminal) ? chatTerminals(terminals.data ?? [], temporary) : [];
   const system = activeTerminal(terminals.data ?? [], chosenSystemId, answering, temporary);
   const offered = capabilities ? availableToggles(capabilities, atModel ?? (models?.length ? models : model)) : NO_TOGGLES;
@@ -293,6 +310,22 @@ export function Composer({
     updateDraft(draftKey, (current) => ({ ...current, skillIds: on ? [...current.skillIds.filter((item) => item !== id), id] : current.skillIds.filter((item) => item !== id) }));
   const setFilter = (id: string, on: boolean) =>
     updateDraft(draftKey, (current) => ({ ...current, filterIds: on ? [...current.filterIds.filter((item) => item !== id), id] : current.filterIds.filter((item) => item !== id) }));
+  function openChatVariables() {
+    if (variablesForm.conflicts.length) {
+      const which = variablesForm.conflicts.map((conflict) => `${conflict.key} (${conflict.modelIds.join(', ')})`).join('; ');
+      Alert.alert('Chat Variables', `The chosen models ask for the same values in different ways: ${which}. Answer with one of them, or ask your admin to make them match.`);
+      return;
+    }
+    if (variablesForm.fields.length) setVariablesOpen(true);
+  }
+  const saveVariables = async (values: Record<string, string>) => {
+    if (savedVariables) {
+      if (await savedVariables.save(values)) setVariablesOpen(false);
+      return;
+    }
+    updateDraft(draftKey, (current) => ({ ...current, chatVariables: { ...current.chatVariables, ...values } }));
+    setVariablesOpen(false);
+  };
   // Choosing a system switches the code interpreter off, as on the web; null stops using one.
   const pickSystem = (id: string | null) => {
     chooseTerminal(account, id);
@@ -312,7 +345,25 @@ export function Composer({
       toast(connectFirst(waiting), 'error');
       return;
     }
-    const message = { text: draft.text, files: draft.files, toggles, toolIds, skillIds, filterIds, ...(atModel ? { atModelId: atModel.id } : {}) };
+    // As on the web: models that disagree about a value stop the message; one still to fill in opens the form.
+    if (variablesForm.conflicts.length) {
+      openChatVariables();
+      return;
+    }
+    if (variablesForm.missing || variablesForm.empty) {
+      setVariablesOpen(true);
+      return;
+    }
+    const message = {
+      text: draft.text,
+      files: draft.files,
+      toggles,
+      toolIds,
+      skillIds,
+      filterIds,
+      ...(atModel ? { atModelId: atModel.id } : {}),
+      ...(savedVariables ? {} : { chatVariables: draft.chatVariables }),
+    };
     const previews = draft.previews;
     setSending(true);
     // As on the web, the input empties as the message goes; one that didn't go out comes back,
@@ -456,6 +507,11 @@ export function Composer({
               </Pressable>
             ) : null}
           </SideScroll>
+          {showVariables ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="Chat Variables" onPress={openChatVariables} hitSlop={6} style={styles.knobs}>
+              <Icon name="variable" size={17} color={variablesForm.conflicts.length || variablesForm.missing ? palette.warning : palette.textMuted} />
+            </Pressable>
+          ) : null}
           {knobModels.length ? (
             <Pressable accessibilityRole="button" accessibilityLabel="Model controls" onPress={() => setKnobsOpen(true)} hitSlop={6} style={styles.knobs}>
               <Icon name="adjustments-vertical" size={16} color={palette.textMuted} />
@@ -522,6 +578,15 @@ export function Composer({
       />
       <PromptVariablesSheet variables={menus.form} onCancel={menus.cancelForm} onInsert={menus.insertForm} />
       {connectTool.element}
+      <PromptVariablesSheet
+        variables={variablesOpen ? chatVariableInputs(variablesForm, variableValues) : null}
+        title="Chat Variables"
+        action="Save"
+        atLeastOne
+        note={savedVariables ? 'The model’s instructions ask for these. They’re kept with this chat.' : 'The model’s instructions ask for these. They go with this chat’s messages.'}
+        onCancel={() => setVariablesOpen(false)}
+        onInsert={(values) => void saveVariables(values)}
+      />
       <IntegrationsSheet
         visible={sheetOpen}
         onClose={() => setSheetOpen(false)}

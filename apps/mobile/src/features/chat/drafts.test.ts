@@ -22,9 +22,10 @@ describe('tools in a draft', () => {
     expect(connectFirst([notion, { ...notion, name: 'Linear' }])).toBe('Connect Notion, Linear first: tap each beside the + button.');
   });
 
-  it('carries the waiting tools into the chat the first message made', () => {
-    updateDraft('from-test', (draft) => ({ ...draft, toolIds: ['plain'], pendingToolIds: ['server:mcp:notion'] }));
+  it('carries the waiting tools and the chat variables into the chat the first message made', () => {
+    updateDraft('from-test', (draft) => ({ ...draft, toolIds: ['plain'], pendingToolIds: ['server:mcp:notion'], chatVariables: { topic: 'beta' } }));
     carryOver('from-test', 'to-test');
-    expect(getDraft('to-test')).toMatchObject({ toolIds: ['plain'], pendingToolIds: ['server:mcp:notion'] });
+    expect(getDraft('to-test')).toMatchObject({ toolIds: ['plain'], pendingToolIds: ['server:mcp:notion'], chatVariables: { topic: 'beta' } });
+    expect(getDraft('from-test').chatVariables).toEqual({});
   });
 });

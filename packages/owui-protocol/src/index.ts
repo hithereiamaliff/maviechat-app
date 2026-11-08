@@ -11,6 +11,7 @@ export * from './adminUsers';
 export * from './auth';
 export * from './capabilities';
 export * from './chatgpt';
+export * from './chatVariables';
 export * from './chats';
 export * from './chatSearch';
 export * from './chatStatus';

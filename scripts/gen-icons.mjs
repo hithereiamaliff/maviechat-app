@@ -117,6 +117,7 @@ const ICONS = [
   'trash',
   'user-circle',
   'user-group',
+  'variable',
   'user-plus',
   'users',
   'view-columns',

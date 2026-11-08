@@ -215,6 +215,11 @@ export interface CompletionRequestInput {
   stream?: boolean;
   features: Record<string, boolean>;
   variables: Record<string, string>;
+  /**
+   * A new or temporary chat's own values for its models' chat variables (`chat_variables`). A
+   * saved chat keeps its values and the server reads them, so it sends none, as on the web.
+   */
+  chatVariables?: Record<string, unknown>;
   /** User settings (`ui.title.auto`, `ui.autoTags`, `ui.autoFollowUps`); all default to on. */
   tasks: { title?: boolean; tags?: boolean; followUps?: boolean };
   /** The first message of a saved chat that was made empty (a note's chat): named and tagged as a new chat is, as the web does. */
@@ -258,6 +263,7 @@ export function buildCompletionRequest(input: CompletionRequestInput): Record<st
     tool_servers: [],
     features: input.features,
     variables: input.variables,
+    ...(input.chatVariables ? { chat_variables: input.chatVariables } : {}),
     model_item: input.model,
     session_id: input.sessionId,
     ...(input.chatId ? { chat_id: input.chatId } : {}),

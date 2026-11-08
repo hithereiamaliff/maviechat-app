@@ -27,12 +27,14 @@ export interface Draft {
   queue: QueuedMessage[];
   /** Picked with `@`: every message goes to this one model until you take it off, as on the web. */
   atModel?: string | null;
+  /** A new or temporary chat's values for its models' chat variables (a saved chat keeps its own). */
+  chatVariables: Record<string, unknown>;
 }
 
 /** The new-chat screen's draft. */
 export const NEW_CHAT = 'new';
 
-const EMPTY: Draft = { text: '', files: [], previews: {}, toggles: {}, toolIds: [], pendingToolIds: [], skillIds: [], filterIds: [], defaultsFor: null, queue: [] };
+const EMPTY: Draft = { text: '', files: [], previews: {}, toggles: {}, toolIds: [], pendingToolIds: [], skillIds: [], filterIds: [], defaultsFor: null, queue: [], chatVariables: {} };
 const drafts = new Map<string, Draft>();
 const listeners = new Set<() => void>();
 
@@ -58,9 +60,9 @@ export function removeFile(key: string, itemId: string): void {
 
 /** The first message created the chat: it keeps the toggles, tools and `@` model, and the new-chat input starts over. */
 export function carryOver(from: string, to: string): void {
-  const { toggles, toolIds, pendingToolIds, skillIds, filterIds, defaultsFor, atModel } = getDraft(from);
+  const { toggles, toolIds, pendingToolIds, skillIds, filterIds, defaultsFor, atModel, chatVariables } = getDraft(from);
   drafts.delete(from);
-  updateDraft(to, (draft) => ({ ...draft, toggles, toolIds, pendingToolIds, skillIds, filterIds, defaultsFor, atModel }));
+  updateDraft(to, (draft) => ({ ...draft, toggles, toolIds, pendingToolIds, skillIds, filterIds, defaultsFor, atModel, chatVariables }));
 }
 
 /**

@@ -104,6 +104,13 @@ This is a spec written from reading Open WebUI's source (v0.12.5, read 2026-11-0
   - **Default and removal:** `PUT /targets/{id}/default`; `DELETE` → `{ok: true}`, 404 the second time.
   - **Test:** `POST /targets/{id}/test` really posts (400 "Webhook delivery failed" when the address refuses). The probe only tries a target that doesn't exist (400 "Notification target not found").
   - **What goes out:** a finished chat posts its title, the whole reply and a link. Slack, Google Chat, Discord and Teams get their own format; any other address gets the event's data as JSON.
+- **Chat Variables** (0.11.3 and 0.12.5; `--chatvars` probe ✓, filling in checked on the 0.12.5 echo model):
+  - **The form:** a model's system prompt asks for `{{chat.variables.key | type:prop=value:…}}`. The server lists them in `info.meta.chat_variables_schema.fields` (`key`, `type` (text by default), `required`, and when given `default`, `label`, `placeholder`, `options`, `min`, `max`, `step`, `minlength`, `maxlength`).
+  - **Several models:** the web merges the chosen models' fields by key (required if any requires it). A key asked for differently is a conflict that stops the message.
+  - **Before sending:** the web opens the form when a required value is missing, or when nothing is filled in and nothing has a default.
+  - **Storage:** a saved chat keeps `variables` (in `ChatResponse`), set with `POST /api/v1/chats/{id}` `{chat: {}, variables}` (the chat merges top-level keys, so `{}` changes nothing) or with `/chats/new` `{chat, variables}`.
+  - **Sending:** a completion's `chat_variables` is used when given; otherwise the saved chat's. Either way it's saved back to the chat (0.12.5: none for someone else's chat). The web sends it only for a new or temporary chat, and the app does the same.
+  - **Filling in:** the server fills the model's system prompt (`required=False`, so a missing one is left empty). A select value outside its options empties them all.
 - **Everyone's Interface defaults** (admins; `--uidefaults` probe ✓ on 0.11.3 and 0.12.5; a non-admin gets 401):
   - **Where:** the admin config's `DEFAULT_INTERFACE_SETTINGS` (`ui.default_interface_settings`). `POST /api/v1/auths/admin/config` sets it to what's sent, or `{}` when it's left out, so every admin save sends the config as read.
   - **Where people see them:** `/api/config` publishes them as `ui.default_interface_settings`. `GET /api/v1/users/user/settings` merges them under each person's own `ui` (`?raw=true` gives only their own). Saving someone's settings drops each value equal to the default, so what they haven't chosen follows the defaults when those change.
