@@ -261,7 +261,11 @@ export interface Banner {
   dismissible: boolean;
   /** Seconds. */
   timestamp: number;
+  /** What else the server keeps (0.12's translations, `i18n`), sent back as read: a save without it would wipe it. */
+  extra?: Record<string, unknown>;
 }
+
+const BANNER_FIELDS = ['id', 'type', 'title', 'content', 'dismissible', 'timestamp'];
 
 const BANNER_TYPES: BannerType[] = ['info', 'warning', 'error', 'success'];
 
@@ -271,12 +275,13 @@ export async function getBanners(client: OwuiClient): Promise<Banner[]> {
     const row = record(raw);
     if (typeof row.id !== 'string') return [];
     const type = BANNER_TYPES.includes(row.type as BannerType) ? (row.type as BannerType) : 'info';
-    return [{ id: row.id, type, title: typeof row.title === 'string' ? row.title : '', content: typeof row.content === 'string' ? row.content : '', dismissible: row.dismissible !== false, timestamp: typeof row.timestamp === 'number' ? row.timestamp : 0 }];
+    const extra = Object.fromEntries(Object.entries(row).filter(([key]) => !BANNER_FIELDS.includes(key)));
+    return [{ id: row.id, type, title: typeof row.title === 'string' ? row.title : '', content: typeof row.content === 'string' ? row.content : '', dismissible: row.dismissible !== false, timestamp: typeof row.timestamp === 'number' ? row.timestamp : 0, ...(Object.keys(extra).length ? { extra } : {}) }];
   });
 }
 
 export async function saveBanners(client: OwuiClient, banners: Banner[]): Promise<void> {
-  await client.post<unknown>('/api/v1/configs/banners', { banners: banners.map((banner) => ({ id: banner.id, type: banner.type, title: banner.title || null, content: banner.content, dismissible: banner.dismissible, timestamp: banner.timestamp })) });
+  await client.post<unknown>('/api/v1/configs/banners', { banners: banners.map((banner) => ({ ...banner.extra, id: banner.id, type: banner.type, title: banner.title || null, content: banner.content, dismissible: banner.dismissible, timestamp: banner.timestamp })) });
 }
 
 /** Whether two banner lists say the same (for no-change saves). */

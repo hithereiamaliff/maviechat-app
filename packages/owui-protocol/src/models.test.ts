@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  withPinnedModelsOrder,
   defaultModelId,
   matchesModelFilter,
   modelAuthor,
@@ -145,5 +146,12 @@ describe('sources, status and errors', () => {
     expect(errorText({ content: 'Rate limited' })).toBe('Rate limited');
     expect(errorText(true)).toMatch(/Something went wrong/);
     expect(errorText(null)).toBeNull();
+  });
+});
+
+describe('pinned models order', () => {
+  it('puts the ones you see in their new order, keeping pins of models you can’t see after them', () => {
+    expect(withPinnedModelsOrder(['a', 'gone', 'b', 'c'], ['c', 'a', 'b'])).toEqual(['c', 'a', 'b', 'gone']);
+    expect(withPinnedModelsOrder([], ['x'])).toEqual(['x']);
   });
 });

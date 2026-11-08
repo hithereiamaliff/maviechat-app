@@ -9,14 +9,19 @@ import {
   listFolders,
   listPinnedChats,
   noteTitle,
+  pinnedNotesOrderOf,
   searchChats,
   searchText,
   SEARCH_PAGE_SIZE,
   userStatusOf,
   userStatusOn,
   setFolderExpanded,
+  shortcutChoices,
   sidebarShortcuts,
+  sortPinnedNotes,
   toggleNotePinned,
+  withPinnedModelsOrder,
+  withShortcuts,
   type FolderNode,
   type ShortcutId,
 } from '@maviechat/owui-protocol';
@@ -28,6 +33,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
 import { MenuButton, type MenuItem } from '@/components/Menu';
+import { ReorderSheet } from '@/components/ReorderSheet';
 import { useToast } from '@/components/Toast';
 import { useAccountsSheet, useOwuiAccountSignOut } from '@/features/accounts/AccountsSheet';
 import { statusLine, useSetStatus, useStatusSheet } from '@/features/sidebar/StatusSheet';
@@ -44,6 +50,7 @@ import { useFolderActions } from '@/features/folders/useFolderActions';
 import { useNotesOn, usePinnedNotes } from '@/features/notes/queries';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useServerConfig, useSessionUser, useUserSettings } from '@/lib/server';
+import { useSaveUiSettings } from '@/lib/uiSettings';
 import { useDebounced } from '@/lib/useDebounced';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useOpenCode } from '@/session/OpenCodeProvider';
@@ -125,6 +132,11 @@ export function Sidebar() {
   const toast = useToast();
   const notesOn = useNotesOn();
   const pinnedNotes = usePinnedNotes();
+  // In the order you put them in, on the web or here (`ui.pinnedNotesOrder`).
+  const sortedNotes = useMemo(() => sortPinnedNotes(pinnedNotes.data ?? [], pinnedNotesOrderOf(settings.data?.ui)), [pinnedNotes.data, settings.data]);
+  const saveUi = useSaveUiSettings();
+  // Which order sheet is open: pinned models, pinned notes, or the shortcuts under Search.
+  const [ordering, setOrdering] = useState<'models' | 'notes' | 'shortcuts' | null>(null);
 
   // Refresh when the sidebar opens; socket-driven updates arrive with sending (next slice).
   useEffect(() => {
@@ -165,7 +177,7 @@ export function Sidebar() {
         search: { active: searching, results: found, loading: results.isFetching, text: searchText(query) },
         pinned: pinned.data ?? [],
         pinnedModels: pinnedModels.visible.map((model) => ({ id: model.id, name: model.name ?? model.id })),
-        pinnedNotes: notesOn ? (pinnedNotes.data ?? []).map((note) => ({ id: note.id, title: noteTitle(note) })) : [],
+        pinnedNotes: notesOn ? sortedNotes.map((note) => ({ id: note.id, title: noteTitle(note) })) : [],
         folders: foldersOn ? tree : [],
         foldersOn,
         isExpanded: (folder) => expanded[folder.id] ?? folder.is_expanded ?? false,
@@ -173,7 +185,7 @@ export function Sidebar() {
         chats: chats.data?.pages.flat() ?? [],
         chatsLoading: chats.isLoading,
       }),
-    [searching, found, results.isFetching, query, pinned.data, pinnedModels.visible, notesOn, pinnedNotes.data, foldersOn, tree, expanded, folderChats, openFolderIds, chats.data, chats.isLoading],
+    [searching, found, results.isFetching, query, pinned.data, pinnedModels.visible, notesOn, sortedNotes, foldersOn, tree, expanded, folderChats, openFolderIds, chats.data, chats.isLoading],
   );
 
   const openChat = (id: string) => {
@@ -241,10 +253,9 @@ export function Sidebar() {
       (error: unknown) => toast(`Couldn’t make a note: ${describeError(error)}`, 'error'),
     );
   // The user's own order, once their settings have loaded (so a customised list never flashes the defaults).
-  const shortcuts =
-    capabilities && !settings.isPending
-      ? sidebarShortcuts(capabilities, (settings.data?.ui as { pinnedMenuItems?: unknown } | null | undefined)?.pinnedMenuItems)
-      : [];
+  const pinnedMenuItems = (settings.data?.ui as { pinnedMenuItems?: unknown } | null | undefined)?.pinnedMenuItems;
+  const shortcuts = capabilities && !settings.isPending ? sidebarShortcuts(capabilities, pinnedMenuItems) : [];
+  const choices = capabilities ? shortcutChoices(capabilities, pinnedMenuItems) : { order: [], pinned: [] };
   // Your status, as the web's user menu has it (while the admin keeps statuses on).
   const statusOn = userStatusOn(config.data);
   const status = statusLine(userStatusOf(you.data));
@@ -272,6 +283,9 @@ export function Sidebar() {
             },
           },
         ]
+      : []),
+    ...(capabilities && !settings.isPending && choices.order.length
+      ? [{ key: 'shortcuts', label: 'Sidebar Shortcuts…', icon: 'bars-3' as const, onPress: () => setOrdering('shortcuts') }]
       : []),
     {
       key: 'settings',
@@ -355,7 +369,10 @@ export function Sidebar() {
               {item.name}
             </Text>
             <MenuButton
-              items={[{ key: 'unpin', label: 'Hide from Sidebar', icon: 'bookmark-slash', onPress: () => pinnedModels.toggle(item.id) }]}
+              items={[
+                { key: 'unpin', label: 'Hide from Sidebar', icon: 'bookmark-slash', onPress: () => pinnedModels.toggle(item.id) },
+                ...(pinnedModels.visible.length > 1 ? [{ key: 'order', label: 'Change Order…', icon: 'bars-3' as const, onPress: () => setOrdering('models') }] : []),
+              ]}
               label={`Options for ${item.name}`}
               size={18}
               color={palette.textMuted}
@@ -370,7 +387,10 @@ export function Sidebar() {
               {item.title}
             </Text>
             <MenuButton
-              items={[{ key: 'unpin', label: 'Unpin from Sidebar', icon: 'bookmark-slash', onPress: () => unpinNote(item.id) }]}
+              items={[
+                { key: 'unpin', label: 'Unpin from Sidebar', icon: 'bookmark-slash', onPress: () => unpinNote(item.id) },
+                ...(sortedNotes.length > 1 ? [{ key: 'order', label: 'Change Order…', icon: 'bars-3' as const, onPress: () => setOrdering('notes') }] : []),
+              ]}
               label={`Options for ${item.title}`}
               size={18}
               color={palette.textMuted}
@@ -494,6 +514,7 @@ export function Sidebar() {
               label={SHORTCUTS[id].label}
               hint={id === 'workspace' || id === 'notes' ? undefined : 'Opens on the web'}
               onPress={() => (id === 'workspace' ? openWorkspace() : id === 'notes' ? openNotes() : openOnWeb(SHORTCUTS[id].path))}
+              onLongPress={() => setOrdering('shortcuts')}
             />
           ))
         : null}
@@ -524,6 +545,31 @@ export function Sidebar() {
       {tagsSheet.element}
       {accountsSheet.element}
       {statusSheet.element}
+      <ReorderSheet
+        visible={ordering === 'models'}
+        title="Pinned Models"
+        note="The order your pinned models show in the sidebar, on the web too."
+        items={pinnedModels.visible.map((model) => ({ id: model.id, label: model.name ?? model.id, leading: <ModelAvatar modelId={model.id} size={24} /> }))}
+        onSave={(order) => saveUi({ pinnedModels: withPinnedModelsOrder(pinnedModels.ids, order) })}
+        onClose={() => setOrdering(null)}
+      />
+      <ReorderSheet
+        visible={ordering === 'notes'}
+        title="Pinned Notes"
+        note="The order your pinned notes show in the sidebar, on the web too."
+        items={sortedNotes.map((note) => ({ id: note.id, label: noteTitle(note), leading: <Icon name="document-text" size={18} color={palette.textMuted} /> }))}
+        onSave={(order) => saveUi({ pinnedNotesOrder: order })}
+        onClose={() => setOrdering(null)}
+      />
+      <ReorderSheet
+        visible={ordering === 'shortcuts'}
+        title="Sidebar Shortcuts"
+        note="The pages under Search in the sidebar: switch one on to pin it there, and put them in order. On the web too."
+        items={choices.order.map((id) => ({ id, label: SHORTCUTS[id].label, leading: <Icon name={SHORTCUTS[id].icon} size={18} color={palette.text} /> }))}
+        switches={{ label: (item) => `Pin ${item.label}`, on: choices.pinned }}
+        onSave={(order, on) => (capabilities ? saveUi({ pinnedMenuItems: withShortcuts(capabilities, pinnedMenuItems, order as ShortcutId[], on as ShortcutId[]) }) : Promise.resolve(false))}
+        onClose={() => setOrdering(null)}
+      />
       {folderActions.element}
     </SidebarPanel>
   );

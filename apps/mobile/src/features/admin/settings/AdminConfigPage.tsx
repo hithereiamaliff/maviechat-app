@@ -17,12 +17,14 @@ import {
   type SettingOption,
   type OwuiClient,
   type SettingSection,
+  movedInList,
 } from '@maviechat/owui-protocol';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
+import { IconButton } from '@/components/IconButton';
 import { useToast } from '@/components/Toast';
 import { useAdminGroups } from '@/features/admin/queries';
 import { Note, SectionTitle } from '@/features/settings/rows';
@@ -160,7 +162,7 @@ const BANNER_TYPES: { key: BannerType; label: string }[] = [
   { key: 'success', label: 'Success' },
 ];
 
-/** Banners everyone sees at the top of their chats: add, change, take away; saved together. */
+/** Banners everyone sees at the top of their chats, in order: add, change, move, take away; saved together. */
 export function BannersEditor() {
   const palette = usePalette();
   const toast = useToast();
@@ -175,7 +177,7 @@ export function BannersEditor() {
   const add = () => setEdited([...list, { id: uuidv4(), type: 'info', title: '', content: '', dismissible: true, timestamp: Math.floor(new Date().getTime() / 1000) }]);
   const save = () => {
     if (list.some((banner) => !banner.content.trim())) return Alert.alert('Not saved yet', 'Every banner needs some text.');
-    reviewChanges('Save the banners?', [`${list.length} ${list.length === 1 ? 'banner' : 'banners'}, shown to everyone at the top of their chats.`], [], () => {
+    reviewChanges('Save the banners?', [`${list.length} ${list.length === 1 ? 'banner' : 'banners'}, shown to everyone at the top of their chats, in this order.`], [], () => {
       void (async () => {
         setBusy(true);
         try {
@@ -196,15 +198,20 @@ export function BannersEditor() {
       <SectionTitle title="Banners" />
       {saved.isError ? <Note>{`Couldn’t load them: ${describeError(saved.error)}`}</Note> : null}
       {!list.length && saved.data ? <Note>None. Banners show at the top of everyone’s chats, until they close them (if they can).</Note> : null}
-      {list.map((banner) => (
+      {list.map((banner, index) => (
         <View key={banner.id} style={[styles.banner, { borderColor: palette.border }]}>
           <View style={styles.chips}>
             {BANNER_TYPES.map((type) => (
               <Chip key={type.key} label={type.label} on={banner.type === type.key} onPress={() => patch(banner.id, { type: type.key })} />
             ))}
-            <Pressable accessibilityRole="button" accessibilityLabel="Take this banner away" onPress={() => setEdited(list.filter((item) => item.id !== banner.id))} hitSlop={8} style={styles.remove}>
-              <Icon name="trash" size={16} color={palette.danger} />
-            </Pressable>
+            {/* The web drags them into order; here each moves with its arrows. */}
+            <View style={styles.remove}>
+              <IconButton icon="chevron-up" label="Move this banner up" size={16} color={palette.textMuted} disabled={index === 0} onPress={() => setEdited(movedInList(list, index, index - 1))} />
+              <IconButton icon="chevron-down" label="Move this banner down" size={16} color={palette.textMuted} disabled={index === list.length - 1} onPress={() => setEdited(movedInList(list, index, index + 1))} />
+              <Pressable accessibilityRole="button" accessibilityLabel="Take this banner away" onPress={() => setEdited(list.filter((item) => item.id !== banner.id))} hitSlop={8}>
+                <Icon name="trash" size={16} color={palette.danger} />
+              </Pressable>
+            </View>
           </View>
           <TextInput value={banner.title} onChangeText={(title) => patch(banner.id, { title })} placeholder="Title (optional)" placeholderTextColor={palette.textFaint} accessibilityLabel="Banner title" style={[styles.input, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]} />
           <TextInput value={banner.content} onChangeText={(content) => patch(banner.id, { content })} multiline placeholder="What it says (Markdown)" placeholderTextColor={palette.textFaint} accessibilityLabel="Banner text" style={[styles.input, styles.multiline, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]} />
@@ -235,7 +242,7 @@ const styles = StyleSheet.create({
   note: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18 },
   banner: { gap: 8, padding: 12, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.lg },
   chips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
-  remove: { marginLeft: 'auto' },
+  remove: { marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 4 },
   input: { borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 9, fontFamily: fonts.regular, fontSize: 15 },
   multiline: { minHeight: 70, textAlignVertical: 'top' },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },

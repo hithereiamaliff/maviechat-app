@@ -33,7 +33,7 @@ export function SidebarPanel({ name, onNewChat, children }: { name: string; onNe
   );
 }
 
-export function SidebarAction({ icon, label, hint, current = false, onPress }: { icon: IconName; label: string; hint?: string; current?: boolean; onPress: () => void }) {
+export function SidebarAction({ icon, label, hint, current = false, onPress, onLongPress }: { icon: IconName; label: string; hint?: string; current?: boolean; onPress: () => void; onLongPress?: () => void }) {
   const palette = usePalette();
   return (
     <Pressable
@@ -41,6 +41,7 @@ export function SidebarAction({ icon, label, hint, current = false, onPress }: {
       accessibilityHint={hint}
       accessibilityState={{ selected: current }}
       onPress={onPress}
+      onLongPress={onLongPress}
       style={({ pressed }) => [styles.action, (pressed || current) && { backgroundColor: palette.sidebarActive }]}>
       <Icon name={icon} size={19} color={palette.text} />
       <Text style={[styles.actionText, { color: palette.text }]}>{label}</Text>

@@ -109,6 +109,12 @@ export function togglePinnedModel(ids: string[], id: string): string[] {
   return ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id];
 }
 
+/** The pins in a new order of the ones you see; pins of models you can't see now are kept, after them (as the web reorders). */
+export function withPinnedModelsOrder(ids: readonly string[], shown: readonly string[]): string[] {
+  const seen = new Set(shown);
+  return [...shown, ...ids.filter((id) => !seen.has(id))];
+}
+
 /** The web's link that opens a new chat with this model, as its Copy Link copies it. */
 export function modelLink(baseUrl: string, id: string): string {
   return `${baseUrl.replace(/\/+$/, '')}/?model=${encodeURIComponent(id)}`;

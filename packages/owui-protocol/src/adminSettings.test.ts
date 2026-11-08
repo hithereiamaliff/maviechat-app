@@ -8,6 +8,7 @@ import {
   describeSettingChange,
   formValue,
   GENERAL_SECTIONS,
+  getBanners,
   saveBanners,
   settingChanges,
   settingConflicts,
@@ -82,6 +83,20 @@ describe('admin settings form', () => {
     };
     await saveBanners(new OwuiClient({ baseUrl: 'https://chat.test', token: 't', fetch }), [{ id: 'b1', type: 'warning', title: '', content: 'Down at 9', dismissible: true, timestamp: 1_730_000_000 }]);
     expect(calls[0]).toEqual({ banners: [{ id: 'b1', type: 'warning', title: null, content: 'Down at 9', dismissible: true, timestamp: 1_730_000_000 }] });
+  });
+
+  it('keeps what else a banner has (0.12’s translations) through a read and a save', async () => {
+    const stored = [{ id: 'b1', type: 'info', title: 'Hi', content: 'Hello', dismissible: true, timestamp: 1, i18n: { ms: { content: 'Helo' } } }];
+    const calls: unknown[] = [];
+    const fetch: FetchLike = async (_url, init) => {
+      if (init?.method === 'POST') calls.push(typeof init.body === 'string' ? JSON.parse(init.body) : undefined);
+      return new Response(JSON.stringify(stored), { status: 200 });
+    };
+    const client = new OwuiClient({ baseUrl: 'https://chat.test', token: 't', fetch });
+    const read = await getBanners(client);
+    expect(read[0]?.extra).toEqual({ i18n: { ms: { content: 'Helo' } } });
+    await saveBanners(client, read);
+    expect(calls[0]).toEqual({ banners: stored });
   });
 });
 

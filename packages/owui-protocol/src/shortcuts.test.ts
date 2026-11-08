@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildCapabilities } from './capabilities';
 import type { ServerConfig } from './server';
-import { canUseWorkspace, sidebarShortcuts } from './shortcuts';
+import { canUseWorkspace, shortcutChoices, sidebarShortcuts, withShortcuts } from './shortcuts';
 
 const config = (features: Record<string, unknown>): ServerConfig => ({ name: 'Test', version: '0.11.3', features });
 
@@ -37,5 +37,22 @@ describe('sidebarShortcuts', () => {
     const caps = buildCapabilities({ config: config({}), user: { role: 'admin', permissions: {} } });
     expect(canUseWorkspace(caps)).toBe(true);
     expect(sidebarShortcuts(caps, ['playground', 'workspace'])).toEqual(['playground', 'workspace']);
+  });
+});
+
+describe('choosing and ordering shortcuts', () => {
+  const caps = buildCapabilities({
+    config: config({ enable_notes: true, enable_calendar: true }),
+    user: { role: 'user', permissions: { features: { calendar: true }, workspace: { prompts: true } } },
+  });
+
+  it('offers every page the account may use, the pinned ones first in their order', () => {
+    expect(shortcutChoices(caps, ['calendar', 'notes'])).toEqual({ order: ['calendar', 'notes', 'workspace'], pinned: ['calendar', 'notes'] });
+    expect(shortcutChoices(caps, undefined)).toEqual({ order: ['notes', 'workspace', 'calendar'], pinned: ['notes', 'workspace'] });
+  });
+
+  it('saves the chosen ones in order, keeping pages it doesn’t know or this account can’t use', () => {
+    expect(withShortcuts(caps, ['notes', 'channels', 'playground', 'workspace'], ['workspace', 'calendar', 'notes'], ['workspace', 'notes'])).toEqual(['workspace', 'notes', 'channels', 'playground']);
+    expect(withShortcuts(caps, undefined, ['calendar', 'notes', 'workspace'], ['calendar'])).toEqual(['calendar']);
   });
 });

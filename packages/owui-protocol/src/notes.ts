@@ -181,6 +181,22 @@ export async function listNotes(client: OwuiClient, query: NoteListQuery = {}): 
 }
 
 /** The notes you pinned to the sidebar. */
+/** The order you put your pinned notes in, on the web or here (`ui.pinnedNotesOrder`). */
+export function pinnedNotesOrderOf(ui: unknown): string[] {
+  const order = (ui as { pinnedNotesOrder?: unknown } | null | undefined)?.pinnedNotesOrder;
+  return Array.isArray(order) ? order.filter((id): id is string => typeof id === 'string' && id.length > 0) : [];
+}
+
+/** Pinned notes in that order: the ones it names first, as it has them; the rest after, as the server lists them (as the web sorts them). */
+export function sortPinnedNotes<T extends { id: string }>(notes: readonly T[], order: readonly string[]): T[] {
+  if (!order.length) return [...notes];
+  const place = new Map(order.map((id, index) => [id, index]));
+  return notes
+    .map((note, index) => ({ note, index }))
+    .sort((a, b) => (place.get(a.note.id) ?? Number.MAX_SAFE_INTEGER) - (place.get(b.note.id) ?? Number.MAX_SAFE_INTEGER) || a.index - b.index)
+    .map(({ note }) => note);
+}
+
 export async function listPinnedNotes(client: OwuiClient): Promise<NoteSummary[]> {
   return list(await client.get<unknown>(`${base}/pinned`)).flatMap((row) => summaryOf(row) ?? []);
 }

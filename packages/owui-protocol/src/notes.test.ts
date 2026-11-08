@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { Capabilities } from './capabilities';
 import { OwuiClient, type FetchLike } from './http';
 import {
+  pinnedNotesOrderOf,
+  sortPinnedNotes,
   attachmentLink,
   attachmentsIn,
   changeNotePages,
@@ -259,5 +261,15 @@ describe('notes', () => {
     expect(calls[0]?.body).toMatchObject({ model: 'm1', stream: false, chat_id: 'temporary:note-n1', messages: [{ role: 'user' }] });
     expect((calls[0]?.body as { messages: { content: string }[] }).messages[0]?.content).toContain('<note>\nmilk, eggs\n</note>');
     await expect(suggestNoteTitle(client, 'm1', 'x', 'n1')).rejects.toThrow('no title');
+  });
+});
+
+describe('pinned notes order', () => {
+  it('reads the order the web saves, and sorts by it with the rest after, as listed', () => {
+    expect(pinnedNotesOrderOf({ pinnedNotesOrder: ['b', 3, '', 'a'] })).toEqual(['b', 'a']);
+    expect(pinnedNotesOrderOf(null)).toEqual([]);
+    const notes = [{ id: 'a' }, { id: 'x' }, { id: 'b' }, { id: 'y' }];
+    expect(sortPinnedNotes(notes, ['b', 'a']).map((note) => note.id)).toEqual(['b', 'a', 'x', 'y']);
+    expect(sortPinnedNotes(notes, []).map((note) => note.id)).toEqual(['a', 'x', 'b', 'y']);
   });
 });
