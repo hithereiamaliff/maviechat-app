@@ -93,6 +93,7 @@ const ICONS = [
   'minus-circle',
   'musical-note',
   'numbered-list',
+  'paper-airplane',
   'paper-clip',
   'pause-circle',
   'pencil',

@@ -11,6 +11,7 @@ import { DataControls } from '@/features/settings/DataControls';
 import { GeneralSettings } from '@/features/settings/GeneralSettings';
 import { InterfaceSettings } from '@/features/settings/InterfaceSettings';
 import { NotificationSettings } from '@/features/settings/NotificationSettings';
+import { NotificationTargets } from '@/features/settings/NotificationTargets';
 import { PersonalizationSettings } from '@/features/settings/PersonalizationSettings';
 import { PromptAndParams } from '@/features/settings/PromptAndParams';
 import { rowStyles } from '@/features/settings/rows';
@@ -50,8 +51,10 @@ export default function SettingsScreen() {
       ) : shown === 'interface' ? (
         <InterfaceSettings />
       ) : shown === 'notifications' ? (
-        <ScrollView contentContainerStyle={rowStyles.content}>
+        <ScrollView contentContainerStyle={rowStyles.content} keyboardShouldPersistTaps="handled">
           <NotificationSettings />
+          {/* As on the web: where the admin lets people add webhooks, and your account may. */}
+          {capabilities?.feature('userWebhooks') ? <NotificationTargets /> : null}
         </ScrollView>
       ) : shown === 'personalization' ? (
         <PersonalizationSettings />

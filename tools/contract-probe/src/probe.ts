@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -45,6 +45,9 @@
  * `--oauth` checks a tool's Connect as far as a server without a sign-in tool shows it: the tools
  * list's sign-in marks, the account page's cookie, the tool sign-in page with and without it, and
  * Disconnect for a tool not connected; nothing is started, kept or removed (src/oauth-probe.ts).
+ * `--webhooks` adds, switches, changes, makes default, renames and removes a notification target
+ * that never sends (off, no events, example.com), then puts the account's targets back; where
+ * webhooks aren't allowed it checks the refusal (src/webhooks-probe.ts).
  * `--a8` saves settings the app's way and puts them back exactly (src/a8-probe.ts), then tries
  * memories, the profile, your variables, a refused password change and an API key (src/a8-account-probe.ts),
  * and the data controls: export, import, shared chats and files (src/a8-data-probe.ts).
@@ -91,6 +94,7 @@ import { probeMessages } from './messages-probe';
 import { probeModels } from './models-probe';
 import { probeNotes } from './notes-probe';
 import { probeOAuth } from './oauth-probe';
+import { probeWebhooks } from './webhooks-probe';
 import { probeStatus } from './status-probe';
 import { probeSharedFolders } from './shared-folders-probe';
 import { probeSearch } from './search-probe';
@@ -140,6 +144,7 @@ const { values: args } = parseArgs({
     notes: { type: 'boolean' },
     status: { type: 'boolean' },
     oauth: { type: 'boolean' },
+    webhooks: { type: 'boolean' },
     sharedfolders: { type: 'boolean' },
     'peer-env': { type: 'string' },
     a8: { type: 'boolean' },
@@ -491,6 +496,12 @@ async function main() {
         const oauthProbe = await probeOAuth({ client, baseUrl, token: session.token });
         for (const result of oauthProbe.steps) results.push({ ...result, name: `OAuth: ${result.name}` });
         fixtures['write.oauth'] = oauthProbe.fixture;
+      }
+
+      if (args.webhooks && capabilities) {
+        const webhooksProbe = await probeWebhooks({ client, capabilities });
+        for (const result of webhooksProbe.steps) results.push({ ...result, name: `Webhooks: ${result.name}` });
+        fixtures['write.webhooks'] = webhooksProbe.fixture;
       }
 
       if (args.notes && capabilities) {

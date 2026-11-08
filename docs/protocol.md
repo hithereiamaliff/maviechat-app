@@ -95,6 +95,15 @@ This is a spec written from reading Open WebUI's source (v0.12.5, read 2026-11-0
 **Prompts, tools, skills, functions and models**
 - `GET /api/v1/prompts/list`
 - `GET /api/v1/tools/`, with user valves at `/tools/id/{id}/valves/user[/update]`
+- **Notification targets** (your webhooks; `--webhooks` probe ✓ on 0.11.3 and 0.12.5 with the switch on for the run, then off again; production's test account gets 403):
+  - **Where:** `/api/v1/notifications/{events,targets}`. 404 when the admin's `ui.enable_user_webhooks` (`features.enable_user_webhooks`) is off; 403 for a non-admin without `features.webhooks`.
+  - **Events:** `GET /events` → `{events: [{event, label, description}]}`. 0.11.3 lists chat.finished, chat.failed, channel.message, calendar.alert and retrieval.content.process_failed; 0.12.5 adds automation.run_failed.
+  - **Listing:** `GET /targets` → `{targets}`, each with `id`, `type: webhook`, `enabled`, `events`, `delivery` (`away`: only when you haven't been active for 3 minutes; `always`), `is_default`, and `config.url_masked` (`scheme://host/...` plus the path's last 4 characters). The whole address never comes back.
+  - **Adding:** `POST /targets` with `{id?, type, enabled, events, delivery, config: {url}}`. Without an id it's named after the host. The address must be http(s) and resolve to a public address unless local fetching is on.
+  - **Changing:** `PUT /targets/{id}` merges what it's sent. With no `config` the address stays. A different `id` renames it, and the default follows.
+  - **Default and removal:** `PUT /targets/{id}/default`; `DELETE` → `{ok: true}`, 404 the second time.
+  - **Test:** `POST /targets/{id}/test` really posts (400 "Webhook delivery failed" when the address refuses). The probe only tries a target that doesn't exist (400 "Notification target not found").
+  - **What goes out:** a finished chat posts its title, the whole reply and a link. Slack, Google Chat, Discord and Teams get their own format; any other address gets the event's data as JSON.
 - **Tools that sign in to their own service** (an MCP tool server with `auth_type` `oauth_2.1` or `oauth_2.1_static`; `--oauth` probe ✓ on 0.11.3, 0.12.5 and production's test account):
   - **Marking:** only such a tool carries `authenticated` (a boolean) in `GET /api/v1/tools/`, with id `server:mcp:{id}`. Its sign-in client is `mcp:{id}` (the web reads the last `:` part as the id and the part after `server:` as the kind).
   - **Starting:** `GET /oauth/clients/{client}/authorize` (outside `/api`) needs you signed in: a bearer header or the `token` cookie. Without either it answers 401; for a client the server doesn't have, 404 (0.12: 403 "Tool servers are disabled" when they're off). It keeps the sign-in state in the `owui-session` cookie and redirects to the service.
