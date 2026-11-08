@@ -416,6 +416,136 @@ export const CODE_EXECUTION_SECTIONS: SettingSection[] = [
   },
 ];
 
+// --- Authentication's LDAP and single sign-on parts (the web's Authentication tab). ---
+
+const required = (value: unknown) => (typeof value === 'string' && value.trim() ? null : 'can’t be empty');
+
+/**
+ * LDAP's switch (its own endpoint) and its directory settings (another), read as one page. The
+ * directory's app account password comes back as stored: the form keeps it hidden.
+ */
+export async function getLdapSettings(client: OwuiClient): Promise<Tree> {
+  const [on, server] = await Promise.all([client.get<unknown>('/api/v1/auths/admin/config/ldap'), client.get<unknown>('/api/v1/auths/admin/config/ldap/server')]);
+  return { ...record(server), ENABLE_LDAP: record(on).ENABLE_LDAP === true };
+}
+
+/**
+ * Saves them. With LDAP on, the directory settings go first, whole (the server refuses empty
+ * required ones, so LDAP never goes on half set up), then the switch; with it off, only the
+ * switch, as on the web. An emptied port goes as none (the server wants a whole number or none).
+ */
+export async function saveLdapSettings(client: OwuiClient, config: Tree): Promise<Tree> {
+  const on = config.ENABLE_LDAP === true;
+  if (on) {
+    const { ENABLE_LDAP: _switch, ...server } = config;
+    await client.post<unknown>('/api/v1/auths/admin/config/ldap/server', { ...server, port: server.port === '' ? null : server.port });
+  }
+  await client.post<unknown>('/api/v1/auths/admin/config/ldap', { enable_ldap: on });
+  return getLdapSettings(client);
+}
+
+const ldapOn = ['ENABLE_LDAP'];
+export const LDAP_SECTIONS: SettingSection[] = [
+  {
+    title: 'LDAP',
+    note: 'With LDAP on, the sign-in screen offers it first, on the web and here: a directory username and password.',
+    fields: [
+      { key: 'ENABLE_LDAP', label: 'LDAP sign-in', kind: 'switch' },
+      { key: 'label', label: 'Directory name', hint: 'What it’s called', kind: 'text', needs: ldapOn, check: required },
+      { key: 'host', label: 'Server address', hint: 'Its host name or IP address', kind: 'text', needs: ldapOn, check: required },
+      { key: 'port', label: 'Port', kind: 'number', empty: 'The usual one', needs: ldapOn, check: checkWhole(1, 65535) },
+      { key: 'attribute_for_mail', label: 'Attribute for email', hint: 'Usually mail', kind: 'text', needs: ldapOn, check: required },
+      { key: 'default_email_domain', label: 'Email domain for entries without one', hint: 'Added to the username when the entry has no email', kind: 'text', needs: ldapOn, optional: true },
+      { key: 'attribute_for_username', label: 'Attribute for the username', hint: 'Usually uid', kind: 'text', needs: ldapOn, check: required },
+      { key: 'app_dn', label: 'App account', hint: 'The DN the server signs in as to look people up', kind: 'text', needs: ldapOn },
+      { key: 'app_dn_password', label: 'App account password', kind: 'secret', needs: ldapOn },
+      { key: 'search_base', label: 'Search base', hint: 'Where people are looked up, such as ou=people,dc=example,dc=com', kind: 'text', needs: ldapOn, check: required },
+      { key: 'search_filters', label: 'Search filter', hint: 'An extra LDAP filter, or none', kind: 'text', needs: ldapOn },
+      { key: 'use_tls', label: 'TLS', kind: 'switch', needs: ldapOn },
+      { key: 'validate_cert', label: 'Check its certificate', kind: 'switch', needs: [...ldapOn, 'use_tls'] },
+      { key: 'certificate_path', label: 'Certificate file', hint: 'Its path on the server', kind: 'text', needs: [...ldapOn, 'use_tls'] },
+      { key: 'ciphers', label: 'Ciphers', hint: 'Usually ALL', kind: 'text', needs: [...ldapOn, 'use_tls'] },
+      { key: 'enable_group_management', label: 'Groups from the directory', hint: 'Each sign-in sets the person’s groups from it', kind: 'switch', needs: ldapOn },
+      { key: 'enable_group_creation', label: 'Make groups it names', kind: 'switch', needs: [...ldapOn, 'enable_group_management'] },
+      { key: 'attribute_for_groups', label: 'Attribute for groups', hint: 'Usually memberOf', kind: 'text', needs: [...ldapOn, 'enable_group_management'] },
+    ],
+  },
+];
+
+/** Single sign-on's settings (the generic OpenID Connect provider and how its accounts are kept). The client secret comes back as stored: the form keeps it hidden. */
+export async function getOAuthSettings(client: OwuiClient): Promise<Tree> {
+  return record(await client.get<unknown>('/api/v1/auths/admin/config/oauth'));
+}
+
+/** Saves them; the server writes only the fields sent (lists as text, separated by commas). */
+export async function saveOAuthSettings(client: OwuiClient, config: Tree): Promise<Tree> {
+  const { ENABLE_OAUTH_PERSISTENT_CONFIG: _kept, ...form } = config;
+  return record(await client.post<unknown>('/api/v1/auths/admin/config/oauth', form));
+}
+
+/** Why they can't be changed here: the server keeps them in its environment, as the web says too. */
+export const oauthLockedWhy = (config: Tree): string | null =>
+  config.ENABLE_OAUTH_PERSISTENT_CONFIG === false ? 'This server keeps its single sign-on settings in its own environment (ENABLE_OAUTH_PERSISTENT_CONFIG is off), so they can only be read here, as on the web.' : null;
+
+const roles = ['ENABLE_OAUTH_ROLE_MANAGEMENT'];
+const groupsOn = ['ENABLE_OAUTH_GROUP_MANAGEMENT'];
+export const OAUTH_SECTIONS: SettingSection[] = [
+  {
+    title: 'Single sign-on',
+    note: 'Google, Microsoft and GitHub sign-in come from the server’s environment; the provider below is the generic OpenID Connect one.',
+    fields: [
+      { key: 'ENABLE_OAUTH', label: 'Single sign-on', kind: 'switch' },
+      { key: 'ENABLE_OAUTH_SIGNUP', label: 'New people may sign up with it', kind: 'switch' },
+      {
+        key: 'OAUTH_MERGE_ACCOUNTS_BY_EMAIL',
+        label: 'Join accounts with the same email',
+        hint: 'A first sign-in takes over the account with its email',
+        kind: 'switch',
+        confirm: (value) => (value === true ? 'Joining by email lets whoever has that email at the provider into the existing account.' : null),
+      },
+      { key: 'OAUTH_AUTO_REDIRECT', label: 'Go straight to the provider', hint: 'When it’s the only way in', kind: 'switch' },
+      { key: 'OAUTH_UPDATE_EMAIL_ON_LOGIN', label: 'Update the email at each sign-in', kind: 'switch' },
+      { key: 'OAUTH_UPDATE_NAME_ON_LOGIN', label: 'Update the name at each sign-in', kind: 'switch' },
+      { key: 'OAUTH_UPDATE_PICTURE_ON_LOGIN', label: 'Update the picture at each sign-in', kind: 'switch' },
+      { key: 'OAUTH_ALLOWED_DOMAINS', label: 'Email domains let in', hint: 'Separated by commas; * for any', kind: 'text' },
+      { key: 'OAUTH_BLOCKED_GROUPS', label: 'Groups kept out', hint: 'Group names, separated by commas', kind: 'text' },
+    ],
+  },
+  {
+    title: 'Provider',
+    fields: [
+      { key: 'OAUTH_PROVIDER_NAME', label: 'Name on the sign-in button', kind: 'text' },
+      { key: 'OPENID_PROVIDER_URL', label: 'Provider’s discovery address', hint: 'Its .well-known/openid-configuration address', kind: 'text' },
+      { key: 'OAUTH_CLIENT_ID', label: 'Client ID', kind: 'text' },
+      { key: 'OAUTH_CLIENT_SECRET', label: 'Client secret', kind: 'secret' },
+      { key: 'OPENID_REDIRECT_URI', label: 'Return address', hint: 'Empty: the server’s own', kind: 'text' },
+      { key: 'OAUTH_SCOPES', label: 'Scopes', hint: 'Separated by spaces', kind: 'text' },
+    ],
+  },
+  {
+    title: 'Claims',
+    note: 'Which of the provider’s claims hold each detail.',
+    fields: [
+      { key: 'OAUTH_SUB_CLAIM', label: 'Account ID', kind: 'text' },
+      { key: 'OAUTH_USERNAME_CLAIM', label: 'Name', kind: 'text' },
+      { key: 'OAUTH_EMAIL_CLAIM', label: 'Email', kind: 'text' },
+      { key: 'OAUTH_PICTURE_CLAIM', label: 'Picture', kind: 'text' },
+    ],
+  },
+  {
+    title: 'Roles and groups from the provider',
+    fields: [
+      { key: 'ENABLE_OAUTH_ROLE_MANAGEMENT', label: 'Roles from the provider', kind: 'switch' },
+      { key: 'OAUTH_ROLES_CLAIM', label: 'Roles claim', kind: 'text', needs: roles },
+      { key: 'OAUTH_ALLOWED_ROLES', label: 'Roles let in', hint: 'Separated by commas', kind: 'text', needs: roles },
+      { key: 'OAUTH_ADMIN_ROLES', label: 'Roles made admins', hint: 'Separated by commas', kind: 'text', needs: roles },
+      { key: 'ENABLE_OAUTH_GROUP_MANAGEMENT', label: 'Groups from the provider', kind: 'switch' },
+      { key: 'ENABLE_OAUTH_GROUP_CREATION', label: 'Make groups it names', kind: 'switch', needs: groupsOn },
+      { key: 'OAUTH_GROUP_CLAIM', label: 'Groups claim', kind: 'text', needs: groupsOn },
+    ],
+  },
+];
+
 // --- Web Search: the retrieval settings' `web` part, sent whole (a field left out is nulled). ---
 
 /** The web search and page-reading settings, as the server keeps them. */

@@ -16,6 +16,13 @@ import {
   SUBAGENT_SECTIONS,
   TASK_SECTIONS,
   WEB_SEARCH_SECTIONS,
+  getLdapSettings,
+  getOAuthSettings,
+  LDAP_SECTIONS,
+  OAUTH_SECTIONS,
+  oauthLockedWhy,
+  saveLdapSettings,
+  saveOAuthSettings,
 } from '@maviechat/owui-protocol';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
@@ -79,9 +86,12 @@ export function AdminSettings() {
               <EventWebhooks />
             </AdminConfigPage>
           ) : page === 'authentication' ? (
-            <AdminConfigPage sections={AUTHENTICATION_SECTIONS}>
-              <Note>LDAP and OAuth sign-in are set on the web.</Note>
-            </AdminConfigPage>
+            <>
+              <AdminConfigPage sections={AUTHENTICATION_SECTIONS} />
+              {/* The web's LDAP and single sign-on parts: each its own endpoint, saved on its own. */}
+              <SettingsEndpointPage name="ldap" read={getLdapSettings} save={saveLdapSettings} sections={LDAP_SECTIONS} />
+              <SettingsEndpointPage name="oauth" read={getOAuthSettings} save={saveOAuthSettings} sections={OAUTH_SECTIONS} lockedWhy={oauthLockedWhy} />
+            </>
           ) : page === 'connections' ? (
             <ConnectionsPage />
           ) : page === 'models' ? (
@@ -108,7 +118,7 @@ export function AdminSettings() {
             <SectionTitle title="System" />
             <Group>
               <ActionRow label="General" hint="Features, this server’s address, everyone’s Interface defaults, banners, event webhooks" onPress={() => setPage('general')} />
-              <ActionRow label="Authentication" hint="Sign-ups, new accounts, sessions, API keys" onPress={() => setPage('authentication')} />
+              <ActionRow label="Authentication" hint="Sign-ups, new accounts, sessions, API keys, LDAP, single sign-on" onPress={() => setPage('authentication')} />
             </Group>
           </View>
           <View style={styles.section}>

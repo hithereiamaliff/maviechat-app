@@ -69,7 +69,22 @@ type Tree = Record<string, unknown>;
  * them after listing them. The save is laid over a fresh read; if something the admin changed
  * was changed elsewhere meanwhile, it asks first.
  */
-export function SettingsEndpointPage({ name, read: readConfig, save: saveConfig, sections, children }: { name: string; read: (client: OwuiClient) => Promise<Tree>; save: (client: OwuiClient, config: Tree) => Promise<unknown>; sections: SettingSection[]; children?: ReactNode }) {
+export function SettingsEndpointPage({
+  name,
+  read: readConfig,
+  save: saveConfig,
+  sections,
+  lockedWhy,
+  children,
+}: {
+  name: string;
+  read: (client: OwuiClient) => Promise<Tree>;
+  save: (client: OwuiClient, config: Tree) => Promise<unknown>;
+  sections: SettingSection[];
+  /** Why the server won't take changes to these (shown read only), or null. */
+  lockedWhy?: (config: Tree) => string | null;
+  children?: ReactNode;
+}) {
   const palette = usePalette();
   const toast = useToast();
   const { client } = useAuthed();
@@ -136,6 +151,16 @@ export function SettingsEndpointPage({ name, read: readConfig, save: saveConfig,
 
   if (config.isLoading) return <ActivityIndicator color={palette.textMuted} />;
   if (config.isError) return <Text style={[styles.note, { color: palette.danger }]}>{`Couldn’t load the settings: ${describeError(config.error)}`}</Text>;
+  const locked = lockedWhy?.(read) ?? null;
+  if (locked) {
+    return (
+      <View style={styles.page}>
+        <Note>{locked}</Note>
+        <SettingsForm sections={sections} stored={read} edits={{}} onEdit={() => undefined} options={options} readOnly />
+        {children}
+      </View>
+    );
+  }
   return (
     <View style={styles.page}>
       <View style={[styles.bar, { borderColor: palette.border, backgroundColor: palette.surface }]}>

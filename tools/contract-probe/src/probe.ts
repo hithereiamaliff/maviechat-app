@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels [--peer-env FILE]] [--signin] [--orders] [--pending] [--userchats] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels [--peer-env FILE]] [--signin] [--orders] [--pending] [--userchats] [--authsettings] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -72,6 +72,9 @@
  * `--userchats` (admins, scratch servers only) has a throwaway user write a chat, then lists it the
  * admin's way (by words, by title), opens it by its id and deletes it; imports a CSV with good and
  * bad rows; every account made is deleted (src/userchats-probe.ts).
+ * `--authsettings` (admins, scratch servers only) reads Authentication's LDAP and single sign-on
+ * settings the app's way; where LDAP isn't set up, checks switching it on with empty settings is
+ * refused and it stays off; nothing is left changed (src/authsettings-probe.ts).
  * `--chatvars` makes a throwaway model whose system prompt asks for chat variables: its form, a
  * saved chat keeping its values, and (on the echo model) the instructions filled in from a
  * temporary chat's values, a saved chat's, and none for an unknown option; all deleted after
@@ -133,6 +136,7 @@ import { probeSignIn } from './signin-probe';
 import { probeOrders } from './orders-probe';
 import { probePending } from './pending-probe';
 import { probeUserChats } from './userchats-probe';
+import { probeAuthSettings } from './authsettings-probe';
 import { probeChatVars } from './chatvars-probe';
 import { probeCodeEdit } from './codeedit-probe';
 import { probeStatus } from './status-probe';
@@ -192,6 +196,7 @@ const { values: args } = parseArgs({
     orders: { type: 'boolean' },
     pending: { type: 'boolean' },
     userchats: { type: 'boolean' },
+    authsettings: { type: 'boolean' },
     chatvars: { type: 'boolean' },
     codeedit: { type: 'boolean' },
     sharedfolders: { type: 'boolean' },
@@ -600,6 +605,12 @@ async function main() {
         const userChatsProbe = await probeUserChats({ client, anonymous, capabilities, baseUrl });
         for (const result of userChatsProbe.steps) results.push({ ...result, name: `Users: ${result.name}` });
         fixtures['write.userchats'] = userChatsProbe.fixture;
+      }
+
+      if (args.authsettings && capabilities) {
+        const authProbe = await probeAuthSettings({ client, capabilities, baseUrl });
+        for (const result of authProbe.steps) results.push({ ...result, name: `Auth settings: ${result.name}` });
+        fixtures['write.authsettings'] = authProbe.fixture;
       }
 
       if (args.chatvars) {

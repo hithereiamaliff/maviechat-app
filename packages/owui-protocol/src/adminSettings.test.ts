@@ -18,6 +18,11 @@ import {
   settingValues,
   storedValue,
   type SettingField,
+  getLdapSettings,
+  getOAuthSettings,
+  oauthLockedWhy,
+  saveLdapSettings,
+  saveOAuthSettings,
 } from './adminSettings';
 
 const fields = [...GENERAL_SECTIONS, ...AUTHENTICATION_SECTIONS].flatMap((section) => section.fields);
@@ -142,5 +147,44 @@ describe('web search settings', () => {
     expect(shown).not.toContain('TAVILY_API_KEY');
     const payload = settingsPayload(web, STORED, STORED, { ENABLE_WEB_SEARCH: false });
     expect(payload.LINKUP_SEARCH_PARAMS).toEqual({ depth: 'deep' });
+  });
+});
+
+describe('LDAP and single sign-on settings', () => {
+  function recorder(routes: Record<string, unknown>) {
+    const calls: { method: string; path: string; body: unknown }[] = [];
+    const fetch: FetchLike = async (url, init) => {
+      const path = new URL(url).pathname;
+      calls.push({ method: init?.method ?? 'GET', path, body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined });
+      return new Response(JSON.stringify(routes[`${init?.method ?? 'GET'} ${path}`] ?? {}), { status: 200 });
+    };
+    return { client: new OwuiClient({ baseUrl: 'https://chat.test', token: 't', fetch }), calls };
+  }
+  const server = { label: 'Corp', host: 'ldap.corp', port: 389, attribute_for_mail: 'mail', attribute_for_username: 'uid', app_dn: 'cn=app', app_dn_password: 'pw', search_base: 'dc=corp' };
+
+  it('reads LDAP’s switch and its directory settings as one page', async () => {
+    const { client } = recorder({ 'GET /api/v1/auths/admin/config/ldap': { ENABLE_LDAP: true }, 'GET /api/v1/auths/admin/config/ldap/server': server });
+    expect(await getLdapSettings(client)).toEqual({ ...server, ENABLE_LDAP: true });
+  });
+
+  it('saves the directory settings before switching LDAP on, and only the switch when off', async () => {
+    const on = recorder({});
+    await saveLdapSettings(on.client, { ...server, port: '', ENABLE_LDAP: true });
+    const posts = on.calls.filter((call) => call.method === 'POST');
+    expect(posts.map((call) => call.path)).toEqual(['/api/v1/auths/admin/config/ldap/server', '/api/v1/auths/admin/config/ldap']);
+    expect(posts[0]?.body).toEqual({ ...server, port: null });
+    expect(posts[1]?.body).toEqual({ enable_ldap: true });
+    const off = recorder({});
+    await saveLdapSettings(off.client, { ...server, ENABLE_LDAP: false });
+    expect(off.calls.filter((call) => call.method === 'POST').map((call) => call.body)).toEqual([{ enable_ldap: false }]);
+  });
+
+  it('saves single sign-on without the server’s own flag, and says when the server keeps it elsewhere', async () => {
+    const { client, calls } = recorder({ 'POST /api/v1/auths/admin/config/oauth': { ENABLE_OAUTH: true } });
+    await saveOAuthSettings(client, { ENABLE_OAUTH: true, OAUTH_ALLOWED_DOMAINS: 'corp.com, *', ENABLE_OAUTH_PERSISTENT_CONFIG: true });
+    expect(calls[0]?.body).toEqual({ ENABLE_OAUTH: true, OAUTH_ALLOWED_DOMAINS: 'corp.com, *' });
+    expect(await getOAuthSettings(recorder({ 'GET /api/v1/auths/admin/config/oauth': { ENABLE_OAUTH: false } }).client)).toEqual({ ENABLE_OAUTH: false });
+    expect(oauthLockedWhy({ ENABLE_OAUTH_PERSISTENT_CONFIG: false })).toMatch(/environment/);
+    expect(oauthLockedWhy({ ENABLE_OAUTH_PERSISTENT_CONFIG: true })).toBeNull();
   });
 });
