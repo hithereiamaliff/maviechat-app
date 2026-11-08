@@ -22,9 +22,10 @@ import {
   type FileItem,
   type ModelItem,
   type ToggleKey,
+  modelsWithout,
 } from '@maviechat/owui-protocol';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useImperativeHandle, useRef, useState, type ComponentRef, type Ref } from 'react';
+import { useEffect, useEffectEvent, useImperativeHandle, useRef, useState, type ComponentRef, type Ref } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
@@ -164,8 +165,9 @@ export function Composer({
   // Skills you can switch on (the web's Integrations list, and the `/` list): the active ones.
   const skills = useQuery({ queryKey: ['workspace', 'skill-choices'], queryFn: () => listSkillChoices(client), staleTime: 60_000 });
   const draft = useDraft(draftKey);
-  const attach = useAttachments({ draftKey, model, temporary });
   const [sending, setSending] = useState(false);
+  // Send pressed while files upload (the web takes the message then): the files it waits for.
+  const [armed, setArmed] = useState<string[] | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [deepTutorOpen, setDeepTutorOpen] = useState(false);
@@ -185,6 +187,9 @@ export function Composer({
   const account = terminalAccount(session.baseUrl, session.user.id);
   const chosenSystemId = useChosenTerminal(account);
   const answering = atModel ? [atModel] : models?.length ? models : [model];
+  const attach = useAttachments({ draftKey, models: answering, temporary });
+  // Models the message goes to that can't see images: the web marks a photo with them.
+  const blind = modelsWithout(answering, 'vision').map((item) => item.name ?? item.id);
   // The answering models' chat variables (the web's Chat Variables): a saved chat's own values, else the draft's.
   const variableValues = savedVariables?.values ?? draft.chatVariables;
   const variablesForm = chatVariablesForm(answering, variableValues);
@@ -210,6 +215,8 @@ export function Composer({
   const hasContent = draft.text.trim().length > 0 || draft.files.length > 0;
   const uploading = filesPending(draft.files);
   const canSend = hasContent && !sending && !uploading;
+  // As on the web, Send works while files upload: the message goes once they're up.
+  const canPress = hasContent && !sending;
   const showIntegrations =
     available.webSearch || available.imageGeneration || available.codeInterpreter || allTools.length > 0 || approvalsOn || systems.length > 0 || activeSkills.length > 0 || filters.length > 0;
   const canExpand = draft.text.split('\n').length > 2;
@@ -378,6 +385,33 @@ export function Composer({
     }
   };
 
+  // Once the files are up, the message goes as if Send were pressed then (queued if a reply runs).
+  // An attachment gone meanwhile (an upload that failed, or one taken off) stops it: nothing goes
+  // that you didn't see go.
+  const sendWhenUp = useEffectEvent(() => {
+    const waited = armed ?? [];
+    setArmed(null);
+    const here = new Set(getDraft(draftKey).files.map((file) => file.itemId));
+    if (waited.some((id) => !here.has(id))) {
+      toast('An attachment is gone (it may not have uploaded), so the message didn’t go. Check the attachments, then send it.', 'error');
+      return;
+    }
+    void submit();
+  });
+  useEffect(() => {
+    if (!armed || uploading) return;
+    const timer = setTimeout(sendWhenUp, 0);
+    return () => clearTimeout(timer);
+  }, [armed, uploading]);
+  const armOrCancel = () => {
+    if (armed) {
+      setArmed(null);
+      toast('It won’t go by itself now: send it when you’re ready.');
+      return;
+    }
+    setArmed(draft.files.flatMap((file) => (file.itemId ? [file.itemId] : [])));
+  };
+
   const editQueued = (id: string) =>
     updateDraft(draftKey, (current) => {
       const item = current.queue.find((entry) => entry.id === id);
@@ -410,7 +444,7 @@ export function Composer({
             </Pressable>
           </View>
         ) : null}
-        <AttachmentStrip files={draft.files} previews={draft.previews} baseUrl={session.baseUrl} token={session.token} onRemove={removeAttachment} onOpen={setPreviewIndex} />
+        <AttachmentStrip files={draft.files} previews={draft.previews} baseUrl={session.baseUrl} token={session.token} onRemove={removeAttachment} onOpen={setPreviewIndex} blind={blind} />
         <View>
           <TextInput
             ref={input}
@@ -540,15 +574,15 @@ export function Composer({
           {!streaming || hasContent ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={streaming ? 'Queue message' : 'Send message'}
-              accessibilityState={{ disabled: !canSend, busy: sending || uploading }}
-              disabled={!canSend}
-              onPress={() => void submit()}
-              style={[styles.send, { backgroundColor: canSend ? palette.primary : palette.surfaceStrong }]}>
-              {sending || uploading ? (
-                <ActivityIndicator size="small" color={canSend ? palette.onPrimary : palette.textFaint} />
+              accessibilityLabel={armed ? 'Don’t send it when the files are up' : uploading ? 'Send once the files are up' : streaming ? 'Queue message' : 'Send message'}
+              accessibilityState={{ disabled: !canPress, busy: sending || armed !== null }}
+              disabled={!canPress}
+              onPress={() => (uploading ? armOrCancel() : void submit())}
+              style={[styles.send, { backgroundColor: canPress ? palette.primary : palette.surfaceStrong }]}>
+              {sending || armed ? (
+                <ActivityIndicator size="small" color={canPress ? palette.onPrimary : palette.textFaint} />
               ) : (
-                <Icon name="arrow-up" size={18} color={canSend ? palette.onPrimary : palette.textFaint} strokeWidth={2.2} />
+                <Icon name="arrow-up" size={18} color={canPress ? palette.onPrimary : palette.textFaint} strokeWidth={2.2} />
               )}
             </Pressable>
           ) : null}

@@ -1,4 +1,4 @@
-import { getConfig, ldapSignIn, normalizeBaseUrl, OwuiClient, signInOptionsOf, signInWithToken, type SignInOptions } from '@maviechat/owui-protocol';
+import { getConfig, ldapSignIn, normalizeBaseUrl, OwuiClient, signInOptionsOf, signInWithToken, type Session, type SignInOptions } from '@maviechat/owui-protocol';
 import { useQuery } from '@tanstack/react-query';
 import { Redirect, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
@@ -9,6 +9,7 @@ import { Button } from '@/components/Button';
 import { IconButton } from '@/components/IconButton';
 import { TextField } from '@/components/TextField';
 import { useAccountsSheet } from '@/features/accounts/AccountsSheet';
+import { PendingScreen } from '@/features/auth/PendingScreen';
 import { SsoSignInSheet, type SsoTarget } from '@/features/auth/SsoSignInSheet';
 import { TwoStepSignIn } from '@/features/auth/TwoStepSignIn';
 import { switchToDeepTutor } from '@/features/deeptutor/switch';
@@ -28,8 +29,6 @@ const baseUrlOf = (typed: string): string | null => {
     return null;
   }
 };
-
-const PENDING = 'Your account is waiting for an administrator to approve it. Try again once it has been approved.';
 
 export default function Login() {
   const palette = usePalette();
@@ -68,6 +67,8 @@ export default function Login() {
   // The web's ?form=: the password form where the admin turned it off.
   const [formAnyway, setFormAnyway] = useState(false);
   const [sso, setSso] = useState<SsoTarget | null>(null);
+  // An account waiting for approval: its screen, and how to check again.
+  const [pending, setPending] = useState<{ baseUrl: string; session: Session | null; retry: () => Promise<SignInOutcome> } | null>(null);
   // LDAP first where the server has it, as on the web.
   const ldap = Boolean(options?.ldap) && (method ?? 'ldap') === 'ldap';
   const showForm = !options || options.passwordForm || options.ldap || formAnyway;
@@ -76,7 +77,7 @@ export default function Login() {
   // Another account to switch to instead of signing in here.
   const others = accounts.some((entry) => entry.signedIn && (state.status !== 'signed-in' || entry.id !== state.accountId));
 
-  function after(outcome: SignInOutcome) {
+  function after(outcome: SignInOutcome, retry: () => Promise<SignInOutcome>) {
     if (outcome.kind === 'signed-in') {
       router.replace('/');
       return;
@@ -86,7 +87,7 @@ export default function Login() {
       setTwoStep(outcome);
       return;
     }
-    setMessage({ tone: 'info', text: PENDING });
+    setPending({ baseUrl: outcome.baseUrl, session: outcome.session, retry });
   }
 
   async function submit() {
@@ -99,9 +100,14 @@ export default function Login() {
     try {
       if (ldap) {
         const baseUrl = normalizeBaseUrl(serverUrl);
-        after(await finishSignIn(baseUrl, await ldapSignIn(new OwuiClient({ baseUrl }), email.trim(), password)));
+        const login = email.trim();
+        const secret = password;
+        const run = async () => finishSignIn(baseUrl, await ldapSignIn(new OwuiClient({ baseUrl }), login, secret));
+        after(await run(), run);
       } else {
-        after(await signIn({ serverUrl, email, password }));
+        const input = { serverUrl, email, password };
+        const run = () => signIn(input);
+        after(await run(), run);
       }
     } catch (error) {
       setMessage({ tone: 'error', text: describeSignInError(error) });
@@ -116,7 +122,8 @@ export default function Login() {
     setBusy(true);
     setMessage(null);
     try {
-      after(await finishSignIn(baseUrl, await signInWithToken(new OwuiClient({ baseUrl }), token)));
+      const run = async () => finishSignIn(baseUrl, await signInWithToken(new OwuiClient({ baseUrl }), token));
+      after(await run(), run);
     } catch (error) {
       setMessage({ tone: 'error', text: describeSignInError(error) });
     } finally {
@@ -141,6 +148,16 @@ export default function Login() {
             email={email.trim()}
             onBack={(text) => {
               setTwoStep(null);
+              setMessage(text ? { tone: 'info', text } : null);
+            }}
+          />
+        ) : pending ? (
+          <PendingScreen
+            baseUrl={pending.baseUrl}
+            session={pending.session}
+            retry={pending.retry}
+            onBack={(text) => {
+              setPending(null);
               setMessage(text ? { tone: 'info', text } : null);
             }}
           />

@@ -2,6 +2,7 @@ import { attachmentUrl, isImageItem, type FileItem } from '@maviechat/owui-proto
 import { Image } from 'expo-image';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { useToast } from '@/components/Toast';
 import { SideScroll } from '@/components/SideScroll';
 import { fonts, radius, usePalette } from '@/theme';
 
@@ -20,6 +21,7 @@ export function AttachmentStrip({
   token,
   onRemove,
   onOpen,
+  blind,
 }: {
   files: FileItem[];
   previews: Record<string, string>;
@@ -28,8 +30,11 @@ export function AttachmentStrip({
   onRemove: (index: number) => void;
   /** A file chip opens its preview (whole document or not). */
   onOpen?: (index: number) => void;
+  /** Models the message goes to that can't see images: photos are marked, as on the web. */
+  blind?: string[];
 }) {
   const palette = usePalette();
+  const toast = useToast();
   if (files.length === 0) return null;
 
   return (
@@ -56,6 +61,16 @@ export function AttachmentStrip({
               contentFit="cover"
             />
             {uploading ? <ActivityIndicator style={StyleSheet.absoluteFill} color="#FFFFFF" /> : null}
+            {blind?.length ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Not seen by ${blind.join(', ')}`}
+                hitSlop={6}
+                onPress={() => toast(`${blind.join(', ')} can’t see images: ${blind.length === 1 ? 'it answers' : 'they answer'} without this one.`)}
+                style={[styles.blind, { backgroundColor: palette.background }]}>
+                <Icon name="exclamation-triangle" size={12} color={palette.danger} />
+              </Pressable>
+            ) : null}
             {remove}
           </View>
         ) : (
@@ -96,6 +111,7 @@ export function AttachmentStrip({
 }
 
 const styles = StyleSheet.create({
+  blind: { position: 'absolute', top: 2, left: 2, borderRadius: radius.full, padding: 2 },
   strip: { gap: 8, paddingTop: 6, paddingRight: 6 },
   thumbWrap: { width: 56, height: 56 },
   thumb: { width: 56, height: 56, borderRadius: radius.md },

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { interpretSignIn, isExpiring, UnexpectedResponseError } from './auth';
+import { interpretSignIn, isExpiring, pendingNotice, UnexpectedResponseError } from './auth';
+import { OwuiClient, type FetchLike } from './http';
 
 const session = {
   id: 'u1',
@@ -55,5 +56,26 @@ describe('isExpiring', () => {
     expect(isExpiring(1_000_000 + 30, now)).toBe(true);
     expect(isExpiring(1_000_000 + 61, now)).toBe(false);
     expect(isExpiring(999_999, now)).toBe(true);
+  });
+});
+
+describe('pendingNotice', () => {
+  const clientWith = (config: unknown, admin: unknown) => {
+    const fetch: FetchLike = async (url) => {
+      const path = new URL(url).pathname;
+      if (path === '/api/config') return new Response(JSON.stringify(config), { status: 200 });
+      if (admin === null) return new Response(JSON.stringify({ detail: 'nope' }), { status: 400 });
+      return new Response(JSON.stringify(admin), { status: 200 });
+    };
+    return new OwuiClient({ baseUrl: 'https://chat.test', token: 'pending-token', fetch });
+  };
+
+  it('reads the admin’s words and contact, where the server shares them', async () => {
+    const notice = await pendingNotice(clientWith({ ui: { pending_user_overlay_title: ' Hold on ', pending_user_overlay_content: 'Ask **Ada**.' } }, { name: 'Ada', email: 'ada@example.com' }));
+    expect(notice).toEqual({ title: 'Hold on', content: 'Ask **Ada**.', admin: { name: 'Ada', email: 'ada@example.com' } });
+  });
+
+  it('leaves out what the server doesn’t answer', async () => {
+    expect(await pendingNotice(clientWith({}, null))).toEqual({ title: '', content: '', admin: null });
   });
 });

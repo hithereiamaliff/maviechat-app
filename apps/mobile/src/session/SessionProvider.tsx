@@ -7,6 +7,7 @@ import {
   signOut as requestSignOut,
   uuidv4,
   type MfaStep,
+  type Session,
   type SignInResult,
 } from '@maviechat/owui-protocol';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
@@ -32,8 +33,15 @@ export type SessionState =
       accountId: string;
     };
 
-/** A sign-in's next step: done, waiting for approval, or (Open WebUI 0.12) a second step with its challenge. */
-export type SignInOutcome = { kind: 'signed-in' } | { kind: 'pending' } | { kind: 'mfa'; step: MfaStep; challengeToken: string; expiresIn: number | null; baseUrl: string };
+/**
+ * A sign-in's next step: done; waiting for approval (with the pending account's session where the
+ * server gave one, to read what the admin tells it and to check again); or (Open WebUI 0.12) a
+ * second step with its challenge.
+ */
+export type SignInOutcome =
+  | { kind: 'signed-in' }
+  | { kind: 'pending'; baseUrl: string; session: Session | null }
+  | { kind: 'mfa'; step: MfaStep; challengeToken: string; expiresIn: number | null; baseUrl: string };
 
 interface SessionContextValue {
   state: SessionState;
@@ -175,7 +183,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const finishSignIn = useCallback<SessionContextValue['finishSignIn']>(
     async (baseUrl, result) => {
-      if (result.kind === 'pending') return { kind: 'pending' };
+      if (result.kind === 'pending') return { kind: 'pending', baseUrl, session: result.session };
       if (result.kind === 'mfa') return { kind: 'mfa', step: result.step, challengeToken: result.challengeToken, expiresIn: result.expiresIn, baseUrl };
       const stored = toStoredSession(baseUrl, result.session);
       const [index, id] = await updateAccountIndex(async (current) => {

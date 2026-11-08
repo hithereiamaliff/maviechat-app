@@ -7,6 +7,7 @@ import {
   isImageItem,
   latestStatus,
   messageBlocks,
+  messageTimes,
   normalizeSources,
   outputText,
   pendingApprovals,
@@ -106,6 +107,7 @@ export const AssistantMessage = memo(function AssistantMessage({
 }) {
   const palette = usePalette();
   const toast = useToast();
+  const times = messageTimes(message.timestamp);
   const capabilities = useCapabilities();
   const settings = useUserSettings();
   // Read Aloud follows the `chat.tts` permission (allowed unless denied) and your speed setting.
@@ -160,9 +162,17 @@ export const AssistantMessage = memo(function AssistantMessage({
 
   return (
     <Pressable onPress={() => setRevealed((value) => !value)} style={styles.wrap} accessibilityHint="Shows message actions">
-      <Text style={[styles.model, { color: palette.text }]} numberOfLines={1}>
-        {modelLabel}
-      </Text>
+      <View style={styles.modelRow}>
+        <Text style={[styles.model, { color: palette.text }]} numberOfLines={1}>
+          {modelLabel}
+        </Text>
+        {/* When it was written, by the model's name as on the web; the whole date on a tap, where the web shows it on hover. */}
+        {times ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={`Written ${times.full}`} hitSlop={8} onPress={() => toast(times.full)}>
+            <Text style={[styles.time, { color: palette.textFaint }]}>{times.short}</Text>
+          </Pressable>
+        ) : null}
+      </View>
 
       {status ? (
         <View style={styles.status}>
@@ -355,7 +365,9 @@ export const AssistantMessage = memo(function AssistantMessage({
 const styles = StyleSheet.create({
   plain: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 24, marginVertical: 4 },
   wrap: { marginTop: 18 },
-  model: { fontFamily: fonts.semibold, fontSize: 15, marginBottom: 4 },
+  modelRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 4 },
+  model: { flexShrink: 1, fontFamily: fonts.semibold, fontSize: 15 },
+  time: { fontFamily: fonts.regular, fontSize: 11 },
   status: { flexDirection: 'row', alignItems: 'center', gap: 8, marginVertical: 4 },
   statusText: { flexShrink: 1, fontFamily: fonts.medium, fontSize: 14 },
   pending: { alignSelf: 'flex-start', marginVertical: 8 },

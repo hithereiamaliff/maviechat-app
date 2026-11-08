@@ -67,6 +67,32 @@ export async function signIn(client: OwuiClient, email: string, password: string
   return interpretSignIn(body);
 }
 
+/** What the server tells an account waiting for approval: the admin's title and text for it, and who the admin is, where it shares that. */
+export interface PendingNotice {
+  /** The admin's own words; empty for the app's. */
+  title: string;
+  /** Markdown; empty for the app's. */
+  content: string;
+  admin: { name: string; email: string } | null;
+}
+
+/**
+ * Read with the pending account's own token (the server shows these only to a signed-in account,
+ * and gives a pending one a token unless 0.12's two-step sign-in is on). Each part is left out
+ * where the server doesn't answer it (the admin's details are shared only when the admin chose to).
+ */
+export async function pendingNotice(client: OwuiClient): Promise<PendingNotice> {
+  const [config, admin] = await Promise.all([client.get<unknown>('/api/config').catch(() => null), client.get<unknown>('/api/v1/auths/admin/details').catch(() => null)]);
+  const ui = isRecord(config) && isRecord(config.ui) ? config.ui : {};
+  const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+  const details = isRecord(admin) ? admin : {};
+  return {
+    title: text(ui.pending_user_overlay_title),
+    content: text(ui.pending_user_overlay_content),
+    admin: text(details.email) ? { name: text(details.name), email: text(details.email) } : null,
+  };
+}
+
 /** The signed-in user with fresh permissions and `expires_at`. Fails with 401 once the token is no longer valid. */
 export function getSessionUser(client: OwuiClient): Promise<SessionUser> {
   return client.get<SessionUser>('/api/v1/auths/');

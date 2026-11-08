@@ -4,7 +4,8 @@ import {
   imageLimits,
   inlineImageItem,
   isWebAddress,
-  modelSupports,
+  anyModelSupports,
+  everyModelSupports,
   OwuiHttpError,
   readableAsText,
   textFileItem,
@@ -37,7 +38,8 @@ import { getDraft, patchFile, removeFile, updateDraft } from './drafts';
  * (documents are also read by the server before they can be sent). A temporary chat stores
  * nothing, so its photos stay inline and text files are read on the phone.
  */
-export function useAttachments({ draftKey, model, temporary }: { draftKey: string; model: ModelItem | undefined; temporary: boolean }) {
+/** `models`: every model the message goes to; as on the web, a photo needs one that can see images, a file needs them all to take files. */
+export function useAttachments({ draftKey, models, temporary }: { draftKey: string; models: (ModelItem | undefined)[]; temporary: boolean }) {
   const { client } = useAuthed();
   const { verifySession } = useSession();
   const capabilities = useCapabilities();
@@ -130,11 +132,11 @@ export function useAttachments({ draftKey, model, temporary }: { draftKey: strin
     const refusals = new Set<string>();
     for (const file of picked) {
       const image = isPhoto(file);
-      if (image && !modelSupports(model, 'vision')) {
+      if (image && !anyModelSupports(models, 'vision')) {
         refusals.add('Selected model(s) do not support image inputs');
       } else if (image && temporary) {
         void shrink(file).then(keepPhoto);
-      } else if (!modelSupports(model, 'file_upload')) {
+      } else if (!image && !everyModelSupports(models, 'file_upload')) {
         refusals.add('Model(s) do not support file upload');
       } else if (temporary) {
         void keepText(file);

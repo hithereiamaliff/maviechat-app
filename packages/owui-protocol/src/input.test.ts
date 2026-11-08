@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { FileItem } from './files';
 import {
+  anyModelSupports,
+  everyModelSupports,
+  messageTimes,
+  modelsWithout,
   availableToggles,
   combineQueued,
   defaultToggles,
@@ -95,5 +99,33 @@ describe('message queue', () => {
         { id: '2', prompt: 'Second', files: [doc] },
       ]),
     ).toEqual({ prompt: 'First\n\nSecond', files: [doc] });
+  });
+});
+
+describe('what the chosen models can take', () => {
+  const seeing = { id: 'a', name: 'A', info: { meta: { capabilities: { vision: true, file_upload: true } } } };
+  const blind = { id: 'b', name: 'B', info: { meta: { capabilities: { vision: false, file_upload: false } } } };
+  const unsaid = { id: 'c', name: 'C' };
+
+  it('lets a photo through when one model can see images, and a file only when every model takes files', () => {
+    expect(anyModelSupports([blind, seeing], 'vision')).toBe(true);
+    expect(anyModelSupports([blind], 'vision')).toBe(false);
+    expect(anyModelSupports([unsaid], 'vision')).toBe(true);
+    expect(anyModelSupports([undefined], 'vision')).toBe(true);
+    expect(everyModelSupports([seeing, unsaid], 'file_upload')).toBe(true);
+    expect(everyModelSupports([seeing, blind], 'file_upload')).toBe(false);
+    expect(modelsWithout([seeing, blind, unsaid], 'vision').map((model) => model.id)).toEqual(['b']);
+  });
+});
+
+describe('message times', () => {
+  it('shows seconds or milliseconds as the web does, short and whole', () => {
+    const times = messageTimes(1_731_045_600, 'en-US');
+    expect(times?.short).toMatch(/Nov \d+, \d+:\d\d/);
+    expect(times?.full).toMatch(/2024/);
+    expect(messageTimes(1_731_045_600_000, 'en-US')?.short).toBe(times?.short);
+    expect(messageTimes(undefined)).toBeNull();
+    expect(messageTimes(0)).toBeNull();
+    expect(messageTimes('soon')).toBeNull();
   });
 });

@@ -13,6 +13,38 @@ export function modelSupports(model: ModelItem | undefined, capability: ModelCap
   return model?.info?.meta?.capabilities?.[capability] ?? true;
 }
 
+const chosen = (models: readonly (ModelItem | undefined)[]): ModelItem[] => models.filter((model): model is ModelItem => model !== undefined);
+
+/** As the web decides for a photo: one of the models the message goes to that can see images is enough (the others answer without it). */
+export function anyModelSupports(models: readonly (ModelItem | undefined)[], capability: ModelCapability): boolean {
+  const list = chosen(models);
+  return list.length === 0 || list.some((model) => modelSupports(model, capability));
+}
+
+/** As the web decides for a file: every model the message goes to must take files. */
+export function everyModelSupports(models: readonly (ModelItem | undefined)[], capability: ModelCapability): boolean {
+  return chosen(models).every((model) => modelSupports(model, capability));
+}
+
+/** The models the message goes to that lack a capability (the web marks a photo some of them can't see). */
+export function modelsWithout(models: readonly (ModelItem | undefined)[], capability: ModelCapability): ModelItem[] {
+  return chosen(models).filter((model) => !modelSupports(model, capability));
+}
+
+/**
+ * A message's time as the web's chat shows it: a short date and time, and the whole date for a
+ * closer look. Takes seconds (as messages keep it) or milliseconds; null when there's none.
+ */
+export function messageTimes(timestamp: unknown, locale?: string): { short: string; full: string } | null {
+  if (typeof timestamp !== 'number' || !Number.isFinite(timestamp) || timestamp <= 0) return null;
+  const date = new Date(timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp);
+  if (Number.isNaN(date.getTime())) return null;
+  return {
+    short: date.toLocaleString(locale, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
+    full: date.toLocaleString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
+  };
+}
+
 const TOGGLES = [
   { key: 'webSearch', feature: 'webSearch', capability: 'web_search' },
   { key: 'imageGeneration', feature: 'imageGeneration', capability: 'image_generation' },
