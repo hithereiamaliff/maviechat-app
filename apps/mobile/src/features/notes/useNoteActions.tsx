@@ -3,7 +3,6 @@ import * as Clipboard from 'expo-clipboard';
 import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
 import { useState } from 'react';
-import { Share } from 'react-native';
 import { showActionSheet, showAlert } from '@/components/dialogs';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
@@ -11,6 +10,7 @@ import { fileNameOf, shareFile } from '@/features/settings/exportFile';
 import { AccessSheet, type AccessTarget } from '@/features/workspace/AccessSheet';
 import { describeError } from '@/lib/errors';
 import { useAuthed } from '@/lib/server';
+import { shareLocalFile } from '@/lib/shareLocalFile';
 import { notePdfHtml } from './notePdf';
 import { useNotesRefresh } from './queries';
 
@@ -51,7 +51,7 @@ export function useNoteActions() {
       const printed = await Print.printToFileAsync({ html: notePdfHtml(noteTitle(whole), whole.md), width: 595, height: 842, margins: { left: 40, right: 40, top: 40, bottom: 40 } });
       const file = new File(Paths.cache, `${name}.pdf`);
       await new File(printed.uri).move(file, { overwrite: true });
-      await Share.share({ url: file.uri, title: noteTitle(whole) });
+      await shareLocalFile(file.uri, noteTitle(whole));
     })().catch(fail('download it'));
 
   const askDownload = (note: NoteSummary) =>

@@ -1,6 +1,6 @@
 import { fileContentUrl } from '@maviechat/owui-protocol';
 import { File, Paths } from 'expo-file-system';
-import { Share } from 'react-native';
+import { shareLocalFile } from './shareLocalFile';
 
 const safeName = (name: string) => name.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, '_').slice(-120) || 'file';
 
@@ -12,5 +12,5 @@ export async function openServerFile(session: { baseUrl: string; token: string }
   const file = new File(Paths.cache, `${id.slice(0, 8)}-${safeName(filename)}`);
   await File.downloadFileAsync(fileContentUrl(session.baseUrl, id), file, { headers: { Authorization: `Bearer ${session.token}` }, idempotent: true });
   if (await File.canPreview(file).catch(() => false)) await File.preview(file);
-  else await Share.share({ url: file.uri, title: filename });
+  else await shareLocalFile(file.uri, filename);
 }

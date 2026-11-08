@@ -23,10 +23,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Clipboard from 'expo-clipboard';
 import { File, Paths } from 'expo-file-system';
 import * as Print from 'expo-print';
-import { Alert, Share } from 'react-native';
+import { Alert } from 'react-native';
 import { useToast } from '@/components/Toast';
 import { showActionSheet, showPrompt } from '@/components/dialogs';
 import { useAuthed, useCapabilities, useModels } from '@/lib/server';
+import { shareLocalFile } from '@/lib/shareLocalFile';
 import { useSession } from '@/session/SessionProvider';
 import { chatPdfHtml } from './chatPdf';
 
@@ -98,7 +99,7 @@ export function useChatActions() {
         file.create({ overwrite: true });
         await file.write(kind === 'json' ? chatJson(record) : chatPlainText(record));
       }
-      await Share.share({ url: file.uri, title: record.title || chat.title });
+      await shareLocalFile(file.uri, record.title || chat.title);
     } catch (error) {
       toast(`Couldn't download the chat: ${error instanceof OwuiHttpError ? (error.detail ?? `HTTP ${error.status}`) : error instanceof Error ? error.message : 'unknown error'}`, 'error');
       if (error instanceof OwuiHttpError && error.isUnauthorized) verifySession();

@@ -1,0 +1,4 @@
+Google Play services libraries (com.google.android.gms), which Firebase Cloud Messaging uses on
+Android to deliver notifications, are not open source. Google distributes them under the Android
+Software Development Kit License Agreement (https://developer.android.com/studio/terms), and
+Firebase under the Google APIs Terms of Service (https://developers.google.com/terms).

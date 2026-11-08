@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import licenseTexts from '@/generated/license-texts.json';
 import licenses from '@/generated/licenses.json';
 import { Icon } from '@/components/Icon';
@@ -17,10 +17,13 @@ interface Notice {
   via?: string;
   /** The package has no licence file of its own: its licence's standard text, with its author. */
   standard?: boolean;
+  /** A native library in one app only (`ios` or `android`). */
+  platform?: string;
   texts: number[];
 }
 
-const NOTICES: Notice[] = licenses;
+// Each app lists what it carries: a native library of the other platform isn't in it.
+const NOTICES: Notice[] = (licenses as Notice[]).filter((notice) => !notice.platform || notice.platform === Platform.OS);
 const TEXTS: string[] = licenseTexts;
 
 function updateLabel(): string {

@@ -2,7 +2,7 @@
   "expo": {
     "name": "MavieChat",
     "slug": "maviechat",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "maviechat",
@@ -26,7 +26,12 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -47,16 +52,29 @@
         {
           "photosPermission": "MavieChat lets you attach photos from your library to a chat.",
           "cameraPermission": "MavieChat lets you take a photo to attach to a chat.",
-          "microphonePermission": false
+          "microphonePermission": "MavieChat records a voice note into a note when you tap Record."
         }
       ],
       [
         "expo-notifications",
         {
-          "enableRemoteNotifications": true
+          "enableRemoteNotifications": true,
+          "icon": "./assets/notification-icon.png",
+          "color": "#134E4A",
+          "defaultChannel": "default"
         }
       ],
-      "expo-video"
+      "expo-video",
+      "expo-sharing",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "MavieChat records a voice note into a note when you tap Record.",
+          "recordAudioAndroid": true,
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false,

@@ -5,8 +5,9 @@ coverage comes from its signed distance to a shape, so edges are anti-aliased ex
     python3 scripts/app-icon/render.py        (needs numpy and Pillow; writes apps/mobile/assets)
 
 Writes the iOS icon (1024 px, opaque, sRGB), the Android adaptive icon's layers (foreground and
-monochrome inside the launcher's safe zone, background full-bleed), the web favicon, and icon.svg
-(the same shapes, for reference)."""
+monochrome inside the launcher's safe zone, background full-bleed), Android's notification icon
+(the M alone, all white on transparency, 96 px), the web favicon, and icon.svg (the same shapes,
+for reference)."""
 import io
 import json
 import os
@@ -18,6 +19,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(HERE, '..', '..', 'apps', 'mobile', 'assets')
 # Android launchers may mask the foreground to a circle 66/108 of its size: shrink the artwork into it.
 ANDROID_SCALE = 0.8
+# Android's notification icon is drawn at 24 dp: the M alone, enlarged to fill most of its square.
+NOTIFICATION_SCALE = 1.6
 
 
 def rgb(hex_colour):
@@ -149,10 +152,12 @@ def main():
     render_layers(design, scale=ANDROID_SCALE).save(os.path.join(ASSETS, 'android-icon-foreground.png'), optimize=True)
     render_layers(design, scale=ANDROID_SCALE, colour='#FFFFFF').save(os.path.join(ASSETS, 'android-icon-monochrome.png'), optimize=True)
     render_background(design).save(os.path.join(ASSETS, 'android-icon-background.png'), optimize=True)
+    m_only = {**design, 'layers': design['layers'][:1]}
+    render_layers(m_only, size=96, scale=NOTIFICATION_SCALE, colour='#FFFFFF').save(os.path.join(ASSETS, 'notification-icon.png'), optimize=True)
     render_opaque(design, 48).save(os.path.join(ASSETS, 'favicon.png'), optimize=True)
     with open(os.path.join(HERE, 'icon.svg'), 'w') as out:
         out.write(svg(design))
-    print('wrote icon.png, android-icon-{foreground,monochrome,background}.png, favicon.png and icon.svg')
+    print('wrote icon.png, android-icon-{foreground,monochrome,background}.png, notification-icon.png, favicon.png and icon.svg')
 
 
 if __name__ == '__main__':
