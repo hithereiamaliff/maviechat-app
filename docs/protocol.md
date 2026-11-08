@@ -95,6 +95,14 @@ This is a spec written from reading Open WebUI's source (v0.12.5, read 2026-11-0
 **Prompts, tools, skills, functions and models**
 - `GET /api/v1/prompts/list`
 - `GET /api/v1/tools/`, with user valves at `/tools/id/{id}/valves/user[/update]`
+- **Tools that sign in to their own service** (an MCP tool server with `auth_type` `oauth_2.1` or `oauth_2.1_static`; `--oauth` probe ✓ on 0.11.3, 0.12.5 and production's test account):
+  - **Marking:** only such a tool carries `authenticated` (a boolean) in `GET /api/v1/tools/`, with id `server:mcp:{id}`. Its sign-in client is `mcp:{id}` (the web reads the last `:` part as the id and the part after `server:` as the kind).
+  - **Starting:** `GET /oauth/clients/{client}/authorize` (outside `/api`) needs you signed in: a bearer header or the `token` cookie. Without either it answers 401; for a client the server doesn't have, 404 (0.12: 403 "Tool servers are disabled" when they're off). It keeps the sign-in state in the `owui-session` cookie and redirects to the service.
+  - **Return:** the service redirects to `/oauth/clients/{client}/callback`. The server checks the state against that cookie, keeps the token per user (`oauth_session`, provider = the client id), then redirects to `webui.url` (or the request's base), with `?error=…` on failure.
+  - **The cookie:** `GET /api/v1/auths/` with a bearer header answers 200 with no redirect and sets the HttpOnly `token` cookie.
+  - **The app's sign-in:** a private (incognito) WebView first loads that page with the header, hidden, because its answer holds the token. It then opens the authorize page with no header, so the token never goes to the service. It ends at the first page after the callback.
+  - **Disconnect:** `DELETE /api/v1/auths/oauth/sessions/{client}` (URL-encoded). 404 "No OAuth session found for this provider" when there's none.
+  - **A model's own tools:** a model's `info.meta.toolIds` that aren't connected are the web's pending integrations. A message waits until they're connected.
 - `GET /api/v1/skills/`
 - `GET /api/v1/functions/`
 - Workspace models: `/api/v1/models/*`. A workspace model has a `base_model_id`; a row without one is an admin's setting for a provider model, which `/models/list` and `/models/export` leave out.

@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -42,6 +42,9 @@
  * (src/shared-folders-probe.ts).
  * `--status` sets your status the app's way (a short name, an emoji kept as itself, cleared) and the
  * web's recent emoji list, each put back as it was (src/status-probe.ts).
+ * `--oauth` checks a tool's Connect as far as a server without a sign-in tool shows it: the tools
+ * list's sign-in marks, the account page's cookie, the tool sign-in page with and without it, and
+ * Disconnect for a tool not connected; nothing is started, kept or removed (src/oauth-probe.ts).
  * `--a8` saves settings the app's way and puts them back exactly (src/a8-probe.ts), then tries
  * memories, the profile, your variables, a refused password change and an API key (src/a8-account-probe.ts),
  * and the data controls: export, import, shared chats and files (src/a8-data-probe.ts).
@@ -87,6 +90,7 @@ import { probeInterface } from './interface-probe';
 import { probeMessages } from './messages-probe';
 import { probeModels } from './models-probe';
 import { probeNotes } from './notes-probe';
+import { probeOAuth } from './oauth-probe';
 import { probeStatus } from './status-probe';
 import { probeSharedFolders } from './shared-folders-probe';
 import { probeSearch } from './search-probe';
@@ -135,6 +139,7 @@ const { values: args } = parseArgs({
     models: { type: 'boolean' },
     notes: { type: 'boolean' },
     status: { type: 'boolean' },
+    oauth: { type: 'boolean' },
     sharedfolders: { type: 'boolean' },
     'peer-env': { type: 'string' },
     a8: { type: 'boolean' },
@@ -480,6 +485,12 @@ async function main() {
         const statusProbe = await probeStatus({ client, config: serverConfig });
         for (const result of statusProbe.steps) results.push({ ...result, name: `Status: ${result.name}` });
         fixtures['write.status'] = statusProbe.fixture;
+      }
+
+      if (args.oauth) {
+        const oauthProbe = await probeOAuth({ client, baseUrl, token: session.token });
+        for (const result of oauthProbe.steps) results.push({ ...result, name: `OAuth: ${result.name}` });
+        fixtures['write.oauth'] = oauthProbe.fixture;
       }
 
       if (args.notes && capabilities) {

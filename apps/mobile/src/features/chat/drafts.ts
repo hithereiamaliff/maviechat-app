@@ -1,4 +1,4 @@
-import type { FeatureToggles, FileItem, QueuedMessage } from '@maviechat/owui-protocol';
+import { needsConnect, oauthToolOf, usableTools, type FeatureToggles, type FileItem, type OAuthTool, type QueuedMessage, type ToolItem } from '@maviechat/owui-protocol';
 import { useSyncExternalStore } from 'react';
 
 /**
@@ -13,6 +13,11 @@ export interface Draft {
   previews: Record<string, string>;
   toggles: FeatureToggles;
   toolIds: string[];
+  /**
+   * The model's own tools that wait for you to connect them (sign in to their service): a
+   * message waits for them, and each goes on once it's connected, as on the web.
+   */
+  pendingToolIds: string[];
   /** Skills switched on (`skill_ids`), from the model's own at first. */
   skillIds: string[];
   /** The model's switchable filters turned on (`filter_ids`), from its defaults at first. */
@@ -27,7 +32,7 @@ export interface Draft {
 /** The new-chat screen's draft. */
 export const NEW_CHAT = 'new';
 
-const EMPTY: Draft = { text: '', files: [], previews: {}, toggles: {}, toolIds: [], skillIds: [], filterIds: [], defaultsFor: null, queue: [] };
+const EMPTY: Draft = { text: '', files: [], previews: {}, toggles: {}, toolIds: [], pendingToolIds: [], skillIds: [], filterIds: [], defaultsFor: null, queue: [] };
 const drafts = new Map<string, Draft>();
 const listeners = new Set<() => void>();
 
@@ -53,10 +58,29 @@ export function removeFile(key: string, itemId: string): void {
 
 /** The first message created the chat: it keeps the toggles, tools and `@` model, and the new-chat input starts over. */
 export function carryOver(from: string, to: string): void {
-  const { toggles, toolIds, skillIds, filterIds, defaultsFor, atModel } = getDraft(from);
+  const { toggles, toolIds, pendingToolIds, skillIds, filterIds, defaultsFor, atModel } = getDraft(from);
   drafts.delete(from);
-  updateDraft(to, (draft) => ({ ...draft, toggles, toolIds, skillIds, filterIds, defaultsFor, atModel }));
+  updateDraft(to, (draft) => ({ ...draft, toggles, toolIds, pendingToolIds, skillIds, filterIds, defaultsFor, atModel }));
 }
+
+/**
+ * The tools a message from this draft takes (the switched-on ones you can use, and the model's
+ * own once connected), and the model's own that still wait for you to connect them.
+ */
+export function draftTools(draft: Pick<Draft, 'toolIds' | 'pendingToolIds'>, tools: ToolItem[]): { toolIds: string[]; waiting: OAuthTool[] } {
+  const usable = new Set(usableTools(tools).map((tool) => tool.id));
+  const toolIds = [...new Set([...draft.toolIds, ...draft.pendingToolIds])].filter((id) => usable.has(id));
+  const waiting = draft.pendingToolIds.flatMap((id) => {
+    const tool = tools.find((item) => item.id === id);
+    const oauth = tool && needsConnect(tool) ? oauthToolOf(tool) : null;
+    return oauth ? [oauth] : [];
+  });
+  return { toolIds, waiting };
+}
+
+/** What a message waits for while tools need connecting, as a toast. */
+export const connectFirst = (waiting: OAuthTool[]): string =>
+  `Connect ${waiting.map((tool) => tool.name).join(', ')} first: tap ${waiting.length > 1 ? 'each' : 'it'} beside the + button.`;
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);

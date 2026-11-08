@@ -1,9 +1,12 @@
-import { terminalLabel, type FeatureToggles, type TerminalServer, type ToggleKey, type ToolItem } from '@maviechat/owui-protocol';
+import { oauthToolOf, terminalLabel, type FeatureToggles, type TerminalServer, type ToggleKey, type ToolItem } from '@maviechat/owui-protocol';
+import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
+import { IconButton } from '@/components/IconButton';
 import { Modal } from '@/components/Modal';
 import { fonts, radius, usePalette } from '@/theme';
+import { useConnectTool, useDisconnectTool } from './ConnectToolSheet';
 
 export const TOGGLE_INFO: Record<ToggleKey, { label: string; hint: string; icon: IconName }> = {
   webSearch: { label: 'Web Search', hint: 'Search the internet', icon: 'globe-alt' },
@@ -20,7 +23,8 @@ const APPROVAL_MODES: { value: 'full' | 'ask'; label: string; hint: string; icon
 
 /**
  * The web app's integrations menu as a bottom sheet: web search, image, code interpreter, tools,
- * and the system the model works on (the web's terminal menu).
+ * and the system the model works on (the web's terminal menu). A tool that signs in to its own
+ * service shows Connect until you have (it then goes on), and a connected one can be disconnected.
  */
 export function IntegrationsSheet({
   visible,
@@ -42,6 +46,7 @@ export function IntegrationsSheet({
   available: Record<ToggleKey, boolean>;
   toggles: FeatureToggles;
   onToggle: (key: ToggleKey, on: boolean) => void;
+  /** Every tool, those still to connect too. */
   tools: ToolItem[];
   toolIds: string[];
   onToggleTool: (id: string, on: boolean) => void;
@@ -59,8 +64,10 @@ export function IntegrationsSheet({
   const palette = usePalette();
   const insets = useSafeAreaInsets();
   const shown = ORDER.filter((key) => available[key]);
+  const connect = useConnectTool((id) => onToggleTool(id, true));
+  const disconnect = useDisconnectTool((id) => onToggleTool(id, false));
 
-  const row = (key: string, icon: IconName, label: string, hint: string | null | undefined, on: boolean, change: (on: boolean) => void, locked = false) => (
+  const row = (key: string, icon: IconName, label: string, hint: string | null | undefined, on: boolean, change: (on: boolean) => void, locked = false, extra?: ReactNode) => (
     <View key={key} style={styles.row}>
       <Icon name={icon} size={20} color={palette.textMuted} />
       <View style={styles.rowText}>
@@ -73,9 +80,42 @@ export function IntegrationsSheet({
           </Text>
         ) : null}
       </View>
+      {extra}
       <Switch value={on} onValueChange={change} accessibilityLabel={label} disabled={locked} />
     </View>
   );
+
+  const toolRow = (tool: ToolItem) => {
+    const oauth = oauthToolOf(tool);
+    if (oauth && !oauth.connected) {
+      return (
+        <Pressable
+          key={tool.id}
+          accessibilityRole="button"
+          accessibilityLabel={`Connect ${oauth.name}`}
+          accessibilityHint="Opens its sign-in page"
+          onPress={() => connect.connect(oauth)}
+          style={styles.row}>
+          <Icon name="wrench-screwdriver" size={20} color={palette.textFaint} />
+          <View style={styles.rowText}>
+            <Text style={[styles.label, { color: palette.textMuted }]} numberOfLines={1}>
+              {oauth.name}
+            </Text>
+            <Text style={[styles.hint, { color: palette.textMuted }]} numberOfLines={2}>
+              {tool.meta?.description || 'Sign in to its service to use it.'}
+            </Text>
+          </View>
+          <View style={[styles.connect, { borderColor: palette.warning }]}>
+            <Text style={[styles.connectText, { color: palette.warning }]}>Connect</Text>
+          </View>
+        </Pressable>
+      );
+    }
+    const unlink = oauth?.canDisconnect ? (
+      <IconButton icon="link-slash" label={`Disconnect ${oauth.name}`} size={18} color={palette.textMuted} onPress={() => disconnect(oauth)} />
+    ) : null;
+    return row(tool.id, 'wrench-screwdriver', tool.name || tool.id, tool.meta?.description, toolIds.includes(tool.id), (on) => onToggleTool(tool.id, on), false, unlink);
+  };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -96,11 +136,7 @@ export function IntegrationsSheet({
           {tools.length > 0 ? (
             <>
               <Text style={[styles.section, { color: palette.textFaint }]}>Tools</Text>
-              {tools.map((tool) =>
-                row(tool.id, 'wrench-screwdriver', tool.name || tool.id, tool.meta?.description, toolIds.includes(tool.id), (on) =>
-                  onToggleTool(tool.id, on),
-                ),
-              )}
+              {tools.map(toolRow)}
             </>
           ) : null}
           {skills && skills.list.length > 0 ? (
@@ -165,6 +201,7 @@ export function IntegrationsSheet({
           ) : null}
         </ScrollView>
       </View>
+      {connect.element}
     </Modal>
   );
 }
@@ -190,4 +227,6 @@ const styles = StyleSheet.create({
   label: { fontFamily: fonts.medium, fontSize: 15 },
   hint: { fontFamily: fonts.regular, fontSize: 13 },
   note: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18, marginTop: 2 },
+  connect: { borderWidth: 1, borderRadius: radius.full, paddingHorizontal: 12, paddingVertical: 5 },
+  connectText: { fontFamily: fonts.semibold, fontSize: 13 },
 });

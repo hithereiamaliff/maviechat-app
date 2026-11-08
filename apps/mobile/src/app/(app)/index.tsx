@@ -13,7 +13,7 @@ import { ChatHeader } from '@/features/chat/ChatHeader';
 import { chatLinkFrom, type ChatLink } from '@/features/chat/chatLink';
 import { Composer, type ComposerHandle, type OutgoingMessage } from '@/features/chat/Composer';
 import { ControlsSheet } from '@/features/chat/controls/ControlsSheet';
-import { carryOver, getDraft, NEW_CHAT, updateDraft, useDraft, useDraftText } from '@/features/chat/drafts';
+import { carryOver, connectFirst, draftTools, getDraft, NEW_CHAT, updateDraft, useDraft, useDraftText } from '@/features/chat/drafts';
 import { ModelAvatar } from '@/features/chat/ModelAvatar';
 import { ModelPicker } from '@/features/chat/ModelPicker';
 import { Suggestions } from '@/features/chat/Suggestions';
@@ -21,7 +21,7 @@ import { useModelChoice } from '@/features/chat/useModelChoice';
 import { useSendMessage } from '@/features/chat/useSendMessage';
 import { openLink } from '@/lib/links';
 import { describeError } from '@/lib/errors';
-import { useAuthed, useCapabilities, useServerConfig, useSessionUser } from '@/lib/server';
+import { useAuthed, useCapabilities, useServerConfig, useSessionUser, useTools } from '@/lib/server';
 import { useInterface } from '@/lib/uiSettings';
 import { fonts, usePalette } from '@/theme';
 
@@ -44,6 +44,7 @@ function NewChat({ link }: { link: ChatLink }) {
   const config = useServerConfig();
   const user = useSessionUser();
   const capabilities = useCapabilities();
+  const tools = useTools();
   // A link's models (Workspace's "Try in Chat", a pinned model, `?models=`) come first.
   const choice = useModelChoice(undefined, link.models);
   const { send } = useSendMessage();
@@ -134,9 +135,16 @@ function NewChat({ link }: { link: ChatLink }) {
       composer.current?.focus();
       return;
     }
-    const { files, toggles, toolIds, skillIds, filterIds } = getDraft(NEW_CHAT);
+    const draft = getDraft(NEW_CHAT);
+    const { files, toggles, skillIds, filterIds } = draft;
     if (filesPending(files)) {
       toast('Wait for the attachments to finish uploading.', 'error');
+      return;
+    }
+    // The model's own tools that need connecting come first, as for a typed message.
+    const { toolIds, waiting } = draftTools(draft, tools.data ?? []);
+    if (waiting.length) {
+      toast(connectFirst(waiting), 'error');
       return;
     }
     void start({ text, files, toggles, toolIds, skillIds, filterIds });

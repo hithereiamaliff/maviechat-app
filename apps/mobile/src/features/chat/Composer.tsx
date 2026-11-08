@@ -15,7 +15,7 @@ import {
   modelFilters,
   modelTerminal,
   terminalLabel,
-  usableTools,
+  toolsToConnect,
   type FeatureToggles,
   type FileItem,
   type ModelItem,
@@ -39,7 +39,8 @@ import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { fonts, usePalette } from '@/theme';
 import { AttachmentStrip } from './AttachmentStrip';
 import { AttachSheet, type AttachMode } from './AttachSheet';
-import { getDraft, updateDraft, useDraft } from './drafts';
+import { useConnectTool } from './ConnectToolSheet';
+import { connectFirst, draftTools, getDraft, updateDraft, useDraft } from './drafts';
 import { FilePreviewSheet } from './FilePreviewSheet';
 import { FullScreenInput } from './FullScreenInput';
 import { IntegrationsSheet, TOGGLE_INFO } from './IntegrationsSheet';
@@ -179,10 +180,11 @@ export function Composer({
   // "Always search the web" (Interface): on for every message where it's available, as on the web.
   const always: ToggleKey[] = ui('webSearch') && available.webSearch ? ['webSearch'] : [];
   const toggles = effectiveToggles(always.length ? { ...draft.toggles, webSearch: true } : draft.toggles, available);
-  const usable = usableTools(tools.data ?? []);
+  const allTools = tools.data ?? [];
   // 0.12's knobs: the chosen models that have some (none on 0.11).
   const knobModels = (models ?? (model ? [model] : [])).filter((item) => modelControls(item).length > 0);
-  const toolIds = draft.toolIds.filter((id) => usable.some((tool) => tool.id === id));
+  // The model's own tools still to connect wait here; each goes on once it's connected, as on the web.
+  const { toolIds, waiting } = draftTools(draft, allTools);
   const activeSkills = (skills.data ?? []).filter((skill) => skill.active);
   const skillIds = draft.skillIds.filter((id) => activeSkills.some((skill) => skill.id === id));
   // The filters of the model that leads (the web's list, too, follows the first model).
@@ -192,7 +194,7 @@ export function Composer({
   const uploading = filesPending(draft.files);
   const canSend = hasContent && !sending && !uploading;
   const showIntegrations =
-    available.webSearch || available.imageGeneration || available.codeInterpreter || usable.length > 0 || approvalsOn || systems.length > 0 || activeSkills.length > 0 || filters.length > 0;
+    available.webSearch || available.imageGeneration || available.codeInterpreter || allTools.length > 0 || approvalsOn || systems.length > 0 || activeSkills.length > 0 || filters.length > 0;
   const canExpand = draft.text.split('\n').length > 2;
   // With "Paste long text as a file" on, a paste over 1,000 characters is attached instead, and the box keeps what it had.
   const setText = (text: string) => {
@@ -233,6 +235,7 @@ export function Composer({
       ...current,
       toggles: defaultToggles(capabilities, model),
       toolIds: defaultToolIds(model, tools.data ?? [], saved),
+      pendingToolIds: toolsToConnect(model, tools.data ?? []),
       skillIds: defaultSkillIds(model, skills.data ?? []),
       filterIds: defaultFilterIds(model),
       defaultsFor: model.id,
@@ -278,7 +281,14 @@ export function Composer({
     updateDraft(draftKey, (current) => ({
       ...current,
       toolIds: on ? [...current.toolIds.filter((item) => item !== id), id] : current.toolIds.filter((item) => item !== id),
+      pendingToolIds: on ? current.pendingToolIds : current.pendingToolIds.filter((item) => item !== id),
     }));
+  const connectTool = useConnectTool((id) => setTool(id, true));
+  // A tool connected or disconnected on the web shows as it is now when the menu opens.
+  const openIntegrations = () => {
+    if (allTools.some((tool) => typeof tool.authenticated === 'boolean')) void queryClient.invalidateQueries({ queryKey: ['tools'] });
+    setSheetOpen(true);
+  };
   const setSkill = (id: string, on: boolean) =>
     updateDraft(draftKey, (current) => ({ ...current, skillIds: on ? [...current.skillIds.filter((item) => item !== id), id] : current.skillIds.filter((item) => item !== id) }));
   const setFilter = (id: string, on: boolean) =>
@@ -298,6 +308,10 @@ export function Composer({
 
   const submit = async () => {
     if (!canSend) return;
+    if (waiting.length) {
+      toast(connectFirst(waiting), 'error');
+      return;
+    }
     const message = { text: draft.text, files: draft.files, toggles, toolIds, skillIds, filterIds, ...(atModel ? { atModelId: atModel.id } : {}) };
     const previews = draft.previews;
     setSending(true);
@@ -386,7 +400,7 @@ export function Composer({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Integrations"
-              onPress={() => setSheetOpen(true)}
+              onPress={openIntegrations}
               hitSlop={4}
               style={({ pressed }) => [styles.round, { borderColor: palette.border }, pressed && { backgroundColor: palette.surfaceStrong }]}>
               <Icon name="puzzle-piece" size={17} color={palette.textMuted} />
@@ -404,11 +418,24 @@ export function Composer({
                 <Icon name={TOGGLE_INFO[key].icon} size={17} color={palette.onActive} />
               </Pressable>
             ))}
+            {waiting.map((tool) => (
+              <Pressable
+                key={tool.id}
+                accessibilityRole="button"
+                accessibilityLabel={`${tool.name} isn’t connected. Connect it`}
+                onPress={() => connectTool.connect(tool)}
+                style={[styles.chip, styles.connectChip, { borderColor: palette.warning }]}>
+                <Icon name="wrench-screwdriver" size={14} color={palette.warning} />
+                <Text style={[styles.connectName, { color: palette.warning }]} numberOfLines={1}>
+                  {tool.name}
+                </Text>
+              </Pressable>
+            ))}
             {toolIds.length > 0 ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`${toolIds.length} tools on. Change tools`}
-                onPress={() => setSheetOpen(true)}
+                onPress={openIntegrations}
                 style={[styles.chip, styles.toolChip, { backgroundColor: palette.active }]}>
                 <Icon name="wrench-screwdriver" size={15} color={palette.onActive} />
                 <Text style={[styles.chipCount, { color: palette.onActive }]}>{toolIds.length}</Text>
@@ -418,7 +445,7 @@ export function Composer({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={system ? `System: ${terminalLabel(system)}. Change` : 'System: none. Choose one'}
-                onPress={() => setSheetOpen(true)}
+                onPress={openIntegrations}
                 style={[styles.chip, styles.systemChip, system ? { backgroundColor: palette.active } : { borderWidth: 1, borderColor: palette.border }]}>
                 <Icon name="cloud" size={16} color={system ? palette.onActive : palette.textMuted} />
                 {system ? (
@@ -494,6 +521,7 @@ export function Composer({
         onDismiss={() => input.current?.focus()}
       />
       <PromptVariablesSheet variables={menus.form} onCancel={menus.cancelForm} onInsert={menus.insertForm} />
+      {connectTool.element}
       <IntegrationsSheet
         visible={sheetOpen}
         onClose={() => setSheetOpen(false)}
@@ -501,7 +529,7 @@ export function Composer({
         always={always}
         toggles={toggles}
         onToggle={setToggle}
-        tools={usable}
+        tools={allTools}
         toolIds={toolIds}
         onToggleTool={setTool}
         skills={activeSkills.length ? { list: activeSkills, chosen: skillIds, onToggle: setSkill } : undefined}
@@ -530,6 +558,8 @@ const styles = StyleSheet.create({
   chipCount: { fontFamily: fonts.semibold, fontSize: 12 },
   systemChip: { flexDirection: 'row', gap: 4, paddingHorizontal: 8, maxWidth: 150 },
   systemName: { fontFamily: fonts.medium, fontSize: 12, flexShrink: 1 },
+  connectChip: { flexDirection: 'row', gap: 4, paddingHorizontal: 9, borderWidth: 1, maxWidth: 150 },
+  connectName: { fontFamily: fonts.medium, fontSize: 12, flexShrink: 1 },
   model: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1, maxWidth: '45%' },
   knobs: { paddingHorizontal: 2 },
   modelText: { fontFamily: fonts.medium, fontSize: 13, flexShrink: 1 },

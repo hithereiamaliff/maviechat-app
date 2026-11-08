@@ -54,9 +54,20 @@ export function defaultToggles(capabilities: Pick<Capabilities, 'feature'>, mode
   return result;
 }
 
-/** Usable tools: OAuth tools you haven't connected yet need the web app first. */
+/** Tools you can switch on now: one that signs in to its own service needs Connect first. */
 export function usableTools(tools: ToolItem[]): ToolItem[] {
   return tools.filter((tool) => tool.authenticated !== false);
+}
+
+/**
+ * The model's own tools that wait for you to connect them (the web's pending integrations):
+ * a message waits until they're connected, and each goes on once it is.
+ */
+export function toolsToConnect(model: ModelItem | undefined, tools: ToolItem[]): string[] {
+  const own = model?.info?.meta?.toolIds;
+  if (!Array.isArray(own)) return [];
+  const waiting = new Set(tools.filter((tool) => tool.authenticated === false).map((tool) => tool.id));
+  return [...new Set(own.filter((id): id is string => typeof id === 'string' && waiting.has(id)))];
 }
 
 /** Tools switched on for a new chat: the model's own (`info.meta.toolIds`), else the ones you last saved (`ui.tools`). */

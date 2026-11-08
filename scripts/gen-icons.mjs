@@ -83,6 +83,7 @@ const ICONS = [
   'italic',
   'light-bulb',
   'link',
+  'link-slash',
   'list-bullet',
   'lock-closed',
   'magnifying-glass',
