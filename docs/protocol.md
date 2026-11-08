@@ -104,6 +104,10 @@ This is a spec written from reading Open WebUI's source (v0.12.5, read 2026-11-0
   - **Default and removal:** `PUT /targets/{id}/default`; `DELETE` → `{ok: true}`, 404 the second time.
   - **Test:** `POST /targets/{id}/test` really posts (400 "Webhook delivery failed" when the address refuses). The probe only tries a target that doesn't exist (400 "Notification target not found").
   - **What goes out:** a finished chat posts its title, the whole reply and a link. Slack, Google Chat, Discord and Teams get their own format; any other address gets the event's data as JSON.
+- **Everyone's Interface defaults** (admins; `--uidefaults` probe ✓ on 0.11.3 and 0.12.5; a non-admin gets 401):
+  - **Where:** the admin config's `DEFAULT_INTERFACE_SETTINGS` (`ui.default_interface_settings`). `POST /api/v1/auths/admin/config` sets it to what's sent, or `{}` when it's left out, so every admin save sends the config as read.
+  - **Where people see them:** `/api/config` publishes them as `ui.default_interface_settings`. `GET /api/v1/users/user/settings` merges them under each person's own `ui` (`?raw=true` gives only their own). Saving someone's settings drops each value equal to the default, so what they haven't chosen follows the defaults when those change.
+  - **The app's save:** it reads the admin config, applies only its changes (dotted paths; removals drop empty groups) to the defaults as read then, and sends the whole config back.
 - **Event webhooks** (admins; `--eventhooks` probe ✓ on 0.11.3 and 0.12.5; a non-admin gets 401):
   - **Events:** `GET /api/events` → `{schema, events: [{event, description, message}]}` (181 on 0.11.3, 191 on 0.12.5).
   - **Listing:** `GET /api/events/webhooks` → `[{id, name, url, enabled, events, targets, created_at, updated_at}]`, the **whole** URL included. `targets` is null for everyone's events and the server's own, `[]` for the server's own only (no person tied), or `[{type: user|group, id}]` for events tied to those people or to people now in those groups.
