@@ -17,6 +17,7 @@ export * from './chatStatus';
 export * from './code';
 export * from './completions';
 export * from './data';
+export * from './eventWebhooks';
 export * from './export';
 export * from './files';
 export * from './folders';

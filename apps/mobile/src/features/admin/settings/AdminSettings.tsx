@@ -26,6 +26,7 @@ import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, usePalette } from '@/theme';
 import { AdminConfigPage, BannersEditor, SettingsEndpointPage } from './AdminConfigPage';
 import { ConnectionsPage } from './ConnectionsPage';
+import { EventWebhooks } from './EventWebhooks';
 import { ModelsPage } from './ModelsPage';
 
 type Page = 'general' | 'authentication' | 'connections' | 'models' | 'interface' | 'subagents' | 'code-execution' | 'web';
@@ -73,7 +74,8 @@ export function AdminSettings() {
           {page === 'general' ? (
             <AdminConfigPage sections={GENERAL_SECTIONS}>
               <BannersEditor />
-              <Note>Webhooks, and the settings new users start with, are on the web for now.</Note>
+              <EventWebhooks />
+              <Note>The settings new users start with are on the web for now.</Note>
             </AdminConfigPage>
           ) : page === 'authentication' ? (
             <AdminConfigPage sections={AUTHENTICATION_SECTIONS}>
@@ -104,7 +106,7 @@ export function AdminSettings() {
           <View style={styles.section}>
             <SectionTitle title="System" />
             <Group>
-              <ActionRow label="General" hint="Features, banners, this server’s address" onPress={() => setPage('general')} />
+              <ActionRow label="General" hint="Features, banners, this server’s address, event webhooks" onPress={() => setPage('general')} />
               <ActionRow label="Authentication" hint="Sign-ups, new accounts, sessions, API keys" onPress={() => setPage('authentication')} />
             </Group>
           </View>

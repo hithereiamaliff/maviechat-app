@@ -104,6 +104,14 @@ This is a spec written from reading Open WebUI's source (v0.12.5, read 2026-11-0
   - **Default and removal:** `PUT /targets/{id}/default`; `DELETE` → `{ok: true}`, 404 the second time.
   - **Test:** `POST /targets/{id}/test` really posts (400 "Webhook delivery failed" when the address refuses). The probe only tries a target that doesn't exist (400 "Notification target not found").
   - **What goes out:** a finished chat posts its title, the whole reply and a link. Slack, Google Chat, Discord and Teams get their own format; any other address gets the event's data as JSON.
+- **Event webhooks** (admins; `--eventhooks` probe ✓ on 0.11.3 and 0.12.5; a non-admin gets 401):
+  - **Events:** `GET /api/events` → `{schema, events: [{event, description, message}]}` (181 on 0.11.3, 191 on 0.12.5).
+  - **Listing:** `GET /api/events/webhooks` → `[{id, name, url, enabled, events, targets, created_at, updated_at}]`, the **whole** URL included. `targets` is null for everyone's events and the server's own, `[]` for the server's own only (no person tied), or `[{type: user|group, id}]` for events tied to those people or to people now in those groups.
+  - **Adding:** `POST` with `{name, url, enabled, events, targets}`; the server makes the id (uuid) and names it "Webhook" when the name is empty.
+  - **Changing:** `PUT /{id}` merges only the fields sent; `targets: null` sent explicitly means everyone.
+  - **Deleting:** `DELETE /{id}` → `{status: true}`, 404 the second time. Deleting `default` (the old single `WEBHOOK_URL`, carried over) clears that too.
+  - **Checks:** events are `*`, a catalog name, or `kind.*` with some event under `kind.` (400 "Invalid event pattern" / "Invalid event"). A non-empty URL must resolve to a public address (400).
+  - **Side effect:** every add, change and delete publishes `config.webhook.updated` to the other webhooks.
 - **Tools that sign in to their own service** (an MCP tool server with `auth_type` `oauth_2.1` or `oauth_2.1_static`; `--oauth` probe ✓ on 0.11.3, 0.12.5 and production's test account):
   - **Marking:** only such a tool carries `authenticated` (a boolean) in `GET /api/v1/tools/`, with id `server:mcp:{id}`. Its sign-in client is `mcp:{id}` (the web reads the last `:` part as the id and the part after `server:` as the kind).
   - **Starting:** `GET /oauth/clients/{client}/authorize` (outside `/api`) needs you signed in: a bearer header or the `token` cookie. Without either it answers 401; for a client the server doesn't have, 404 (0.12: 403 "Tool servers are disabled" when they're off). It keeps the sign-in state in the `owui-session` cookie and redirects to the service.

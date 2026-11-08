@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -48,6 +48,10 @@
  * `--webhooks` adds, switches, changes, makes default, renames and removes a notification target
  * that never sends (off, no events, example.com), then puts the account's targets back; where
  * webhooks aren't allowed it checks the refusal (src/webhooks-probe.ts).
+ * `--eventhooks` (admins) adds an event webhook that can't fire (off, for a person who doesn't
+ * exist), switches it, changes whose and which events alone, has a bad pattern, an unknown event
+ * and an unreachable address refused, deletes it and checks the list is as before; a non-admin
+ * gets the refusal (src/eventhooks-probe.ts). Addresses are never printed.
  * `--a8` saves settings the app's way and puts them back exactly (src/a8-probe.ts), then tries
  * memories, the profile, your variables, a refused password change and an API key (src/a8-account-probe.ts),
  * and the data controls: export, import, shared chats and files (src/a8-data-probe.ts).
@@ -95,6 +99,7 @@ import { probeModels } from './models-probe';
 import { probeNotes } from './notes-probe';
 import { probeOAuth } from './oauth-probe';
 import { probeWebhooks } from './webhooks-probe';
+import { probeEventHooks } from './eventhooks-probe';
 import { probeStatus } from './status-probe';
 import { probeSharedFolders } from './shared-folders-probe';
 import { probeSearch } from './search-probe';
@@ -145,6 +150,7 @@ const { values: args } = parseArgs({
     status: { type: 'boolean' },
     oauth: { type: 'boolean' },
     webhooks: { type: 'boolean' },
+    eventhooks: { type: 'boolean' },
     sharedfolders: { type: 'boolean' },
     'peer-env': { type: 'string' },
     a8: { type: 'boolean' },
@@ -502,6 +508,12 @@ async function main() {
         const webhooksProbe = await probeWebhooks({ client, capabilities });
         for (const result of webhooksProbe.steps) results.push({ ...result, name: `Webhooks: ${result.name}` });
         fixtures['write.webhooks'] = webhooksProbe.fixture;
+      }
+
+      if (args.eventhooks && capabilities) {
+        const eventHooksProbe = await probeEventHooks({ client, capabilities });
+        for (const result of eventHooksProbe.steps) results.push({ ...result, name: `Event webhooks: ${result.name}` });
+        fixtures['write.eventhooks'] = eventHooksProbe.fixture;
       }
 
       if (args.notes && capabilities) {
