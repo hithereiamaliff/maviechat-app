@@ -55,8 +55,8 @@
  * `--uidefaults` (admins) saves everyone's Interface defaults the app's way over the admin
  * config, checks the rest of it, `/api/config` and your merged settings, takes one away, clears
  * them, then puts the defaults back exactly; a non-admin gets the refusal (src/uidefaults-probe.ts).
- * `--adminmodels` (admins, scratch servers only: it changes everyone's settings, then puts them
- * back) saves the model order, the defaults for every model and everyone's prompt suggestions the
+ * `--adminmodels` (admins, scratch servers only, refusing any other URL: it changes everyone's
+ * settings, then puts them back) saves the model order, the defaults for every model and everyone's prompt suggestions the
  * app's way, imports, exports and deletes a throwaway model; a non-admin gets the refusal
  * (src/adminmodels-probe.ts).
  * `--chatvars` makes a throwaway model whose system prompt asks for chat variables: its form, a
@@ -545,7 +545,7 @@ async function main() {
       }
 
       if (args.adminmodels && capabilities) {
-        const adminModelsProbe = await probeAdminModels({ client, capabilities });
+        const adminModelsProbe = await probeAdminModels({ client, capabilities, baseUrl });
         for (const result of adminModelsProbe.steps) results.push({ ...result, name: `Admin models: ${result.name}` });
         fixtures['write.adminmodels'] = adminModelsProbe.fixture;
       }

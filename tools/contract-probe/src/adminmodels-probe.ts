@@ -40,7 +40,7 @@ const modelSettings = (config: Tree) => JSON.stringify(MODEL_KEYS.map((key) => c
  * throwaway model, changing it by a second import, exporting it, deleting it. The models settings
  * and the suggestions are put back exactly. Prints counts, never other settings' values.
  */
-export async function probeAdminModels({ client, capabilities }: { client: OwuiClient; capabilities: Capabilities }): Promise<{ steps: WriteStep[]; fixture: Record<string, unknown> }> {
+export async function probeAdminModels({ client, capabilities, baseUrl }: { client: OwuiClient; capabilities: Capabilities; baseUrl: string }): Promise<{ steps: WriteStep[]; fixture: Record<string, unknown> }> {
   const steps: WriteStep[] = [];
   const fixture: Record<string, unknown> = {};
   const check = async (name: string, run: () => Promise<string>) => {
@@ -61,6 +61,10 @@ export async function probeAdminModels({ client, capabilities }: { client: OwuiC
       }
       throw new Error('a non-admin read the models settings');
     });
+    return { steps, fixture };
+  }
+  if (!/^http:\/\/127\.0\.0\.1:(3013|3014)\/?$/.test(baseUrl)) {
+    steps.push({ name: 'scratch servers only', ok: true, note: 'skipped: it changes everyone’s settings for a moment' });
     return { steps, fixture };
   }
 
