@@ -47,6 +47,7 @@ export * from './settings';
 export * from './sharing';
 export * from './shortcuts';
 export * from './socket';
+export * from './sso';
 export * from './sources';
 export * from './stream';
 export * from './terminals';

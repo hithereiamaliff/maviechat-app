@@ -197,9 +197,9 @@ It is used as a spec only (clean-room): match the behaviour and layout, never co
 | | Item | Mn |
 |---|---|---|
 | [x] | Server URL, then email + password; errors; pending approval (M0, `app/login.tsx`) | M0/M1 |
-| [ ] | LDAP switch (when enabled) | M6 |
+| [x] | LDAP switch (when enabled). 2026-11-08: the sign-in screen reads the server's public config once its address is typed; where LDAP is on it comes first, as on the web (Username and Password, `POST /api/v1/auths/ldap`), with Use Email Instead / Use LDAP Instead where both are on; 0.12's second step and pending accounts as with a password. Where the admin turned the password form off, Sign In with a Password Instead shows it anyway (the web's `?form=`) | M6 |
 | [x] | MFA challenge: code, recovery code, first-time setup (0.12.x). M5 (2026-11-04): after the password, a 0.12 server's second step: a code from the authenticator (iOS offers codes from Passwords), or a recovery code; first-time setup when the admin turned it on (Add to Passwords or an Authenticator opens the `otpauth://` link the server's QR code holds; the setup key to copy; the QR for another device), then the recovery codes once (copy, save to Files); an admin's reset token leads to setting up again; an expired step says to sign in again. Admins switch it on in Settings → Admin → Authentication (0.12 only; it signs everyone out, the app included). Not yet: managing your own (new recovery codes, another authenticator) in Account (web) | M5 |
-| [ ] | SSO buttons (when the server has providers) | M6 |
+| [x] | SSO buttons (when the server has providers). 2026-11-08: Continue with each provider the config lists (the web's names: Google, Microsoft, GitHub, Feishu; OIDC by the admin's name). The sign-in runs in a private web view: the server's start page, the provider's own, then back on the server's /auth, where the session it leaves (its `token` cookie, or after 0.12's second step on its own page, the page's storage) is picked up by a script that runs only on the server's pages; `?error=`, 0.12's `?pending=1` and a WEBUI_URL pointing elsewhere are said. Google refuses sign-in inside apps' web views, which the sheet says on Google's page. Not tried with a real provider: none of the three servers has one | M6 |
 | — | Sign-up, onboarding (first admin) | — |
 
 ## 14. Browser-only features and our approach
