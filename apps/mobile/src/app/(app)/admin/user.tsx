@@ -9,7 +9,7 @@ import { EditUserSheet, ROLE_LABELS } from '@/features/admin/AdminSheets';
 import { openGroup } from '@/features/admin/GroupsTabs';
 import { agoLabel, useAdminGroups, useAdminRefresh, useAdminUser, useDefaultPermissions, usePrimaryAdminId, useUserAccess } from '@/features/admin/queries';
 import { UserPicture } from '@/features/admin/UsersTab';
-import { Note, SectionTitle } from '@/features/settings/rows';
+import { ActionRow, Group, Note, SectionTitle } from '@/features/settings/rows';
 import { Chip } from '@/features/workspace/ListControls';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useSessionUser } from '@/lib/server';
@@ -108,6 +108,15 @@ export default function AdminUserScreen() {
             </View>
             {locked ? <Note>This is the primary admin: only they can change their account.</Note> : self && data.role === 'admin' ? <Note>Another admin can change your role; you can’t remove your own admin role here.</Note> : null}
           </View>
+          {/* The web's Chats, for a user's chats where the server lets admins see them (never another admin's). */}
+          {capabilities?.feature('adminChatAccess') && data.role !== 'admin' ? (
+            <View style={styles.section}>
+              <SectionTitle title="Chats" />
+              <Group>
+                <ActionRow label={`${data.name}’s chats`} hint="Read them, or delete one" onPress={() => router.push({ pathname: '/admin/user-chats', params: { id: data.id, name: data.name } })} />
+              </Group>
+            </View>
+          ) : null}
           <View style={styles.section}>
             <SectionTitle title="Groups" />
             {data.groups.length ? (

@@ -17,6 +17,7 @@ const FEATURE_LABELS: Record<FeatureId, string> = {
   calendar: 'Calendar',
   userWebhooks: 'Notification webhooks',
   messageRating: 'Message rating',
+  adminChatAccess: 'Admins see users’ chats',
   plugins: 'Tools and functions',
   tools: 'Tools',
   functions: 'Functions',

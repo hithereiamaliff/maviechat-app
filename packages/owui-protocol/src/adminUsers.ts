@@ -146,3 +146,66 @@ export function roleChangeProblem(target: { id: string; role: string }, me: { id
   if (target.id === me.id && target.role === 'admin' && role !== 'admin') return 'You can’t take away your own admin role here: another admin can.';
   return null;
 }
+
+// --- A user's chats, for admins where the server lets admins see them (`enable_admin_chat_access`). ---
+
+export interface UserChat {
+  id: string;
+  title: string;
+  /** Milliseconds. */
+  updatedAt: number;
+}
+
+/** The server's page size for a user's chats. */
+export const USER_CHATS_PAGE = 60;
+
+const millis = (value: unknown): number => (typeof value === 'number' && value > 0 ? (value < 1_000_000_000_000 ? value * 1000 : value) : 0);
+
+/**
+ * A user's chats, 60 a page, newest first or by title, found by words as on the web. The server
+ * refuses unless it lets admins see users' chats; each opens through the shared-chat page, which
+ * reads any chat by its id for such an admin.
+ */
+export async function listUserChats(client: OwuiClient, userId: string, query: { page?: number; query?: string; orderBy?: 'updated_at' | 'title'; direction?: 'asc' | 'desc' } = {}): Promise<UserChat[]> {
+  const body = await client.get<unknown>(`/api/v1/chats/list/user/${encodeURIComponent(userId)}`, {
+    query: { page: query.page ?? 1, ...(query.query ? { query: query.query } : {}), ...(query.orderBy ? { order_by: query.orderBy } : {}), ...(query.direction ? { direction: query.direction } : {}) },
+  });
+  return list(body).flatMap((raw) => {
+    const row = record(raw);
+    const id = text(row.id);
+    return id ? [{ id, title: text(row.title), updatedAt: millis(row.updated_at) }] : [];
+  });
+}
+
+// --- Users from a CSV file (the web's CSV Import). ---
+
+export interface CsvUser {
+  /** Its row in the file, counting the header as 1. */
+  line: number;
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+}
+
+/**
+ * Users from a CSV file as the web reads it: a header row first, then Name, Email, Password,
+ * Role, split at commas (no quoting), blank rows skipped; a row of another shape, or another role,
+ * is named by its row. The server checks the rest as each is added.
+ */
+export function usersFromCsv(csv: string): { users: CsvUser[]; problems: number[] } {
+  const users: CsvUser[] = [];
+  const problems: number[] = [];
+  csv.split('\n').forEach((row, index) => {
+    if (index === 0) return;
+    const columns = row.split(',').map((column) => column.trim());
+    if (columns.length === 1 && columns[0] === '') return;
+    const role = (columns[3] ?? '').toLowerCase();
+    if (columns.length !== 4 || !(USER_ROLES as readonly string[]).includes(role)) {
+      problems.push(index + 1);
+      return;
+    }
+    users.push({ line: index + 1, name: columns[0] ?? '', email: columns[1] ?? '', password: columns[2] ?? '', role: role as UserRole });
+  });
+  return { users, problems };
+}

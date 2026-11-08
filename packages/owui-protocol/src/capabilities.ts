@@ -21,6 +21,8 @@ export const FEATURES = {
   calendar: { flag: 'enable_calendar', permission: 'features.calendar' },
   userWebhooks: { flag: 'enable_user_webhooks', permission: 'features.webhooks' },
   messageRating: { flag: 'enable_message_rating', permission: 'chat.rate_response' },
+  /** Admins may see users' chats (a server setting, `ENABLE_ADMIN_CHAT_ACCESS`). */
+  adminChatAccess: { flag: 'enable_admin_chat_access', permission: null },
   /** Tools and functions (the Workspace's Tools tab needs it too). */
   plugins: { flag: 'enable_plugins', permission: null },
   /** Workspace tools: 0.12 switches them on their own (under plugins); 0.11 has only plugins. */

@@ -1,4 +1,4 @@
-import { deleteUser, recentlyActive, updateUser, type AdminUser, type UserOrder } from '@maviechat/owui-protocol';
+import { addUser, deleteUser, recentlyActive, updateUser, usersFromCsv, type AdminUser, type CsvUser, type UserOrder } from '@maviechat/owui-protocol';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState, type ReactNode } from 'react';
@@ -6,7 +6,9 @@ import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, TextIn
 import { Button } from '@/components/Button';
 import { MenuButton, type MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { pickTextFile, plural } from '@/features/workspace/EditorParts';
 import { Chip } from '@/features/workspace/ListControls';
+import { eachFew, failures } from '@/lib/eachFew';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useSessionUser } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
@@ -49,12 +51,52 @@ export function UsersTab({ tabs }: { tabs: ReactNode }) {
   const debounced = useDebounced(query.trim(), 300);
   const [order, setOrder] = useState(ORDERS[0] ?? { key: 'created_at' as const, label: 'Joined', direction: 'asc' as const });
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const users = useAdminUsers({ query: debounced, orderBy: order.key, direction: order.direction });
   const everyone = useAllUsers();
   const pending = (everyone.data ?? []).filter((user) => user.role === 'pending');
   const items = users.data?.pages.flatMap((page) => page.items) ?? [];
   // Captured once per render for the "active" dots and "last active" labels.
   const [now] = useState(() => new Date().getTime());
+
+  // The web's CSV Import: a header row, then Name, Email, Password, Role; each row added as an account.
+  const runImport = async (rows: CsvUser[]) => {
+    setImporting(true);
+    const failed = await eachFew(rows, (row) => addUser(client, { name: row.name, email: row.email, password: row.password, role: row.role }), (row) => `Row ${row.line}`);
+    setImporting(false);
+    refresh();
+    if (!failed.length) toast(`Added ${plural(rows.length, 'account')}`);
+    else toast(`Added ${rows.length - failed.length} of ${rows.length}. ${failures(failed)}`, 'error');
+  };
+  const importCsv = async () => {
+    let found: ReturnType<typeof usersFromCsv>;
+    try {
+      const file = await pickTextFile(['text/csv', 'text/comma-separated-values', 'application/csv']);
+      if (!file) return;
+      found = usersFromCsv(file.text);
+    } catch (error) {
+      return toast(`Couldn’t read the file: ${describeError(error)}`, 'error');
+    }
+    const shape = 'Name, Email, Password, Role (admin, user or pending)';
+    if (!found.users.length) {
+      return toast(found.problems.length ? `No row could be read: each needs ${shape}, after a header row.` : 'There are no accounts in the file.', 'error');
+    }
+    const admins = found.users.filter((row) => row.role === 'admin').length;
+    Alert.alert(
+      `Add ${plural(found.users.length, 'account')}?`,
+      [
+        admins ? `${admins === found.users.length ? 'All' : admins} of them as admins, who can change everything on this server.` : '',
+        found.problems.length ? `Left out: ${found.problems.length === 1 ? 'row' : 'rows'} ${found.problems.join(', ')} (each needs ${shape}).` : '',
+        'Each gets the password in the file: pass them on safely.',
+      ]
+        .filter(Boolean)
+        .join(' '),
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Add', style: admins ? 'destructive' : 'default', onPress: () => void runImport(found.users) },
+      ],
+    );
+  };
 
   const setRole = (user: { id: string; name: string }, role: 'admin' | 'user' | 'pending') => {
     const go = () =>
@@ -125,6 +167,11 @@ export function UsersTab({ tabs }: { tabs: ReactNode }) {
         <View>
           <Button label="Add" onPress={() => setAdding(true)} />
         </View>
+        <MenuButton
+          label="More ways to add"
+          color={palette.textMuted}
+          items={[{ key: 'csv', label: importing ? 'Importing…' : 'Import from CSV…', icon: 'arrow-up-tray', onPress: () => void (importing ? undefined : importCsv()) }]}
+        />
       </View>
       <View style={styles.chips}>
         {ORDERS.map((item) => (
