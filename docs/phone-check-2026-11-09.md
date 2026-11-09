@@ -1,6 +1,6 @@
 # Phone check, 2026-11-09
 
-Everything since the last checks you confirmed (2026-11-06): the updates of 2026-11-07, 11-08 and 11-09. All of it is live over the air on store build 6. Close MavieChat completely (swipe it away) and open it again; if nothing's new, do it once more. The latest update is `c2668bde`.
+Everything since the last checks you confirmed (2026-11-06): the updates of 2026-11-07, 11-08 and 11-09. All of it is live over the air on store build 6. Close MavieChat completely (swipe it away) and open it again; if nothing's new, do it once more. The latest update is `ff3743ff`.
 
 Each line says where to go, what to do, and what should happen. Lines marked **Optional** change something real, or need an account or service you may not have; skip them if you like. Admin settings save for everyone on the server, so most admin lines say "look, then Cancel".
 
@@ -51,6 +51,39 @@ If you haven't been through the earlier list, [phone-check-2026-11-04.md](phone-
 ### Links (2026-11-07)
 - [ ] In a reply or a note, tap a link to one of your server's chats or notes: it opens in the app, not the browser.
 - [ ] A shared chat link (`/s/…`): the app's own page opens, with **Clone Chat**.
+
+### Tools’ JavaScript (2026-11-09)
+- [ ] Settings → Interface → under **This phone**, **Tools’ code** says **Ask first**. Tap it: **Ask first**, **Run**, **Never**. Cancel.
+- [ ] **Optional** (it adds a tool on your server, which runs it; delete it after): Workspace → Tools → **New** (or on the web, Workspace → Tools → +). Name it "Phone JavaScript check", replace all the code with the code below, Save. In a new chat, tap the puzzle piece beside the message box (**Integrations**) → switch on **Phone JavaScript check**, then send "Run the phone JavaScript check". **A tool wants to run code on this phone** shows the code → **Run**: the share sheet offers `hello.txt` (Save to Files, or close it), and the reply says the device answered 42. Then Workspace → Tools → its **…** → **Delete**.
+
+The test tool's code:
+
+```python
+"""
+title: Phone JavaScript check
+description: Asks the device to run a little JavaScript, then says what came back.
+"""
+
+CODE = """
+const file = new Blob(["Hello from a tool's JavaScript"], { type: "text/plain" });
+const link = document.createElement("a");
+link.href = URL.createObjectURL(file);
+link.download = "hello.txt";
+link.click();
+return 6 * 7;
+"""
+
+
+class Tools:
+    async def phone_javascript_check(self, __event_call__=None) -> str:
+        """
+        Run a short JavaScript check on the user's device. It offers a small text file and returns 42.
+        """
+        if __event_call__ is None:
+            return "This chat can't run code on the device."
+        answer = await __event_call__({"type": "execute", "data": {"code": CODE}})
+        return f"The device answered: {answer!r}"
+```
 
 ## Notes (2026-11-07)
 - [ ] Sidebar → Notes: the list has date headings; its menu has **Show as Grid** / **Show as List**.

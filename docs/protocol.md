@@ -329,8 +329,8 @@ The server merges these writes: it keeps its own copy of in-progress assistant m
   - `request:user_input` → `{status, answers}`;
   - `request:elicitation` → `{action: accept|decline|cancel, content?}`.
 - **`execute:python`** (`{id, code, session_id, files}`, sent only to the socket that started the reply): run on the phone, the chat's files written to `/mnt/uploads`, answered `{stdout, stderr, result}`. Plots print as `data:image/png;base64,…` lines, which the server turns into images.
+- **`execute`** (`{code}`, a tool's JavaScript, sent only to the socket that started the reply; 0.11.3 and 0.12.5 ✓, `npm run probe -- --toolscript`): run on the phone as the web runs it (the code is the body of an async function; what it returns is the answer), in a fresh sealed web view, asked first by default. A refusal, a failure or the 60-second limit answers `{error}`, the shape the server's own event caller uses (the web answers nothing on failure).
 - **Answered "unsupported" immediately** so the turn never hangs:
-  - `execute` (run JavaScript);
   - `request:chat:completion` (direct connections run by the client);
   - `request:terminal`.
 - `execute:tool` (call a user tool server from the client): later, with plain fetch.
@@ -381,7 +381,8 @@ The server merges these writes: it keeps its own copy of in-progress assistant m
 - **No client save after a reply.** In 0.11.3 the web client only refreshes the sidebar after a reply; the server persists output and runs outlet filters. `chat:outlet` patches message text (the app keeps `originalContent`).
 - **Answers the app gives to device-execution requests** (so turns never hang):
   - `execute:python` → what Python on the phone gave, `{stdout, stderr, result}` (an error, a time limit or a failed start in `stderr`);
-  - `execute`, `execute:tool`, `request:chat:completion`, `request:terminal` → `{error}`;
+  - `execute` → what the code returned, or `{error}` when it's refused, fails or runs over 60 seconds;
+  - `execute:tool`, `request:chat:completion`, `request:terminal` → `{error}`;
   - `request:user_input` → `{status: 'cancelled', answers: {}}`;
   - `request:elicitation` → `{action: 'cancel'}`;
   - `confirmation` and `input` are asked with native alerts.
