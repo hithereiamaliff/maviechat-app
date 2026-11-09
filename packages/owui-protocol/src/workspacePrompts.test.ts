@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { OwuiClient, type FetchLike } from './http';
-import { commandFromName, commandProblem, listPromptVersions, listWorkspacePrompts, promptsExport, promptsFromImport, saveWorkspacePromptVersion } from './workspacePrompts';
+import { commandFromName, commandProblem, getPromptVersion, listPromptVersions, listWorkspacePrompts, promptsExport, promptsFromImport, saveWorkspacePromptVersion } from './workspacePrompts';
 import { createWorkspaceSkill, skillDraftFromMarkdown, skillFrontMatter, skillIdFromName, skillIdProblem, skillsFromImport, updateWorkspaceSkill } from './workspaceSkills';
 
 function recordingClient(...answers: unknown[]) {
@@ -25,8 +25,15 @@ describe('workspace prompts', () => {
   });
 
   it('reads versions newest first', async () => {
-    const versions = await listPromptVersions(recordingClient([{ id: 'v2', snapshot: { content: 'B', name: 'Summary' }, commit_message: 'shorter', user: { name: 'Amy' }, created_at: 1_730_000_100 }, { snapshot: {} }]).client, 'p1');
-    expect(versions).toEqual([{ id: 'v2', content: 'B', name: 'Summary', commitMessage: 'shorter', author: 'Amy', createdAt: 1_730_000_100_000 }]);
+    const versions = await listPromptVersions(recordingClient([{ id: 'v2', snapshot: { content: 'B', name: 'Summary', tags: ['work', { name: 'old' }] }, commit_message: 'shorter', user: { name: 'Amy' }, created_at: 1_730_000_100 }, { snapshot: {} }]).client, 'p1');
+    expect(versions).toEqual([{ id: 'v2', content: 'B', name: 'Summary', tags: ['work', 'old'], commitMessage: 'shorter', author: 'Amy', createdAt: 1_730_000_100_000 }]);
+  });
+
+  it('reads one version on its own', async () => {
+    const { client, calls } = recordingClient({ id: 'v 1', prompt_id: 'p1', snapshot: { content: 'A', name: 'Summary' }, commit_message: null, created_at: 1_730_000_000 });
+    expect(await getPromptVersion(client, 'p1', 'v 1')).toEqual({ id: 'v 1', content: 'A', name: 'Summary', tags: [], commitMessage: '', author: '', createdAt: 1_730_000_000_000 });
+    expect(calls[0]?.url).toBe('https://chat.test/api/v1/prompts/id/p1/history/v%201');
+    await expect(getPromptVersion(recordingClient({ detail: 'x' }).client, 'p1', 'v9')).rejects.toThrow();
   });
 
   it('makes commands from names, and checks them as the web does', () => {

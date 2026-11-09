@@ -132,22 +132,36 @@ export interface PromptVersion {
   id: string;
   content: string;
   name: string;
+  /** Its tags as saved with it. */
+  tags: string[];
   commitMessage: string;
+  /** Who saved it (empty when the server didn't say: a version read on its own). */
   author: string;
   createdAt: number;
 }
 
+/** A version as the server lists it, with what it saved (its snapshot); null without an id. */
+function versionFrom(raw: unknown): PromptVersion | null {
+  const row = record(raw);
+  const versionId = text(row.id);
+  if (!versionId) return null;
+  const snapshot = record(row.snapshot);
+  const user = record(row.user);
+  const tags = list(snapshot.tags).map((tag) => (typeof tag === 'string' ? tag : text(record(tag).name))).filter(Boolean);
+  return { id: versionId, content: text(snapshot.content), name: text(snapshot.name), tags, commitMessage: text(row.commit_message), author: text(user.name) || text(user.email), createdAt: ms(row.created_at) };
+}
+
 /** Versions, newest first (20 a page, from 0; versions saved in the same second keep the server's order). */
 export async function listPromptVersions(client: OwuiClient, id: string, page = 0): Promise<PromptVersion[]> {
-  const versions = list(await client.get<unknown>(`${idPath(id)}/history`, { query: { page } })).flatMap((raw) => {
-    const row = record(raw);
-    const versionId = text(row.id);
-    if (!versionId) return [];
-    const snapshot = record(row.snapshot);
-    const user = record(row.user);
-    return [{ id: versionId, content: text(snapshot.content), name: text(snapshot.name), commitMessage: text(row.commit_message), author: text(user.name) || text(user.email), createdAt: ms(row.created_at) }];
-  });
+  const versions = list(await client.get<unknown>(`${idPath(id)}/history`, { query: { page } })).flatMap((raw) => versionFrom(raw) ?? []);
   return versions.map((version, index) => ({ version, index })).sort((a, b) => b.version.createdAt - a.version.createdAt || a.index - b.index).map((item) => item.version);
+}
+
+/** One version on its own (the live one, say, when it isn't among those listed so far). */
+export async function getPromptVersion(client: OwuiClient, id: string, versionId: string): Promise<PromptVersion> {
+  const version = versionFrom(await client.get<unknown>(`${idPath(id)}/history/${encodeURIComponent(versionId)}`));
+  if (!version) throw new Error('The server didn’t send that version.');
+  return version;
 }
 
 /** Makes an older version live again (its text, name and tags; the command and sharing stay). */

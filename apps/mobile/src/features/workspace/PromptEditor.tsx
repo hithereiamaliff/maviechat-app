@@ -22,7 +22,8 @@ import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
 import { editorStyles as styles, Field, SheetHeader, SheetLoading, TagsField } from './EditorParts';
-import { usePromptVersions, useWorkspacePrompt, useWorkspaceRefresh } from './queries';
+import { usePromptVersion, usePromptVersions, useWorkspacePrompt, useWorkspaceRefresh } from './queries';
+import { VersionChanges } from './VersionChanges';
 
 /** What the prompt sheet opens on: a new prompt, one to change (or read), or a copy of one. */
 export type PromptEditorTarget = { kind: 'new' } | { kind: 'edit'; id: string } | { kind: 'clone'; id: string };
@@ -35,8 +36,9 @@ const when = (ms: number) => (ms ? new Date(ms).toLocaleString(undefined, { date
 /**
  * A Workspace prompt, as Open WebUI's prompt page has it: name, `/command` (from the name until
  * you change it), tags and text. Changed text saves as a new version (live, or kept aside), with
- * a note of what changed; name, command and tags alone change without one. Its versions: make an
- * older one live again, copy one, or delete one that isn't live.
+ * a note of what changed; name, command and tags alone change without one. Its versions: compare
+ * one with the live one or the one before it, make an older one live again, copy one, or delete
+ * one that isn't live.
  */
 export function PromptEditor({ target, onClose }: { target: PromptEditorTarget | null; onClose: () => void }) {
   return (
@@ -222,25 +224,43 @@ function Form({ target, prompt, onClose }: { target: PromptEditorTarget; prompt:
   );
 }
 
-/** Every saved version, newest first: what changed, who, when, and which is live; open one to see its text. */
+/**
+ * Every saved version, newest first: what changed, who, when, and which is live; open one to see
+ * its text, or what differs between it and the live one or the one before it.
+ */
 function Versions({ prompt, readOnly, onMakeLive, onDelete }: { prompt: WorkspacePrompt; readOnly: boolean; onMakeLive: (version: PromptVersion) => void; onDelete: (version: PromptVersion) => void }) {
   const palette = usePalette();
   const toast = useToast();
   const versions = usePromptVersions(prompt.id);
   const [open, setOpen] = useState<string | null>(null);
+  const [comparing, setComparing] = useState<'live' | 'previous' | null>(null);
   const items = versions.data?.pages.flat() ?? [];
+  const listedLive = items.find((item) => item.id === prompt.versionId);
+  // The live version is read on its own when it's older than the versions listed so far.
+  const fetchedLive = usePromptVersion(prompt.id, comparing === 'live' && !listedLive ? prompt.versionId : null);
+  const live = listedLive ?? fetchedLive.data;
   return (
     <View style={styles.field}>
       <Text style={[styles.label, { color: palette.text }]}>Versions</Text>
       {versions.isLoading ? <ActivityIndicator color={palette.textMuted} /> : null}
       {versions.isError ? <Text style={[styles.note, { color: palette.danger }]}>{`Couldn’t load them: ${describeError(versions.error)}`}</Text> : null}
       {versions.data && !items.length ? <Text style={[styles.note, { color: palette.textFaint }]}>None saved yet.</Text> : null}
-      {items.map((version) => {
+      {items.map((version, index) => {
         const isLive = version.id === prompt.versionId;
         const shown = open === version.id;
+        const previous = items[index + 1];
+        const withLive = shown && comparing === 'live' && !isLive;
+        const withPrevious = shown && comparing === 'previous' && previous !== undefined;
         return (
           <View key={version.id} style={[local.version, { borderColor: isLive ? palette.link : palette.border }]}>
-            <Pressable accessibilityRole="button" accessibilityState={{ expanded: shown }} onPress={() => setOpen(shown ? null : version.id)} style={styles.row}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: shown }}
+              onPress={() => {
+                setOpen(shown ? null : version.id);
+                setComparing(null);
+              }}
+              style={styles.row}>
               <View style={styles.flex}>
                 <Text style={[styles.label, { color: palette.text }]} numberOfLines={1}>
                   {version.commitMessage || 'Saved'}
@@ -254,10 +274,21 @@ function Versions({ prompt, readOnly, onMakeLive, onDelete }: { prompt: Workspac
             </Pressable>
             {shown ? (
               <>
-                <Text selectable style={[styles.mono, local.text, { color: palette.text, backgroundColor: palette.surface }]}>
-                  {version.content}
-                </Text>
+                {withLive && live ? (
+                  <VersionChanges before={version} after={live} caption="From this version to the live one: − only in this version, + only in the live one." />
+                ) : withLive ? (
+                  fetchedLive.isError ? <Text style={[styles.note, { color: palette.danger }]}>{`Couldn’t load the live version: ${describeError(fetchedLive.error)}`}</Text> : <ActivityIndicator color={palette.textMuted} />
+                ) : withPrevious ? (
+                  <VersionChanges before={previous} after={version} caption="What this version changed from the one before it: − taken out, + put in." />
+                ) : (
+                  <Text selectable style={[styles.mono, local.text, { color: palette.text, backgroundColor: palette.surface }]}>
+                    {version.content}
+                  </Text>
+                )}
                 <View style={local.actions}>
+                  {withLive || withPrevious ? <Action label="Show Text" onPress={() => setComparing(null)} /> : null}
+                  {!isLive && prompt.versionId && !withLive ? <Action label="Compare with Live" onPress={() => setComparing('live')} /> : null}
+                  {previous && !withPrevious ? <Action label="Compare with Previous" onPress={() => setComparing('previous')} /> : null}
                   {!isLive && !readOnly ? <Action label="Make Live" onPress={() => onMakeLive(version)} /> : null}
                   <Action label="Copy" onPress={() => void Clipboard.setStringAsync(version.content).then(() => toast('Copied'))} />
                   {!isLive && !readOnly ? <Action label="Delete" danger onPress={() => onDelete(version)} /> : null}

@@ -1,4 +1,5 @@
 import {
+  getPromptVersion,
   getWorkspaceKnowledge,
   getWorkspaceModel,
   getWorkspacePrompt,
@@ -115,6 +116,16 @@ export function usePromptVersions(id: string | null) {
     getNextPageParam: (last, pages) => (last.length >= 20 ? pages.length : undefined),
     enabled: Boolean(id),
     staleTime: 0,
+  });
+}
+
+/** One version on its own: the live one, when it's older than the versions listed so far. */
+export function usePromptVersion(id: string, versionId: string | null) {
+  const { client } = useAuthed();
+  return useQuery({
+    queryKey: ['workspace', 'prompt-version', id, versionId ?? ''],
+    queryFn: () => getPromptVersion(client, id, versionId ?? ''),
+    enabled: Boolean(id && versionId),
   });
 }
 
