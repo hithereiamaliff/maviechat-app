@@ -61,3 +61,5 @@ npm run bundle
 ## Security and licence
 
 To report a security problem, see [SECURITY.md](SECURITY.md). MavieChat is released under the licence in [LICENSE](LICENSE).
+
+The licence covers the code. The MavieChat name and icon belong to TechMavie Digital and aren't covered by it. If you publish your own build, give it a different name and icon.
