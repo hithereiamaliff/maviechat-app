@@ -27,3 +27,6 @@ npm-debug.*
 # Generated native folders
 /apps/mobile/ios
 /apps/mobile/android
+
+# Maintainer notes, kept in their own private repository
+ops/
