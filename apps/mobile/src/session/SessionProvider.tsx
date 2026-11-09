@@ -73,6 +73,12 @@ interface SessionContextValue {
    * the session (as the web app does) and signs out only when the session itself is gone.
    */
   verifySession(): void;
+  /**
+   * Holds off signing out after a 401 while something that signs every device out shows what
+   * mustn't be lost first (new recovery codes). Call before the request; the returned function
+   * releases it.
+   */
+  holdSessionChecks(): () => void;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -277,6 +283,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const expireRef = useRef(expireSession);
   const clientRef = useRef(client);
   const verifying = useRef(false);
+  const holds = useRef(0);
   useEffect(() => {
     expireRef.current = expireSession;
     clientRef.current = client;
@@ -284,16 +291,26 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const verifySession = useCallback(() => {
     const current = clientRef.current;
-    if (!current || verifying.current) return;
+    if (!current || verifying.current || holds.current > 0) return;
     verifying.current = true;
     getSessionUser(current)
       .catch((error: unknown) => {
-        if (error instanceof OwuiHttpError && error.isUnauthorized) return expireRef.current(EXPIRED_NOTICE);
+        if (error instanceof OwuiHttpError && error.isUnauthorized && holds.current === 0) return expireRef.current(EXPIRED_NOTICE);
         return undefined;
       })
       .finally(() => {
         verifying.current = false;
       });
+  }, []);
+
+  const holdSessionChecks = useCallback(() => {
+    holds.current += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      holds.current -= 1;
+    };
   }, []);
 
   useEffect(
@@ -307,8 +324,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ state, client, accounts, signIn, finishSignIn, signOut, expireSession, switchAccount, removeAccount, accountSession, signedInSessions, verifySession }),
-    [state, client, accounts, signIn, finishSignIn, signOut, expireSession, switchAccount, removeAccount, accountSession, signedInSessions, verifySession],
+    () => ({ state, client, accounts, signIn, finishSignIn, signOut, expireSession, switchAccount, removeAccount, accountSession, signedInSessions, verifySession, holdSessionChecks }),
+    [state, client, accounts, signIn, finishSignIn, signOut, expireSession, switchAccount, removeAccount, accountSession, signedInSessions, verifySession, holdSessionChecks],
   );
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

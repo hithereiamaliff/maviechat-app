@@ -16,6 +16,9 @@ import { fonts, radius, usePalette } from '@/theme';
 
 type Challenge = Extract<SignInOutcome, { kind: 'mfa' }>;
 
+/** Where a new authenticator goes, said for this phone. */
+export const ADD_TO_APP = ANDROID ? 'Add it to an authenticator app' : 'Add it to the iPhone’s Passwords or to an authenticator app';
+
 /**
  * Open WebUI 0.12's second sign-in step, after the password: a code from the authenticator app
  * (or a recovery code); setting an authenticator up when the server asks for one (it then hands
@@ -37,7 +40,24 @@ export function TwoStepSignIn({ challenge: first, email, onBack }: { challenge: 
   };
 
   if (codes) return <RecoveryCodes codes={codes.list} onDone={codes.done} />;
-  if (challenge.step === 'enroll') return <Enroll key={challenge.challengeToken} client={client} challenge={challenge} email={email} onBack={onBack} onConfirmed={(result, list) => setCodes({ list, done: () => next(result) })} />;
+  if (challenge.step === 'enroll') {
+    return (
+      <AuthenticatorSetup
+        key={challenge.challengeToken}
+        client={client}
+        challengeToken={challenge.challengeToken}
+        email={email}
+        title="Set up two-step sign-in"
+        intro={`This server asks for a code from an authenticator app each time you sign in. ${ADD_TO_APP}, then enter the code it shows.`}
+        confirm={async (code) => {
+          const { result, recoveryCodes } = await confirmMfaEnrollment(client, challenge.challengeToken, code);
+          setCodes({ list: recoveryCodes, done: () => next(result) });
+        }}
+        onBack={() => onBack()}
+        onExpired={() => onBack('That step expired. Sign in again.')}
+      />
+    );
+  }
   return <CodeStep key={`${challenge.step}:${challenge.challengeToken}`} client={client} challenge={challenge} step={challenge.step} onBack={onBack} onResult={next} />;
 }
 
@@ -102,11 +122,38 @@ function CodeStep({ client, challenge, step, onBack, onResult }: { client: OwuiC
   );
 }
 
-function Enroll({ client, challenge, email, onBack, onConfirmed }: { client: OwuiClient; challenge: Challenge; email: string; onBack: (message?: string) => void; onConfirmed: (result: Awaited<ReturnType<typeof confirmMfaEnrollment>>['result'], codes: string[]) => void }) {
+/**
+ * Adding an authenticator for a challenge: its setup key (straight into the iPhone's Passwords or
+ * an authenticator app, typed in, or a QR code for another device), then the first code it shows.
+ * At sign-in when the server asks for one, and in Settings when replacing it.
+ */
+export function AuthenticatorSetup({
+  client,
+  challengeToken,
+  email,
+  title,
+  intro,
+  backLabel = 'Back',
+  confirm,
+  onBack,
+  onExpired,
+}: {
+  client: OwuiClient;
+  challengeToken: string;
+  email: string;
+  title: string;
+  intro: string;
+  backLabel?: string;
+  /** Sends the first code; throws when the server doesn't take it. */
+  confirm: (code: string) => Promise<void>;
+  onBack: () => void;
+  /** The challenge ran out: start again. */
+  onExpired: () => void;
+}) {
   const palette = usePalette();
   const toast = useToast();
   // Asked once: each request makes a new key, and the first may already be in the authenticator.
-  const setup = useQuery({ queryKey: ['mfa-enroll', challenge.challengeToken], queryFn: () => startMfaEnrollment(client, challenge.challengeToken), staleTime: Infinity, gcTime: 0, retry: false, refetchOnWindowFocus: false, refetchOnReconnect: false });
+  const setup = useQuery({ queryKey: ['mfa-enroll', challengeToken], queryFn: () => startMfaEnrollment(client, challengeToken), staleTime: Infinity, gcTime: 0, retry: false, refetchOnWindowFocus: false, refetchOnReconnect: false });
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
@@ -118,11 +165,10 @@ function Enroll({ client, challenge, email, onBack, onConfirmed }: { client: Owu
     setBusy(true);
     setProblem('');
     try {
-      const { result, recoveryCodes } = await confirmMfaEnrollment(client, challenge.challengeToken, code);
-      onConfirmed(result, recoveryCodes);
+      await confirm(code);
     } catch (error) {
       const text = describeSignInError(error);
-      if (/expired|start again/i.test(text)) onBack('That step expired. Sign in again.');
+      if (/expired|start again/i.test(text)) onExpired();
       else setProblem(text);
     } finally {
       setBusy(false);
@@ -130,13 +176,13 @@ function Enroll({ client, challenge, email, onBack, onConfirmed }: { client: Owu
   };
   return (
     <View style={styles.form}>
-      <Text style={[styles.title, { color: palette.text }]}>Set up two-step sign-in</Text>
-      <Text style={[styles.body, { color: palette.textMuted }]}>This server asks for a code from an authenticator app each time you sign in. {ANDROID ? 'Add it to an authenticator app' : 'Add it to the iPhone’s Passwords or to an authenticator app'}, then enter the code it shows.</Text>
+      <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
+      <Text style={[styles.body, { color: palette.textMuted }]}>{intro}</Text>
       {setup.isLoading ? <ActivityIndicator color={palette.textMuted} /> : null}
       {setup.isError ? <Text style={[styles.body, { color: palette.danger }]}>{describeSignInError(setup.error)}</Text> : null}
       {key ? (
         <>
-          <Button label="Add to Passwords or an Authenticator" onPress={addToApp} />
+          <Button label={ANDROID ? 'Add to an Authenticator' : 'Add to Passwords or an Authenticator'} onPress={addToApp} />
           <View style={[styles.keyBox, { borderColor: palette.border, backgroundColor: palette.surface }]}>
             <Text style={[styles.small, { color: palette.textMuted }]}>Or type this setup key into your app</Text>
             <Text selectable style={[styles.key, { color: palette.text }]}>
@@ -157,15 +203,17 @@ function Enroll({ client, challenge, email, onBack, onConfirmed }: { client: Owu
           <Button label="Confirm" onPress={() => void submit()} loading={busy} disabled={!code.trim()} />
         </>
       ) : null}
-      <Pressable accessibilityRole="button" onPress={() => onBack()} hitSlop={8} style={styles.link}>
-        <Text style={[styles.linkText, { color: palette.link }]}>Back</Text>
+      <Pressable accessibilityRole="button" onPress={onBack} hitSlop={8} style={styles.link}>
+        <Text style={[styles.linkText, { color: palette.link }]}>{backLabel}</Text>
       </Pressable>
     </View>
   );
 }
 
+const KEEP_THEM = 'If you lose your authenticator, each of these signs you in once. They won’t be shown again: save them somewhere safe, like the Passwords app or a password manager.';
+
 /** Recovery codes, shown once: each signs in once without the authenticator. */
-function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => Promise<void> }) {
+export function RecoveryCodes({ codes, intro = KEEP_THEM, onDone }: { codes: string[]; intro?: string; onDone: () => Promise<void> }) {
   const palette = usePalette();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -173,7 +221,7 @@ function RecoveryCodes({ codes, onDone }: { codes: string[]; onDone: () => Promi
   return (
     <View style={styles.form}>
       <Text style={[styles.title, { color: palette.text }]}>Keep your recovery codes</Text>
-      <Text style={[styles.body, { color: palette.textMuted }]}>If you lose your authenticator, each of these signs you in once. They won’t be shown again: save them somewhere safe, like the Passwords app or a password manager.</Text>
+      <Text style={[styles.body, { color: palette.textMuted }]}>{intro}</Text>
       <View style={[styles.keyBox, { borderColor: palette.border, backgroundColor: palette.surface }]}>
         <Text selectable style={[styles.codes, { color: palette.text }]}>
           {all}

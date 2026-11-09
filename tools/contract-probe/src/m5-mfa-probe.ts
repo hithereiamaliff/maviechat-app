@@ -42,7 +42,50 @@ export function totp(secret: string, atMs = Date.now()): string {
 }
 
 /** Waits for the next 30-second step: a code can't be used twice. */
-const nextStep = () => sleep(30_000 - (Date.now() % 30_000) + 750);
+export const nextStep = () => sleep(30_000 - (Date.now() % 30_000) + 750);
+
+/**
+ * The scratch admin's side of two-step sign-in: signing in through whatever step the server asks
+ * for (its key kept in the scratch env file, 0600, once it has one), and switching two-step
+ * sign-in on or off for everyone (which signs everyone out).
+ */
+export function mfaAdmin({ baseUrl, admin, envFile }: { baseUrl: string; admin: { email: string; password: string; mfaSecret?: string }; envFile: string }) {
+  const anon = new OwuiClient({ baseUrl, token: null });
+  let adminSecret = admin.mfaSecret ?? '';
+
+  /** Signs the admin in, through whatever step the server asks for. */
+  const session = async (): Promise<OwuiClient> => {
+    const first = await signIn(anon, admin.email, admin.password);
+    let done: SignInResult = first;
+    if (first.kind === 'mfa' && first.step === 'enroll') {
+      const setup = await startMfaEnrollment(anon, first.challengeToken);
+      adminSecret = setup.manualKey.replace(/\s+/g, '');
+      // Kept where the scratch admin's sign-in is (0600), so a later run can sign in again.
+      appendFileSync(envFile, `OWUI_MFA_SECRET=${adminSecret}\n`, { mode: 0o600 });
+      done = (await confirmMfaEnrollment(anon, first.challengeToken, totp(adminSecret))).result;
+    } else if (first.kind === 'mfa' && first.step === 'verify') {
+      if (!adminSecret) throw new Error('the scratch admin has two-step sign-in, but its key isn’t in the env file');
+      done = await verifyMfa(anon, first.challengeToken, totp(adminSecret));
+      if (done.kind === 'mfa') {
+        await nextStep();
+        done = await verifyMfa(anon, first.challengeToken, totp(adminSecret));
+      }
+    }
+    const signedIn = sessionOf(done);
+    if (!signedIn) throw new Error(`the scratch admin couldn’t sign in (${done.kind})`);
+    return anon.withToken(signedIn.token);
+  };
+
+  /** Two-step sign-in on or off for everyone; true when the server says everyone was signed out. */
+  const setMfa = async (client: OwuiClient, on: boolean) => {
+    const config = await getAdminConfig(client);
+    if (!('ENABLE_MFA' in config)) throw new Error('this server’s admin config has no ENABLE_MFA');
+    const answer = await saveAdminConfig(client, { ...config, ENABLE_MFA: on });
+    return answer.sessions_revoked === true;
+  };
+
+  return { session, setMfa };
+}
 
 /**
  * M5: two-step sign-in on a 0.12 scratch server. Two-step sign-in switched on (everyone signed
@@ -69,37 +112,7 @@ export async function probeM5Mfa({ baseUrl, version, admin, envFile }: { baseUrl
     return { steps, fixture };
   }
   const anon = new OwuiClient({ baseUrl, token: null });
-  let adminSecret = admin.mfaSecret ?? '';
-
-  /** Signs the admin in, through whatever step the server asks for. */
-  const adminSession = async (): Promise<OwuiClient> => {
-    const first = await signIn(anon, admin.email, admin.password);
-    let done: SignInResult = first;
-    if (first.kind === 'mfa' && first.step === 'enroll') {
-      const setup = await startMfaEnrollment(anon, first.challengeToken);
-      adminSecret = setup.manualKey.replace(/\s+/g, '');
-      // Kept where the scratch admin's sign-in is (0600), so a later run can sign in again.
-      appendFileSync(envFile, `OWUI_MFA_SECRET=${adminSecret}\n`, { mode: 0o600 });
-      done = (await confirmMfaEnrollment(anon, first.challengeToken, totp(adminSecret))).result;
-    } else if (first.kind === 'mfa' && first.step === 'verify') {
-      if (!adminSecret) throw new Error('the scratch admin has two-step sign-in, but its key isn’t in the env file');
-      done = await verifyMfa(anon, first.challengeToken, totp(adminSecret));
-      if (done.kind === 'mfa') {
-        await nextStep();
-        done = await verifyMfa(anon, first.challengeToken, totp(adminSecret));
-      }
-    }
-    const session = sessionOf(done);
-    if (!session) throw new Error(`the scratch admin couldn’t sign in (${done.kind})`);
-    return anon.withToken(session.token);
-  };
-
-  const setMfa = async (client: OwuiClient, on: boolean) => {
-    const config = await getAdminConfig(client);
-    if (!('ENABLE_MFA' in config)) throw new Error('this server’s admin config has no ENABLE_MFA');
-    const answer = await saveAdminConfig(client, { ...config, ENABLE_MFA: on });
-    return answer.sessions_revoked === true;
-  };
+  const { session: adminSession, setMfa } = mfaAdmin({ baseUrl, admin, envFile });
 
   const stamp = Date.now().toString(36);
   const email = `app-probe-mfa-${stamp}@maviechat.invalid`;

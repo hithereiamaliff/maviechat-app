@@ -37,6 +37,7 @@ import { useSession } from '@/session/SessionProvider';
 import { fonts, radius, usePalette } from '@/theme';
 import { initialsColour, usePictureMaker } from './PictureMaker';
 import { ActionRow, Group, Note, rowStyles, SectionTitle } from './rows';
+import { TwoStepSection } from './TwoStepSection';
 import { VariableEditor } from './VariableEditor';
 
 const GENDERS = [
@@ -57,7 +58,8 @@ const PHOTO: ImagePicker.ImagePickerOptions = {
 
 /**
  * Open WebUI's Account tab: your picture, name, bio, gender and birth date and your own variables
- * (saved together with Save, as on the web), your password, and your API key when the admin allows one.
+ * (saved together with Save, as on the web), your password, your two-step sign-in where the server
+ * asks for it (0.12), and your API key when the admin allows one.
  */
 export function AccountSettings() {
   const palette = usePalette();
@@ -256,6 +258,7 @@ export function AccountSettings() {
       </View>
 
       {passwordForm ? <PasswordSection onChanged={() => void expireSession('Your password was changed. Sign in with the new one.')} /> : null}
+      <TwoStepSection />
       {apiKeys ? <ApiKeySection admin={capabilities?.isAdmin ?? false} token={session.token} /> : null}
 
       <VariableEditor

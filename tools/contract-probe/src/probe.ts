@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels [--peer-env FILE]] [--signin] [--orders] [--pending] [--userchats] [--authsettings] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels [--peer-env FILE]] [--signin] [--orders] [--pending] [--userchats] [--authsettings] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa] [--accountmfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -72,6 +72,10 @@
  * `--userchats` (admins, scratch servers only) has a throwaway user write a chat, then lists it the
  * admin's way (by words, by title), opens it by its id and deletes it; imports a CSV with good and
  * bad rows; every account made is deleted (src/userchats-probe.ts).
+ * `--accountmfa` (a scratch server's admin; after everything else: it signs everyone out) switches
+ * two-step sign-in on, has throwaway users try Settings → Account's part: the status, new recovery
+ * codes (every device signed out at once), replacing the authenticator, and a sign-in too old for
+ * either; then switches it off and deletes them (src/accountmfa-probe.ts).
  * `--authsettings` (admins, scratch servers only) reads Authentication's LDAP and single sign-on
  * settings the app's way; where LDAP isn't set up, checks switching it on with empty settings is
  * refused and it stays off; nothing is left changed (src/authsettings-probe.ts).
@@ -136,6 +140,7 @@ import { probeSignIn } from './signin-probe';
 import { probeOrders } from './orders-probe';
 import { probePending } from './pending-probe';
 import { probeUserChats } from './userchats-probe';
+import { probeAccountMfa } from './accountmfa-probe';
 import { probeAuthSettings } from './authsettings-probe';
 import { probeChatVars } from './chatvars-probe';
 import { probeCodeEdit } from './codeedit-probe';
@@ -214,6 +219,7 @@ const { values: args } = parseArgs({
     m4functions: { type: 'boolean' },
     m4evaluations: { type: 'boolean' },
     m5mfa: { type: 'boolean' },
+    accountmfa: { type: 'boolean' },
   },
 });
 
@@ -779,6 +785,15 @@ async function main() {
       const m5 = await probeM5Mfa({ baseUrl, version: version?.version, admin: { email: env.OWUI_EMAIL, password: env.OWUI_PASSWORD, mfaSecret: env.OWUI_MFA_SECRET }, envFile: expandHome(envFile) });
       for (const result of m5.steps) results.push({ ...result, name: `M5: ${result.name}` });
       fixtures['write.m5-mfa'] = m5.fixture;
+    }
+  }
+  if (args.accountmfa) {
+    if (!SCRATCH_URLS.has(baseUrl) || !env.OWUI_EMAIL || !env.OWUI_PASSWORD) {
+      results.push({ name: 'account two-step sign-in', ok: false, note: 'only on a scratch server, as its admin' });
+    } else {
+      const account = await probeAccountMfa({ baseUrl, version: version?.version, admin: { email: env.OWUI_EMAIL, password: env.OWUI_PASSWORD, mfaSecret: env.OWUI_MFA_SECRET }, envFile: expandHome(envFile) });
+      for (const result of account.steps) results.push({ ...result, name: `account two-step: ${result.name}` });
+      fixtures['write.account-mfa'] = account.fixture;
     }
   }
 
