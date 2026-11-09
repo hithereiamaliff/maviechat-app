@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffText, textDiffFromUnified, textLines, unifiedLines } from './textDiff';
+import { diffBlocks, diffText, mergeText, textDiffFromUnified, textLines, unifiedLines } from './textDiff';
 
 const lines = (count: number, name: (i: number) => string) => Array.from({ length: count }, (_, index) => name(index + 1)).join('\n');
 const ten = lines(10, (i) => `line ${i}`);
@@ -117,5 +117,48 @@ describe('a diff -u text read back', () => {
     expect(textDiffFromUnified('--- a\n+++ b\n@@ -0,0 +1,2 @@\n+a\n+b').hunks[0]).toMatchObject({ beforeStart: 1, beforeCount: 0, afterStart: 1, afterCount: 2 });
     expect(unifiedLines(textDiffFromUnified('@@ -3 +3 @@\n-x\n+y'))).toEqual(['@@ -3 +3 @@', '-x', '+y']);
     expect(textDiffFromUnified('', true)).toEqual({ hunks: [], removed: 0, added: 0, lineEndingsOnly: true });
+  });
+});
+
+describe('merging a revision', () => {
+  const current = 'You are kind.\nAnswer briefly.\nUse British spelling.\nSign off.\n';
+  const revision = 'You are kind.\nAnswer in detail.\nUse British spelling.\nCite sources.\nSign off.\n';
+
+  it('splits both texts into unchanged runs and changes', () => {
+    expect(diffBlocks(current, revision)).toEqual([
+      { kind: 'same', lines: ['You are kind.'] },
+      { kind: 'change', removed: ['Answer briefly.'], added: ['Answer in detail.'] },
+      { kind: 'same', lines: ['Use British spelling.'] },
+      { kind: 'change', removed: [], added: ['Cite sources.'] },
+      { kind: 'same', lines: ['Sign off.'] },
+    ]);
+  });
+
+  it('takes the revision by default, the current lines, or both (current first), change by change', () => {
+    expect(mergeText(current, revision)).toBe(revision);
+    expect(mergeText(current, revision, { 0: 'current', 1: 'current' })).toBe(current);
+    expect(mergeText(current, revision, { 0: 'both' })).toBe('You are kind.\nAnswer briefly.\nAnswer in detail.\nUse British spelling.\nCite sources.\nSign off.\n');
+    expect(mergeText(current, revision, { 1: 'current' })).toBe('You are kind.\nAnswer in detail.\nUse British spelling.\nSign off.\n');
+  });
+
+  it('ends as the side it follows does', () => {
+    expect(mergeText('a\nb\n', 'a\nc')).toBe('a\nc');
+    expect(mergeText('a\nb\n', 'a\nc', { 0: 'current' })).toBe('a\nb\n');
+    expect(mergeText('', 'new\n')).toBe('new\n');
+    expect(mergeText('same', 'same')).toBe('same');
+  });
+
+  it('always rebuilds either text when every change goes one way', () => {
+    const next = numbers(23);
+    for (let round = 0; round < 100; round += 1) {
+      const words = ['alpha', 'beta', 'gamma', ''];
+      const pick = () => words[Math.floor(next() * words.length)] ?? '';
+      const a = Array.from({ length: Math.floor(next() * 20) }, pick).join('\n');
+      const b = textLines(a).flatMap((line) => (next() < 0.25 ? [] : next() < 0.25 ? [pick(), line] : [line])).join('\n');
+      const changes = diffBlocks(a, b).filter((block) => block.kind === 'change').length;
+      const keep = Object.fromEntries(Array.from({ length: changes }, (_, index) => [index, 'current' as const]));
+      expect(textLines(mergeText(a, b))).toEqual(textLines(b));
+      expect(textLines(mergeText(a, b, keep))).toEqual(textLines(a));
+    }
   });
 });

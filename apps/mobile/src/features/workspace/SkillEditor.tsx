@@ -5,6 +5,8 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { describeError } from '@/lib/errors';
+import { CompareLink } from '@/features/compare/CompareLink';
+import { RevisionMergeSheet } from '@/features/compare/RevisionMergeSheet';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { usePalette } from '@/theme';
 import { editorStyles as styles, Field, SheetHeader, SheetLoading, TagsField } from './EditorParts';
@@ -52,6 +54,8 @@ function Form({ target, skill, onClose }: { target: SkillEditorTarget; skill: Wo
   const [description, setDescription] = useState(skill?.description ?? draft?.description ?? '');
   const [tags, setTags] = useState<string[]>(skill?.tags ?? []);
   const [content, setContent] = useState(skill?.content ?? draft?.content ?? '');
+  // The instructions when a comparison with a revision opened (null while none is open).
+  const [comparing, setComparing] = useState<string | null>(null);
   // 0.12 keeps each saved change as a version, with a note when one is given.
   const versioned = editing && !readOnly && isAtLeast(capabilities?.version, '0.12.0');
   const [note, setNote] = useState('');
@@ -148,6 +152,8 @@ function Form({ target, skill, onClose }: { target: SkillEditorTarget; skill: Wo
             style={[styles.input, styles.body, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]}
           />
         </Field>
+        {readOnly ? null : <CompareLink onPress={() => setComparing(content)} />}
+        <RevisionMergeSheet current={comparing} title="Compare the Instructions" onApply={setContent} onClose={() => setComparing(null)} />
         {versioned ? (
           <Field label="Note" note="What changed, kept with the version this save makes (Versions… in its menu).">
             <TextInput value={note} onChangeText={setNote} placeholder="Optional" placeholderTextColor={palette.textFaint} accessibilityLabel="Note on this change" style={[styles.input, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]} />

@@ -44,6 +44,8 @@ interface Options {
   onCompact?: () => void;
   /** `/status`: what the chat uses and has running, once it has messages. */
   onStatus?: () => void;
+  /** `/compare`: the message so far beside a revision you paste (0.12's comparison). */
+  onCompare?: () => void;
 }
 
 /**
@@ -52,7 +54,7 @@ interface Options {
  * for the server to add); `$` for skills alone; `@` for a model to talk to, knowledge, folders and
  * web pages; `#` for knowledge and web pages; `:` for an emoji by its name (`:smile`).
  */
-export function useInputMenus({ draftKey, text, cursor, focused, setText, onPickModel, onTemporary, onFork, onCompact, onStatus }: Options) {
+export function useInputMenus({ draftKey, text, cursor, focused, setText, onPickModel, onTemporary, onFork, onCompact, onStatus, onCompare }: Options) {
   const { client } = useAuthed();
   const toast = useToast();
   const capabilities = useCapabilities();
@@ -126,6 +128,7 @@ export function useInputMenus({ draftKey, text, cursor, focused, setText, onPick
       ...(onCompact ? [{ id: 'compact', title: 'Compact', subtitle: 'Summarise the chat so far, to make room', run: onCompact }] : []),
       ...(onFork ? [{ id: 'fork', title: 'Fork', subtitle: 'Carry on in a copy of this chat', run: onFork }] : []),
       ...(onStatus ? [{ id: 'status', title: 'Status', subtitle: 'What this chat uses and has running', run: onStatus }] : []),
+      ...(onCompare ? [{ id: 'compare', title: 'Compare', subtitle: 'Your message beside a revision you paste', run: onCompare }] : []),
     ].filter((command) => command.id.startsWith(query.toLowerCase()));
     for (const command of commands) {
       entries.push({
@@ -142,7 +145,9 @@ export function useInputMenus({ draftKey, text, cursor, focused, setText, onPick
                   ? 'bars-arrow-up'
                   : command.id === 'status'
                     ? 'information-circle'
-                    : 'eye-slash',
+                    : command.id === 'compare'
+                      ? 'arrows-right-left'
+                      : 'eye-slash',
         title: `/${command.id}`,
         subtitle: command.subtitle,
         onPick: () => {

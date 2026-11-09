@@ -43,6 +43,7 @@ import { fonts, usePalette } from '@/theme';
 import { AttachmentStrip } from './AttachmentStrip';
 import { AttachSheet, type AttachMode } from './AttachSheet';
 import { useConnectTool } from './ConnectToolSheet';
+import { RevisionMergeSheet } from '@/features/compare/RevisionMergeSheet';
 import { connectFirst, draftTools, getDraft, updateDraft, useDraft } from './drafts';
 import { FilePreviewSheet } from './FilePreviewSheet';
 import { FullScreenInput } from './FullScreenInput';
@@ -173,6 +174,8 @@ export function Composer({
   const [deepTutorOpen, setDeepTutorOpen] = useState(false);
   const [knobsOpen, setKnobsOpen] = useState(false);
   const [attachMode, setAttachMode] = useState<AttachMode | null>(null);
+  // The message when a comparison with a revision opened (null while none is open).
+  const [comparing, setComparing] = useState<string | null>(null);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [variablesOpen, setVariablesOpen] = useState(false);
   const deepTutorSignedIn = useDeepTutor().state.status === 'signed-in';
@@ -245,6 +248,7 @@ export function Composer({
     onFork,
     onCompact,
     onStatus,
+    onCompare: () => setComparing(getDraft(draftKey).text),
   });
 
   // Like the web, a model brings its own default toggles, tools, skills, filters and system when you start with it.
@@ -294,6 +298,7 @@ export function Composer({
     ...(notesOn ? [{ key: 'notes', label: 'Attach Notes', icon: 'pencil-square' as const, onPress: () => setAttachMode('notes') }] : []),
     { key: 'knowledge', label: 'Attach Knowledge', icon: 'circle-stack', onPress: () => setAttachMode('knowledge') },
     { key: 'chats', label: 'Reference Chats', icon: 'chat-bubble-left-right', onPress: () => setAttachMode('chats') },
+    { key: 'compare', label: 'Compare Text…', icon: 'arrows-right-left', onPress: () => setComparing(getDraft(draftKey).text) },
     ...(deepTutorSignedIn
       ? [{ key: 'deeptutor', label: 'Reference DeepTutor Chat', icon: 'academic-cap' as const, onPress: () => setDeepTutorOpen(true) }]
       : []),
@@ -591,6 +596,8 @@ export function Composer({
       {plusMenu}
       {attach.pictureElement}
       <AttachSheet mode={attachMode} draftKey={draftKey} chatId={draftKey} onClose={() => setAttachMode(null)} />
+      {/* The result goes in as the message, as typed text (never turned into a file). */}
+      <RevisionMergeSheet current={comparing} title="Compare Text" applyLabel="Use" onApply={(text) => updateDraft(draftKey, (current) => ({ ...current, text }))} onClose={() => setComparing(null)} />
       <FilePreviewSheet
         file={previewIndex !== null ? (draft.files[previewIndex] ?? null) : null}
         onClose={() => setPreviewIndex(null)}

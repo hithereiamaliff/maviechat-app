@@ -7,7 +7,7 @@ import { describeError } from '@/lib/errors';
 import { fonts, radius, usePalette } from '@/theme';
 
 /** A Workspace sheet's top bar: Cancel (Done when read-only), the title, and Save. */
-export function SheetHeader({ title, onCancel, onSave, canSave, busy, readOnly = false }: { title: string; onCancel: () => void; onSave: () => void; canSave: boolean; busy: boolean; readOnly?: boolean }) {
+export function SheetHeader({ title, onCancel, onSave, canSave, busy, readOnly = false, saveLabel = 'Save' }: { title: string; onCancel: () => void; onSave: () => void; canSave: boolean; busy: boolean; readOnly?: boolean; saveLabel?: string }) {
   const palette = usePalette();
   return (
     <View style={editorStyles.header}>
@@ -23,7 +23,7 @@ export function SheetHeader({ title, onCancel, onSave, canSave, busy, readOnly =
         <ActivityIndicator color={palette.textMuted} />
       ) : (
         <Pressable accessibilityRole="button" disabled={!canSave} onPress={onSave} hitSlop={10}>
-          <Text style={[editorStyles.action, editorStyles.strong, { color: canSave ? palette.link : palette.textFaint }]}>Save</Text>
+          <Text style={[editorStyles.action, editorStyles.strong, { color: canSave ? palette.link : palette.textFaint }]}>{saveLabel}</Text>
         </Pressable>
       )}
     </View>

@@ -43,6 +43,8 @@ import { usePictureMaker } from '@/features/settings/PictureMaker';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useModels } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
+import { CompareLink } from '@/features/compare/CompareLink';
+import { RevisionMergeSheet } from '@/features/compare/RevisionMergeSheet';
 import { Field } from './EditorParts';
 import { AttachmentsSection, CapabilitiesSection, ParamsSection, Section, SuggestionsSection, VoiceSection } from './ModelSections';
 import { useWorkspaceModel, useWorkspaceRefresh } from './queries';
@@ -131,6 +133,8 @@ function Form({ target, model, defaults, onClose, onSaved }: { target: ModelEdit
   const [tags, setTags] = useState<string[]>(model ? tagNames(model.meta.tags) : []);
   const [newTag, setNewTag] = useState('');
   const [system, setSystem] = useState(typeof model?.params.system === 'string' ? model.params.system : '');
+  // The system prompt when a comparison with a revision opened (null while none is open).
+  const [comparing, setComparing] = useState<string | null>(null);
   // 0.12 keeps each save of a saved model as a version, with a note when one is given.
   const versioned = editing && !readOnly && (!own || Boolean(target.kind === 'base' && target.saved)) && isAtLeast(capabilities?.version, '0.12.0');
   const [note, setNote] = useState('');
@@ -368,6 +372,8 @@ function Form({ target, model, defaults, onClose, onSaved }: { target: ModelEdit
             accessibilityLabel="System prompt"
             style={[styles.input, styles.system, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]}
           />
+          {readOnly ? null : <CompareLink onPress={() => setComparing(system)} />}
+          <RevisionMergeSheet current={comparing} title="Compare the System Prompt" onApply={setSystem} onClose={() => setComparing(null)} />
           {variables.chat.length || variables.user.length ? (
             <Text style={[styles.note, { color: palette.textMuted }]}>
               {[variables.chat.length ? `Asks each chat for: ${variables.chat.join(', ')}.` : '', variables.user.length ? `Each person sets: ${variables.user.join(', ')}.` : ''].filter(Boolean).join(' ')}

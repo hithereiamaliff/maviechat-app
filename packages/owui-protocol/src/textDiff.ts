@@ -123,8 +123,8 @@ function tidy(steps: Step[]): Step[] {
   return out;
 }
 
-/** What changed from `before` to `after`, line by line, with `context` unchanged lines around each change. */
-export function diffText(before: string, after: string, context = 3): TextDiff {
+/** Every line of both texts in order: unchanged, taken out and put in (each run of changes with what's taken out first). */
+export function diffLines(before: string, after: string): DiffLine[] {
   const a = textLines(before);
   const b = textLines(after);
   // What both begin and end with is kept; the steps are worked out for what's between.
@@ -147,7 +147,12 @@ export function diffText(before: string, after: string, context = 3): TextDiff {
     else if (step === 'removed') lines.push({ kind: 'removed', text: a[i] ?? '', before: ++i, after: null });
     else lines.push({ kind: 'added', text: b[j] ?? '', before: null, after: ++j });
   }
+  return lines;
+}
 
+/** What changed from `before` to `after`, line by line, with `context` unchanged lines around each change. */
+export function diffText(before: string, after: string, context = 3): TextDiff {
+  const lines = diffLines(before, after);
   // Changes closer than twice the context share a hunk.
   const changed = lines.flatMap((line, index) => (line.kind === 'same' ? [] : [index]));
   const hunks: DiffHunk[] = [];
@@ -216,4 +221,54 @@ export function textDiffFromUnified(patch: string, lineEndingsOnly = false): Tex
   }
   const all = hunks.flatMap((item) => item.lines);
   return { hunks, removed: all.filter((line) => line.kind === 'removed').length, added: all.filter((line) => line.kind === 'added').length, lineEndingsOnly: lineEndingsOnly && !hunks.length };
+}
+
+/** A run of unchanged lines, or one change: what the first text has there, and what the second has. */
+export type DiffBlock = { kind: 'same'; lines: string[] } | { kind: 'change'; removed: string[]; added: string[] };
+
+/** Both texts as runs of unchanged lines and changes, in order (for merging one into the other). */
+export function diffBlocks(before: string, after: string): DiffBlock[] {
+  const blocks: DiffBlock[] = [];
+  for (const line of diffLines(before, after)) {
+    const last = blocks[blocks.length - 1];
+    if (line.kind === 'same') {
+      if (last?.kind === 'same') last.lines.push(line.text);
+      else blocks.push({ kind: 'same', lines: [line.text] });
+    } else {
+      const change = last?.kind === 'change' ? last : (blocks[blocks.push({ kind: 'change', removed: [], added: [] }) - 1] as Extract<DiffBlock, { kind: 'change' }>);
+      if (line.kind === 'removed') change.removed.push(line.text);
+      else change.added.push(line.text);
+    }
+  }
+  return blocks;
+}
+
+/** What a merge keeps of one change: the revision's lines, the current ones, or both (the current first). */
+export type MergeChoice = 'revision' | 'current' | 'both';
+
+const endsWithBreak = (text: string) => /(\r\n|[\n\v\f\r\x1c-\x1e\x85\u2028\u2029])$/.test(text);
+
+/**
+ * The text a merge of a revision into the current text makes: unchanged lines as they are, each
+ * change as chosen (the revision's where nothing was chosen; changes count from 0). Lines are
+ * joined with \n; it ends with a line break when the revision does, or the current text does if
+ * every change keeps the current lines.
+ */
+export function mergeText(current: string, revision: string, choices: Record<number, MergeChoice> = {}): string {
+  const lines: string[] = [];
+  let change = 0;
+  let allCurrent = true;
+  for (const block of diffBlocks(current, revision)) {
+    if (block.kind === 'same') {
+      lines.push(...block.lines);
+      continue;
+    }
+    const choice = choices[change] ?? 'revision';
+    change += 1;
+    if (choice !== 'current') allCurrent = false;
+    if (choice !== 'revision') lines.push(...block.removed);
+    if (choice !== 'current') lines.push(...block.added);
+  }
+  const text = lines.join('\n');
+  return text && endsWithBreak(change && allCurrent ? current : revision) ? `${text}\n` : text;
 }

@@ -22,6 +22,8 @@ import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
 import { editorStyles as styles, Field, SheetHeader, SheetLoading, TagsField } from './EditorParts';
+import { CompareLink } from '@/features/compare/CompareLink';
+import { RevisionMergeSheet } from '@/features/compare/RevisionMergeSheet';
 import { usePromptVersion, usePromptVersions, useWorkspacePrompt, useWorkspaceRefresh } from './queries';
 import { VersionChanges } from './VersionChanges';
 
@@ -74,6 +76,8 @@ function Form({ target, prompt, onClose }: { target: PromptEditorTarget; prompt:
   const [commandTouched, setCommandTouched] = useState(target.kind !== 'new');
   const [tags, setTags] = useState<string[]>(prompt?.tags ?? []);
   const [content, setContent] = useState(prompt?.content ?? '');
+  // The text when a comparison with a revision opened (null while none is open).
+  const [comparing, setComparing] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [live, setLive] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -203,6 +207,8 @@ function Form({ target, prompt, onClose }: { target: PromptEditorTarget; prompt:
             style={[styles.input, styles.body, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]}
           />
         </Field>
+        {readOnly ? null : <CompareLink onPress={() => setComparing(content)} />}
+        <RevisionMergeSheet current={comparing} title="Compare the Text" onApply={setContent} onClose={() => setComparing(null)} />
         {textChanged ? (
           <View style={[local.box, { borderColor: palette.border }]}>
             <TextInput value={message} onChangeText={setMessage} placeholder="What changed (optional)" placeholderTextColor={palette.textFaint} accessibilityLabel="What changed" style={[styles.input, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]} />
