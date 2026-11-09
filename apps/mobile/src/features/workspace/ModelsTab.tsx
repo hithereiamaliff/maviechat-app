@@ -3,6 +3,7 @@ import {
   exportWorkspaceModels,
   getWorkspaceModel,
   importWorkspaceModel,
+  isAtLeast,
   listAllWorkspaceModels,
   modelsFromImport,
   setWorkspaceModelActive,
@@ -27,6 +28,7 @@ import { describeError } from '@/lib/errors';
 import { useDebounced } from '@/lib/useDebounced';
 import { useAuthed, useCapabilities, useModels } from '@/lib/server';
 import { AccessSheet, type AccessTarget } from './AccessSheet';
+import { CodeVersionsSheet, type CodeVersionsTarget } from './CodeVersionsSheet';
 import { pickTextFile, plural } from './EditorParts';
 import { ListControls } from './ListControls';
 import { ModelEditor, type ModelEditorTarget } from './ModelEditor';
@@ -98,6 +100,9 @@ export function ModelsTab({ tabs }: { tabs: (count?: number) => ReactNode }) {
   const [byName, setByName] = useState(false);
   const [editor, setEditor] = useState<ModelEditorTarget | null>(null);
   const [sharing, setSharing] = useState<AccessTarget | null>(null);
+  const [versions, setVersions] = useState<CodeVersionsTarget | null>(null);
+  // 0.12 keeps each saved change of a model as a version (its writers may look).
+  const versioned = isAtLeast(capabilities?.version, '0.12.0');
   const [importing, setImporting] = useState(false);
   const [bulk, setBulk] = useState<Bulk | null>(null);
   const pinned = usePinnedModels();
@@ -211,6 +216,7 @@ export function ModelsTab({ tabs }: { tabs: (count?: number) => ReactNode }) {
       ? [
           { key: 'edit', label: 'Edit', icon: 'pencil-square' as const, onPress: () => setEditor({ kind: 'edit', id: model.id }) },
           { key: 'share', label: 'Share…', icon: 'users' as const, onPress: () => setSharing({ area: 'models', id: model.id, name: model.name, grants: model.accessGrants }) },
+          ...(versioned ? [{ key: 'versions', label: 'Versions…', icon: 'clock' as const, onPress: () => setVersions({ kind: 'models', id: model.id, name: model.name, canWrite: true }) }] : []),
           { key: 'hide', label: model.hidden ? 'Show in Pickers' : 'Hide from Pickers', icon: model.hidden ? ('eye' as const) : ('eye-slash' as const), onPress: () => run(() => setWorkspaceModelHidden(client, model.id, !model.hidden), model.hidden ? 'Shown in everyone’s picker' : 'Hidden from everyone’s picker') },
           ...(canCreate ? [{ key: 'clone', label: 'Clone', icon: 'rectangle-stack' as const, onPress: () => setEditor({ kind: 'clone', id: model.id }) }] : []),
           ...(canExport ? [{ key: 'export', label: 'Export', icon: 'arrow-down-tray' as const, onPress: () => void exportModel(model) }] : []),
@@ -259,6 +265,7 @@ export function ModelsTab({ tabs }: { tabs: (count?: number) => ReactNode }) {
         )}
       />
       <ModelEditor target={editor} onClose={() => setEditor(null)} />
+      <CodeVersionsSheet target={versions} onClose={() => setVersions(null)} onChanged={refresh} />
       <AccessSheet target={sharing} onClose={() => setSharing(null)} onSaved={refresh} />
     </View>
   );

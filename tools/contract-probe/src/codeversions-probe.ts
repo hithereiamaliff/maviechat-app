@@ -1,13 +1,17 @@
 import {
   compareCodeVersions,
+  compareModelSnapshots,
   createAdminFunction,
+  createWorkspaceModel,
   createWorkspaceSkill,
   createWorkspaceTool,
   deleteAdminFunction,
   deleteCodeVersion,
   deleteWorkspaceSkill,
   deleteWorkspaceTool,
+  deleteWorkspaceModel,
   diffText,
+  getWorkspaceModel,
   getCodeVersion,
   isAtLeast,
   listCodeVersions,
@@ -16,6 +20,7 @@ import {
   OwuiHttpError,
   unifiedLines,
   updateAdminFunction,
+  updateWorkspaceModel,
   updateWorkspaceSkill,
   updateWorkspaceTool,
   type Capabilities,
@@ -156,6 +161,74 @@ export async function probeCodeVersions({ client, capabilities, baseUrl, version
           return 'gone';
         });
       }
+    }
+  }
+
+  // Models: compared here, and made live only when what a version uses can still be reached.
+  const listed = (await client.get<unknown>('/api/models')) as { data?: { id?: string }[] } | null;
+  const ids = (listed?.data ?? []).map((model) => model.id ?? '').filter(Boolean);
+  const baseModelId = ids.includes('app_probe_echo') ? 'app_probe_echo' : (ids[0] ?? '');
+  const modelId = `app-probe-ver-model-${stamp}`;
+  if (!baseModelId) {
+    steps.push({ name: 'models: versions', ok: true, note: 'skipped: no model to build on' });
+    return { steps, fixture };
+  }
+  const base = { id: modelId, baseModelId, isActive: true, meta: { description: 'APP PROBE', profile_image_url: '/static/favicon.png' } };
+  let modelMade = false;
+  try {
+    await check('models: three saves kept as versions (one using a tool that doesn’t exist), linked, the last live', async () => {
+      await createWorkspaceModel(client, { ...base, name: `APP PROBE versions model ${stamp}`, params: { system: 'First.\nBe brief.' }, accessGrants: [] });
+      modelMade = true;
+      await sleep(1100);
+      await updateWorkspaceModel(client, { ...base, name: `APP PROBE versions model ${stamp} renamed`, params: { system: 'First.\nBe thorough.', temperature: 0.5 }, meta: { ...base.meta, toolIds: [`app_probe_missing_tool_${stamp}`] }, note: 'with a missing tool' });
+      await sleep(1100);
+      await updateWorkspaceModel(client, { ...base, name: `APP PROBE versions model ${stamp} renamed`, params: { system: 'First.\nBe thorough.\nCite sources.', temperature: 0.6 }, note: 'third' });
+      const versions = await listCodeVersions(client, 'models', modelId);
+      const live = await liveCodeVersionId(client, 'models', modelId);
+      const [newest, middle, first] = versions;
+      if (versions.length !== 3 || !newest || !middle || !first) throw new Error(`${versions.length} versions`);
+      if (live !== newest.id || newest.parentId !== middle.id || middle.parentId !== first.id) throw new Error('not linked newest-first with the newest live');
+      if (versions.map((item) => item.note).join('|') !== 'third|with a missing tool|') throw new Error('the notes differ');
+      return '3 versions, linked, notes kept, the newest live';
+    });
+    if (modelMade) {
+      await check('models: compared here: the rename, the temperature and the system prompt line by line', async () => {
+        const [newest, , first] = await listCodeVersions(client, 'models', modelId);
+        if (!newest || !first) throw new Error('no versions');
+        const [a, b] = await Promise.all([getCodeVersion(client, 'models', modelId, first.id), getCodeVersion(client, 'models', modelId, newest.id)]);
+        if (a.snapshot.content !== 'First.\nBe brief.' || a.snapshot.baseModelId !== baseModelId) throw new Error('the first version reads differently');
+        const compared = compareModelSnapshots(a.snapshot, b.snapshot);
+        const via = await compareCodeVersions(client, 'models', modelId, first.id, newest.id);
+        const whats = compared.changes.map((change) => change.what);
+        if (!whats.includes('Name') || !whats.includes('Parameters › temperature')) throw new Error(`changes: ${whats.join(', ')}`);
+        if (compared.diff.removed !== 1 || compared.diff.added !== 2) throw new Error(`−${compared.diff.removed} +${compared.diff.added}`);
+        if (JSON.stringify(via) !== JSON.stringify(compared)) throw new Error('the two ways differ');
+        return `${compared.changes.map((change) => `${change.what}: ${change.before} → ${change.after}`).join('; ')}; the prompt −1 +2`;
+      });
+
+      await check('models: a version using a missing tool can’t be made live; the first can; the live one can’t be deleted, another can', async () => {
+        const [newest, middle, first] = await listCodeVersions(client, 'models', modelId);
+        if (!newest || !middle || !first) throw new Error('not three versions');
+        const missing = await statusOf(() => makeCodeVersionLive(client, 'models', modelId, middle.id, newest.id));
+        fixture.missingTool = missing;
+        if (missing === 200) throw new Error('a version using a missing tool was made live');
+        await makeCodeVersionLive(client, 'models', modelId, first.id, newest.id);
+        if ((await liveCodeVersionId(client, 'models', modelId)) !== first.id) throw new Error('the first isn’t live');
+        const model = await getWorkspaceModel(client, modelId);
+        if (model.params.system !== 'First.\nBe brief.' || model.name !== `APP PROBE versions model ${stamp}`) throw new Error('its settings aren’t back');
+        const deleteLive = await statusOf(() => deleteCodeVersion(client, 'models', modelId, first.id));
+        await deleteCodeVersion(client, 'models', modelId, middle.id);
+        const left = await listCodeVersions(client, 'models', modelId);
+        if (deleteLive === 200 || left.length !== 2) throw new Error(`deleting the live one answered ${deleteLive}; ${left.length} left`);
+        return `the missing tool refused (${missing}); the first live again, its name and prompt back; deleting it refused (${deleteLive}); the middle one deleted`;
+      });
+    }
+  } finally {
+    if (modelMade) {
+      await check('models: the throwaway deleted', async () => {
+        await deleteWorkspaceModel(client, modelId);
+        return 'gone';
+      });
     }
   }
   return { steps, fixture };

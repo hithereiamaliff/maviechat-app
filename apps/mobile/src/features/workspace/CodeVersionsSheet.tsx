@@ -8,6 +8,8 @@ import {
   liveCodeVersionId,
   makeCodeVersionLive,
   OwuiHttpError,
+  settingLabel,
+  settingText,
   type ChangedFile,
   type CodeVersion,
   type VersionedKind,
@@ -33,16 +35,26 @@ export interface CodeVersionsTarget {
   canWrite: boolean;
 }
 
-const NOUN: Record<VersionedKind, string> = { tools: 'tool', functions: 'function', skills: 'skill' };
+const NOUN: Record<VersionedKind, string> = { tools: 'tool', functions: 'function', skills: 'skill', models: 'model' };
+/** What making an older version live does, said before it's done. */
+const MAKE_LIVE: Record<VersionedKind, string> = {
+  tools: 'The server loads its code again, as when it was saved (installing what its header lists). Only make code you trust live.',
+  functions: 'The server loads its code again, as when it was saved (installing what its header lists). Only make code you trust live.',
+  skills: 'Models using the skill get this version from now on.',
+  models: 'Its settings come back as they were saved. The server checks again that it can reach what it uses (its base model, knowledge, tools and the rest) and says what’s missing if not.',
+};
+/** What the code is called, where it's shown. */
+const CODE: Record<VersionedKind, string> = { tools: 'Code', functions: 'Code', skills: 'Text', models: 'System Prompt' };
 const when = (ms: number) => (ms ? new Date(ms).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '');
 /** Lines of a version's code drawn before Show All. */
 const FIRST_LINES = 300;
 
 /**
- * A tool's, function's or skill's versions (Open WebUI 0.12, as its editors show them): each save
- * that changed it, newest first, with its note, who and when, and which is live. Open one to read
- * its code (a skill's SKILL.md and its files), compare it with the live one or the one before,
- * make it live again, copy it, or delete it (not the live one).
+ * A tool's, function's, skill's or model's versions (Open WebUI 0.12, as its editors show them):
+ * each save that changed it, newest first, with its note, who and when, and which is live. Open
+ * one to read it (code; a skill's SKILL.md and its files; a model's system prompt and settings),
+ * compare it with the live one or the one it was saved over, make it live again, copy it, or
+ * delete it (not the live one).
  */
 export function CodeVersionsSheet({ target, onClose, onChanged }: { target: CodeVersionsTarget | null; onClose: () => void; onChanged: () => void }) {
   return (
@@ -79,7 +91,7 @@ function Versions({ target, onClose, onChanged }: { target: CodeVersionsTarget; 
   const makeLive = (version: CodeVersion) =>
     Alert.alert(
       'Make this version live?',
-      kind === 'skills' ? 'Models using the skill get this version from now on.' : `The server loads its code again, as when it was saved (installing what its header lists). Only make code you trust live.`,
+      MAKE_LIVE[kind],
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -120,7 +132,7 @@ function Versions({ target, onClose, onChanged }: { target: CodeVersionsTarget; 
       <SheetHeader title={`Versions of ${target.name}`} onCancel={onClose} onSave={onClose} canSave={false} busy={false} readOnly />
       <ScrollView contentContainerStyle={editorStyles.content}>
         <Text style={[editorStyles.note, { color: palette.textMuted }]}>
-          {`Each save that changes the ${NOUN[kind]} is kept here and made live.${kind === 'skills' ? '' : ' Making an older one live loads its code on the server again.'}`}
+          {`Each save that changes the ${NOUN[kind]} is kept here and made live.${kind === 'tools' || kind === 'functions' ? ' Making an older one live loads its code on the server again.' : ''}`}
         </Text>
         {versions.isLoading || live.isLoading ? <ActivityIndicator color={palette.textMuted} /> : null}
         {versions.isError ? <Text style={[editorStyles.note, { color: palette.danger }]}>{`Couldn’t load them: ${describeError(versions.error)}`}</Text> : null}
@@ -161,7 +173,7 @@ function Versions({ target, onClose, onChanged }: { target: CodeVersionsTarget; 
                     <Snapshot kind={kind} id={id} versionId={version.id} />
                   )}
                   <View style={styles.actions}>
-                    {comparing ? <Action label={kind === 'skills' ? 'Show Text' : 'Show Code'} onPress={() => setComparing(null)} /> : null}
+                    {comparing ? <Action label={kind === 'models' ? 'Show Version' : `Show ${CODE[kind]}`} onPress={() => setComparing(null)} /> : null}
                     {!isLive && liveId && comparing !== 'live' ? <Action label="Compare with Live" onPress={() => setComparing('live')} /> : null}
                     {previous && comparing !== 'previous' ? <Action label="Compare with Previous" onPress={() => setComparing('previous')} /> : null}
                     {!isLive && target.canWrite ? <Action label="Make Live…" onPress={() => makeLive(version)} /> : null}
@@ -193,17 +205,43 @@ function Snapshot({ kind, id, versionId }: { kind: VersionedKind; id: string; ve
   return (
     <View style={styles.snapshot}>
       <Text style={[styles.title, { color: palette.text }]}>{snapshot.name}</Text>
+      {kind === 'models' ? <Text style={[editorStyles.note, { color: palette.textMuted }]}>{snapshot.baseModelId ? `Built on ${snapshot.baseModelId}` : 'A connection’s own model'}</Text> : null}
       {snapshot.description ? <Text style={[editorStyles.note, { color: palette.textMuted }]}>{snapshot.description}</Text> : null}
-      <Text selectable style={[styles.code, { color: palette.text, backgroundColor: palette.surface }]}>
-        {all || lines.length <= FIRST_LINES ? snapshot.content : lines.slice(0, FIRST_LINES).join('\n')}
-      </Text>
+      {kind === 'models' && snapshot.content ? <Text style={[styles.label, { color: palette.textMuted }]}>System Prompt</Text> : null}
+      {snapshot.content || kind !== 'models' ? (
+        <Text selectable style={[styles.code, { color: palette.text, backgroundColor: palette.surface }]}>
+          {all || lines.length <= FIRST_LINES ? snapshot.content : lines.slice(0, FIRST_LINES).join('\n')}
+        </Text>
+      ) : null}
       {!all && lines.length > FIRST_LINES ? <Action label={`Show All ${lines.length} Lines`} onPress={() => setAll(true)} /> : null}
       {others.length ? <Text style={[editorStyles.note, { color: palette.textMuted }]}>{`Its other files: ${others.map((file) => `${file.path}${file.binary ? ' (binary)' : ''}`).join(', ')}`}</Text> : null}
+      {snapshot.settings.length ? <Settings settings={snapshot.settings} /> : null}
     </View>
   );
 }
 
-/** Two versions compared by the server: name and description, the code line by line, a skill's other files. */
+/** A model version's other settings, folded until asked for. */
+function Settings({ settings }: { settings: { path: string; value: unknown }[] }) {
+  const palette = usePalette();
+  const [shown, setShown] = useState(false);
+  return (
+    <View style={styles.file}>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: shown }} onPress={() => setShown(!shown)} style={styles.row}>
+        <Text style={[styles.label, styles.flex, { color: palette.textMuted }]}>{`Settings (${settings.length})`}</Text>
+        <Icon name={shown ? 'chevron-up' : 'chevron-down'} size={13} color={palette.textMuted} />
+      </Pressable>
+      {shown
+        ? settings.map((setting) => (
+            <Text key={setting.path} style={[editorStyles.note, { color: palette.text }]}>
+              {`${settingLabel(setting.path)}: ${settingText(setting.path, setting.value)}`}
+            </Text>
+          ))
+        : null}
+    </View>
+  );
+}
+
+/** Two versions compared (code by the server; a model here): names and settings that changed, the code line by line, a skill's other files. */
 function Comparison({ kind, id, fromId, toId, caption }: { kind: VersionedKind; id: string; fromId: string; toId: string; caption: string }) {
   const palette = usePalette();
   const { client } = useAuthed();
@@ -213,7 +251,7 @@ function Comparison({ kind, id, fromId, toId, caption }: { kind: VersionedKind; 
   const { changes, diff, files } = compared.data;
   return (
     <View style={styles.snapshot}>
-      <DiffView diff={diff} caption={kind === 'skills' ? `${caption} Its SKILL.md:` : caption} changes={changes.map((change) => `${change.what}: “${change.before}” → “${change.after}”`)} />
+      <DiffView diff={diff} caption={kind === 'skills' ? `${caption} Its SKILL.md:` : kind === 'models' ? `${caption} Its system prompt:` : caption} changes={changes.map((change) => `${change.what}: ${change.before} → ${change.after}`)} />
       {files.length ? <Text style={[styles.title, { color: palette.text }]}>Its other files</Text> : null}
       {files.map((file) => (
         <SkillFileChange key={file.path} id={id} fromId={fromId} toId={toId} file={file} />
@@ -246,7 +284,7 @@ function SkillFileChange({ id, fromId, toId, file }: { id: string; fromId: strin
   );
 }
 
-/** Copies a version's code (it's read first if it isn't yet). */
+/** Copies a version's code, or a model's system prompt (it's read first if it isn't yet). */
 function CopyAction({ kind, id, versionId }: { kind: VersionedKind; id: string; versionId: string }) {
   const toast = useToast();
   const { client } = useAuthed();
@@ -254,12 +292,16 @@ function CopyAction({ kind, id, versionId }: { kind: VersionedKind; id: string; 
   const copy = () =>
     void queryClient
       .fetchQuery({ queryKey: ['code-versions', kind, id, 'version', versionId], queryFn: () => getCodeVersion(client, kind, id, versionId), staleTime: Infinity })
-      .then((version) => Clipboard.setStringAsync(version.snapshot.content))
+      .then(async (version) => {
+        if (!version.snapshot.content) return false;
+        await Clipboard.setStringAsync(version.snapshot.content);
+        return true;
+      })
       .then(
-        () => toast('Copied'),
+        (copied) => toast(copied ? 'Copied' : `It has no ${CODE[kind].toLowerCase()}`),
         (error: unknown) => toast(`Couldn’t copy it: ${describeError(error)}`, 'error'),
       );
-  return <Action label="Copy" onPress={copy} />;
+  return <Action label={kind === 'models' ? 'Copy System Prompt' : 'Copy'} onPress={copy} />;
 }
 
 function Action({ label, onPress, danger = false }: { label: string; onPress: () => void; danger?: boolean }) {
@@ -276,6 +318,7 @@ const styles = StyleSheet.create({
   version: { gap: 10, padding: 12, borderWidth: StyleSheet.hairlineWidth, borderRadius: radius.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   title: { fontFamily: fonts.medium, fontSize: 14 },
+  label: { fontFamily: fonts.medium, fontSize: 12 },
   live: { fontFamily: fonts.medium, fontSize: 11, paddingHorizontal: 8, paddingVertical: 2, borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
   snapshot: { gap: 8 },
   code: { fontFamily: fonts.mono, fontSize: 12, lineHeight: 18, padding: 10, borderRadius: radius.md, overflow: 'hidden' },

@@ -10,6 +10,7 @@ import {
   idsOf,
   importAdminModels,
   inAdminView,
+  isAtLeast,
   inModelOrder,
   isPublicModel,
   listAdminModels,
@@ -34,12 +35,13 @@ import { usePinnedModels } from '@/features/chat/usePinnedModels';
 import { fileNameOf, shareFile, stampedName } from '@/features/settings/exportFile';
 import { ActionRow, Group, Note } from '@/features/settings/rows';
 import { AccessSheet, type AccessTarget } from '@/features/workspace/AccessSheet';
+import { CodeVersionsSheet, type CodeVersionsTarget } from '@/features/workspace/CodeVersionsSheet';
 import { pickTextFile, plural } from '@/features/workspace/EditorParts';
 import { Chip } from '@/features/workspace/ListControls';
 import { ModelEditor, type ModelEditorTarget } from '@/features/workspace/ModelEditor';
 import { eachFew, failures } from '@/lib/eachFew';
 import { describeError } from '@/lib/errors';
-import { useAuthed } from '@/lib/server';
+import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
 import { ModelDefaultsSheet } from './ModelDefaultsSheet';
 import { ModelOrderSheet } from './ModelOrderSheet';
@@ -130,6 +132,9 @@ export function ModelsPage() {
   const [tag, setTag] = useState('');
   const [sharing, setSharing] = useState<AccessTarget | null>(null);
   const [editor, setEditor] = useState<ModelEditorTarget | null>(null);
+  const [versions, setVersions] = useState<CodeVersionsTarget | null>(null);
+  // 0.12 keeps each saved change of a model's settings as a version.
+  const versioned = isAtLeast(useCapabilities()?.version, '0.12.0');
   const mine = usePinnedModels();
   const [sheet, setSheet] = useState<'defaults' | 'order' | null>(null);
   const [working, setWorking] = useState<Bulk | 'import' | null>(null);
@@ -318,6 +323,7 @@ export function ModelsPage() {
       { key: 'public', label: everyone ? 'Make Private' : 'Make Public', icon: everyone ? 'lock-closed' : 'globe-alt', onPress: () => run(everyone ? `${model.name} isn’t for everyone now` : `Everyone may use ${model.name} now`, () => setAdminModelPublic(client, model, !everyone)) },
       { key: 'share', label: 'Who May Use It…', icon: 'users', onPress: () => setSharing({ area: 'models', id: model.id, name: model.name, grants: model.accessGrants }) },
       { key: 'link', label: 'Copy Link', icon: 'link', onPress: () => void Clipboard.setStringAsync(`${session.baseUrl}/?model=${encodeURIComponent(model.id)}`).then(() => toast('Link copied')) },
+      ...(model.hasRow && versioned ? [{ key: 'versions', label: 'Versions…', icon: 'clock' as const, onPress: () => setVersions({ kind: 'models', id: model.id, name: model.name, canWrite: true }) }] : []),
       ...(model.hasRow ? [{ key: 'export', label: 'Export', icon: 'arrow-down-tray' as const, onPress: () => void exportOne(model) }] : []),
       ...(kind ? [{ key: 'delete', label: kind === 'reset' ? 'Reset…' : 'Delete…', icon: kind === 'reset' ? ('arrow-path' as const) : ('trash' as const), destructive: true, onPress: () => askDelete(model, kind) }] : []),
     ];
@@ -375,6 +381,7 @@ export function ModelsPage() {
       ))}
       <AccessSheet target={sharing} onClose={() => setSharing(null)} onSaved={refresh} />
       <ModelEditor target={editor} onClose={() => setEditor(null)} onSaved={refresh} />
+      <CodeVersionsSheet target={versions} onClose={() => setVersions(null)} onChanged={refresh} />
       <ModelDefaultsSheet visible={sheet === 'defaults'} onClose={() => setSheet(null)} />
       <ModelOrderSheet visible={sheet === 'order'} models={all} onClose={() => setSheet(null)} onSaved={refresh} />
     </View>

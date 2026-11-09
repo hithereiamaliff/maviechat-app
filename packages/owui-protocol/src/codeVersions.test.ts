@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { updateAdminFunction, updateWorkspaceTool } from './codeItems';
-import { compareCodeVersions, compareSkillFile, deleteCodeVersion, getCodeVersion, listCodeVersions, liveCodeVersionId, makeCodeVersionLive } from './codeVersions';
+import { compareCodeVersions, compareModelSnapshots, compareSkillFile, deleteCodeVersion, getCodeVersion, listCodeVersions, liveCodeVersionId, makeCodeVersionLive, settingLabel, settingText } from './codeVersions';
 import { OwuiClient, type FetchLike } from './http';
 import { unifiedLines } from './textDiff';
+import { modelFormBody } from './workspaceModels';
 import { updateWorkspaceSkill } from './workspaceSkills';
 
 function server(routes: Record<string, unknown>) {
@@ -33,8 +34,8 @@ describe('versions of tools, functions and skills', () => {
       'GET /api/v1/tools/id/t1/history/v1': { id: 'v1', snapshot: { name: 'Weather', content: 'import os', meta: { description: 'Forecasts' } }, created_at: 1 },
       'GET /api/v1/skills/id/s1/history/v1': { id: 'v1', snapshot: { name: 'Writing', description: 'Style', content: '# Writing', data: { files: [{ path: 'SKILL.md', size: 9, encoding: null }, { path: 'logo.png', size: 120, encoding: 'base64' }] } }, created_at: 1 },
     });
-    expect((await getCodeVersion(client, 'tools', 't1', 'v1')).snapshot).toEqual({ name: 'Weather', description: 'Forecasts', content: 'import os', files: [] });
-    expect((await getCodeVersion(client, 'skills', 's1', 'v1')).snapshot).toEqual({ name: 'Writing', description: 'Style', content: '# Writing', files: [{ path: 'SKILL.md', size: 9, binary: false }, { path: 'logo.png', size: 120, binary: true }] });
+    expect((await getCodeVersion(client, 'tools', 't1', 'v1')).snapshot).toEqual({ name: 'Weather', description: 'Forecasts', content: 'import os', files: [], baseModelId: '', settings: [] });
+    expect((await getCodeVersion(client, 'skills', 's1', 'v1')).snapshot).toEqual({ name: 'Writing', description: 'Style', content: '# Writing', files: [{ path: 'SKILL.md', size: 9, binary: false }, { path: 'logo.png', size: 120, binary: true }], baseModelId: '', settings: [] });
   });
 
   it('finds the live version, deletes one, and makes one live (a skill with the one it was at)', async () => {
@@ -53,8 +54,8 @@ describe('versions of tools, functions and skills', () => {
     const result = await compareCodeVersions(client, 'tools', 't1', 'v1', 'v2');
     expect(calls[0]?.query).toBe('?from_id=v1&to_id=v2');
     expect(result.changes).toEqual([
-      { what: 'Name', before: 'Old', after: 'New' },
-      { what: 'Description', before: 'A', after: 'B' },
+      { what: 'Name', before: '“Old”', after: '“New”' },
+      { what: 'Description', before: '“A”', after: '“B”' },
     ]);
     expect(unifiedLines(result.diff)).toEqual(['@@ -1,2 +1,2 @@', ' import os', '-x = 1', '+x = 2']);
     expect(result.diff).toMatchObject({ removed: 1, added: 1, lineEndingsOnly: false });
@@ -66,7 +67,7 @@ describe('versions of tools, functions and skills', () => {
       'GET /api/v1/skills/id/s1/history/diff/file': { binary: false, diff: PATCH, line_endings_only: false },
     });
     const result = await compareCodeVersions(client, 'skills', 's1', 'v1', 'v2');
-    expect(result.changes).toEqual([{ what: 'Description', before: 'A', after: 'B' }]);
+    expect(result.changes).toEqual([{ what: 'Description', before: '“A”', after: '“B”' }]);
     expect(result.diff.removed).toBe(1);
     expect(result.files).toEqual([
       { path: 'logo.png', status: 'added', binary: true },
@@ -84,5 +85,69 @@ describe('versions of tools, functions and skills', () => {
     expect(calls[0]?.body).toMatchObject({ commit_message: 'faster' });
     expect(calls[1]?.body).not.toHaveProperty('commit_message');
     expect(calls[2]?.body).toMatchObject({ commit_message: 'clearer' });
+  });
+});
+
+describe('versions of models', () => {
+  const SNAPSHOT = {
+    name: 'Tutor',
+    base_model_id: 'gpt-4o',
+    params: { system: 'Be kind.\nBe brief.', temperature: 0.7, stop: [] },
+    meta: { description: 'Helps', profile_image_url: 'data:image/png;base64,AAAA', capabilities: { vision: true, citations: false }, toolIds: ['web'], knowledge: [{ id: 'k1', name: 'Docs' }], tags: [], suggestion_prompts: null },
+  };
+
+  it('keeps a model’s versions by its id in the query', async () => {
+    const { client, calls } = server({ 'GET /api/v1/models/model/history': [{ id: 'v1', parent_id: null, created_at: 1 }], 'GET /api/v1/models/model': { id: 'm1', version_id: 'v1' } });
+    expect(await listCodeVersions(client, 'models', 'm1', 3)).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ path: '/api/v1/models/model/history', query: '?id=m1&page=3' });
+    expect(await liveCodeVersionId(client, 'models', 'm1')).toBe('v1');
+    expect(calls[1]).toMatchObject({ path: '/api/v1/models/model', query: '?id=m1' });
+    await deleteCodeVersion(client, 'models', 'm1', 'v0');
+    expect(calls[2]).toMatchObject({ method: 'DELETE', path: '/api/v1/models/model/history/v0', query: '?id=m1' });
+    await makeCodeVersionLive(client, 'models', 'm1', 'v0', 'v1');
+    expect(calls[3]).toMatchObject({ method: 'POST', path: '/api/v1/models/model/update/version', query: '?id=m1', body: { version_id: 'v0' } });
+  });
+
+  it('reads a model’s version: its system prompt as its code, its other settings one by one, empty ones left out', async () => {
+    const { client } = server({ 'GET /api/v1/models/model/history/v1': { id: 'v1', snapshot: SNAPSHOT, created_at: 1 } });
+    const { snapshot } = await getCodeVersion(client, 'models', 'm1', 'v1');
+    expect(snapshot).toMatchObject({ name: 'Tutor', description: 'Helps', content: 'Be kind.\nBe brief.', baseModelId: 'gpt-4o' });
+    expect(snapshot.settings).toEqual([
+      { path: 'params.temperature', value: 0.7 },
+      { path: 'meta.profile_image_url', value: 'data:image/png;base64,AAAA' },
+      { path: 'meta.capabilities.vision', value: true },
+      { path: 'meta.capabilities.citations', value: false },
+      { path: 'meta.toolIds', value: ['web'] },
+      { path: 'meta.knowledge', value: [{ id: 'k1', name: 'Docs' }] },
+    ]);
+  });
+
+  it('compares two models setting by setting, and the system prompt line by line', async () => {
+    const before = await getCodeVersion(server({ 'GET /api/v1/models/model/history/v1': { id: 'v1', snapshot: SNAPSHOT } }).client, 'models', 'm1', 'v1');
+    const changed = { ...SNAPSHOT, name: 'Tutor 2', params: { system: 'Be kind.\nBe thorough.', temperature: 0.9 }, meta: { ...SNAPSHOT.meta, profile_image_url: 'data:image/png;base64,BBBB', capabilities: { vision: false, citations: false }, toolIds: ['web', 'code'] } };
+    const after = await getCodeVersion(server({ 'GET /api/v1/models/model/history/v2': { id: 'v2', snapshot: changed } }).client, 'models', 'm1', 'v2');
+    const result = compareModelSnapshots(before.snapshot, after.snapshot);
+    expect(result.changes).toEqual([
+      { what: 'Name', before: '“Tutor”', after: '“Tutor 2”' },
+      { what: 'Capabilities › vision', before: 'true', after: 'false' },
+      { what: 'Picture', before: 'a picture', after: 'another picture' },
+      { what: 'Tools', before: 'web', after: 'web, code' },
+      { what: 'Parameters › temperature', before: '0.7', after: '0.9' },
+    ]);
+    expect(result.diff).toMatchObject({ removed: 1, added: 1 });
+  });
+
+  it('says settings for reading', () => {
+    expect(settingLabel('meta.capabilities.vision')).toBe('Capabilities › vision');
+    expect(settingLabel('params.custom_params.seed')).toBe('Parameters › custom_params › seed');
+    expect(settingLabel('meta.somethingNew')).toBe('somethingNew');
+    expect(settingText('meta.knowledge', [{ id: 'k1', name: 'Docs' }, { id: 'k2' }])).toBe('Docs, k2');
+    expect(settingText('meta.toolIds', undefined)).toBe('not set');
+    expect(settingText('meta.description', 'x'.repeat(100))).toHaveLength(82);
+  });
+
+  it('sends a note with a model’s save', () => {
+    expect(modelFormBody({ id: 'm1', baseModelId: 'gpt-4o', name: 'Tutor', meta: {}, params: {}, isActive: true, note: ' kinder ' })).toMatchObject({ commit_message: 'kinder' });
+    expect(modelFormBody({ id: 'm1', baseModelId: 'gpt-4o', name: 'Tutor', meta: {}, params: {}, isActive: true })).not.toHaveProperty('commit_message');
   });
 });

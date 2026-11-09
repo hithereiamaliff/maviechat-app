@@ -128,6 +128,8 @@ export interface ModelForm {
   isActive: boolean;
   /** Only when sharing changed; left out, the sharing stays as it is. */
   accessGrants?: AccessGrant[];
+  /** What changed, kept with the version a save makes (0.12; 0.11 keeps no versions). */
+  note?: string;
 }
 
 const isEmpty = (value: unknown): boolean => value === null || value === undefined || value === '' || (Array.isArray(value) && value.length === 0) || (typeof value === 'object' && value !== null && !Array.isArray(value) && Object.keys(value).length === 0);
@@ -145,6 +147,7 @@ export function modelFormOf(model: WorkspaceModel): ModelForm {
 export function modelFormBody(form: ModelForm): Tree {
   const body: Tree = { id: form.id, base_model_id: form.baseModelId || null, name: form.name.trim(), meta: pruneEmpty(form.meta), params: pruneEmpty(form.params), is_active: form.isActive };
   if (form.accessGrants !== undefined) body.access_grants = form.accessGrants;
+  if (form.note?.trim()) body.commit_message = form.note.trim();
   return body;
 }
 

@@ -6,6 +6,7 @@ import {
   customParamsOf,
   defaultFeaturesOf,
   getModelDefaults,
+  isAtLeast,
   knowledgeMeta,
   knowledgeRefsOf,
   listServerVoices,
@@ -42,6 +43,7 @@ import { usePictureMaker } from '@/features/settings/PictureMaker';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useModels } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
+import { Field } from './EditorParts';
 import { AttachmentsSection, CapabilitiesSection, ParamsSection, Section, SuggestionsSection, VoiceSection } from './ModelSections';
 import { useWorkspaceModel, useWorkspaceRefresh } from './queries';
 
@@ -129,6 +131,9 @@ function Form({ target, model, defaults, onClose, onSaved }: { target: ModelEdit
   const [tags, setTags] = useState<string[]>(model ? tagNames(model.meta.tags) : []);
   const [newTag, setNewTag] = useState('');
   const [system, setSystem] = useState(typeof model?.params.system === 'string' ? model.params.system : '');
+  // 0.12 keeps each save of a saved model as a version, with a note when one is given.
+  const versioned = editing && !readOnly && (!own || Boolean(target.kind === 'base' && target.saved)) && isAtLeast(capabilities?.version, '0.12.0');
+  const [note, setNote] = useState('');
   const [image, setImage] = useState<string | null>(null);
   const meta0 = model?.meta ?? {};
   const params0 = model?.params ?? {};
@@ -219,7 +224,7 @@ function Form({ target, model, defaults, onClose, onSaved }: { target: ModelEdit
     setProblem('');
     try {
       const form = formNow();
-      if (editing && !(own && !target.saved)) await updateWorkspaceModel(client, form);
+      if (editing && !(own && !target.saved)) await updateWorkspaceModel(client, versioned ? { ...form, note } : form);
       else await createWorkspaceModel(client, form);
       refresh();
       onSaved?.();
@@ -388,6 +393,11 @@ function Form({ target, model, defaults, onClose, onSaved }: { target: ModelEdit
         />
         <SuggestionsSection prompts={prompts} setPrompts={setPrompts} readOnly={readOnly} />
         <VoiceSection voice={voice} setVoice={setVoice} voices={voices.data ?? []} readOnly={readOnly} />
+        {versioned ? (
+          <Field label="Note" note="What changed, kept with the version this save makes (Versions… in its menu).">
+            <TextInput value={note} onChangeText={setNote} placeholder="Optional" placeholderTextColor={palette.textFaint} accessibilityLabel="Note on this change" style={[styles.input, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]} />
+          </Field>
+        ) : null}
         <Section title="JSON Preview" note="What Save sends, as on the web">
           <JsonPreview body={modelFormBody(formNow())} />
         </Section>
