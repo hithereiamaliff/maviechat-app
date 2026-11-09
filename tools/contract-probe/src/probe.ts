@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels [--peer-env FILE]] [--signin] [--orders] [--pending] [--userchats] [--authsettings] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa] [--accountmfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels [--peer-env FILE]] [--signin] [--orders] [--pending] [--userchats] [--kbexport] [--authsettings] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa] [--accountmfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -76,6 +76,9 @@
  * two-step sign-in on, has throwaway users try Settings → Account's part: the status, new recovery
  * codes (every device signed out at once), replacing the authenticator, and a sign-in too old for
  * either; then switches it off and deletes them (src/accountmfa-probe.ts).
+ * `--kbexport` (admins, scratch servers only) exports a throwaway collection with two text files
+ * as the app does (a ZIP with each file's text), an empty one (no files), and checks a user and a
+ * missing collection are refused; all deleted after (src/kbexport-probe.ts).
  * `--authsettings` (admins, scratch servers only) reads Authentication's LDAP and single sign-on
  * settings the app's way; where LDAP isn't set up, checks switching it on with empty settings is
  * refused and it stays off; nothing is left changed (src/authsettings-probe.ts).
@@ -142,6 +145,7 @@ import { probePending } from './pending-probe';
 import { probeUserChats } from './userchats-probe';
 import { probeAccountMfa } from './accountmfa-probe';
 import { probeAuthSettings } from './authsettings-probe';
+import { probeKnowledgeExport } from './kbexport-probe';
 import { probeChatVars } from './chatvars-probe';
 import { probeCodeEdit } from './codeedit-probe';
 import { probeStatus } from './status-probe';
@@ -201,6 +205,7 @@ const { values: args } = parseArgs({
     orders: { type: 'boolean' },
     pending: { type: 'boolean' },
     userchats: { type: 'boolean' },
+    kbexport: { type: 'boolean' },
     authsettings: { type: 'boolean' },
     chatvars: { type: 'boolean' },
     codeedit: { type: 'boolean' },
@@ -611,6 +616,12 @@ async function main() {
         const userChatsProbe = await probeUserChats({ client, anonymous, capabilities, baseUrl });
         for (const result of userChatsProbe.steps) results.push({ ...result, name: `Users: ${result.name}` });
         fixtures['write.userchats'] = userChatsProbe.fixture;
+      }
+
+      if (args.kbexport && capabilities) {
+        const exportProbe = await probeKnowledgeExport({ client, anonymous, capabilities, baseUrl });
+        for (const result of exportProbe.steps) results.push({ ...result, name: `Knowledge export: ${result.name}` });
+        fixtures['write.kbexport'] = exportProbe.fixture;
       }
 
       if (args.authsettings && capabilities) {

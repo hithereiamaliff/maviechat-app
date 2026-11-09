@@ -115,6 +115,16 @@ export class OwuiClient {
     return text;
   }
 
+  /** A GET whose answer is a file (a ZIP, say), as its bytes; refusals throw as for `request`. */
+  async getBytes(path: string, options: Omit<RequestOptions, 'body' | 'form'> = {}): Promise<Uint8Array> {
+    const response = await this.open('GET', path, { ...options, headers: { Accept: '*/*', ...options.headers } });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new OwuiHttpError(response.status, errorDetail(parseJson(text), text), path);
+    }
+    return new Uint8Array(await response.arrayBuffer());
+  }
+
   /** Multipart upload; fetch sets the boundary, so no Content-Type header is sent. */
   postForm<T>(path: string, form: FormData, options?: Omit<RequestOptions, 'body'>): Promise<T> {
     return this.request<T>('POST', path, { ...options, form });

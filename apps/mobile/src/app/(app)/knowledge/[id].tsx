@@ -27,12 +27,13 @@ import { showPrompt } from '@/components/dialogs';
 import { AccessSheet, type AccessTarget } from '@/features/workspace/AccessSheet';
 import { AddPagesSheet, AddTextSheet, FolderPath, FolderPicker, KnowledgeFileSheet } from '@/features/workspace/KnowledgeParts';
 import { KnowledgeSheet, type KnowledgeSheetTarget } from '@/features/workspace/KnowledgeSheet';
+import { EXPORT_LABEL, useKnowledgeExport } from '@/features/workspace/knowledgeExport';
 import { useKnowledgeUploads, type KnowledgeUpload } from '@/features/workspace/knowledgeUploads';
 import { Chip } from '@/features/workspace/ListControls';
 import { useKnowledgeFiles, usePendingKnowledgeFiles, useWorkspaceKnowledge, useWorkspaceRefresh } from '@/features/workspace/queries';
 import { describeError } from '@/lib/errors';
 import { openServerFile } from '@/lib/openServerFile';
-import { useAuthed } from '@/lib/server';
+import { useAuthed, useCapabilities } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
 import { fonts, radius, usePalette } from '@/theme';
 
@@ -46,7 +47,8 @@ const rowKey = (row: Row) => (row.kind === 'upload' ? row.upload.key : row.kind 
  * One knowledge collection, as Open WebUI's collection page has it: its folders and files (search,
  * in their text too; order), what's still being read, and for writers: upload files, add web
  * pages or text, folders (make, rename, move, delete), files (rename, move, remove), the text a
- * file was read as, name and description, sharing, emptying and deleting it.
+ * file was read as, name and description, sharing, emptying and deleting it; for admins, its text
+ * as a ZIP.
  */
 export default function KnowledgeScreen() {
   const palette = usePalette();
@@ -54,6 +56,8 @@ export default function KnowledgeScreen() {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { client, session } = useAuthed();
+  const isAdmin = useCapabilities()?.isAdmin ?? false;
+  const exportIt = useKnowledgeExport();
   const refreshAll = useWorkspaceRefresh();
   const params = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(params.id) ? (params.id[0] ?? '') : (params.id ?? '');
@@ -163,6 +167,7 @@ export default function KnowledgeScreen() {
           : []),
         { key: 'copy', label: 'Copy Id', icon: 'clipboard-document', onPress: () => void Clipboard.setStringAsync(id).then(() => toast('Id copied')) },
         { key: 'web', label: 'Open on the Web', icon: 'globe-alt', onPress: () => void WebBrowser.openBrowserAsync(`${session.baseUrl}/workspace/knowledge/${encodeURIComponent(id)}`) },
+        ...(isAdmin && !knowledge.external ? [{ key: 'export', label: EXPORT_LABEL, icon: 'arrow-down-tray' as const, onPress: () => exportIt(knowledge) }] : []),
         ...(writable ? [{ key: 'reset', label: 'Empty It…', icon: 'arrow-path' as const, destructive: true, onPress: emptyIt }] : []),
         ...(knowledge.writeAccess ? [{ key: 'delete', label: 'Delete…', icon: 'trash' as const, destructive: true, onPress: deleteIt }] : []),
       ]

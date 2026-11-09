@@ -87,6 +87,24 @@ export async function deleteWorkspaceKnowledge(client: OwuiClient, id: string): 
   await client.delete<unknown>(`${kbPath(id)}/delete`);
 }
 
+/**
+ * The collection as a ZIP, for admins (the web's Export): each file's text as the server read it,
+ * one `.txt` per file; files with no text yet are left out. Connected collections are refused.
+ */
+export async function exportWorkspaceKnowledge(client: OwuiClient, id: string): Promise<Uint8Array> {
+  // The server makes the whole ZIP before it answers.
+  return client.getBytes(`${kbPath(id)}/export`, { timeoutMs: 120_000 });
+}
+
+/** How many files a ZIP holds, from its end record; null when the bytes don't end like a ZIP. */
+export function zipEntryCount(bytes: Uint8Array): number | null {
+  // The end record: 22 bytes, then a comment of up to 65535; it starts PK 05 06.
+  for (let at = bytes.length - 22; at >= 0 && at >= bytes.length - 22 - 0xffff; at -= 1) {
+    if (bytes[at] === 0x50 && bytes[at + 1] === 0x4b && bytes[at + 2] === 0x05 && bytes[at + 3] === 0x06) return (bytes[at + 10] ?? 0) | ((bytes[at + 11] ?? 0) << 8);
+  }
+  return null;
+}
+
 /** Empties it: every file out (yours deleted, unless the server keeps files) and every folder gone. */
 export async function resetWorkspaceKnowledge(client: OwuiClient, id: string): Promise<WorkspaceKnowledge> {
   return knowledgeFrom(await client.post<unknown>(`${kbPath(id)}/reset`, undefined, { query: { include_directories: true } }));

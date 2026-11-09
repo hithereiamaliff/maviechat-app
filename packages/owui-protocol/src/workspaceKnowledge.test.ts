@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { OwuiClient, type FetchLike } from './http';
+import { OwuiClient, OwuiHttpError, type FetchLike } from './http';
 import {
+  exportWorkspaceKnowledge,
   fetchUrl,
   knowledgeUploadMetadata,
   listKnowledgeFiles,
@@ -11,6 +12,7 @@ import {
   updateWorkspaceKnowledge,
   urlFileName,
   urlsFromText,
+  zipEntryCount,
 } from './workspaceKnowledge';
 
 function recordingClient(...answers: unknown[]) {
@@ -82,5 +84,43 @@ describe('workspace knowledge', () => {
     expect(page).toEqual({ kind: 'page', name: 'Example', url: 'https://example.com', content: 'Hello' });
     const file = await fetchUrl(recordingClient({ status: true, type: 'file', name: 'a.pdf', url: 'https://example.com/a.pdf', file: { id: 'f9' } }).client, 'https://example.com/a.pdf');
     expect(file).toEqual({ kind: 'file', name: 'a.pdf', url: 'https://example.com/a.pdf', fileId: 'f9' });
+  });
+});
+
+describe('knowledge export', () => {
+  /** A ZIP's end record (22 bytes) for `count` files, after `before` bytes of anything, with an optional comment. */
+  const endRecord = (count: number, before = 0, comment = '') => {
+    const bytes = new Uint8Array(before + 22 + comment.length).fill(7, 0, before);
+    bytes.set([0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, count & 0xff, count >> 8, count & 0xff, count >> 8], before);
+    bytes.set([comment.length & 0xff, comment.length >> 8], before + 20);
+    bytes.set(new TextEncoder().encode(comment), before + 22);
+    return bytes;
+  };
+
+  it('reads the export as bytes, asking for any type', async () => {
+    const seen: { url: string; accept: string | undefined }[] = [];
+    const fetch: FetchLike = async (url, init) => {
+      seen.push({ url, accept: (init?.headers as Record<string, string> | undefined)?.Accept });
+      return new Response(endRecord(2, 40), { status: 200, headers: { 'content-type': 'application/zip' } });
+    };
+    const bytes = await exportWorkspaceKnowledge(new OwuiClient({ baseUrl: 'https://chat.test', token: 't', fetch }), 'k 1');
+    expect(seen[0]).toEqual({ url: 'https://chat.test/api/v1/knowledge/k%201/export', accept: '*/*' });
+    expect(bytes.length).toBe(62);
+    expect(zipEntryCount(bytes)).toBe(2);
+  });
+
+  it('throws the server’s reason when it refuses (a connected collection, say)', async () => {
+    const fetch: FetchLike = async () => new Response(JSON.stringify({ detail: 'External knowledge bases are read-only.' }), { status: 400 });
+    const error = await exportWorkspaceKnowledge(new OwuiClient({ baseUrl: 'https://chat.test', token: 't', fetch }), 'k2').catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(OwuiHttpError);
+    expect((error as OwuiHttpError).detail).toBe('External knowledge bases are read-only.');
+  });
+
+  it('counts a ZIP’s files from its end record, comment or not', () => {
+    expect(zipEntryCount(endRecord(0))).toBe(0);
+    expect(zipEntryCount(endRecord(300, 1000))).toBe(300);
+    expect(zipEntryCount(endRecord(3, 10, 'made here'))).toBe(3);
+    expect(zipEntryCount(new TextEncoder().encode('<!doctype html><html></html>'))).toBeNull();
+    expect(zipEntryCount(new Uint8Array(5))).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ import { useDebounced } from '@/lib/useDebounced';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { AccessSheet, type AccessTarget } from './AccessSheet';
 import { plural } from './EditorParts';
+import { EXPORT_LABEL, useKnowledgeExport } from './knowledgeExport';
 import { KnowledgeSheet, type KnowledgeSheetTarget } from './KnowledgeSheet';
 import { ListControls } from './ListControls';
 import { useWorkspaceKnowledgeList, useWorkspaceRefresh } from './queries';
@@ -23,6 +24,7 @@ export function KnowledgeTab({ tabs }: { tabs: (count?: number) => ReactNode }) 
   const capabilities = useCapabilities();
   const refresh = useWorkspaceRefresh();
   const run = useWorkspaceRun();
+  const exportIt = useKnowledgeExport();
   const [query, setQuery] = useState('');
   const debounced = useDebounced(query.trim(), 300);
   const [view, setView] = useState<WorkspaceView>('');
@@ -40,6 +42,7 @@ export function KnowledgeTab({ tabs }: { tabs: (count?: number) => ReactNode }) 
     ]);
   const menuFor = (item: WorkspaceKnowledge): MenuItem[] => [
     { key: 'open', label: 'Open', icon: 'folder-open', onPress: () => openKnowledge(item.id) },
+    ...(capabilities?.isAdmin && !item.external ? [{ key: 'export', label: EXPORT_LABEL, icon: 'arrow-down-tray' as const, onPress: () => exportIt(item) }] : []),
     ...(item.writeAccess
       ? [
           { key: 'share', label: 'Share…', icon: 'users' as const, onPress: () => setSharing({ area: 'knowledge', id: item.id, name: item.name, grants: item.accessGrants }) },
