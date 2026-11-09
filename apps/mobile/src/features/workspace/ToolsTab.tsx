@@ -1,4 +1,4 @@
-import { deleteWorkspaceTool, exportWorkspaceTools, filterTools, TOOL_TEMPLATE, type WorkspaceTool, type WorkspaceView } from '@maviechat/owui-protocol';
+import { deleteWorkspaceTool, exportWorkspaceTools, filterTools, isAtLeast, TOOL_TEMPLATE, type WorkspaceTool, type WorkspaceView } from '@maviechat/owui-protocol';
 import * as WebBrowser from 'expo-web-browser';
 import { useRef, useState, type ReactNode } from 'react';
 import { Alert, View } from 'react-native';
@@ -10,6 +10,7 @@ import { fileNameOf, shareFile, stampedName } from '@/features/settings/exportFi
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useSessionUser } from '@/lib/server';
 import { AccessSheet, type AccessTarget } from './AccessSheet';
+import { CodeVersionsSheet, type CodeVersionsTarget } from './CodeVersionsSheet';
 import { ListControls } from './ListControls';
 import { useWorkspaceRefresh, useWorkspaceTools } from './queries';
 import { SharedValvesSheet, ToolSheet, type ValvesTarget } from './ToolSheets';
@@ -35,6 +36,9 @@ export function ToolsTab({ tabs }: { tabs: (count?: number) => ReactNode }) {
   const [valves, setValves] = useState<ValvesTarget | null>(null);
   const [sharing, setSharing] = useState<AccessTarget | null>(null);
   const [editing, setEditing] = useState<CodeTarget | null>(null);
+  const [versions, setVersions] = useState<CodeVersionsTarget | null>(null);
+  // 0.12 keeps each saved change of a tool as a version (writers only).
+  const versioned = isAtLeast(capabilities?.version, '0.12.0');
   // Edit Code in a tool's sheet: the editor opens once that sheet has gone.
   const editNextRef = useRef<string | null>(null);
   const imports = useCodeImport('tools', setEditing, refresh);
@@ -67,6 +71,7 @@ export function ToolsTab({ tabs }: { tabs: (count?: number) => ReactNode }) {
           { key: 'valves', label: 'Settings…', icon: 'cog-6-tooth' as const, onPress: () => setValves({ kind: 'tools', id: tool.id, name: tool.name }) },
           { key: 'share', label: 'Share…', icon: 'users' as const, onPress: () => setSharing({ area: 'tools', id: tool.id, name: tool.name, grants: tool.accessGrants }) },
           { key: 'edit', label: 'Edit Code', icon: 'code-bracket' as const, onPress: () => setEditing({ kind: 'tools', id: tool.id }) },
+          ...(versioned ? [{ key: 'versions', label: 'Versions…', icon: 'clock' as const, onPress: () => setVersions({ kind: 'tools', id: tool.id, name: tool.name, canWrite: true }) }] : []),
         ]
       : []),
     ...(tool.fundingUrl ? [{ key: 'fund', label: 'Support the Author', icon: 'link' as const, onPress: () => void WebBrowser.openBrowserAsync(tool.fundingUrl) }] : []),
@@ -122,6 +127,7 @@ export function ToolsTab({ tabs }: { tabs: (count?: number) => ReactNode }) {
         }}
       />
       <CodeEditorSheet target={editing} onClose={() => setEditing(null)} onSaved={refresh} />
+      <CodeVersionsSheet target={versions} onClose={() => setVersions(null)} onChanged={refresh} />
       <SharedValvesSheet target={valves} onClose={() => setValves(null)} />
       <AccessSheet target={sharing} onClose={() => setSharing(null)} onSaved={refresh} />
     </View>

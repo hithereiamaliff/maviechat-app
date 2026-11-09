@@ -1,4 +1,4 @@
-import { diffText, type DiffHunk, type DiffLine } from '@maviechat/owui-protocol';
+import { diffText, type DiffHunk, type DiffLine, type TextDiff } from '@maviechat/owui-protocol';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { fonts, radius, usePalette } from '@/theme';
@@ -24,10 +24,20 @@ const tagsText = (tags: string[]) => (tags.length ? tags.join(', ') : 'none');
  * comparison can't be reached, gets it as well.
  */
 export function VersionChanges({ before, after, caption }: { before: VersionSide; after: VersionSide; caption: string }) {
+  const changes = [
+    ...(before.name !== after.name ? [`Name: “${before.name}” → “${after.name}”`] : []),
+    ...(before.tags.join('\n') !== after.tags.join('\n') ? [`Tags: ${tagsText(before.tags)} → ${tagsText(after.tags)}`] : []),
+  ];
+  return <DiffView diff={diffText(before.content, after.content)} caption={caption} changes={changes} />;
+}
+
+/**
+ * A comparison drawn: a caption, a line for each other change (a name, say), how many lines were
+ * taken out and put in, then each stretch of changes (the first 300 lines, then Show All).
+ */
+export function DiffView({ diff, caption, changes = [] }: { diff: TextDiff; caption: string; changes?: string[] }) {
   const palette = usePalette();
   const [all, setAll] = useState(false);
-  const diff = diffText(before.content, after.content);
-  const tagsChanged = before.tags.join('\n') !== after.tags.join('\n');
   const rows = diff.hunks.reduce((sum, hunk) => sum + hunk.lines.length, 0);
   // Whole hunks, in order, while they fit in the first rows (always at least one).
   const shown: DiffHunk[] = [];
@@ -42,8 +52,11 @@ export function VersionChanges({ before, after, caption }: { before: VersionSide
   return (
     <View style={styles.box}>
       <Text style={[styles.caption, { color: palette.textMuted }]}>{caption}</Text>
-      {before.name !== after.name ? <Text style={[styles.meta, { color: palette.text }]}>{`Name: “${before.name}” → “${after.name}”`}</Text> : null}
-      {tagsChanged ? <Text style={[styles.meta, { color: palette.text }]}>{`Tags: ${tagsText(before.tags)} → ${tagsText(after.tags)}`}</Text> : null}
+      {changes.map((change) => (
+        <Text key={change} style={[styles.meta, { color: palette.text }]}>
+          {change}
+        </Text>
+      ))}
       <Text style={[styles.summary, { color: palette.text }]}>
         {diff.hunks.length ? `${diff.removed} ${diff.removed === 1 ? 'line' : 'lines'} taken out, ${diff.added} put in` : diff.lineEndingsOnly ? 'Only the line breaks differ.' : 'The text is the same.'}
       </Text>

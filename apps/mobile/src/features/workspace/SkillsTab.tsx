@@ -1,4 +1,4 @@
-import { createWorkspaceSkill, deleteWorkspaceSkill, exportWorkspaceSkills, getWorkspaceSkill, skillDraftFromMarkdown, skillsFromImport, toggleWorkspaceSkill, type SkillInput, type WorkspaceSkill, type WorkspaceView } from '@maviechat/owui-protocol';
+import { createWorkspaceSkill, deleteWorkspaceSkill, exportWorkspaceSkills, getWorkspaceSkill, isAtLeast, skillDraftFromMarkdown, skillsFromImport, toggleWorkspaceSkill, type SkillInput, type WorkspaceSkill, type WorkspaceView } from '@maviechat/owui-protocol';
 import { useState, type ReactNode } from 'react';
 import { Alert, View } from 'react-native';
 import type { MenuItem } from '@/components/Menu';
@@ -8,6 +8,7 @@ import { describeError } from '@/lib/errors';
 import { useDebounced } from '@/lib/useDebounced';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { AccessSheet, type AccessTarget } from './AccessSheet';
+import { CodeVersionsSheet, type CodeVersionsTarget } from './CodeVersionsSheet';
 import { pickTextFile, plural } from './EditorParts';
 import { ListControls } from './ListControls';
 import { useWorkspaceRefresh, useWorkspaceSkills } from './queries';
@@ -29,6 +30,9 @@ export function SkillsTab({ tabs }: { tabs: (count?: number) => ReactNode }) {
   const [byName, setByName] = useState(false);
   const [editor, setEditor] = useState<SkillEditorTarget | null>(null);
   const [sharing, setSharing] = useState<AccessTarget | null>(null);
+  const [versions, setVersions] = useState<CodeVersionsTarget | null>(null);
+  // 0.12 keeps each saved change of a skill as a version; whoever can read it can look.
+  const versioned = isAtLeast(capabilities?.version, '0.12.0');
   const [importing, setImporting] = useState(false);
   const skills = useWorkspaceSkills({ query: debounced, view, orderBy: byName ? 'name' : 'updated_at', direction: byName ? 'asc' : 'desc' });
   const items = skills.data?.pages.flatMap((page) => page.items) ?? [];
@@ -104,6 +108,7 @@ export function SkillsTab({ tabs }: { tabs: (count?: number) => ReactNode }) {
   const menuFor = (skill: WorkspaceSkill): MenuItem[] => [
     { key: 'open', label: skill.writeAccess ? 'Edit' : 'View', icon: skill.writeAccess ? 'pencil-square' : 'eye', onPress: () => setEditor({ kind: 'edit', id: skill.id }) },
     ...(canCreate ? [{ key: 'clone', label: 'Clone', icon: 'rectangle-stack' as const, onPress: () => setEditor({ kind: 'clone', id: skill.id }) }] : []),
+    ...(versioned ? [{ key: 'versions', label: 'Versions…', icon: 'clock' as const, onPress: () => setVersions({ kind: 'skills', id: skill.id, name: skill.name, canWrite: skill.writeAccess }) }] : []),
     ...(skill.writeAccess ? [{ key: 'share', label: 'Share…', icon: 'users' as const, onPress: () => setSharing({ area: 'skills', id: skill.id, name: skill.name, grants: skill.accessGrants }) }] : []),
     ...(canExport ? [{ key: 'export', label: 'Export', icon: 'arrow-down-tray' as const, onPress: () => void exportOne(skill) }] : []),
     ...(skill.writeAccess ? [{ key: 'delete', label: 'Delete', icon: 'trash' as const, destructive: true, onPress: () => remove(skill) }] : []),
@@ -145,6 +150,7 @@ export function SkillsTab({ tabs }: { tabs: (count?: number) => ReactNode }) {
         )}
       />
       <SkillEditor target={editor} onClose={() => setEditor(null)} />
+      <CodeVersionsSheet target={versions} onClose={() => setVersions(null)} onChanged={refresh} />
       <AccessSheet target={sharing} onClose={() => setSharing(null)} onSaved={refresh} />
     </View>
   );

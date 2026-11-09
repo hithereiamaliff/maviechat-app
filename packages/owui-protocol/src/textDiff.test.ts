@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diffText, textLines, unifiedLines } from './textDiff';
+import { diffText, textDiffFromUnified, textLines, unifiedLines } from './textDiff';
 
 const lines = (count: number, name: (i: number) => string) => Array.from({ length: count }, (_, index) => name(index + 1)).join('\n');
 const ten = lines(10, (i) => `line ${i}`);
@@ -97,5 +97,25 @@ describe('text diff', () => {
     expect(diff).toMatchObject({ removed: 1200, added: 1200 });
     expect(diff.hunks).toHaveLength(1);
     expect(diff.hunks[0]?.lines[0]).toEqual({ kind: 'removed', text: 'old 1', before: 1, after: null });
+  });
+});
+
+describe('a diff -u text read back', () => {
+  it('gives the same hunks as the diff it was written from, file lines skipped', () => {
+    const next = numbers(11);
+    for (let round = 0; round < 100; round += 1) {
+      const words = ['alpha', 'beta', 'gamma', 'delta', ''];
+      const pick = () => words[Math.floor(next() * words.length)] ?? '';
+      const before = Array.from({ length: Math.floor(next() * 25) }, pick).join('\n');
+      const after = textLines(before).flatMap((line) => (next() < 0.2 ? [] : next() < 0.2 ? [pick(), line] : [line])).join('\n');
+      const diff = diffText(before, after);
+      expect(textDiffFromUnified(['--- selected.py', '+++ production.py', ...unifiedLines(diff)].join('\n'))).toEqual({ ...diff, lineEndingsOnly: false });
+    }
+  });
+
+  it('reads empty sides, single lines, and keeps the server’s line-breaks-only', () => {
+    expect(textDiffFromUnified('--- a\n+++ b\n@@ -0,0 +1,2 @@\n+a\n+b').hunks[0]).toMatchObject({ beforeStart: 1, beforeCount: 0, afterStart: 1, afterCount: 2 });
+    expect(unifiedLines(textDiffFromUnified('@@ -3 +3 @@\n-x\n+y'))).toEqual(['@@ -3 +3 @@', '-x', '+y']);
+    expect(textDiffFromUnified('', true)).toEqual({ hunks: [], removed: 0, added: 0, lineEndingsOnly: true });
   });
 });

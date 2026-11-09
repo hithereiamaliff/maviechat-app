@@ -6,6 +6,7 @@ import {
   formatPythonCode,
   getAdminFunction,
   getWorkspaceTool,
+  isAtLeast,
   requirementsOf,
   updateAdminFunction,
   updateWorkspaceTool,
@@ -111,6 +112,9 @@ function Editor({
   const [id, setId] = useState(isNew ? (initial.suggestedId ?? codeIdFromName(initial.name)) : existingId);
   const [idEdited, setIdEdited] = useState(Boolean(initial.suggestedId));
   const [description, setDescription] = useState(initial.description);
+  // 0.12 keeps each save as a version, with a note when one is given.
+  const versioned = !isNew && isAtLeast(capabilities?.version, '0.12.0');
+  const [note, setNote] = useState('');
   const [details, setDetails] = useState(isNew);
   const [ready, setReady] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -202,7 +206,7 @@ function Editor({
   const write = async (code: string) => {
     setBusy('saving');
     try {
-      const fields = { name: name.trim(), description: description.trim(), content: code };
+      const fields = { name: name.trim(), description: description.trim(), content: code, note: versioned ? note : '' };
       if (existingId) {
         if (kind === 'tools') await updateWorkspaceTool(client, existingId, fields);
         else await updateAdminFunction(client, existingId, fields);
@@ -285,6 +289,7 @@ function Editor({
             <Text style={[editorStyles.note, styles.mono, { color: palette.textMuted }]}>{existingId}</Text>
           )}
           <TextInput value={description} onChangeText={setDescription} placeholder="What it’s for" placeholderTextColor={palette.textFaint} accessibilityLabel="Description" style={input} />
+          {versioned ? <TextInput value={note} onChangeText={setNote} placeholder="A note on this change, kept with its version" placeholderTextColor={palette.textFaint} accessibilityLabel="Note on this change" style={input} /> : null}
         </View>
       ) : null}
       <View style={[styles.toolbar, { borderColor: palette.border }]}>

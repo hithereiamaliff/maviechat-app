@@ -13,18 +13,22 @@ export interface CodeFields {
   name: string;
   description: string;
   content: string;
+  /** What changed, kept with the version this save makes (0.12; 0.11 keeps no versions). */
+  note?: string;
 }
+
+const noteOf = (fields: CodeFields) => (fields.note?.trim() ? { commit_message: fields.note.trim() } : {});
 
 const idPath = (kind: CodeKind, id: string) => `/api/v1/${kind}/id/${encodeURIComponent(id)}`;
 
 /** Saves new code for a tool; its sharing stays as it is (none is sent). */
 export async function updateWorkspaceTool(client: OwuiClient, id: string, fields: CodeFields): Promise<void> {
-  await client.post<unknown>(`${idPath('tools', id)}/update`, { id, name: fields.name.trim(), meta: { description: fields.description.trim() }, content: fields.content });
+  await client.post<unknown>(`${idPath('tools', id)}/update`, { id, name: fields.name.trim(), meta: { description: fields.description.trim() }, content: fields.content, ...noteOf(fields) });
 }
 
 /** Saves new code for a function; if it doesn't load, the server says why and keeps the old. */
 export async function updateAdminFunction(client: OwuiClient, id: string, fields: CodeFields): Promise<void> {
-  await client.post<unknown>(`${idPath('functions', id)}/update`, { id, name: fields.name.trim(), meta: { description: fields.description.trim() }, content: fields.content });
+  await client.post<unknown>(`${idPath('functions', id)}/update`, { id, name: fields.name.trim(), meta: { description: fields.description.trim() }, content: fields.content, ...noteOf(fields) });
 }
 
 /** A tool's or function's code from a link (admins; a GitHub page becomes its raw file), named from the file. */

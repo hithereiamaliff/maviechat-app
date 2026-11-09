@@ -184,3 +184,36 @@ export function unifiedHeader(hunk: DiffHunk): string {
 export function unifiedLines(diff: TextDiff): string[] {
   return diff.hunks.flatMap((hunk) => [unifiedHeader(hunk), ...hunk.lines.map((line) => `${line.kind === 'same' ? ' ' : line.kind === 'removed' ? '-' : '+'}${line.text}`)]);
 }
+
+/**
+ * A `diff -u` text (as the server compares two versions) read back as hunks: lines before the
+ * first hunk (the two file lines) are skipped. `lineEndingsOnly` is the server's own say.
+ */
+export function textDiffFromUnified(patch: string, lineEndingsOnly = false): TextDiff {
+  const hunks: DiffHunk[] = [];
+  let hunk: DiffHunk | null = null;
+  let before = 0;
+  let after = 0;
+  for (const raw of patch.split('\n')) {
+    const heading = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(raw);
+    if (heading) {
+      const beforeCount = heading[2] === undefined ? 1 : Number(heading[2]);
+      const afterCount = heading[4] === undefined ? 1 : Number(heading[4]);
+      // An empty side's start names the line before it.
+      const beforeStart = Number(heading[1]) + (beforeCount === 0 ? 1 : 0);
+      const afterStart = Number(heading[3]) + (afterCount === 0 ? 1 : 0);
+      hunk = { beforeStart, beforeCount, afterStart, afterCount, lines: [] };
+      hunks.push(hunk);
+      before = beforeStart;
+      after = afterStart;
+      continue;
+    }
+    if (!hunk || !raw || raw.startsWith('\\')) continue;
+    const text = raw.slice(1);
+    if (raw.startsWith('-')) hunk.lines.push({ kind: 'removed', text, before: before++, after: null });
+    else if (raw.startsWith('+')) hunk.lines.push({ kind: 'added', text, before: null, after: after++ });
+    else hunk.lines.push({ kind: 'same', text, before: before++, after: after++ });
+  }
+  const all = hunks.flatMap((item) => item.lines);
+  return { hunks, removed: all.filter((line) => line.kind === 'removed').length, added: all.filter((line) => line.kind === 'added').length, lineEndingsOnly: lineEndingsOnly && !hunks.length };
+}

@@ -111,12 +111,15 @@ export interface SkillInput {
   accessGrants?: AccessGrant[];
   /** A 0.12 package's files, `SKILL.md` among them (0.11 servers ignore them). */
   files?: SkillFile[];
+  /** What changed, kept with the version a save makes (0.12; 0.11 keeps no versions). */
+  note?: string;
 }
 
 function skillBody(input: SkillInput): Tree {
   // Skills keep their tags as plain strings (0.11.3 refuses `{name}` objects here, unlike models).
   const body: Tree = { id: input.id, name: input.name.trim(), description: input.description.trim(), content: input.content, meta: { ...(input.meta ?? {}), tags: input.tags }, is_active: input.isActive };
   if (input.accessGrants !== undefined) body.access_grants = input.accessGrants;
+  if (input.note?.trim()) body.commit_message = input.note.trim();
   // A package's other files go along, its SKILL.md being the text given (0.11 ignores them).
   if (input.files?.some((file) => file.path !== 'SKILL.md')) body.files = [...input.files.filter((file) => file.path !== 'SKILL.md'), { path: 'SKILL.md', content: input.content }];
   return body;

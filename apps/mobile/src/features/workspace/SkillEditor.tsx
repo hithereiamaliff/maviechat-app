@@ -1,11 +1,11 @@
-import { createWorkspaceSkill, OwuiHttpError, skillDraftFromMarkdown, skillFrontMatter, skillIdFromName, skillIdProblem, updateWorkspaceSkill, type WorkspaceSkill } from '@maviechat/owui-protocol';
+import { createWorkspaceSkill, isAtLeast, OwuiHttpError, skillDraftFromMarkdown, skillFrontMatter, skillIdFromName, skillIdProblem, updateWorkspaceSkill, type WorkspaceSkill } from '@maviechat/owui-protocol';
 import { useState } from 'react';
 import { ScrollView, Text, TextInput } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { describeError } from '@/lib/errors';
-import { useAuthed } from '@/lib/server';
+import { useAuthed, useCapabilities } from '@/lib/server';
 import { usePalette } from '@/theme';
 import { editorStyles as styles, Field, SheetHeader, SheetLoading, TagsField } from './EditorParts';
 import { useWorkspaceRefresh, useWorkspaceSkill } from './queries';
@@ -40,6 +40,7 @@ function Form({ target, skill, onClose }: { target: SkillEditorTarget; skill: Wo
   const palette = usePalette();
   const toast = useToast();
   const { client } = useAuthed();
+  const capabilities = useCapabilities();
   const refresh = useWorkspaceRefresh();
   const editing = target.kind === 'edit';
   const cloning = target.kind === 'clone';
@@ -51,6 +52,9 @@ function Form({ target, skill, onClose }: { target: SkillEditorTarget; skill: Wo
   const [description, setDescription] = useState(skill?.description ?? draft?.description ?? '');
   const [tags, setTags] = useState<string[]>(skill?.tags ?? []);
   const [content, setContent] = useState(skill?.content ?? draft?.content ?? '');
+  // 0.12 keeps each saved change as a version, with a note when one is given.
+  const versioned = editing && !readOnly && isAtLeast(capabilities?.version, '0.12.0');
+  const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState('');
   const idIssue = editing ? null : skillIdProblem(skillId.trim());
@@ -74,7 +78,7 @@ function Form({ target, skill, onClose }: { target: SkillEditorTarget; skill: Wo
     setProblem('');
     try {
       const input = { id: skillId.trim(), name: name.trim(), description: description.trim(), content, tags };
-      if (editing && skill) await updateWorkspaceSkill(client, { ...input, isActive: skill.isActive, meta: skill.meta });
+      if (editing && skill) await updateWorkspaceSkill(client, { ...input, isActive: skill.isActive, meta: skill.meta, note: versioned ? note : '' });
       else await createWorkspaceSkill(client, { ...input, isActive: true, meta: cloning ? skill?.meta : undefined });
       refresh();
       toast(editing ? 'Skill saved' : 'Skill made (private)');
@@ -144,6 +148,11 @@ function Form({ target, skill, onClose }: { target: SkillEditorTarget; skill: Wo
             style={[styles.input, styles.body, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]}
           />
         </Field>
+        {versioned ? (
+          <Field label="Note" note="What changed, kept with the version this save makes (Versions… in its menu).">
+            <TextInput value={note} onChangeText={setNote} placeholder="Optional" placeholderTextColor={palette.textFaint} accessibilityLabel="Note on this change" style={[styles.input, { color: palette.text, borderColor: palette.border, backgroundColor: palette.surface }]} />
+          </Field>
+        ) : null}
         <Text style={[styles.note, { color: palette.textFaint }]}>{editing ? 'Its sharing stays as it is.' : 'New skills are private: only you (and admins) can use them.'}</Text>
       </ScrollView>
     </KeyboardAvoidingView>

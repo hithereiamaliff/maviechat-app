@@ -1,4 +1,4 @@
-import { deleteAdminFunction, exportAdminFunctions, FUNCTION_TEMPLATE, FUNCTION_TYPE_LABELS, getAdminFunction, listAdminFunctions, setFunctionActive, setFunctionGlobal, type AdminFunction } from '@maviechat/owui-protocol';
+import { deleteAdminFunction, exportAdminFunctions, FUNCTION_TEMPLATE, FUNCTION_TYPE_LABELS, getAdminFunction, isAtLeast, listAdminFunctions, setFunctionActive, setFunctionGlobal, type AdminFunction } from '@maviechat/owui-protocol';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as WebBrowser from 'expo-web-browser';
 import { useRef, useState, type ReactNode } from 'react';
@@ -10,11 +10,12 @@ import { useToast } from '@/components/Toast';
 import { CodeEditorSheet, type CodeTarget } from '@/features/code/CodeEditorSheet';
 import { useCodeImport } from '@/features/code/useCodeImport';
 import { fileNameOf, shareFile, stampedName } from '@/features/settings/exportFile';
+import { CodeVersionsSheet, type CodeVersionsTarget } from '@/features/workspace/CodeVersionsSheet';
 import { editorStyles, SheetHeader, SheetLoading } from '@/features/workspace/EditorParts';
 import { Chip } from '@/features/workspace/ListControls';
 import { SharedValvesSheet, type ValvesTarget } from '@/features/workspace/ToolSheets';
 import { describeError } from '@/lib/errors';
-import { useAuthed } from '@/lib/server';
+import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
 
 const TYPES = ['all', 'pipe', 'filter', 'action', 'event'] as const;
@@ -37,6 +38,9 @@ export function FunctionsTab({ tabs }: { tabs: ReactNode }) {
   const [valves, setValves] = useState<ValvesTarget | null>(null);
   const [showing, setShowing] = useState<string | null>(null);
   const [editing, setEditing] = useState<CodeTarget | null>(null);
+  const [versions, setVersions] = useState<CodeVersionsTarget | null>(null);
+  // 0.12 keeps each saved change of a function as a version.
+  const versioned = isAtLeast(useCapabilities()?.version, '0.12.0');
   // Edit Code in a function's code sheet: the editor opens once that sheet has gone.
   const editNextRef = useRef<string | null>(null);
   const wanted = query.trim().toLowerCase();
@@ -80,6 +84,7 @@ export function FunctionsTab({ tabs }: { tabs: ReactNode }) {
       : []),
     { key: 'code', label: 'View Code', icon: 'code-bracket', onPress: () => setShowing(fn.id) },
     { key: 'edit', label: 'Edit Code', icon: 'pencil', onPress: () => setEditing({ kind: 'functions', id: fn.id }) },
+    ...(versioned ? [{ key: 'versions', label: 'Versions…', icon: 'clock' as const, onPress: () => setVersions({ kind: 'functions', id: fn.id, name: fn.name, canWrite: true }) }] : []),
     ...(fn.fundingUrl ? [{ key: 'fund', label: 'Support the Author', icon: 'link' as const, onPress: () => void WebBrowser.openBrowserAsync(fn.fundingUrl) }] : []),
     { key: 'export', label: 'Export', icon: 'arrow-down-tray', onPress: () => void exportFunctions(fn) },
     { key: 'delete', label: 'Delete', icon: 'trash', destructive: true, onPress: () => remove(fn) },
@@ -159,6 +164,7 @@ export function FunctionsTab({ tabs }: { tabs: ReactNode }) {
         }}
       />
       <CodeEditorSheet target={editing} onClose={() => setEditing(null)} onSaved={refresh} />
+      <CodeVersionsSheet target={versions} onClose={() => setVersions(null)} onChanged={refresh} />
     </View>
   );
 }
