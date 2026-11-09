@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels [--peer-env FILE]] [--signin] [--orders] [--pending] [--userchats] [--kbexport] [--promptdiff] [--codeversions] [--uitext] [--apps] [--extknowledge] [--authsettings] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa] [--accountmfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels [--peer-env FILE]] [--signin] [--orders] [--pending] [--userchats] [--kbexport] [--promptdiff] [--codeversions] [--uitext] [--apps] [--toolscript] [--extknowledge] [--authsettings] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa] [--accountmfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -91,6 +91,9 @@
  * `--apps` (admins, scratch servers only; Apps switched on for the run, then put back) checks Admin →
  * Apps: refusals, an app installed by hand at an address that never resolves, changed, refused
  * switching on, failed connecting, uninstalled (src/apps-probe.ts).
+ * `--toolscript` (admins, scratch servers only) installs a throwaway pipe that asks the browser to
+ * run JavaScript, answers its requests over the socket with the app's own page script, and
+ * checks the answers reach the tool; the pipe and chat are deleted (src/toolscript-probe.ts).
  * `--extknowledge` (admins, scratch servers only) checks Admin → External Knowledge: the server's
  * refusals, then a whole source's life against a Qdrant stand-in on Docker's bridge (up only
  * while it runs): test, save, switch, change (the saved key kept), refused change, new key,
@@ -167,6 +170,7 @@ import { probeExternalKnowledge } from './extknowledge-probe';
 import { probeCodeVersions } from './codeversions-probe';
 import { probeInterfaceText } from './uitext-probe';
 import { probeApps } from './apps-probe';
+import { probeToolScript } from './toolscript-probe';
 import { probeChatVars } from './chatvars-probe';
 import { probeCodeEdit } from './codeedit-probe';
 import { probeStatus } from './status-probe';
@@ -232,6 +236,7 @@ const { values: args } = parseArgs({
     codeversions: { type: 'boolean' },
     uitext: { type: 'boolean' },
     apps: { type: 'boolean' },
+    toolscript: { type: 'boolean' },
     authsettings: { type: 'boolean' },
     chatvars: { type: 'boolean' },
     codeedit: { type: 'boolean' },
@@ -678,6 +683,12 @@ async function main() {
         const appsProbe = await probeApps({ client, capabilities, baseUrl });
         for (const result of appsProbe.steps) results.push({ ...result, name: `Apps: ${result.name}` });
         fixtures['write.apps'] = appsProbe.fixture;
+      }
+
+      if (args.toolscript && capabilities) {
+        const scriptProbe = await probeToolScript({ client, baseUrl, token: session.token, userId: session.id, userName: session.name, capabilities });
+        for (const result of scriptProbe.steps) results.push({ ...result, name: `Tools’ JavaScript: ${result.name}` });
+        fixtures['write.toolscript'] = scriptProbe.fixture;
       }
 
       if (args.authsettings && capabilities) {

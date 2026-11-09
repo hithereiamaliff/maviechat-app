@@ -10,8 +10,12 @@ import { patchChatRow } from '@/features/chats/cache';
 import { setViewingChat } from '@/features/notifications/presence';
 import { pushAnnouncesReplies } from '@/features/notifications/push';
 import { PythonHost } from '@/features/python/PythonHost';
+import { offerScriptFile, offerScriptPage, RunCodeSheet, type RunChoice } from '@/features/script/RunCodeSheet';
+import { ScriptRunner } from '@/features/script/runner';
+import { ScriptHost } from '@/features/script/ScriptHost';
 import { PythonRunner } from '@/features/python/runner';
 import { pythonFiles } from '@/features/python/serverFiles';
+import { devicePrefs, setDevicePrefs } from '@/lib/devicePrefs';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, usePalette } from '@/theme';
 import { ChatStreams } from './chatStreams';
@@ -95,6 +99,18 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
     sessionRef.current = session;
   }, [session]);
 
+  // Tools' JavaScript, each run in a fresh sealed page; what it offers (files, pages) goes to the person.
+  const [script] = useState(() => new ScriptRunner({ file: offerScriptFile, open: offerScriptPage }));
+  useEffect(() => () => script.dispose(), [script]);
+  // Asked one at a time, in a sheet, before any of it runs (unless this phone says otherwise).
+  const [askingCode, setAskingCode] = useState<{ code: string; done: (choice: RunChoice) => void } | null>(null);
+  const asks = useRef<Promise<unknown>>(Promise.resolve());
+  const askToRun = (code: string): Promise<RunChoice> => {
+    const asked = asks.current.then(() => new Promise<RunChoice>((resolve) => setAskingCode({ code, done: resolve })));
+    asks.current = asked.catch(() => undefined);
+    return asked;
+  };
+
   // The model's questions asked live, one set at a time, answered in a sheet.
   const [asking, setAsking] = useState<{ questions: AskUserQuestion[]; deadline: number | null; done: (answers: Record<string, AskUserAnswer> | null) => void } | null>(null);
   const [streams] = useState(
@@ -112,6 +128,18 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
           const { files: prepared, notes } = await pythonFiles(sessionRef.current, files);
           const output = await python.run({ code, files: prepared });
           return notes.length ? { ...output, stderr: `${notes.join('\n')}\n${output.stderr}` } : output;
+        },
+        // A tool's JavaScript, as the web runs it, but sealed off from the app; the server gets its result, or why not.
+        runScript: async (code) => {
+          const mode = devicePrefs().toolCode;
+          if (mode === 'never') return { error: 'Running tools’ JavaScript is turned off on this phone.' };
+          if (mode === 'ask') {
+            const choice = await askToRun(code);
+            if (choice === 'skip') return { error: 'The user chose not to run this code on their phone.' };
+            if (choice === 'always') setDevicePrefs({ toolCode: 'run' });
+          }
+          const outcome = await script.run(code);
+          return outcome.ok ? outcome.result : { error: `The code failed: ${outcome.error}` };
         },
       }),
   );
@@ -213,6 +241,10 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
     [status, streams, markRead, runPython, watchNote],
   );
 
+  const decide = (choice: RunChoice) => {
+    askingCode?.done(choice);
+    setAskingCode(null);
+  };
   const finish = (answers: Record<string, AskUserAnswer> | null) => {
     asking?.done(answers);
     setAsking(null);
@@ -221,6 +253,10 @@ export function LiveProvider({ currentChatId, children }: { currentChatId: strin
     <LiveContext.Provider value={value}>
       {children}
       <PythonHost runner={python} baseUrl={baseUrl} />
+      <ScriptHost runner={script} />
+      <Modal visible={askingCode !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => decide('skip')}>
+        {askingCode ? <RunCodeSheet code={askingCode.code} onChoose={decide} /> : null}
+      </Modal>
       <Modal visible={asking !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => finish(null)}>
         {asking ? <LiveQuestions questions={asking.questions} deadline={asking.deadline} onDone={finish} /> : null}
       </Modal>

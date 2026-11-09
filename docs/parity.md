@@ -31,7 +31,6 @@ Every open row and every "Not yet" note in this list was checked against Open We
 - None left. (Found 2026-11-09 and done the same day: tool, function, skill and model versions; the comparison with a pasted revision.)
 
 **Real, but the owner's call:**
-- A tool's `execute` JavaScript: the web runs it in the browser; here it would run server-sent code on the phone, in a sealed web view.
 - The app in other languages: a project of its own (the web's locale files can't be copied).
 
 **Real, but none of the three servers can try them:**
@@ -227,7 +226,7 @@ Every open row and every "Not yet" note in this list was checked against Open We
 
 | Open WebUI feature | MavieChat |
 |---|---|
-| Pyodide (`execute:python`, Run in the browser), `execute` JavaScript | Messages slice (2026-11-07): Python runs on the phone in a hidden sandboxed web view, with Pyodide from the Open WebUI server's own `/pyodide/` (the files the web uses; not shipped with the app). The code interpreter's `execute:python` gets the chat's files in `/mnt/uploads` (fetched by the app with your sign-in; the token never enters the web view; over 10 MB left out) and the answer the web gives (`stdout`, `stderr`, `result`). Run uses Jupyter where the admin chose it. `execute` (JavaScript) is still answered "unsupported". Audit (2026-11-08): both versions run a tool's `execute` JavaScript in the browser; running server-sent code on the phone, in a sealed web view, is the owner's call |
+| Pyodide (`execute:python`, Run in the browser), `execute` JavaScript | Messages slice (2026-11-07): Python runs on the phone in a hidden sandboxed web view, with Pyodide from the Open WebUI server's own `/pyodide/` (the files the web uses; not shipped with the app). The code interpreter's `execute:python` gets the chat's files in `/mnt/uploads` (fetched by the app with your sign-in; the token never enters the web view; over 10 MB left out) and the answer the web gives (`stdout`, `stderr`, `result`). Run uses Jupyter where the admin chose it. Tools' JavaScript (2026-11-09, the owner's go): an `execute` request runs, as the web runs it (the body of an async function; its return value is the answer), in a fresh hidden web view each time, sealed off from the app: private, no sign-in, chats or storage in it, no camera or microphone, no other windows or navigation, 60 seconds at most. Asked first by default, with the code shown (Run, Don't Run, Always Run); Settings → Interface → This phone → Tools' code: Ask first, Run or Never. A refusal or failure answers `{ error }`, as the server's own errors do (the web doesn't answer a failure at all, so the tool waits for the server's timeout). Files it offers as downloads go to the share sheet; pages it opens are asked about, then shown in the in-app browser |
 | Artifacts, tool embeds and HTML previews in iframes | Sandboxed WebViews (at most ~3 live) |
 | Mermaid, Vega, KaTeX | Maths: native SVG from MathJax in the app (no web view). Mermaid and Vega: a sandboxed web view per diagram, sized to fit, renderers pinned on jsDelivr |
 | TipTap rich-text input | Plain native text input with markdown (Open WebUI's phone behaviour is plain anyway) |

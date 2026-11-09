@@ -32,6 +32,7 @@ export * from './interactions';
 export * from './interfaceDefaults';
 export * from './interfaceText';
 export * from './apps';
+export * from './toolScript';
 export * from './knowledge';
 export * from './memories';
 export * from './mfa';

@@ -16,6 +16,8 @@ export interface StreamHooks {
   pushAnnounces?(chatId: string): boolean;
   /** Runs the code interpreter's Python on the phone, with the chat's files the server lists. */
   runPython?(code: string, files: unknown): Promise<CodeOutput>;
+  /** A tool's JavaScript (`execute`): resolves with what to answer (its result, or `{ error }`). */
+  runScript?(code: string): Promise<unknown>;
 }
 
 interface QueuedEvent {
@@ -237,8 +239,20 @@ export class ChatStreams {
         }
         return;
       }
+      case 'execute': {
+        if (!this.hooks.runScript) {
+          reply?.({ error: "MavieChat can't run tools' JavaScript here." });
+          return;
+        }
+        try {
+          reply?.(await this.hooks.runScript(text(payload.code)));
+        } catch (error) {
+          reply?.({ error: error instanceof Error ? error.message : String(error) });
+        }
+        return;
+      }
       default:
-        // execute (JavaScript), tool servers, direct connections, terminals: not available in the app.
+        // Tool servers, direct connections, terminals: not available in the app.
         reply?.({ error: `MavieChat can't handle “${type}” requests yet.` });
     }
   }

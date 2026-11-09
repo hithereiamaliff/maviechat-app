@@ -13,6 +13,7 @@ import { useState, type ReactNode } from 'react';
 import { Alert, ScrollView } from 'react-native';
 import { useToast } from '@/components/Toast';
 import { selectionActions } from '@/features/chat/selectionActions';
+import { setDevicePrefs, useDevicePrefs, type ToolCodeMode } from '@/lib/devicePrefs';
 import { describeError } from '@/lib/errors';
 import { useCapabilities, useUserSettings } from '@/lib/server';
 import { useCanSaveSettings, useInterface, useSaveUiSettings } from '@/lib/uiSettings';
@@ -141,9 +142,33 @@ export function InterfaceSettings() {
           ? 'Saved with your account, so the web app follows them too. The web’s other display settings are about the browser (text size, fonts, keyboard) or features the app doesn’t have yet.'
           : 'Your admin doesn’t let this account change its settings.'}
       </Note>
+      <ToolCodeRow />
       {picture.element}
       <QuickActionsSheet visible={editing === 'actions'} onClose={() => setEditing(null)} />
       <PhotoSizeSheet visible={editing === 'size'} onClose={() => setEditing(null)} />
     </ScrollView>
+  );
+}
+
+const TOOL_CODE: Record<ToolCodeMode, string> = { ask: 'Ask first', run: 'Run', never: 'Never' };
+
+/**
+ * Whether tools may run their JavaScript on this phone (as the web runs it in the browser): asked
+ * about each time, run, or never. Kept on this phone only.
+ */
+function ToolCodeRow() {
+  const { toolCode } = useDevicePrefs();
+  const choose = () =>
+    Alert.alert('Tools’ code on this phone', 'Some tools send JavaScript to run where you are, as the web runs it in the browser. Here it runs sealed off from MavieChat: it can’t see your sign-in or your chats, but it can reach the internet.', [
+      ...(['ask', 'run', 'never'] as const).map((mode) => ({ text: TOOL_CODE[mode], onPress: () => setDevicePrefs({ toolCode: mode }) })),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
+  return (
+    <>
+      <SectionTitle title="This phone" />
+      <Group>
+        <ActionRow label="Tools’ code" hint="JavaScript a tool sends to run here, sealed off from the app." value={TOOL_CODE[toolCode]} onPress={choose} />
+      </Group>
+    </>
   );
 }

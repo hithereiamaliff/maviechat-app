@@ -127,6 +127,20 @@ describe('ChatStreams', () => {
     expect(answers.some((value) => typeof value === 'object' && value !== null && 'error' in value)).toBe(true);
   });
 
+  it('runs a tool’s JavaScript through the app (or says it can’t), and answers with what came back', async () => {
+    const { streams, event, hooks } = setup();
+    const answers: unknown[] = [];
+    hooks.runScript = vi.fn(async (code: string) => (code === 'return 42;' ? 42 : { error: 'The user didn’t let this code run on their phone.' }));
+    streams.handle(event('c1', 'a1', 'execute', { code: 'return 42;' }), (value) => answers.push(value));
+    streams.handle(event('c1', 'a1', 'execute', { code: 'alert(1)' }), (value) => answers.push(value));
+    hooks.runScript = vi.fn(async () => {
+      throw new Error('boom');
+    });
+    streams.handle(event('c1', 'a1', 'execute', { code: 'x' }), (value) => answers.push(value));
+    for (let tick = 0; tick < 5; tick += 1) await Promise.resolve();
+    expect(answers).toEqual([42, { error: 'The user didn’t let this code run on their phone.' }, { error: 'boom' }]);
+  });
+
   it("runs the code interpreter's Python on the phone, with the chat's files, and answers what it gave", async () => {
     const { streams, event, hooks } = setup();
     const answers: unknown[] = [];
