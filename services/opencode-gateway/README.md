@@ -65,6 +65,7 @@ MavieChat and this gateway are independent of OpenCode and its makers.
 
 2. Fill in `.env`: your domain, the folders OpenCode may work in from the phone, and OpenCode's password (the one in `/etc/opencode/server.env`).
 3. Start it with `docker compose up -d`. After a minute, `curl https://<your domain>/health` should answer `{"ok":true}`.
+   The image is `ghcr.io/hithereiamaliff/maviechat-gateway:latest`, built from this repository's `main`. To stay on one version instead, change `latest` to a release, such as `0.1.0`.
 
 Both containers use the computer's own network. The gateway listens only on 127.0.0.1:8080 and reaches OpenCode at 127.0.0.1:4096. Caddy answers on ports 80 and 443 and fetches the HTTPS certificate itself.
 
