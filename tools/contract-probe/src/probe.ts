@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels [--peer-env FILE]] [--signin] [--orders] [--pending] [--userchats] [--kbexport] [--promptdiff] [--authsettings] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa] [--accountmfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels [--peer-env FILE]] [--signin] [--orders] [--pending] [--userchats] [--kbexport] [--promptdiff] [--extknowledge] [--authsettings] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa] [--accountmfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -82,6 +82,10 @@
  * `--promptdiff` (scratch servers only) gives a throwaway prompt four versions and compares them
  * the app's way: on 0.12 line for line with the server's own comparison, on 0.11 (whose own can't
  * be reached) from the versions' text; the prompt is deleted after (src/promptdiff-probe.ts).
+ * `--extknowledge` (admins, scratch servers only) checks Admin → External Knowledge: the server's
+ * refusals, then a whole source's life against a Qdrant stand-in on Docker's bridge (up only
+ * while it runs): test, save, switch, change (the saved key kept), refused change, new key,
+ * sharing kept, delete (src/extknowledge-probe.ts).
  * `--authsettings` (admins, scratch servers only) reads Authentication's LDAP and single sign-on
  * settings the app's way; where LDAP isn't set up, checks switching it on with empty settings is
  * refused and it stays off; nothing is left changed (src/authsettings-probe.ts).
@@ -150,6 +154,7 @@ import { probeAccountMfa } from './accountmfa-probe';
 import { probeAuthSettings } from './authsettings-probe';
 import { probeKnowledgeExport } from './kbexport-probe';
 import { probePromptDiff } from './promptdiff-probe';
+import { probeExternalKnowledge } from './extknowledge-probe';
 import { probeChatVars } from './chatvars-probe';
 import { probeCodeEdit } from './codeedit-probe';
 import { probeStatus } from './status-probe';
@@ -211,6 +216,7 @@ const { values: args } = parseArgs({
     userchats: { type: 'boolean' },
     kbexport: { type: 'boolean' },
     promptdiff: { type: 'boolean' },
+    extknowledge: { type: 'boolean' },
     authsettings: { type: 'boolean' },
     chatvars: { type: 'boolean' },
     codeedit: { type: 'boolean' },
@@ -633,6 +639,12 @@ async function main() {
         const diffProbe = await probePromptDiff({ client, version: version?.version, baseUrl });
         for (const result of diffProbe.steps) results.push({ ...result, name: `Prompt versions: ${result.name}` });
         fixtures['write.promptdiff'] = diffProbe.fixture;
+      }
+
+      if (args.extknowledge && capabilities) {
+        const externalProbe = await probeExternalKnowledge({ client, capabilities, baseUrl });
+        for (const result of externalProbe.steps) results.push({ ...result, name: `External knowledge: ${result.name}` });
+        fixtures['write.extknowledge'] = externalProbe.fixture;
       }
 
       if (args.authsettings && capabilities) {

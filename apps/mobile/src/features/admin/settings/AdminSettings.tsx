@@ -34,10 +34,11 @@ import { fonts, usePalette } from '@/theme';
 import { AdminConfigPage, BannersEditor, SettingsEndpointPage } from './AdminConfigPage';
 import { ConnectionsPage } from './ConnectionsPage';
 import { EventWebhooks } from './EventWebhooks';
+import { ExternalKnowledgePage } from './ExternalKnowledgePage';
 import { InterfaceDefaults } from './InterfaceDefaults';
 import { ModelsPage } from './ModelsPage';
 
-type Page = 'general' | 'authentication' | 'connections' | 'models' | 'interface' | 'subagents' | 'code-execution' | 'web';
+type Page = 'general' | 'authentication' | 'connections' | 'models' | 'interface' | 'subagents' | 'code-execution' | 'web' | 'external-knowledge';
 
 /** The web's admin settings tabs not in the app yet, and why each is better on the web for now. */
 const WEB_PAGES: { group: string; pages: { key: string; label: string; why: string }[] }[] = [
@@ -45,7 +46,7 @@ const WEB_PAGES: { group: string; pages: { key: string; label: string; why: stri
   {
     group: 'Tools',
     pages: [
-      { key: 'integrations', label: 'Integrations', why: 'Tool and terminal servers, OAuth, outside knowledge' },
+      { key: 'integrations', label: 'Integrations', why: 'Tool and terminal servers and their sign-ins' },
       { key: 'documents', label: 'Documents', why: 'Saving reloads the embedding model on the server' },
       { key: 'pipelines', label: 'Pipelines', why: 'Uploads code to a pipelines server' },
     ],
@@ -62,8 +63,9 @@ const WEB_PAGES: { group: string; pages: { key: string; label: string; why: stri
 
 /**
  * The settings modal's Admin tab (admins only): the server's own settings. General,
- * Authentication, Connections, Models, Sub-agents, Interface, Web Search and Code Execution are here; each saves only what changed, after listing it. The
- * rest open on the web until their slices land.
+ * Authentication, Connections, Models, Sub-agents, Interface, Web Search, Code Execution and
+ * External Knowledge (on the web, a part of Integrations) are here; each saves only what changed.
+ * The rest open on the web until their slices land.
  */
 export function AdminSettings() {
   const palette = usePalette();
@@ -105,6 +107,8 @@ export function AdminSettings() {
             <SettingsEndpointPage name="web" read={getWebConfig} save={saveWebConfig} sections={WEB_SEARCH_SECTIONS}>
               <Note>With hybrid search on (Documents), saving also reloads the server’s reranker.</Note>
             </SettingsEndpointPage>
+          ) : page === 'external-knowledge' ? (
+            <ExternalKnowledgePage />
           ) : page === 'subagents' ? (
             <SettingsEndpointPage name="subagents" read={getSubagentsConfig} save={saveSubagentsConfig} sections={SUBAGENT_SECTIONS} />
           ) : (
@@ -135,6 +139,7 @@ export function AdminSettings() {
               <ActionRow label="Interface" hint="Titles, tags, follow-ups, searches; long chats; tool approvals" onPress={() => setPage('interface')} />
               <ActionRow label="Web Search" hint="The engine, its key, how pages are read" onPress={() => setPage('web')} />
               <ActionRow label="Code Execution" hint="The Run button and the code interpreter" onPress={() => setPage('code-execution')} />
+              <ActionRow label="External Knowledge" hint="Collections in Qdrant, Milvus or pgvector, searched where they live" onPress={() => setPage('external-knowledge')} />
             </Group>
           </View>
           {WEB_PAGES.map((group) => (

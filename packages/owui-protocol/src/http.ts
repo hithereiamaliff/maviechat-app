@@ -103,6 +103,10 @@ export class OwuiClient {
     return this.request<T>('POST', path, { ...options, body });
   }
 
+  patch<T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'body'>): Promise<T> {
+    return this.request<T>('PATCH', path, { ...options, body });
+  }
+
   delete<T>(path: string, options?: Omit<RequestOptions, 'body'>): Promise<T> {
     return this.request<T>('DELETE', path, options);
   }

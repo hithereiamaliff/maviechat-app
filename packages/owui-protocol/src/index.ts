@@ -58,6 +58,7 @@ export * from './valves';
 export * from './variables';
 export * from './version';
 export * from './workspaceKnowledge';
+export * from './externalKnowledge';
 export * from './textDiff';
 export * from './workspaceModelEditor';
 export * from './workspaceModels';
