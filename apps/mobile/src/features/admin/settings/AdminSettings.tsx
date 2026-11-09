@@ -18,6 +18,7 @@ import {
   WEB_SEARCH_SECTIONS,
   getLdapSettings,
   getOAuthSettings,
+  isAtLeast,
   LDAP_SECTIONS,
   OAUTH_SECTIONS,
   oauthLockedWhy,
@@ -32,6 +33,7 @@ import { ActionRow, Group, Note, SectionTitle } from '@/features/settings/rows';
 import { useAuthed, useCapabilities } from '@/lib/server';
 import { fonts, usePalette } from '@/theme';
 import { AdminConfigPage, BannersEditor, SettingsEndpointPage } from './AdminConfigPage';
+import { AppsPage } from './AppsPage';
 import { ConnectionsPage } from './ConnectionsPage';
 import { EventWebhooks } from './EventWebhooks';
 import { ExternalKnowledgePage } from './ExternalKnowledgePage';
@@ -39,7 +41,7 @@ import { InterfaceDefaults } from './InterfaceDefaults';
 import { InterfaceText } from './InterfaceText';
 import { ModelsPage } from './ModelsPage';
 
-type Page = 'general' | 'authentication' | 'connections' | 'models' | 'interface' | 'subagents' | 'code-execution' | 'web' | 'external-knowledge';
+type Page = 'general' | 'authentication' | 'connections' | 'models' | 'interface' | 'subagents' | 'code-execution' | 'web' | 'external-knowledge' | 'apps';
 
 /** The web's admin settings tabs not in the app yet, and why each is better on the web for now. */
 const WEB_PAGES: { group: string; pages: { key: string; label: string; why: string }[] }[] = [
@@ -73,6 +75,8 @@ export function AdminSettings() {
   const { session } = useAuthed();
   const capabilities = useCapabilities();
   const [page, setPage] = useState<Page | null>(null);
+  // Apps came with 0.12 (switched on in General).
+  const appsOnServer = isAtLeast(capabilities?.version, '0.12.0');
   if (!capabilities?.isAdmin) return <Text style={[styles.empty, { color: palette.textMuted }]}>Only admins change the server’s settings.</Text>;
   return (
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -111,6 +115,8 @@ export function AdminSettings() {
             </SettingsEndpointPage>
           ) : page === 'external-knowledge' ? (
             <ExternalKnowledgePage />
+          ) : page === 'apps' ? (
+            <AppsPage />
           ) : page === 'subagents' ? (
             <SettingsEndpointPage name="subagents" read={getSubagentsConfig} save={saveSubagentsConfig} sections={SUBAGENT_SECTIONS} />
           ) : (
@@ -142,6 +148,7 @@ export function AdminSettings() {
               <ActionRow label="Web Search" hint="The engine, its key, how pages are read" onPress={() => setPage('web')} />
               <ActionRow label="Code Execution" hint="The Run button and the code interpreter" onPress={() => setPage('code-execution')} />
               <ActionRow label="External Knowledge" hint="Collections in Qdrant, Milvus or pgvector, searched where they live" onPress={() => setPage('external-knowledge')} />
+              {appsOnServer ? <ActionRow label="Apps" hint="Outside apps that join channels and answer there (experimental)" onPress={() => setPage('apps')} /> : null}
             </Group>
           </View>
           {WEB_PAGES.map((group) => (

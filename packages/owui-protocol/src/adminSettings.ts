@@ -184,6 +184,7 @@ export const GENERAL_SECTIONS: SettingSection[] = [
           { value: 'channel', label: 'In the channel' },
         ],
       },
+      { key: 'ENABLE_APPS', label: 'Apps', hint: 'Outside apps that join channels and answer there (marked experimental on the web). Set them up in Admin → Apps.', kind: 'switch', optional: true },
       { key: 'ENABLE_CALENDAR', label: 'Calendar', kind: 'switch' },
       { key: 'ENABLE_AUTOMATIONS', label: 'Automations', kind: 'switch' },
       { key: 'ENABLE_USER_WEBHOOKS', label: 'People’s own webhooks', kind: 'switch' },
