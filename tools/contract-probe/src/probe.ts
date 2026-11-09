@@ -1,7 +1,7 @@
 /**
  * Read-only contract probe against a live Open WebUI server.
  *
- *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels [--peer-env FILE]] [--signin] [--orders] [--pending] [--userchats] [--kbexport] [--promptdiff] [--codeversions] [--extknowledge] [--authsettings] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa] [--accountmfa]
+ *   npm run probe -- [--url http://127.0.0.1:3003] [--env ~/.config/maviechat/owui-test.env] [--no-fixtures] [--write] [--a2] [--a3] [--a4] [--a5] [--a6] [--folders] [--newchat] [--attach] [--integrations] [--messages] [--interface] [--search] [--models] [--notes] [--status] [--oauth] [--webhooks] [--eventhooks] [--uidefaults] [--adminmodels [--peer-env FILE]] [--signin] [--orders] [--pending] [--userchats] [--kbexport] [--promptdiff] [--codeversions] [--uitext] [--extknowledge] [--authsettings] [--chatvars] [--codeedit] [--sharedfolders --peer-env FILE] [--a8] [--m3] [--m3text] [--m3kb] [--m3tools] [--m4users] [--m4settings] [--m4connections] [--m4models] [--m4forms] [--m4functions] [--m4evaluations] [--m5mfa] [--accountmfa]
  *
  * Without a test account it checks only the public endpoints. With one it signs in,
  * reads config, models, the chat list and one saved chat's tree, joins the socket,
@@ -85,6 +85,9 @@
  * `--codeversions` (0.12 scratch servers, as an admin: saving a tool or function runs it) gives a
  * throwaway tool, filter and skill three versions each and goes through them the app's way: list,
  * read, compare (read back as the app's own diff), make live, delete (src/codeversions-probe.ts).
+ * `--uitext` (admins, scratch servers only) saves two interface texts the app's way (one with a
+ * placeholder), checks browsers get them, has a dropped placeholder refused, and puts the setting
+ * back exactly (src/uitext-probe.ts).
  * `--extknowledge` (admins, scratch servers only) checks Admin → External Knowledge: the server's
  * refusals, then a whole source's life against a Qdrant stand-in on Docker's bridge (up only
  * while it runs): test, save, switch, change (the saved key kept), refused change, new key,
@@ -159,6 +162,7 @@ import { probeKnowledgeExport } from './kbexport-probe';
 import { probePromptDiff } from './promptdiff-probe';
 import { probeExternalKnowledge } from './extknowledge-probe';
 import { probeCodeVersions } from './codeversions-probe';
+import { probeInterfaceText } from './uitext-probe';
 import { probeChatVars } from './chatvars-probe';
 import { probeCodeEdit } from './codeedit-probe';
 import { probeStatus } from './status-probe';
@@ -222,6 +226,7 @@ const { values: args } = parseArgs({
     promptdiff: { type: 'boolean' },
     extknowledge: { type: 'boolean' },
     codeversions: { type: 'boolean' },
+    uitext: { type: 'boolean' },
     authsettings: { type: 'boolean' },
     chatvars: { type: 'boolean' },
     codeedit: { type: 'boolean' },
@@ -656,6 +661,12 @@ async function main() {
         const versionsProbe = await probeCodeVersions({ client, capabilities, baseUrl, version: version?.version });
         for (const result of versionsProbe.steps) results.push({ ...result, name: `Versions: ${result.name}` });
         fixtures['write.codeversions'] = versionsProbe.fixture;
+      }
+
+      if (args.uitext && capabilities) {
+        const textProbe = await probeInterfaceText({ client, anonymous, capabilities, baseUrl });
+        for (const result of textProbe.steps) results.push({ ...result, name: `Interface text: ${result.name}` });
+        fixtures['write.uitext'] = textProbe.fixture;
       }
 
       if (args.authsettings && capabilities) {

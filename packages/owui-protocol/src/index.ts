@@ -30,6 +30,7 @@ export * from './ids';
 export * from './input';
 export * from './interactions';
 export * from './interfaceDefaults';
+export * from './interfaceText';
 export * from './knowledge';
 export * from './memories';
 export * from './mfa';

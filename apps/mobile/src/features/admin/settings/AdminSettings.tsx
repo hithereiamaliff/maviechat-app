@@ -36,6 +36,7 @@ import { ConnectionsPage } from './ConnectionsPage';
 import { EventWebhooks } from './EventWebhooks';
 import { ExternalKnowledgePage } from './ExternalKnowledgePage';
 import { InterfaceDefaults } from './InterfaceDefaults';
+import { InterfaceText } from './InterfaceText';
 import { ModelsPage } from './ModelsPage';
 
 type Page = 'general' | 'authentication' | 'connections' | 'models' | 'interface' | 'subagents' | 'code-execution' | 'web' | 'external-knowledge';
@@ -84,6 +85,7 @@ export function AdminSettings() {
           {page === 'general' ? (
             <AdminConfigPage sections={GENERAL_SECTIONS}>
               <InterfaceDefaults />
+              <InterfaceText />
               <BannersEditor />
               <EventWebhooks />
             </AdminConfigPage>
@@ -121,7 +123,7 @@ export function AdminSettings() {
           <View style={styles.section}>
             <SectionTitle title="System" />
             <Group>
-              <ActionRow label="General" hint="Features, this server’s address, everyone’s Interface defaults, banners, event webhooks" onPress={() => setPage('general')} />
+              <ActionRow label="General" hint="Features, this server’s address, everyone’s Interface defaults, the web’s interface text, banners, event webhooks" onPress={() => setPage('general')} />
               <ActionRow label="Authentication" hint="Sign-ups, new accounts, sessions, API keys, LDAP, single sign-on" onPress={() => setPage('authentication')} />
             </Group>
           </View>
