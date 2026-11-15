@@ -6,6 +6,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { ExplainerSheet } from '@/features/welcome/ExplainerSheet';
 import { EXPLAINERS, type ExplainerKey } from '@/features/welcome/explainers';
+import { FORM_MAX_WIDTH } from '@/lib/layout';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useOpenCode } from '@/session/OpenCodeProvider';
 import { useSession } from '@/session/SessionProvider';
@@ -120,7 +121,8 @@ export default function Welcome() {
 }
 
 const styles = StyleSheet.create({
-  content: { flexGrow: 1, paddingHorizontal: 24, gap: 32 },
+  // On an iPad the form keeps a phone's width, in the middle.
+  content: { flexGrow: 1, width: '100%', maxWidth: FORM_MAX_WIDTH, alignSelf: 'center', paddingHorizontal: 24, gap: 32 },
   header: { gap: 8 },
   title: { fontFamily: fonts.semibold, fontSize: 28 },
   subtitle: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 22 },

@@ -15,6 +15,7 @@ import { useToast } from '@/components/Toast';
 import { selectionActions } from '@/features/chat/selectionActions';
 import { setDevicePrefs, useDevicePrefs, type ToolCodeMode } from '@/lib/devicePrefs';
 import { describeError } from '@/lib/errors';
+import { useLayout } from '@/lib/layout';
 import { useCapabilities, useUserSettings } from '@/lib/server';
 import { useCanSaveSettings, useInterface, useSaveUiSettings } from '@/lib/uiSettings';
 import { PhotoSizeSheet, photoSizeLabel } from './PhotoSizeSheet';
@@ -40,6 +41,7 @@ const PHOTO: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality:
  */
 export function InterfaceSettings() {
   const on = useInterface();
+  const { wide } = useLayout();
   const save = useSaveUiSettings();
   const canSave = useCanSaveSettings();
   const capabilities = useCapabilities();
@@ -114,6 +116,7 @@ export function InterfaceSettings() {
           const setting: (typeof INTERFACE_SETTINGS)[InterfaceKey] = INTERFACE_SETTINGS[key];
           if (setting.group !== group) return false;
           if ('needsTemporary' in setting && !temporary) return false;
+          if ('wideOnly' in setting && !wide) return false;
           return !('onlyWhenOff' in setting) || !on(setting.onlyWhenOff as InterfaceKey);
         });
         if (!shown.length) return null;

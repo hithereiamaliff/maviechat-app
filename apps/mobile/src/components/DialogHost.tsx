@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View, type KeyboardTypeOptions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { closeDialog, currentDialog, subscribeDialogs, type PromptButton, type PromptRequest, type SheetRequest } from '@/lib/dialogQueue';
+import { SHEET_MAX_WIDTH } from '@/lib/layout';
 import { fonts, radius, usePalette } from '@/theme';
 import { Modal } from './Modal';
 
@@ -157,7 +158,8 @@ const styles = StyleSheet.create({
   button: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: radius.md },
   buttonText: { fontFamily: fonts.semibold, fontSize: 15 },
   sheetFrame: { flex: 1, justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingTop: 8 },
+  // On a tablet the sheet stops at a comfortable width, in the middle.
+  sheet: { width: '100%', maxWidth: SHEET_MAX_WIDTH, alignSelf: 'center', borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingTop: 8 },
   sheetHeader: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 12, gap: 4, borderBottomWidth: StyleSheet.hairlineWidth },
   sheetTitle: { fontFamily: fonts.medium, fontSize: 14, lineHeight: 20 },
   sheetMessage: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18 },

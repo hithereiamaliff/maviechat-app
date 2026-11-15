@@ -78,6 +78,8 @@ export interface InterfaceSetting {
   needsTemporary?: boolean;
   /** Shown only while that switch is off (the web's "show username" goes with bubbles off). */
   onlyWhenOff?: string;
+  /** In your own settings, shown only on a wide window (an iPad), where it changes the app. */
+  wideOnly?: boolean;
 }
 
 /**
@@ -91,6 +93,7 @@ export const INTERFACE_SETTINGS = {
   enableMessageQueue: { path: 'enableMessageQueue', group: 'Chat', default: true, label: 'Queue messages', hint: 'Send while a reply is being written; your message waits its turn.' },
   chatBubble: { path: 'chatBubble', group: 'Chat', default: true, label: 'Chat bubbles', hint: 'Your messages in bubbles on the right. Off, every message is a full-width row under a name.' },
   showUsername: { path: 'showUsername', group: 'Chat', default: false, label: 'Your name instead of “You”', hint: 'Without bubbles, your messages are labelled with your name.', onlyWhenOff: 'chatBubble' },
+  widescreenMode: { path: 'widescreenMode', group: 'Chat', default: false, wideOnly: true, label: 'Use the full width', hint: 'On an iPad or another wide screen, chats fill the width instead of a column in the middle. The web follows it too.' },
   temporaryChatByDefault: { path: 'temporaryChatByDefault', group: 'Chat', default: false, label: 'New chats are temporary', needsTemporary: true },
   chatFadeStreamingText: { path: 'chatFadeStreamingText', group: 'Chat', default: true, label: 'Fade in replies as they’re written', hint: 'Each new word fades in, instead of appearing at once.' },
   renderMarkdownInUserMessages: { path: 'renderMarkdownInUserMessages', group: 'Chat', default: true, label: 'Format your messages', hint: 'Show the Markdown in what you send: bold, lists, code.' },

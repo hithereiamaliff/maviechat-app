@@ -1,5 +1,5 @@
 import { Redirect, Stack, usePathname } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useLaunchTarget } from '@/features/deeptutor/launch';
 import { LiveProvider } from '@/features/live/LiveProvider';
 import { PushSetup } from '@/features/notifications/PushSetup';
@@ -7,6 +7,7 @@ import { Sidebar } from '@/features/sidebar/Sidebar';
 import { SpaceDrawer } from '@/features/sidebar/SpaceDrawer';
 import { signedOutRoute } from '@/features/welcome/entry';
 import { setLinkServer } from '@/lib/serverLinks';
+import { useInterface } from '@/lib/uiSettings';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useOpenCode } from '@/session/OpenCodeProvider';
 import { useSession } from '@/session/SessionProvider';
@@ -51,7 +52,7 @@ export default function AppLayout() {
     // Keyed by the account in use: switching accounts starts its socket, streams and screens afresh.
     <LiveProvider key={state.accountId} currentChatId={currentChatId}>
       <PushSetup />
-      <SpaceDrawer sidebar={() => <Sidebar />}>
+      <OwuiDrawer>
         <Stack
           screenOptions={{
             headerShown: false,
@@ -71,7 +72,17 @@ export default function AppLayout() {
           <Stack.Screen name="admin/group" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
           <Stack.Screen name="settings" options={{ presentation: 'modal', animation: 'slide_from_bottom', gestureEnabled: true }} />
         </Stack>
-      </SpaceDrawer>
+      </OwuiDrawer>
     </LiveProvider>
+  );
+}
+
+/** The space's sidebar frame. On a wide window the chats keep the web's column, unless your Widescreen setting is on (as on the web). */
+function OwuiDrawer({ children }: { children: ReactNode }) {
+  const on = useInterface();
+  return (
+    <SpaceDrawer sidebar={() => <Sidebar />} fullWidth={on('widescreenMode')}>
+      {children}
+    </SpaceDrawer>
   );
 }

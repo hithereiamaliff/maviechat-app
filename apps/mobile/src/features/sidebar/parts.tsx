@@ -26,7 +26,7 @@ export function SidebarPanel({ name, onNewChat, children }: { name: string; onNe
             {name}
           </Text>
         </Pressable>
-        <IconButton icon="bars-3" label="Close sidebar" onPress={sidebar.close} />
+        <IconButton icon="bars-3" label={sidebar.docked ? 'Hide sidebar' : 'Close sidebar'} onPress={sidebar.hide} />
       </View>
       {children}
     </View>

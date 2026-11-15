@@ -13,6 +13,7 @@ import { PendingScreen } from '@/features/auth/PendingScreen';
 import { SsoSignInSheet, type SsoTarget } from '@/features/auth/SsoSignInSheet';
 import { TwoStepSignIn } from '@/features/auth/TwoStepSignIn';
 import { switchToDeepTutor } from '@/features/deeptutor/switch';
+import { FORM_MAX_WIDTH } from '@/lib/layout';
 import { useDebounced } from '@/lib/useDebounced';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { describeSignInError } from '@/session/errors';
@@ -287,7 +288,8 @@ export default function Login() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  content: { flexGrow: 1, paddingHorizontal: 24, gap: 32 },
+  // On an iPad the form keeps a phone's width, in the middle.
+  content: { flexGrow: 1, width: '100%', maxWidth: FORM_MAX_WIDTH, alignSelf: 'center', paddingHorizontal: 24, gap: 32 },
   header: { gap: 8 },
   title: { fontFamily: fonts.semibold, fontSize: 28 },
   subtitle: { fontFamily: fonts.regular, fontSize: 16 },

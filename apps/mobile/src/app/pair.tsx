@@ -9,6 +9,7 @@ import { IconButton } from '@/components/IconButton';
 import { TextField } from '@/components/TextField';
 import { describeOcError } from '@/features/opencode/errors';
 import { DEVICE } from '@/lib/device';
+import { FORM_MAX_WIDTH } from '@/lib/layout';
 import { serverHost } from '@/session/accounts';
 import { useOpenCode } from '@/session/OpenCodeProvider';
 import { useSession } from '@/session/SessionProvider';
@@ -105,7 +106,8 @@ export default function Pair() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  content: { flexGrow: 1, paddingHorizontal: 24, gap: 28 },
+  // On an iPad the form keeps a phone's width, in the middle.
+  content: { flexGrow: 1, width: '100%', maxWidth: FORM_MAX_WIDTH, alignSelf: 'center', paddingHorizontal: 24, gap: 28 },
   header: { gap: 8 },
   title: { fontFamily: fonts.semibold, fontSize: 28 },
   subtitle: { fontFamily: fonts.regular, fontSize: 16, lineHeight: 22 },

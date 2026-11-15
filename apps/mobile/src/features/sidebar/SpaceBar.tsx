@@ -32,7 +32,8 @@ export function SpaceBar({
 
   return (
     <View style={[styles.header, { paddingTop: insets.top + 4, backgroundColor: palette.background }]}>
-      <IconButton icon="bars-3" label="Open sidebar" onPress={sidebar.open} />
+      {/* Beside the content on a wide window, the sidebar has its own close button instead. */}
+      {sidebar.docked ? null : <IconButton icon="bars-3" label="Open sidebar" onPress={sidebar.open} />}
       {switchButton}
       <Text style={[styles.title, { color: palette.text }]} numberOfLines={1} accessibilityRole="header">
         {title ?? ''}

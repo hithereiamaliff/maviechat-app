@@ -27,7 +27,7 @@ describe('the Interface settings everyone starts with', () => {
   });
 
   it('names what the web sets that the app doesn’t show', () => {
-    expect(otherDefaultKeys({ chatBubble: true, title: { auto: false }, chatDirection: 'RTL', widescreenMode: true, textScale: 1.2, landingPageMode: 'chat', gone: null })).toEqual(['textScale', 'widescreenMode']);
+    expect(otherDefaultKeys({ chatBubble: true, title: { auto: false }, chatDirection: 'RTL', widescreenMode: true, textScale: 1.2, landingPageMode: 'chat', gone: null })).toEqual(['textScale']);
   });
 
   it('drops the empty groups and nulls a removal leaves', () => {
