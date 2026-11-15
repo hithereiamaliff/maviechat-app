@@ -49,6 +49,7 @@ import { noteWhen } from '@/features/notes/noteText';
 import { pageName, PagesSheet } from '@/features/notes/PagesSheet';
 import { useNote } from '@/features/notes/queries';
 import { useNoteActions } from '@/features/notes/useNoteActions';
+import { RecordSheet } from '@/features/notes/RecordSheet';
 import { useNoteFiles, type NoteFileSource, type UploadedNoteFile } from '@/features/notes/useNoteFiles';
 import { Chip } from '@/features/workspace/ListControls';
 import { describeError } from '@/lib/errors';
@@ -71,10 +72,12 @@ const FORMATS: { format: NoteFormat; icon: IconName; label: string }[] = [
   { format: 'link', icon: 'link', label: 'Link' },
 ];
 
-const ADD: { source: NoteFileSource; label: string; icon: IconName }[] = [
+/** What can go into a note: files, photos, the camera, a recording made now (the web's Record), or one from Files. */
+const ADD: { source: NoteFileSource | 'record'; label: string; icon: IconName }[] = [
   { source: 'files', label: 'Add Files…', icon: 'paper-clip' },
   { source: 'photos', label: 'Add Photos…', icon: 'photo' },
   { source: 'camera', label: 'Take Photo…', icon: 'camera' },
+  { source: 'record', label: 'Record…', icon: 'microphone' },
   { source: 'audio', label: 'Add a Recording…', icon: 'musical-note' },
 ];
 
@@ -463,7 +466,8 @@ function NoteEditor({ note, capabilities, fresh, startPage }: { note: Note; capa
     else if (pagesOn) insertRef.current(attachmentLink(link));
     else saveFiles((current) => withNoteFile(current, file.entry));
   };
-  const addFiles = (source: NoteFileSource) => void noteFiles.add(source, attach);
+  const [recording, setRecording] = useState(false);
+  const addFiles = (source: NoteFileSource | 'record') => (source === 'record' ? setRecording(true) : void noteFiles.add(source, attach));
   const askAdd = () =>
     showActionSheet({ title: 'Add to the Note', options: [...ADD.map((item) => item.label), 'Cancel'], cancelButtonIndex: ADD.length }, (index) => {
       const item = ADD[index];
@@ -635,6 +639,7 @@ function NoteEditor({ note, capabilities, fresh, startPage }: { note: Note; capa
       )}
       {actions.element}
       {noteFiles.pictureElement}
+      <RecordSheet visible={recording} onClose={() => setRecording(false)} onRecorded={(file) => void noteFiles.addPicked([file], attach)} />
       {pagesOn && page ? (
         <PagesSheet
           visible={pagesOpen}

@@ -2,12 +2,13 @@ import { uiValue, withCsp, type Artifact } from '@maviechat/owui-protocol';
 import * as Clipboard from 'expo-clipboard';
 import { File, Paths } from 'expo-file-system';
 import { useState } from 'react';
-import { Pressable, Share, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { describeError } from '@/lib/errors';
 import { useServerConfig, useUserSettings } from '@/lib/server';
+import { shareLocalFile } from '@/lib/shareLocalFile';
 import { previewPage } from '@/markdown/webPages';
 import { WebFrame } from '@/markdown/WebFrame';
 import { fonts, usePalette } from '@/theme';
@@ -51,7 +52,7 @@ function Viewer({ artifacts, start, chatId, onClose }: { artifacts: Artifact[]; 
       const file = new File(Paths.cache, `artifact-${chatId}-${index}.${artifact.kind === 'svg' ? 'svg' : 'html'}`);
       file.create({ overwrite: true });
       await file.write(artifact.content);
-      await Share.share({ url: file.uri });
+      await shareLocalFile(file.uri);
     } catch (error) {
       toast(`Couldn’t save it: ${describeError(error)}`, 'error');
     }

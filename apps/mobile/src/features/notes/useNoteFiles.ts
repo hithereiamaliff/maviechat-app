@@ -77,15 +77,29 @@ export function useNoteFiles() {
     return { picture, entry: { ...entry, id: uploaded.id } };
   };
 
+  const allowed = (): boolean => {
+    if (capabilities && !capabilities.can('chat.file_upload', true)) {
+      toast('You do not have permission to upload files.', 'error');
+      return false;
+    }
+    return true;
+  };
+
   /** Picks from `source`, then uploads each, handing each one over as it's done. */
   const add = async (source: NoteFileSource, each: (file: UploadedNoteFile) => void) => {
-    if (capabilities && !capabilities.can('chat.file_upload', true)) return toast('You do not have permission to upload files.', 'error');
+    if (!allowed()) return;
     let picked: Picked[];
     try {
       picked = await pick(source);
     } catch (error) {
       return toast(`Couldn’t open the picker: ${describeError(error)}`, 'error');
     }
+    await addPicked(picked, each);
+  };
+
+  /** Uploads files the app already has (a recording just made), handing each one over as it's done. */
+  const addPicked = async (picked: Picked[], each: (file: UploadedNoteFile) => void) => {
+    if (!allowed()) return;
     const refusal = tooBig(picked);
     if (refusal) return toast(refusal, 'error');
     for (const file of picked) {
@@ -101,5 +115,5 @@ export function useNoteFiles() {
     }
   };
 
-  return { add, uploading, pictureElement: pictures.element };
+  return { add, addPicked, uploading, pictureElement: pictures.element };
 }

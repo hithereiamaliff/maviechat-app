@@ -3,12 +3,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { File, Paths } from 'expo-file-system';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Share } from 'react-native';
+import { Alert } from 'react-native';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
 import { AccessSheet, type AccessTarget } from '@/features/workspace/AccessSheet';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities } from '@/lib/server';
+import { shareLocalFile } from '@/lib/shareLocalFile';
 import { FolderSheet, type FolderSheetTarget } from './FolderSheet';
 
 export interface FolderRef {
@@ -58,7 +59,7 @@ export function useFolderActions({ onNavigate, onCreated }: Options = {}) {
       const file = new File(Paths.cache, folderExportName(folder.name));
       file.create({ overwrite: true });
       await file.write(JSON.stringify(chats));
-      await Share.share({ url: file.uri, title: folder.name });
+      await shareLocalFile(file.uri, folder.name);
     } catch (error) {
       toast(`Couldn’t export the folder: ${describeError(error)}`, 'error');
     }

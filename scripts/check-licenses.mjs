@@ -80,7 +80,7 @@ if (process.argv.includes('--write')) writeNotices();
  * Apache all ask for it to travel with the app), Heroicons (a dev dependency whose artwork the
  * app draws), emoji-datasource (a dev dependency whose emoji names the app carries), the packages
  * bundled into the code editor page (CodeMirror, scripts/code-editor/packages.json), and the
- * native libraries compiled into the iOS app (scripts/native-licenses).
+ * native libraries compiled into each app (scripts/native-licenses, each marked with its platform).
  * Texts are kept once each in license-texts.json; entries point at them.
  */
 function writeNotices() {
@@ -171,7 +171,7 @@ function writeNotices() {
   const nativeDir = path.join(root, 'scripts/native-licenses');
   const native = JSON.parse(readFileSync(path.join(nativeDir, 'index.json'), 'utf8')).libraries;
   for (const library of native) {
-    notices.push({ name: library.name, version: library.version, license: library.license, via: library.via, texts: library.files.map((file) => keep(readFileSync(path.join(nativeDir, file), 'utf8'))) });
+    notices.push({ name: library.name, version: library.version, license: library.license, via: library.via, ...(library.platform ? { platform: library.platform } : {}), texts: library.files.map((file) => keep(readFileSync(path.join(nativeDir, file), 'utf8'))) });
   }
 
   if (missing.length) {
