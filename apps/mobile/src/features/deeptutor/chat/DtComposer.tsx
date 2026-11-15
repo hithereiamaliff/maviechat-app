@@ -8,6 +8,7 @@ import { Modal } from '@/components/Modal';
 import { updateDraft, useDraftText } from '@/features/chat/drafts';
 import { useImportedChats } from '@/features/deeptutor/personalization/queries';
 import { useDtAttachmentLimits, useDtNotebooks, useDtSessions } from '@/features/deeptutor/queries';
+import { useKeyCommand } from '@/lib/hardwareKeyboard';
 import { useGrowingInput } from '@/lib/useGrowingInput';
 import { fonts, radius, usePalette } from '@/theme';
 import { capabilityName, modeInfo } from './capabilities';
@@ -124,6 +125,7 @@ export function DtComposer({
   const text = useDraftText(draftKey);
   const field = useGrowingInput(text, (value) => updateDraft(draftKey, (draft) => ({ ...draft, text: value })));
   const [sending, setSending] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [sheet, setSheet] = useState<'mode' | 'tools' | 'model' | 'notebook' | 'chat' | 'knowledge' | 'persona' | 'skills' | 'mcp' | null>(null);
   const info = modeInfo(mode);
   const limits = useDtAttachmentLimits();
@@ -219,6 +221,10 @@ export function DtComposer({
     setSending(false);
   };
 
+  // A keyboard on an iPad: Return sends while you type here, Shift-Return starts a new line, and Shift-Esc comes back here.
+  useKeyCommand('return', () => void submit(), focused);
+  useKeyCommand('focusInput', () => input.current?.focus());
+
   return (
     <View style={[styles.wrap, !floating && { paddingBottom: Math.max(insets.bottom, 8) }]}>
       <View style={[styles.box, { borderColor: palette.border, backgroundColor: palette.background }]}>
@@ -227,6 +233,8 @@ export function DtComposer({
           ref={input}
           value={field.value}
           onChangeText={field.onChangeText}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           placeholder={placeholder ?? PLACEHOLDERS[mode] ?? 'Ask DeepTutor anything'}
           placeholderTextColor={palette.textFaint}
           multiline

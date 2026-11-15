@@ -35,6 +35,7 @@ import { useAnchoredMenu, type MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
 import { DeepTutorPicker } from '@/features/deeptutor/DeepTutorPicker';
 import { describeError } from '@/lib/errors';
+import { useKeyCommand } from '@/lib/hardwareKeyboard';
 import { useAuthed, useCapabilities, useModels, useServerConfig, useTerminals, useTools, useUserSettings } from '@/lib/server';
 import { useInterface } from '@/lib/uiSettings';
 import { useGrowingInput } from '@/lib/useGrowingInput';
@@ -393,6 +394,19 @@ export function Composer({
   // Once the files are up, the message goes as if Send were pressed then (queued if a reply runs).
   // An attachment gone meanwhile (an upload that failed, or one taken off) stops it: nothing goes
   // that you didn't see go.
+  // A keyboard on an iPad: Return sends while you type here (the list above, when open, takes its
+  // first entry, as on the web), Shift-Return starts a new line, and Shift-Esc comes back here.
+  useKeyCommand(
+    'return',
+    () => {
+      const first = menus.entries[0];
+      if (first) first.onPick();
+      else void submit();
+    },
+    focused,
+  );
+  useKeyCommand('focusInput', () => input.current?.focus());
+
   const sendWhenUp = useEffectEvent(() => {
     const waited = armed ?? [];
     setArmed(null);

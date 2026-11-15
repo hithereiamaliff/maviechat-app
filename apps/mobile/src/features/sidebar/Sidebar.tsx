@@ -49,6 +49,7 @@ import { switchToDeepTutor, switchToOpenCode } from '@/features/deeptutor/switch
 import { useFolderActions } from '@/features/folders/useFolderActions';
 import { useNotesOn, usePinnedNotes } from '@/features/notes/queries';
 import { describeError } from '@/lib/errors';
+import { useKeyCommand } from '@/lib/hardwareKeyboard';
 import { useAuthed, useCapabilities, useServerConfig, useSessionUser, useUserSettings } from '@/lib/server';
 import { useSaveUiSettings } from '@/lib/uiSettings';
 import { useDebounced } from '@/lib/useDebounced';
@@ -196,6 +197,16 @@ export function Sidebar() {
     sidebar.close();
     router.replace('/');
   };
+  // A keyboard on an iPad: the web's shortcuts for a new chat, search and settings.
+  useKeyCommand('newChat', newChat);
+  useKeyCommand('search', () => {
+    sidebar.open();
+    setSearch('');
+  });
+  useKeyCommand('settings', () => {
+    sidebar.close();
+    router.push('/settings');
+  });
   // The search's words in a new chat's message box (nothing is sent).
   const newChatWith = (text: string) => {
     sidebar.close();

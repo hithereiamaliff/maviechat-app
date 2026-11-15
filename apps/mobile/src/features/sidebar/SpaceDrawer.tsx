@@ -3,6 +3,7 @@ import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Drawer } from 'react-native-drawer-layout';
 import type { GestureType, LegacyPanGesture } from 'react-native-gesture-handler';
 import { SidebarSwipeContext } from '@/components/SideScroll';
+import { useKeyCommand } from '@/lib/hardwareKeyboard';
 import { CONTENT_MAX_WIDTH, isWideWidth } from '@/lib/layout';
 import { sidebarMode } from '@/lib/layoutRules';
 import { SIDEBAR_WIDTH, usePalette } from '@/theme';
@@ -34,6 +35,8 @@ export function SpaceDrawer({ sidebar, swipeEnabled = true, fullWidth = false, c
       if (wide) setHidden(true);
     },
   };
+  // A keyboard on an iPad: ⌘⇧S shows or hides the sidebar, as on the web.
+  useKeyCommand('sidebar', () => (visible ? controls.hide() : controls.open()));
   // The swipe, for the sideways scrollers that it waits for. The drawer's types name gesture
   // handler 3's new gesture type, but it hands over a classic one (`Gesture.Pan()`).
   const swipe = useRef<GestureType | undefined>(undefined);

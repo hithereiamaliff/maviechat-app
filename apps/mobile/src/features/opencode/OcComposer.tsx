@@ -1,5 +1,5 @@
 import { OcHttpError, type Agent } from '@maviechat/opencode-protocol';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type ComponentRef } from 'react';
 import { ActivityIndicator, Alert, Pressable, SectionList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
@@ -8,6 +8,7 @@ import { IconButton } from '@/components/IconButton';
 import { MenuTrigger } from '@/components/Menu';
 import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { useKeyCommand } from '@/lib/hardwareKeyboard';
 import { fonts, radius, usePalette } from '@/theme';
 import { describeOcError } from './errors';
 import { modelSections, type ModelChoice } from './models';
@@ -182,6 +183,8 @@ export function OcComposer({
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const input = useRef<ComponentRef<typeof TextInput>>(null);
   const shown = model ?? defaultModel;
   const current = models.find((item) => sameModel(shown, item));
   const modelLabel = current?.name ?? shown?.modelID ?? 'Default model';
@@ -197,11 +200,18 @@ export function OcComposer({
     }
   };
 
+  // A keyboard on an iPad: Return sends while you type here, Shift-Return starts a new line, and Shift-Esc comes back here.
+  useKeyCommand('return', () => void send(), focused && !disabled);
+  useKeyCommand('focusInput', () => input.current?.focus(), !disabled);
+
   return (
     <View style={[styles.wrap, { borderColor: palette.border, backgroundColor: palette.background }]}>
       <TextInput
+        ref={input}
         value={text}
         onChangeText={setText}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         placeholder={placeholder}
         placeholderTextColor={palette.textFaint}
         multiline

@@ -12,6 +12,7 @@ import { switchToDeepTutor, switchToOpenWebUI } from '@/features/deeptutor/switc
 import { SidebarAction, SidebarChatRow, SidebarNote, SidebarPanel, SidebarSearch, SidebarUser, sidebarStyles } from '@/features/sidebar/parts';
 import { useSidebar } from '@/features/sidebar/SidebarContext';
 import { DEVICE } from '@/lib/device';
+import { useKeyCommand } from '@/lib/hardwareKeyboard';
 import { useDebounced } from '@/lib/useDebounced';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useOcAuthed, useOpenCode } from '@/session/OpenCodeProvider';
@@ -46,6 +47,12 @@ export function OcSidebar() {
     sidebar.close();
     router.replace('/code');
   };
+  // A keyboard on an iPad: the web's shortcuts for a new session and search.
+  useKeyCommand('newChat', newSession);
+  useKeyCommand('search', () => {
+    sidebar.open();
+    setSearch('');
+  });
   const open = (item: Session) => {
     sidebar.close();
     router.replace({ pathname: '/code/s/[id]', params: { id: item.id, dir: item.directory } });

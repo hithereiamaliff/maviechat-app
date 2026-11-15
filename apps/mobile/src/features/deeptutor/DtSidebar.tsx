@@ -9,6 +9,7 @@ import { useAccountsSheet } from '@/features/accounts/AccountsSheet';
 import type { MenuItem } from '@/components/Menu';
 import { SidebarAction, SidebarChatRow, SidebarHeading, SidebarNote, SidebarPanel, SidebarSearch, SidebarUser, sidebarStyles } from '@/features/sidebar/parts';
 import { useSidebar } from '@/features/sidebar/SidebarContext';
+import { useKeyCommand } from '@/lib/hardwareKeyboard';
 import { useDebounced } from '@/lib/useDebounced';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
 import { useOpenCode } from '@/session/OpenCodeProvider';
@@ -86,6 +87,16 @@ export function DtSidebar() {
     sidebar.close();
     router.replace('/learn');
   };
+  // A keyboard on an iPad: the web's shortcuts for a new chat, search and settings.
+  useKeyCommand('newChat', newChat);
+  useKeyCommand('search', () => {
+    sidebar.open();
+    setSearch('');
+  });
+  useKeyCommand('settings', () => {
+    sidebar.close();
+    router.push('/learn/settings');
+  });
   const openChat = (id: string) => {
     sidebar.close();
     if (id !== currentChatId) router.replace({ pathname: '/learn/[id]', params: { id } });
