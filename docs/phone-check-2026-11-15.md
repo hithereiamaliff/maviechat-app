@@ -1,6 +1,6 @@
 # Phone check: iPad and big screens (2026-11-15)
 
-The latest update is `0f224813`. To get it, close MavieChat completely (swipe it away) and open it again; if nothing's new, do it once more.
+The latest update is `77dfb2a7`. To get it, close MavieChat completely (swipe it away) and open it again; if nothing's new, do it once more.
 
 ## On your iPhone, now
 
@@ -11,6 +11,7 @@ Nothing should look different.
 - [ ] The same in DeepTutor and in OpenCode.
 - [ ] Settings → **Interface**: there's no **Use the full width** switch on the iPhone.
 - [ ] Notes → … → **Show as Grid**: still two cards a row.
+- [ ] Typing on the screen keyboard: Return still starts a new line in the message box, in all three spaces.
 
 ## On your iPad, with the 1.0.0 TestFlight build
 
@@ -25,3 +26,13 @@ The iPad switch comes with that build; until then the iPad shows the iPhone-size
 - [ ] Notes → **Show as Grid**: three cards a row.
 - [ ] Share or export something (a chat's … → **Download**): the share pop-up appears in the middle of the screen.
 - [ ] If you sign in again: the sign-in form is a column in the middle.
+
+### With a keyboard attached (Magic Keyboard or any Bluetooth keyboard)
+
+- [ ] In a chat, type a message and press Return: it sends. Shift-Return starts a new line instead.
+- [ ] Type `/` and press Return while the list shows: the first entry is picked, not sent.
+- [ ] The same in DeepTutor and OpenCode: Return sends, Shift-Return starts a new line.
+- [ ] Hold ⌘: the iPad lists MavieChat's shortcuts: **New Chat**, **Search**, **Settings**, **Show or Hide Sidebar**, **Go to Message Box** (and **Send Message** while you're typing).
+- [ ] ⌘⇧O starts a new chat (a new session in OpenCode). ⌘K opens the sidebar's search. ⌘. opens Settings (Open WebUI and DeepTutor). ⌘⇧S hides or shows the sidebar. ⇧Esc puts the cursor back in the message box.
+- [ ] In a note or a search field, Return still works as usual (a new line, or search).
+- [ ] If you type in Chinese, Japanese or Korean: Return first finishes the word you're composing; the next Return sends.
