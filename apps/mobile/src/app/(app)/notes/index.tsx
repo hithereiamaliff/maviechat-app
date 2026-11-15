@@ -18,6 +18,7 @@ import { ListControls } from '@/features/workspace/ListControls';
 import { ListState, listStyles, WorkspaceList, WorkspaceRow } from '@/features/workspace/WorkspaceList';
 import { setDevicePrefs, useDevicePrefs } from '@/lib/devicePrefs';
 import { describeError } from '@/lib/errors';
+import { useLayout } from '@/lib/layout';
 import { useAuthed } from '@/lib/server';
 import { useDebounced } from '@/lib/useDebounced';
 import { fonts, radius, usePalette } from '@/theme';
@@ -63,16 +64,18 @@ export default function Notes() {
   const items = useMemo(() => notes.data?.pages.flatMap((page) => page.items) ?? [], [notes.data]);
   const [now] = useState(() => new Date().getTime());
   const grid = useDevicePrefs().notesGrid;
+  // Two cards a row on a phone, three on a wide window (an iPad).
+  const perRow = useLayout().wide ? 3 : 2;
   const rows = useMemo<Row[]>(
     () =>
       groupNotes(items, new Date(now)).flatMap(({ group, notes: inGroup }) => {
         const heading: Row = { kind: 'group', key: `g-${group.key}`, label: group.label };
         if (!grid) return [heading, ...inGroup.map((note): Row => ({ kind: 'note', key: note.id, note }))];
         const pairs: Row[] = [];
-        for (let start = 0; start < inGroup.length; start += 2) pairs.push({ kind: 'pair', key: `p-${inGroup[start]?.id ?? start}`, notes: inGroup.slice(start, start + 2) });
+        for (let start = 0; start < inGroup.length; start += perRow) pairs.push({ kind: 'pair', key: `p-${inGroup[start]?.id ?? start}`, notes: inGroup.slice(start, start + perRow) });
         return [heading, ...pairs];
       }),
-    [items, grid, now],
+    [items, grid, now, perRow],
   );
 
   const newNote = () => {
@@ -148,7 +151,10 @@ export default function Notes() {
                   {row.notes.map((note) => (
                     <NoteCard key={note.id} note={note} now={now} menu={actions.items(note, !shownReadOnly)} />
                   ))}
-                  {row.notes.length === 1 ? <View style={styles.flex} /> : null}
+                  {/* Empty places keep the last row's cards the same width as the others. */}
+                  {Array.from({ length: perRow - row.notes.length }, (_, place) => (
+                    <View key={`empty-${place}`} style={styles.flex} />
+                  ))}
                 </View>
               ) : (
                 <WorkspaceRow
