@@ -69,6 +69,7 @@ All EAS commands run from `apps/mobile` with `EXPO_TOKEN=$(cat ~/.config/maviech
 - **Runtime version policy: `fingerprint`.** A native change (new native module, plugin or permission) needs a new store build. Updates never reach builds with a different fingerprint.
 - **After `eas init` / `eas update:configure`:** strip the plugin-evaluated values they write into `app.json` (e.g. `extra.router`).
 - **App icon:** `python3 scripts/app-icon/render.py` (needs numpy and Pillow) draws it from the shapes in `scripts/app-icon/icon.json` into `apps/mobile/assets`: the iOS icon, Android's adaptive layers and the favicon. To change the icon, edit the JSON and run it again. A new icon needs a store build.
+- **Store graphics:** `python3 scripts/store-graphics/render.py` draws Google Play's 512 px icon and its 1024 × 500 feature graphic into `store/google-play/`, from the same `icon.json` and with Inter (after `npm ci`). It never touches the app's assets.
 
 ## Server versions
 
