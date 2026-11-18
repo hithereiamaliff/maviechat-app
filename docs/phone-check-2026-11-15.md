@@ -36,3 +36,12 @@ The iPad switch comes with that build; until then the iPad shows the iPhone-size
 - [ ] ⌘⇧O starts a new chat (a new session in OpenCode). ⌘K opens the sidebar's search. ⌘. opens Settings (Open WebUI and DeepTutor). ⌘⇧S hides or shows the sidebar. ⇧Esc puts the cursor back in the message box.
 - [ ] In a note or a search field, Return still works as usual (a new line, or search).
 - [ ] If you type in Chinese, Japanese or Korean: Return first finishes the word you're composing; the next Return sends.
+
+## Added 18 November: the privacy policy link
+
+The update is `597019a1` (Android: `85a44b72`). It arrives the same way: close MavieChat completely and open it again, twice if needed. Settings → **About** then shows it on the **Update** line as `01a1ec59`.
+
+- [ ] Open WebUI: ☰ → your name at the bottom → **Settings** → **About** → **Privacy Policy**: the policy opens in the in-app browser.
+- [ ] DeepTutor: the same, from DeepTutor's **Settings** → **About**.
+- [ ] OpenCode: ☰ → your machine's name at the bottom → **Privacy Policy**.
+- [ ] If you're ever signed out of everything: the first screen shows **Privacy Policy** at the bottom.
