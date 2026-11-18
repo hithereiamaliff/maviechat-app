@@ -7,6 +7,7 @@ import { IconButton } from '@/components/IconButton';
 import { ExplainerSheet } from '@/features/welcome/ExplainerSheet';
 import { EXPLAINERS, type ExplainerKey } from '@/features/welcome/explainers';
 import { FORM_MAX_WIDTH } from '@/lib/layout';
+import { openPrivacyPolicy } from '@/lib/privacyPolicy';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useOpenCode } from '@/session/OpenCodeProvider';
 import { useSession } from '@/session/SessionProvider';
@@ -104,9 +105,14 @@ export default function Welcome() {
         </Pressable>
       </View>
 
-      <Text style={[styles.footer, { color: palette.textMuted }]}>
-        MavieChat is an independent app for Open WebUI and DeepTutor servers and is not affiliated with either.
-      </Text>
+      <View style={styles.footer}>
+        <Text style={[styles.footerText, { color: palette.textMuted }]}>
+          MavieChat is an independent app for Open WebUI and DeepTutor servers and is not affiliated with either.
+        </Text>
+        <Pressable accessibilityRole="link" accessibilityHint="Opens it in the browser" onPress={openPrivacyPolicy} hitSlop={8}>
+          <Text style={[styles.footerLink, { color: palette.link }]}>Privacy Policy</Text>
+        </Pressable>
+      </View>
       <ExplainerSheet
         explainer={explaining ? EXPLAINERS[explaining] : null}
         onClose={() => setExplaining(null)}
@@ -134,5 +140,7 @@ const styles = StyleSheet.create({
   description: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20 },
   nudge: { alignSelf: 'center', paddingVertical: 6 },
   nudgeText: { fontFamily: fonts.medium, fontSize: 15, textAlign: 'center' },
-  footer: { marginTop: 'auto', fontFamily: fonts.regular, fontSize: 12, lineHeight: 17, textAlign: 'center' },
+  footer: { marginTop: 'auto', alignItems: 'center', gap: 8 },
+  footerText: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 17, textAlign: 'center' },
+  footerLink: { fontFamily: fonts.medium, fontSize: 13 },
 });

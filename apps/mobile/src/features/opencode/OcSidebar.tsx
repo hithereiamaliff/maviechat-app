@@ -13,6 +13,7 @@ import { SidebarAction, SidebarChatRow, SidebarNote, SidebarPanel, SidebarSearch
 import { useSidebar } from '@/features/sidebar/SidebarContext';
 import { DEVICE } from '@/lib/device';
 import { useKeyCommand } from '@/lib/hardwareKeyboard';
+import { openPrivacyPolicy } from '@/lib/privacyPolicy';
 import { useDebounced } from '@/lib/useDebounced';
 import { useDeepTutor } from '@/session/DeepTutorProvider';
 import { useOcAuthed, useOpenCode } from '@/session/OpenCodeProvider';
@@ -134,6 +135,16 @@ export function OcSidebar() {
       onPress: () => {
         sidebar.close();
         switchToDeepTutor(deepTutorSignedIn);
+      },
+    },
+    // OpenCode has no Settings, so its About-like links live here.
+    {
+      key: 'privacy',
+      label: 'Privacy Policy',
+      icon: 'shield-check',
+      onPress: () => {
+        sidebar.close();
+        openPrivacyPolicy();
       },
     },
     {

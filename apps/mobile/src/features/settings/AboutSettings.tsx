@@ -5,6 +5,7 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, V
 import licenseTexts from '@/generated/license-texts.json';
 import licenses from '@/generated/licenses.json';
 import { Icon } from '@/components/Icon';
+import { openPrivacyPolicy } from '@/lib/privacyPolicy';
 import { supportLabel, useCapabilities, useServerConfig, useServerVersion } from '@/lib/server';
 import { fonts, radius, usePalette } from '@/theme';
 
@@ -99,6 +100,14 @@ export function AppAbout({ serverRows }: { serverRows: [string, string][] }) {
         MavieChat is an independent app for Open WebUI and DeepTutor servers. It is not affiliated with Open WebUI or DeepTutor.
       </Text>
 
+      <Pressable
+        accessibilityRole="link"
+        accessibilityHint="Opens it in the browser"
+        onPress={openPrivacyPolicy}
+        style={[styles.group, styles.toggle, { borderColor: palette.border }]}>
+        <Text style={[styles.label, styles.toggleLabel, { color: palette.text }]}>Privacy Policy</Text>
+        <Icon name="arrow-top-right-on-square" size={16} color={palette.textMuted} strokeWidth={2} />
+      </Pressable>
       <Pressable
         accessibilityRole="button"
         accessibilityState={{ expanded: showLicenses }}
