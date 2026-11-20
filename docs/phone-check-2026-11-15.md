@@ -45,3 +45,15 @@ The update is `597019a1` (Android: `85a44b72`). It arrives the same way: close M
 - [ ] DeepTutor: the same, from DeepTutor's **Settings** → **About**.
 - [ ] OpenCode: ☰ → your machine's name at the bottom → **Privacy Policy**.
 - [ ] If you're ever signed out of everything: the first screen shows **Privacy Policy** at the bottom.
+
+## Added 20 November: the notice about AI services
+
+The update is `136cad78` (Android: `98bd2dd2`). It arrives the same way: close MavieChat completely and open it again, twice if needed. Settings → **About** then shows it on the **Update** line as `01a1f8da`.
+
+It's asked once per server on this phone, so each space shows it only on its first send.
+
+- [ ] Open WebUI: send a message in any chat. Before it goes, **Where your messages go** names chat.techmavie.digital. Tap **Not Now**: nothing is sent, no error appears, and your text is back in the message box.
+- [ ] Send it again and tap **Continue**: it goes. Send another: no notice this time.
+- [ ] DeepTutor: send a message. The notice names learn.techmavie.digital. **Not Now** keeps your text, with no error; **Continue** sends it.
+- [ ] OpenCode: send a prompt in a session. The notice names your machine and the AI providers set up there. **Not Now** keeps your text; **Continue** sends it.
+- [ ] On Android, tapping outside the notice counts as **Not Now**.
