@@ -30,6 +30,10 @@ Docs:
 ## Layout
 
 - `apps/mobile`: the Expo app (expo-router; routes in `src/app/`).
+  - **AI notice (Apple's guideline 5.1.2(i)):** before the first message or file goes to a server, the app says where it goes and asks, once per server on this phone (`src/features/aiNotice`). OpenCode asks once per machine and login, and names the AI providers set up there.
+    - A new path that sends typed text, files or recordings to a server calls its space's hook first: `useOwuiAiNotice`, `useDtAiNotice` or `useOcAiNotice`.
+    - Not Now sends nothing and leaves the input as it was. DeepTutor's `send` rejects with `NotSentError`; callers stay quiet for it (`isNotSent`).
+    - The wording never names a server's AI services. The app can't know them.
   - **Accounts (M7):** each space keeps several sign-ins.
     - The Keychain item `maviechat.accounts` lists them with no tokens (`src/session/accounts.ts`); each sign-in sits in `maviechat.account.<id>`.
     - `useSession()` / `useDeepTutor()` return the account in use; their layouts key everything by `state.accountId`.

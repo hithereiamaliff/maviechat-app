@@ -9,6 +9,7 @@ import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { MenuButton, type MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { useDtAiNotice } from '@/features/aiNotice/useAiNotice';
 import { filePart, pickDocuments } from '@/features/deeptutor/knowledge/CreateKbSheet';
 import { chatWithKnowledgeBase } from '@/features/deeptutor/knowledge/open';
 import { documentCount, engineName, fileSize, kbStatus } from '@/features/deeptutor/knowledge/status';
@@ -26,6 +27,7 @@ export default function KnowledgeBaseScreen() {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
   const toast = useToast();
+  const askAiNotice = useDtAiNotice();
   const queryClient = useQueryClient();
   const { client, session } = useDtAuthed();
   const params = useLocalSearchParams<{ name: string }>();
@@ -43,6 +45,8 @@ export default function KnowledgeBaseScreen() {
     if (!kb) return;
     const picked = await pickDocuments(kb.provider, toast);
     if (!picked.length) return;
+    // Files go to the server here, so its AI notice comes first (once per server).
+    if (!(await askAiNotice())) return;
     setWorking('upload');
     try {
       await uploadKbFiles(client, name, picked.map(filePart));

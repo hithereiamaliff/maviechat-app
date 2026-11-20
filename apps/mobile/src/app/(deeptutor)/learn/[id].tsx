@@ -36,6 +36,8 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Button } from '@/components/Button';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { isNotSent } from '@/features/aiNotice/notice';
+import { useDtAiNotice } from '@/features/aiNotice/useAiNotice';
 import { NEW_CHAT, updateDraft } from '@/features/chat/drafts';
 import { capabilityName, isNativeCapability } from '@/features/deeptutor/chat/capabilities';
 import { DtComposer } from '@/features/deeptutor/chat/DtComposer';
@@ -75,6 +77,7 @@ export default function DeepTutorChat() {
   const { client, session } = useDtAuthed();
   const owui = useSession();
   const live = useDtLive();
+  const askAiNotice = useDtAiNotice();
   const chatActions = useDtChatActions();
   const turn = useLiveTurn(id);
   const detail = useDtSession(id);
@@ -261,15 +264,19 @@ export default function DeepTutorChat() {
       return true;
     } catch (error) {
       live.turns.remove(id);
-      toast(`Couldn't send: ${describeError(error)}`, 'error');
+      if (!isNotSent(error)) toast(`Couldn't send: ${describeError(error)}`, 'error');
       return false;
     }
   };
 
   const regenerate = () => {
-    live.turns.beginRegenerate(id);
-    setPinKey(`regenerate-${Date.now()}`);
-    live.regenerate(id);
+    // The server's AI notice comes first (once per server), so Not Now leaves the reply as it was.
+    void askAiNotice().then((yes) => {
+      if (!yes) return;
+      live.turns.beginRegenerate(id);
+      setPinKey(`regenerate-${Date.now()}`);
+      void live.regenerate(id);
+    });
   };
 
   // Research's outline → the research: the same question again, with the outline confirmed and no new message.
@@ -288,7 +295,7 @@ export default function DeepTutorChat() {
       });
     } catch (error) {
       live.turns.remove(id);
-      toast(`Couldn't start the research: ${describeError(error)}`, 'error');
+      if (!isNotSent(error)) toast(`Couldn't start the research: ${describeError(error)}`, 'error');
     }
   };
 
@@ -311,7 +318,7 @@ export default function DeepTutorChat() {
       return true;
     } catch (error) {
       live.turns.remove(id);
-      toast(`Couldn't send: ${describeError(error)}`, 'error');
+      if (!isNotSent(error)) toast(`Couldn't send: ${describeError(error)}`, 'error');
       return false;
     }
   };

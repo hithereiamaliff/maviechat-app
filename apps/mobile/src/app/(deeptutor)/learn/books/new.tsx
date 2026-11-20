@@ -20,6 +20,7 @@ import { Button } from '@/components/Button';
 import { Icon } from '@/components/Icon';
 import { SideScroll } from '@/components/SideScroll';
 import { useToast } from '@/components/Toast';
+import { useDtAiNotice } from '@/features/aiNotice/useAiNotice';
 import { bookErrorText, DEPTH_LABELS } from '@/features/deeptutor/books/labels';
 import { useBookRefresh, useBookSocket } from '@/features/deeptutor/books/useBooks';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
@@ -51,6 +52,7 @@ interface Choice {
 export default function NewBook() {
   const palette = usePalette();
   const toast = useToast();
+  const askAiNotice = useDtAiNotice();
   const { client } = useDtAuthed();
   const socket = useBookSocket();
   const refresh = useBookRefresh();
@@ -107,6 +109,8 @@ export default function NewBook() {
 
   const create = async () => {
     if (!intent.trim() || creating) return;
+    // What you ask for goes to the server's AI, so its notice comes first (once per server).
+    if (!(await askAiNotice())) return;
     setCreating(true);
     try {
       const refs = await Promise.all(picked.map(sourceOf));

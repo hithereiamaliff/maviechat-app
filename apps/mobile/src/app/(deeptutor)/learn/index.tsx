@@ -7,6 +7,7 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { useToast } from '@/components/Toast';
+import { isNotSent } from '@/features/aiNotice/notice';
 import { updateDraft } from '@/features/chat/drafts';
 import { isNativeCapability, modeInfo } from '@/features/deeptutor/chat/capabilities';
 import { DtComposer, type DtComposerHandle } from '@/features/deeptutor/chat/DtComposer';
@@ -66,7 +67,7 @@ export default function DeepTutorHome() {
       return true;
     } catch (error) {
       setPending(null);
-      toast(`Couldn't send: ${describeError(error)}`, 'error');
+      if (!isNotSent(error)) toast(`Couldn't send: ${describeError(error)}`, 'error');
       return false;
     }
   };

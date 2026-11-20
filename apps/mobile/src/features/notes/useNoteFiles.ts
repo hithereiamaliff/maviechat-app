@@ -3,6 +3,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { useToast } from '@/components/Toast';
+import { useOwuiAiNotice } from '@/features/aiNotice/useAiNotice';
 import { usePictureMaker } from '@/features/settings/PictureMaker';
 import { describeError } from '@/lib/errors';
 import { isPhoto, photo, PHOTO_OPTIONS, type Picked } from '@/lib/pickedFiles';
@@ -31,6 +32,7 @@ const record = (value: unknown): Tree => (typeof value === 'object' && value !==
  */
 export function useNoteFiles() {
   const { client } = useAuthed();
+  const askAiNotice = useOwuiAiNotice();
   const { verifySession } = useSession();
   const capabilities = useCapabilities();
   const config = useServerConfig();
@@ -102,6 +104,8 @@ export function useNoteFiles() {
     if (!allowed()) return;
     const refusal = tooBig(picked);
     if (refusal) return toast(refusal, 'error');
+    // Files go to the server as they're added, so its AI notice comes first (once per server).
+    if (picked.length > 0 && !(await askAiNotice())) return;
     for (const file of picked) {
       setUploading((count) => count + 1);
       try {

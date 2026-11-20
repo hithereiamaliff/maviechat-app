@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useToast } from '@/components/Toast';
+import { isNotSent } from '@/features/aiNotice/notice';
 import { BookBar } from '@/features/deeptutor/books/BookBar';
 import { PAGE_CHAT_STARTERS } from '@/features/deeptutor/books/pageChat';
 import { useBookRefresh } from '@/features/deeptutor/books/useBooks';
@@ -51,7 +52,7 @@ export default function NewPageChat() {
       return true;
     } catch (error) {
       setPending(null);
-      toast(`Couldn't start the chat: ${describeError(error)}`, 'error');
+      if (!isNotSent(error)) toast(`Couldn't start the chat: ${describeError(error)}`, 'error');
       return false;
     }
   };

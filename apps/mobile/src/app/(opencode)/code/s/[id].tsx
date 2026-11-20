@@ -7,6 +7,7 @@ import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from '@/components/Toast';
+import { useOcAiNotice } from '@/features/aiNotice/useAiNotice';
 import { showPrompt } from '@/components/dialogs';
 import { setViewingChat } from '@/features/notifications/presence';
 import { pushTokenIfOn } from '@/features/notifications/push';
@@ -33,6 +34,7 @@ export default function OpenCodeSession() {
   const { live, loaded, problem } = useOcSessionLive(id, directory);
   const session = useQuery({ queryKey: ocKey(accountId, 'session', id), queryFn: () => getSession(client, directory, id) });
   const models = useOcModels(directory);
+  const askAiNotice = useOcAiNotice(directory);
   const agents = useOcAgents(directory);
   const [showChanges, setShowChanges] = useState(false);
   const list = useRef<FlashListRef<MessageWithParts>>(null);
@@ -61,6 +63,9 @@ export default function OpenCodeSession() {
 
   const fail = (error: unknown) => toast(describeOcError(error), 'error');
   const send = async (text: string): Promise<boolean> => {
+    // What you send goes on to the AI providers set up on the paired computer, so the notice comes
+    // first (once per machine and login). Not Now keeps the text in the input.
+    if (!(await askAiNotice())) return false;
     try {
       following.current = true;
       // With notifications on, the machine tells this phone when the session finishes or needs you.
@@ -131,7 +136,8 @@ export default function OpenCodeSession() {
         <QuestionCard
           key={request.id}
           request={request}
-          onAnswer={(answers) => answerQuestion(client, directory, request.id, answers).then(() => undefined, fail)}
+          // An answer is sent on to the AI too, so it waits for the notice as a message does.
+          onAnswer={(answers) => askAiNotice().then((yes) => (yes ? answerQuestion(client, directory, request.id, answers).then(() => undefined, fail) : undefined))}
           onSkip={() => rejectQuestion(client, directory, request.id).then(() => undefined, fail)}
         />
       ))}

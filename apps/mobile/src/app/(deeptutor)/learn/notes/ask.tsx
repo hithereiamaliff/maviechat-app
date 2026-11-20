@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useToast } from '@/components/Toast';
+import { isNotSent } from '@/features/aiNotice/notice';
 import { DtComposer } from '@/features/deeptutor/chat/DtComposer';
 import { useDtLive } from '@/features/deeptutor/chat/DtLiveProvider';
 import { DtUserBubble } from '@/features/deeptutor/chat/DtReplyView';
@@ -46,7 +47,7 @@ export default function AskDito() {
       return true;
     } catch (error) {
       setPending(null);
-      toast(`Couldn't send: ${describeError(error)}`, 'error');
+      if (!isNotSent(error)) toast(`Couldn't send: ${describeError(error)}`, 'error');
       return false;
     }
   };

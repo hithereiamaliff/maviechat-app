@@ -21,6 +21,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { useToast } from '@/components/Toast';
+import { useOwuiAiNotice } from '@/features/aiNotice/useAiNotice';
 import { deepTutorAttachment } from '@/features/deeptutor/crossReference';
 import { describeError } from '@/lib/errors';
 import { usePictureMaker } from '@/features/settings/PictureMaker';
@@ -41,6 +42,7 @@ import { getDraft, patchFile, removeFile, updateDraft } from './drafts';
 /** `models`: every model the message goes to; as on the web, a photo needs one that can see images, a file needs them all to take files. */
 export function useAttachments({ draftKey, models, temporary }: { draftKey: string; models: (ModelItem | undefined)[]; temporary: boolean }) {
   const { client } = useAuthed();
+  const askAiNotice = useOwuiAiNotice();
   const { verifySession } = useSession();
   const capabilities = useCapabilities();
   const config = useServerConfig();
@@ -54,6 +56,9 @@ export function useAttachments({ draftKey, models, temporary }: { draftKey: stri
   const shrink = (file: Picked) => shrinkPhoto(file, imageLimits(settings.data?.ui, config.data), picture.maker);
 
   const upload = async (file: Picked, image: boolean) => {
+    // An attachment goes to the server as soon as it's added, so the server's AI notice comes first
+    // (once per server). Several picked at once share one question.
+    if (!(await askAiNotice())) return;
     const itemId = uuidv4();
     const placeholder: FileItem = {
       type: 'file',

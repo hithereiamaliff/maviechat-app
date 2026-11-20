@@ -23,6 +23,7 @@ import { Icon } from '@/components/Icon';
 import { MenuButton, type MenuItem } from '@/components/Menu';
 import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { useDtAiNotice } from '@/features/aiNotice/useAiNotice';
 import { showActionSheet, showPrompt } from '@/components/dialogs';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { sessionDate, useDtCollection, useDtCollectionChats, useDtLibrary, useDtSupportedFormats } from '@/features/deeptutor/queries';
@@ -49,6 +50,7 @@ function describe(material: DtMaterial): string {
 export default function ReadingCollection() {
   const palette = usePalette();
   const toast = useToast();
+  const askAiNotice = useDtAiNotice();
   const queryClient = useQueryClient();
   const { client, session } = useDtAuthed();
   const params = useLocalSearchParams<{ id: string }>();
@@ -75,6 +77,8 @@ export default function ReadingCollection() {
   const upload = async () => {
     const result = await DocumentPicker.getDocumentAsync({ multiple: true, copyToCacheDirectory: true });
     if (result.canceled) return;
+    // Files go to the server here, so its AI notice comes first (once per server).
+    if (!(await askAiNotice())) return;
     for (const asset of result.assets) {
       const extension = asset.name.split('.').pop()?.toLowerCase() ?? '';
       if (formats.data && !formats.data.extensions.includes(extension)) {

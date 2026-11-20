@@ -11,6 +11,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 import { useToast } from '@/components/Toast';
+import { NotSentError } from '@/features/aiNotice/notice';
+import { useDtAiNotice } from '@/features/aiNotice/useAiNotice';
 import { pushTokenIfOn } from '@/features/notifications/push';
 import { isRelayServer, watchDeepTutorTurn } from '@/features/notifications/relay';
 import { DT_EXPIRED_NOTICE, DT_QUERY_ROOT, useDeepTutor, useDtAuthed } from '@/session/DeepTutorProvider';
@@ -20,11 +22,15 @@ import { LiveTurns, type LiveTurn } from './liveTurns';
 interface DtLiveValue {
   turns: LiveTurns;
   state: DtConnectionState;
-  /** Sends a message; resolves with its session (a new one for a new chat). */
+  /**
+   * Sends a message; resolves with its session (a new one for a new chat). The server's AI notice
+   * comes first (once per server on this phone): Not Now rejects with a `NotSentError`.
+   */
   send(request: DtTurnRequest): Promise<string>;
   /** Asks DeepTutor to stop the session's running reply. */
   stop(sessionId: string): Promise<boolean>;
-  regenerate(sessionId: string): void;
+  /** Writes the last reply again; false (nothing sent) at the AI notice's Not Now. */
+  regenerate(sessionId: string): Promise<boolean>;
   /** Answers the questions the session's running turn asked. */
   answer(sessionId: string, answers: { questionId: string; text: string }[]): Promise<boolean>;
   /** Shows a turn already running (started before the app restarted, or on another device). */
@@ -39,6 +45,7 @@ const DtLiveContext = createContext<DtLiveValue | null>(null);
  */
 export function DtLiveProvider({ children }: { children: ReactNode }) {
   const { client, session } = useDtAuthed();
+  const askAiNotice = useDtAiNotice();
   const { expireSession } = useDeepTutor();
   const queryClient = useQueryClient();
   const toast = useToast();
@@ -139,6 +146,7 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
       turns,
       state,
       send: async (request) => {
+        if (!(await askAiNotice())) throw new NotSentError();
         if (request.persistUserMessage !== false) pushWatch.prompts.set(request.sessionId ?? '', request.content);
         return (await connection.startTurn(request)).sessionId;
       },
@@ -146,7 +154,11 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
         const turnId = turns.get(sessionId)?.turnId;
         return turnId ? connection.cancel(turnId) : false;
       },
-      regenerate: (sessionId) => connection.regenerate(sessionId),
+      regenerate: async (sessionId) => {
+        if (!(await askAiNotice())) return false;
+        connection.regenerate(sessionId);
+        return true;
+      },
       answer: async (sessionId, answers) => {
         const turnId = turns.get(sessionId)?.turnId;
         return turnId ? connection.reply(turnId, { answers }) : false;
@@ -156,7 +168,7 @@ export function DtLiveProvider({ children }: { children: ReactNode }) {
         connection.follow(turnId, 0);
       },
     }),
-    [connection, state, turns, pushWatch.prompts],
+    [connection, state, turns, pushWatch.prompts, askAiNotice],
   );
 
   return <DtLiveContext.Provider value={value}>{children}</DtLiveContext.Provider>;

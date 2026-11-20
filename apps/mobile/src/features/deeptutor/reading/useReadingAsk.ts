@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useCallback } from 'react';
 import { useToast } from '@/components/Toast';
+import { isNotSent } from '@/features/aiNotice/notice';
 import { useDtLive } from '@/features/deeptutor/chat/DtLiveProvider';
 import { describeError } from '@/lib/errors';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
@@ -37,7 +38,7 @@ export function useReadingAsk() {
         return true;
       } catch (error) {
         if (chatId) live.turns.remove(chatId);
-        toast(`Couldn't ask the tutor: ${describeError(error)}`, 'error');
+        if (!isNotSent(error)) toast(`Couldn't ask the tutor: ${describeError(error)}`, 'error');
         return false;
       }
     },

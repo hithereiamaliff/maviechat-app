@@ -1,5 +1,6 @@
 import { fileProcessingStatus, getFileText, knowledgeUploadMetadata, listKnowledgeFiles, uploadFile } from '@maviechat/owui-protocol';
 import { useEffect, useRef, useState } from 'react';
+import { useOwuiAiNotice } from '@/features/aiNotice/useAiNotice';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useServerConfig } from '@/lib/server';
 import { PHONE_UPLOAD_MAX_BYTES, textPart, uploadPart } from '@/lib/uploadPart';
@@ -29,6 +30,7 @@ const FOLLOW_MS = 30 * 60_000;
  */
 export function useKnowledgeUploads(kbId: string, onLinked: () => void) {
   const { client } = useAuthed();
+  const askAiNotice = useOwuiAiNotice();
   const config = useServerConfig();
   const [uploads, setUploads] = useState<KnowledgeUpload[]>([]);
   const alive = useRef(true);
@@ -71,6 +73,8 @@ export function useKnowledgeUploads(kbId: string, onLinked: () => void) {
 
   /** Sends each in turn; a file too big, empty or refused is marked failed with why. */
   const send = async (sources: UploadSource[]) => {
+    // Files go to the server here, so its AI notice comes first (once per server).
+    if (sources.length > 0 && !(await askAiNotice())) return;
     const started = sources.map((source) => {
       counter.current += 1;
       return { source, key: `upload-${counter.current}` };

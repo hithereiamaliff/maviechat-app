@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-nat
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { Icon } from '@/components/Icon';
 import { useToast } from '@/components/Toast';
+import { useOcAiNotice } from '@/features/aiNotice/useAiNotice';
 import { pushTokenIfOn } from '@/features/notifications/push';
 import { describeOcError } from '@/features/opencode/errors';
 import { OcComposer, type ModelPick } from '@/features/opencode/OcComposer';
@@ -31,6 +32,7 @@ export default function OpenCodeHome() {
   const picker = useProjectPicker();
   const directory = project.directory;
   const models = useOcModels(directory);
+  const askAiNotice = useOcAiNotice(directory);
   const agents = useOcAgents(directory);
   const recent = useOcSessions(directory);
   // OpenCode lists what a session changed only inside a git repository.
@@ -48,6 +50,9 @@ export default function OpenCodeHome() {
       picker.open();
       return false;
     }
+    // What you send goes on to the AI providers set up on the paired computer, so the notice comes
+    // first (once per machine and login). Not Now keeps the text in the input.
+    if (!(await askAiNotice())) return false;
     try {
       // Unless you pick a model, OpenCode uses its own default.
       const session = await createSession(

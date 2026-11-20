@@ -17,6 +17,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'rea
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { useDtAiNotice } from '@/features/aiNotice/useAiNotice';
 import { showActionSheet, showPrompt } from '@/components/dialogs';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
 import { GroupComposer, withQuote, type Quote } from '@/features/deeptutor/partners/groups/GroupComposer';
@@ -40,6 +41,7 @@ const one = (value: string | string[] | undefined) => (Array.isArray(value) ? (v
 export default function GroupDiscussion() {
   const palette = usePalette();
   const toast = useToast();
+  const askAiNotice = useDtAiNotice();
   const params = useLocalSearchParams<{ id: string; session?: string }>();
   const groupId = one(params.id);
   const asked = one(params.session);
@@ -78,11 +80,15 @@ export default function GroupDiscussion() {
     const text = draft.trim();
     if (!text) return;
     const { mentions } = resolveMentions(text, members);
-    if (chat.send(withQuote(text, quote), mentions)) {
-      setDraft('');
-      setQuote(null);
-      requestAnimationFrame(() => list.current?.scrollToEnd({ animated: true }));
-    } else toast(chat.running ? 'A round is running: wait for it, or stop it.' : 'Not connected yet. Try again in a moment.');
+    // The server's AI notice comes first (once per server); Not Now leaves the message in the input.
+    void askAiNotice().then((yes) => {
+      if (!yes) return;
+      if (chat.send(withQuote(text, quote), mentions)) {
+        setDraft('');
+        setQuote(null);
+        requestAnimationFrame(() => list.current?.scrollToEnd({ animated: true }));
+      } else toast(chat.running ? 'A round is running: wait for it, or stop it.' : 'Not connected yet. Try again in a moment.');
+    });
   };
 
   const answeredBy = (round: DtGroupRound) => [...new Map(round.seats.filter((seat) => seat.state === 'done').map((seat) => [seat.partnerId, seat.name])).entries()];

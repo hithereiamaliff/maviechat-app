@@ -33,6 +33,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useCallback } from 'react';
 import { useToast } from '@/components/Toast';
+import { useOwuiAiNotice } from '@/features/aiNotice/useAiNotice';
 import { useLive } from '@/features/live/LiveProvider';
 import { describeError } from '@/lib/errors';
 import { useAuthed, useCapabilities, useServerConfig, useSessionUser, useUserSettings } from '@/lib/server';
@@ -120,6 +121,7 @@ export function useSendMessage() {
   const settings = useUserSettings();
   const config = useServerConfig();
   const user = useSessionUser();
+  const askAiNotice = useOwuiAiNotice();
 
   const dispatch = useCallback(
     async (
@@ -137,6 +139,9 @@ export function useSendMessage() {
       },
     ): Promise<Sent | null> => {
       const { turn, model } = job;
+      // Nothing goes to the server until its AI notice is accepted on this phone (asked once per server).
+      // Not Now gives the message back to the input.
+      if (!(await askAiNotice())) return null;
       let sessionId: string;
       try {
         sessionId = await live.waitForSession();
@@ -254,7 +259,7 @@ export function useSendMessage() {
         return null;
       }
     },
-    [client, session, live, queryClient, toast, capabilities, settings.data, config.data, user.data, verifySession],
+    [client, session, live, queryClient, toast, capabilities, settings.data, config.data, user.data, verifySession, askAiNotice],
   );
 
   const historyOf = useCallback(

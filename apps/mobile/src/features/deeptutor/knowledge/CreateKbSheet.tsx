@@ -9,6 +9,7 @@ import { Icon } from '@/components/Icon';
 import { IconButton } from '@/components/IconButton';
 import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
+import { useDtAiNotice } from '@/features/aiNotice/useAiNotice';
 import { useDtRagProviders } from '@/features/deeptutor/queries';
 import { describeError } from '@/lib/errors';
 import { DT_QUERY_ROOT, useDtAuthed } from '@/session/DeepTutorProvider';
@@ -61,6 +62,7 @@ export function CreateKbSheet({ visible, onClose, onCreated }: CreateKbSheetProp
 function CreateBody({ onClose, onCreated }: Omit<CreateKbSheetProps, 'visible'>) {
   const palette = usePalette();
   const toast = useToast();
+  const askAiNotice = useDtAiNotice();
   const queryClient = useQueryClient();
   const { client, session } = useDtAuthed();
   const providers = useDtRagProviders(true);
@@ -97,6 +99,8 @@ function CreateBody({ onClose, onCreated }: Omit<CreateKbSheetProps, 'visible'>)
   const create = async () => {
     setTouched(true);
     if (problem || !engine) return;
+    // Files go to the server here (when some are picked), so its AI notice comes first (once per server).
+    if (files.length > 0 && !(await askAiNotice())) return;
     setBusy(true);
     try {
       await createKnowledgeBase(client, { name, provider: engine, pageindexMode: engine.startsWith('pageindex') ? mode : undefined, files: files.map(filePart) });

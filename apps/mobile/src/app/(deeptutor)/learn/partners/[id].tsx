@@ -23,6 +23,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'rea
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { useDtAiNotice } from '@/features/aiNotice/useAiNotice';
 import type { ExtraChip } from '@/features/deeptutor/chat/DtExtrasViews';
 import type { DtListItem } from '@/features/deeptutor/chat/DtMessageList';
 import { clearExtras, useDtAttach } from '@/features/deeptutor/chat/extras';
@@ -51,6 +52,7 @@ const one = (value: string | string[] | undefined) => (Array.isArray(value) ? (v
 export default function PartnerChat() {
   const palette = usePalette();
   const toast = useToast();
+  const askAiNotice = useDtAiNotice();
   const params = useLocalSearchParams<{ id: string; session?: string }>();
   const partnerId = one(params.id);
   const asked = one(params.session);
@@ -140,10 +142,14 @@ export default function PartnerChat() {
       void runCommand(command.command, command.argument);
       return;
     }
-    if (chat.send(text, files.map((file) => ({ type: file.type, filename: file.filename, mimeType: file.mimeType, base64: file.base64 })))) {
-      setDraft('');
-      clearExtras(draftKey);
-    } else toast(chat.running ? 'Wait for the reply to finish.' : 'Not connected yet. Try again in a moment.');
+    // The server's AI notice comes first (once per server); Not Now leaves the message in the input.
+    void askAiNotice().then((yes) => {
+      if (!yes) return;
+      if (chat.send(text, files.map((file) => ({ type: file.type, filename: file.filename, mimeType: file.mimeType, base64: file.base64 })))) {
+        setDraft('');
+        clearExtras(draftKey);
+      } else toast(chat.running ? 'Wait for the reply to finish.' : 'Not connected yet. Try again in a moment.');
+    });
   };
 
   const branch = async () => {

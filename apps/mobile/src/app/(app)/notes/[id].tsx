@@ -40,6 +40,7 @@ import { IconButton } from '@/components/IconButton';
 import type { MenuItem } from '@/components/Menu';
 import { SideScroll } from '@/components/SideScroll';
 import { useToast } from '@/components/Toast';
+import { useOwuiAiNotice } from '@/features/aiNotice/useAiNotice';
 import { useLive } from '@/features/live/LiveProvider';
 import { applyFormat, insertBlock, noteCounts, toggleTask, type NoteFormat, type Selection } from '@/features/notes/formatting';
 import { emptyHistory, redo, remember, undo } from '@/features/notes/history';
@@ -132,6 +133,7 @@ function NoteEditor({ note, capabilities, fresh, startPage }: { note: Note; capa
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const { client, session } = useAuthed();
+  const askAiNotice = useOwuiAiNotice();
   const { watchNote } = useLive();
   const queryClient = useQueryClient();
   const actions = useNoteActions();
@@ -467,7 +469,9 @@ function NoteEditor({ note, capabilities, fresh, startPage }: { note: Note; capa
     else saveFiles((current) => withNoteFile(current, file.entry));
   };
   const [recording, setRecording] = useState(false);
-  const addFiles = (source: NoteFileSource | 'record') => (source === 'record' ? setRecording(true) : void noteFiles.add(source, attach));
+  // A recording goes to the server once it's made, so the server's AI notice comes before recording starts.
+  const addFiles = (source: NoteFileSource | 'record') =>
+    source === 'record' ? void askAiNotice().then((yes) => yes && setRecording(true)) : void noteFiles.add(source, attach);
   const askAdd = () =>
     showActionSheet({ title: 'Add to the Note', options: [...ADD.map((item) => item.label), 'Cancel'], cancelButtonIndex: ADD.length }, (index) => {
       const item = ADD[index];
@@ -504,6 +508,7 @@ function NoteEditor({ note, capabilities, fresh, startPage }: { note: Note; capa
     const model = defaultModelIds(models.data ?? [], settings.data, config.data)[0];
     if (!model) return toast('There’s no model to ask.', 'error');
     if (!latest.current.md.trim()) return toast('Write something first, then it can be named.');
+    if (!(await askAiNotice())) return;
     setBusy('title');
     try {
       changed({ title: await suggestNoteTitle(client, model, latest.current.md, first.id) });
