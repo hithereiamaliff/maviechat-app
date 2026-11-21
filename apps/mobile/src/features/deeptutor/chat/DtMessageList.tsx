@@ -1,8 +1,10 @@
 import type { DtReply } from '@maviechat/deeptutor-protocol';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
+import { hostOf } from '@/features/aiNotice/notice';
+import { useReportSheet } from '@/features/report/ReportSheet';
 import { usePalette } from '@/theme';
 import type { SentAttachment } from './DtExtrasViews';
 import { DtReplyView, DtUserBubble, type DtReplyActions } from './DtReplyView';
@@ -35,6 +37,10 @@ export function DtMessageList({ ref, items, baseUrl, actions, pinToBottomKey, he
   const list = useRef<FlashListRef<DtListItem>>(null);
   const following = useRef(true);
   const [atBottom, setAtBottom] = useState(true);
+  // Report… on every reply (DeepTutor has no place for reports of its own, so they go to TechMavie Digital).
+  const report = useReportSheet();
+  const { open: openReport } = report;
+  const onReport = useCallback((reply: DtReply) => openReport({ space: 'deeptutor', server: hostOf(baseUrl), reply: reply.answer }), [openReport, baseUrl]);
 
   useImperativeHandle(
     ref,
@@ -82,10 +88,11 @@ export function DtMessageList({ ref, items, baseUrl, actions, pinToBottomKey, he
           item.kind === 'user' ? (
             <DtUserBubble text={item.text} attachments={item.attachments} references={item.references} />
           ) : (
-            <DtReplyView reply={item.reply} baseUrl={baseUrl} stateKey={item.reply.turnId || item.key} last={item.last} {...actions} />
+            <DtReplyView reply={item.reply} baseUrl={baseUrl} stateKey={item.reply.turnId || item.key} last={item.last} {...actions} onReport={onReport} />
           )
         }
       />
+      {report.element}
       {!atBottom ? (
         <Pressable
           accessibilityRole="button"

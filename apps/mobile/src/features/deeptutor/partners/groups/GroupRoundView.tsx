@@ -1,4 +1,4 @@
-import { canSummarise, type DtGroupMember, type DtGroupRound, type DtGroupSeat, type DtInvocation } from '@maviechat/deeptutor-protocol';
+import { canSummarise, type DtGroupMember, type DtGroupRound, type DtGroupSeat, type DtInvocation, type DtReply } from '@maviechat/deeptutor-protocol';
 import { memo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
@@ -16,6 +16,8 @@ export interface RoundActions {
   onPin(seat: DtGroupSeat): void;
   onRetry(round: DtGroupRound, seat: DtGroupSeat): void;
   onSummarise(round: DtGroupRound): void;
+  /** Report…: opens the report sheet for a member's answer. */
+  onReport?(reply: DtReply): void;
 }
 
 const KIND_LABELS: Record<string, string> = { debate_rebuttal: 'Rebuttal', round_summary: 'Summary', invocation_reply: 'Answer' };
@@ -89,7 +91,7 @@ function SeatView({ round, seat, face, baseUrl, busy, actions }: { round: DtGrou
           <Text style={[styles.waitingText, { color: palette.textFaint }]}>Waiting its turn…</Text>
         </View>
       ) : (
-        <DtReplyView reply={seat.reply} baseUrl={baseUrl} stateKey={seat.key} last={false} speaker={{ name, face: avatar }} />
+        <DtReplyView reply={seat.reply} baseUrl={baseUrl} stateKey={seat.key} last={false} speaker={{ name, face: avatar }} onReport={actions.onReport} />
       )}
       {seat.state === 'error' && !busy ? <SeatButton icon="arrow-path" label="Try Again" onPress={() => actions.onRetry(round, seat)} /> : null}
       {seat.state === 'done' && seat.message && !busy ? (

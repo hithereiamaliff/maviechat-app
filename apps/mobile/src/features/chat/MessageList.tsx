@@ -19,6 +19,9 @@ import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/components/Icon';
+import { hostOf } from '@/features/aiNotice/notice';
+import { serverComment } from '@/features/report/report';
+import { useReportSheet } from '@/features/report/ReportSheet';
 import { useUserSettings } from '@/lib/server';
 import { ChatDirectionContext, directionStyles } from '@/markdown/ChatDirectionContext';
 import { usePalette } from '@/theme';
@@ -140,6 +143,8 @@ export function MessageList({
   const [atBottom, setAtBottom] = useState(true);
   const [editing, setEditing] = useState<HistoryMessage | null>(null);
   const lastId = messages[messages.length - 1]?.id;
+  // Report… on every reply: to TechMavie Digital, and (where you may rate) to the server's admins as its own 👎.
+  const report = useReportSheet();
 
   // The other version takes the same place in the list; its top is brought into view, as on the web.
   const switchVersion = (messageId: string, direction: -1 | 1) => {
@@ -183,29 +188,41 @@ export function MessageList({
         renderItem={({ item }) => {
           const branch = position(item.id);
           const { saveEdit, sendEdit, regenerate, remove, editReply, rate, continueReply, actionsFor, runAction } = actions;
-          const reply = (message: HistoryMessage, place: { index: number; count: number }, step: (direction: -1 | 1) => void) => (
-            <AssistantMessage
-              message={message}
-              modelLabel={typeof message.modelName === 'string' && message.modelName ? message.modelName : modelName(models, message.model)}
-              branch={place}
-              onStep={step}
-              isLast={item.id === lastId}
-              baseUrl={baseUrl}
-              token={token}
-              onFollowUp={onFollowUp}
-              onRegenerate={regenerate ? (prompt) => regenerate(message, prompt) : undefined}
-              // A reply can be deleted only while another version of it remains, as on the web.
-              onDelete={remove && actions.canDeleteReply && place.count > 1 ? () => remove(message) : undefined}
-              onEdit={editReply ? () => setEditing(message) : undefined}
-              onRate={rate ? (change) => rate(message, change) : undefined}
-              onContinue={continueReply ? () => continueReply(message) : undefined}
-              actions={actionsFor?.(message)}
-              onAction={runAction ? (action) => runAction(message, action) : undefined}
-              onApprove={actions.resolveApproval ? (callId, approve) => actions.resolveApproval!(message, callId, approve) : undefined}
-              onQuote={actions.quote}
-              onInsert={actions.insertIntoNote ? () => actions.insertIntoNote?.(message) : undefined}
-            />
-          );
+          const reply = (message: HistoryMessage, place: { index: number; count: number }, step: (direction: -1 | 1) => void) => {
+            const label = typeof message.modelName === 'string' && message.modelName ? message.modelName : modelName(models, message.model);
+            return (
+              <AssistantMessage
+                message={message}
+                modelLabel={label}
+                branch={place}
+                onStep={step}
+                isLast={item.id === lastId}
+                baseUrl={baseUrl}
+                token={token}
+                onFollowUp={onFollowUp}
+                onRegenerate={regenerate ? (prompt) => regenerate(message, prompt) : undefined}
+                // A reply can be deleted only while another version of it remains, as on the web.
+                onDelete={remove && actions.canDeleteReply && place.count > 1 ? () => remove(message) : undefined}
+                onEdit={editReply ? () => setEditing(message) : undefined}
+                onRate={rate ? (change) => rate(message, change) : undefined}
+                onContinue={continueReply ? () => continueReply(message) : undefined}
+                actions={actionsFor?.(message)}
+                onAction={runAction ? (action) => runAction(message, action) : undefined}
+                onApprove={actions.resolveApproval ? (callId, approve) => actions.resolveApproval!(message, callId, approve) : undefined}
+                onQuote={actions.quote}
+                onInsert={actions.insertIntoNote ? () => actions.insertIntoNote?.(message) : undefined}
+                onReport={(text) =>
+                  report.open({
+                    space: 'owui',
+                    server: hostOf(baseUrl),
+                    model: label,
+                    reply: text,
+                    toServer: rate ? (reason, note) => rate(message, { rating: -1, details: { reason: 'other', comment: serverComment(reason, note), details: { rating: null } } }) : undefined,
+                  })
+                }
+              />
+            );
+          };
           const groups = item.role === 'assistant' && history ? replyGroups(history, item.id) : null;
           if (groups && history) {
             const last = item.id === lastId;
@@ -253,6 +270,7 @@ export function MessageList({
         onClose={() => setEditing(null)}
         onSave={(texts, asCopy) => (editing && actions.editReply ? actions.editReply(editing, texts, asCopy) : Promise.resolve(false))}
       />
+      {report.element}
       {!atBottom ? (
         <Pressable
           accessibilityRole="button"

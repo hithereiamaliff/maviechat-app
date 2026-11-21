@@ -69,6 +69,7 @@ const ICONS = [
   'eye-slash',
   'face-smile',
   'film',
+  'flag',
   'folder',
   'folder-open',
   'folder-plus',

@@ -17,6 +17,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'rea
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import type { MenuItem } from '@/components/Menu';
 import { useToast } from '@/components/Toast';
+import { hostOf } from '@/features/aiNotice/notice';
 import { useDtAiNotice } from '@/features/aiNotice/useAiNotice';
 import { showActionSheet, showPrompt } from '@/components/dialogs';
 import { DtHeader } from '@/features/deeptutor/DtHeader';
@@ -26,6 +27,7 @@ import { DiscussionsSheet, ManageGroupSheet, WhiteboardSheet } from '@/features/
 import { useGroupChat } from '@/features/deeptutor/partners/groups/useGroupChat';
 import { PartnerFace } from '@/features/deeptutor/partners/PartnerFace';
 import { useDtGroup, useDtPartners, usePartnersRefresh } from '@/features/deeptutor/partners/queries';
+import { useReportSheet } from '@/features/report/ReportSheet';
 import { describeError } from '@/lib/errors';
 import { DT_EXPIRED_NOTICE, DT_QUERY_ROOT, useDeepTutor, useDtAuthed } from '@/session/DeepTutorProvider';
 import { fonts, radius, usePalette } from '@/theme';
@@ -92,7 +94,9 @@ export default function GroupDiscussion() {
   };
 
   const answeredBy = (round: DtGroupRound) => [...new Map(round.seats.filter((seat) => seat.state === 'done').map((seat) => [seat.partnerId, seat.name])).entries()];
+  const report = useReportSheet();
   const actions: RoundActions = {
+    onReport: (reply) => report.open({ space: 'deeptutor', server: hostOf(session.baseUrl), reply: reply.answer }),
     onApprove: (invocation) => {
       if (!chat.approve(invocation.id)) toast('Not connected yet. Try again in a moment.');
     },
@@ -238,6 +242,7 @@ export default function GroupDiscussion() {
         onClose={() => setSheet(null)}
       />
       <WhiteboardSheet visible={sheet === 'whiteboard'} groupId={groupId} onClose={() => setSheet(null)} />
+      {report.element}
       {group.data ? <ManageGroupSheet visible={sheet === 'manage'} group={group.data} partners={partners.data ?? []} onClose={() => setSheet(null)} /> : null}
     </View>
   );

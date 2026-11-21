@@ -2,6 +2,7 @@ import { errorText, type MessageWithParts, type OtherPart, type Part, type ToolP
 import { memo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
+import { IconButton } from '@/components/IconButton';
 import { SideScroll } from '@/components/SideScroll';
 import { Markdown } from '@/markdown/Markdown';
 import { fonts, radius, usePalette } from '@/theme';
@@ -168,8 +169,20 @@ function PartView({ part }: { part: Part | OtherPart }) {
 
 const formatTokens = (count: number) => (count >= 1000 ? `${(count / 1000).toFixed(count >= 10_000 ? 0 : 1)}k` : String(count));
 
-/** A message: yours in a bubble; OpenCode's as its parts in order, with model, tokens and cost once done. */
-export const OcMessage = memo(function OcMessage({ entry }: { entry: MessageWithParts }) {
+/** A reply's words, as shown (what Report… sends when you include them). */
+export function replyText(parts: (Part | OtherPart)[]): string {
+  return parts
+    .filter((part): part is Extract<Part, { type: 'text' }> => part.type === 'text' && !(part as { synthetic?: boolean }).synthetic)
+    .map((part) => part.text.trim())
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+/**
+ * A message: yours in a bubble; OpenCode's as its parts in order, with model, tokens and cost once
+ * done, and Report… beside them.
+ */
+export const OcMessage = memo(function OcMessage({ entry, onReport }: { entry: MessageWithParts; onReport?: (text: string, model: string) => void }) {
   const palette = usePalette();
   const { info, parts } = entry;
   if (info.role === 'user') {
@@ -195,6 +208,7 @@ export const OcMessage = memo(function OcMessage({ entry }: { entry: MessageWith
   }
   const done = Boolean(info.time.completed);
   const usage = done && info.tokens ? info.tokens.input + info.tokens.output + info.tokens.reasoning : 0;
+  const words = done && onReport ? replyText(parts) : '';
   return (
     <View style={styles.assistant}>
       {parts.map((part) => (
@@ -202,10 +216,15 @@ export const OcMessage = memo(function OcMessage({ entry }: { entry: MessageWith
       ))}
       {info.error && info.error.name !== 'MessageAbortedError' ? <Note text={errorText(info.error)} tone="danger" /> : null}
       {info.error?.name === 'MessageAbortedError' ? <Note text="Stopped." /> : null}
-      {done && info.modelID ? (
-        <Text style={[styles.meta, { color: palette.textFaint }]}>
-          {[info.modelID, usage ? `${formatTokens(usage)} tokens` : '', info.cost ? `$${info.cost.toFixed(info.cost < 0.01 ? 4 : 2)}` : ''].filter(Boolean).join(' · ')}
-        </Text>
+      {done && (info.modelID || words) ? (
+        <View style={styles.footer}>
+          <Text style={[styles.meta, styles.metaText, { color: palette.textFaint }]}>
+            {[info.modelID, usage ? `${formatTokens(usage)} tokens` : '', info.cost ? `$${info.cost.toFixed(info.cost < 0.01 ? 4 : 2)}` : ''].filter(Boolean).join(' · ')}
+          </Text>
+          {words && onReport ? (
+            <IconButton icon="flag" label="Report" size={16} color={palette.textFaint} onPress={() => onReport(words, [info.providerID, info.modelID].filter(Boolean).join('/'))} />
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -226,4 +245,6 @@ const styles = StyleSheet.create({
   reasoningLabel: { fontFamily: fonts.medium, fontSize: 14 },
   note: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18 },
   meta: { fontFamily: fonts.regular, fontSize: 12 },
+  footer: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: -6 },
+  metaText: { flex: 1 },
 });

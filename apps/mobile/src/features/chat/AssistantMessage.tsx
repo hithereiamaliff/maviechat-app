@@ -76,6 +76,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   onApprove,
   onQuote,
   onInsert,
+  onReport,
 }: {
   message: HistoryMessage;
   modelLabel: string;
@@ -104,6 +105,8 @@ export const AssistantMessage = memo(function AssistantMessage({
   onQuote?: (prompt: string) => void;
   /** A note's chat: puts this reply's text into the note (the web's Insert). */
   onInsert?: () => void;
+  /** Report…: opens the report sheet with the reply's text as shown. */
+  onReport?: (text: string) => void;
 }) {
   const palette = usePalette();
   const toast = useToast();
@@ -321,6 +324,7 @@ export const AssistantMessage = memo(function AssistantMessage({
               />
             </>
           ) : null}
+          {onReport ? <IconButton icon="flag" label="Report" size={18} color={palette.textMuted} onPress={() => onReport(plainText(blocks))} /> : null}
           {isLast && onContinue ? <IconButton icon="play" label="Continue response" size={18} color={palette.textMuted} onPress={onContinue} /> : null}
           {onRegenerate && !ui('regenerateMenu') ? (
             <IconButton icon="arrow-path" label="Regenerate" size={18} color={palette.textMuted} onPress={() => onRegenerate()} />

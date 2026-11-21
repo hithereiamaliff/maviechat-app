@@ -7,6 +7,7 @@ import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useToast } from '@/components/Toast';
+import { hostOf } from '@/features/aiNotice/notice';
 import { useOcAiNotice } from '@/features/aiNotice/useAiNotice';
 import { showPrompt } from '@/components/dialogs';
 import { setViewingChat } from '@/features/notifications/presence';
@@ -19,6 +20,7 @@ import { OcHeader } from '@/features/opencode/OcHeader';
 import { OcMessage } from '@/features/opencode/OcParts';
 import { PermissionCard, QuestionCard } from '@/features/opencode/OcRequests';
 import { folderName, ocKey, useOcAgents, useOcModels } from '@/features/opencode/queries';
+import { useReportSheet } from '@/features/report/ReportSheet';
 import { useOcAuthed } from '@/session/OpenCodeProvider';
 import { fonts, usePalette } from '@/theme';
 
@@ -30,7 +32,14 @@ export default function OpenCodeSession() {
   const queryClient = useQueryClient();
   const { id, dir } = useLocalSearchParams<{ id: string; dir: string }>();
   const directory = dir ?? '';
-  const { client, accountId } = useOcAuthed();
+  const { client, accountId, session: machine } = useOcAuthed();
+  // Report… on OpenCode's replies: to TechMavie Digital (the AI is set up on your own computer).
+  const report = useReportSheet();
+  const { open: openReport } = report;
+  const onReport = useCallback(
+    (text: string, model: string) => openReport({ space: 'opencode', server: hostOf(machine.gatewayUrl), model, reply: text }),
+    [openReport, machine.gatewayUrl],
+  );
   const { live, loaded, problem } = useOcSessionLive(id, directory);
   const session = useQuery({ queryKey: ocKey(accountId, 'session', id), queryFn: () => getSession(client, directory, id) });
   const models = useOcModels(directory);
@@ -169,7 +178,7 @@ export default function OpenCodeSession() {
           keyExtractor={(entry) => entry.info.id}
           renderItem={({ item }) => (
             <View style={styles.item}>
-              <OcMessage entry={item} />
+              <OcMessage entry={item} onReport={onReport} />
             </View>
           )}
           ListFooterComponent={footer}
@@ -201,6 +210,7 @@ export default function OpenCodeSession() {
         </View>
       </KeyboardAvoidingView>
       <ChangesSheet visible={showChanges} changes={changes} onClose={() => setShowChanges(false)} />
+      {report.element}
     </View>
   );
 }

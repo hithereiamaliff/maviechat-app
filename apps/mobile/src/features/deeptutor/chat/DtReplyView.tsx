@@ -162,6 +162,8 @@ export interface DtReplyActions {
   mastery?: DtMasteryContext;
   /** Who answers, when it isn't DeepTutor itself (a partner): a name, and a face beside it. */
   speaker?: { name: string; face?: ReactNode };
+  /** Report…: opens the report sheet for this reply. */
+  onReport?: (reply: DtReply) => void;
 }
 
 export interface DtMasteryContext {
@@ -182,7 +184,7 @@ interface DtReplyViewProps extends DtReplyActions {
 }
 
 /** A DeepTutor reply: its stages and reasoning, the answer with each step in its place, the mode's own result, sources and actions. */
-export const DtReplyView = memo(function DtReplyView({ reply, baseUrl, stateKey, last, onRegenerate, onStartResearch, onAnswer, onSaveQuiz, onOpenWeb, mastery, speaker }: DtReplyViewProps) {
+export const DtReplyView = memo(function DtReplyView({ reply, baseUrl, stateKey, last, onRegenerate, onStartResearch, onAnswer, onSaveQuiz, onOpenWeb, mastery, speaker, onReport }: DtReplyViewProps) {
   const palette = usePalette();
   const toast = useToast();
   const segments = useMemo(() => replySegments({ answer: reply.answer, tools: reply.tools.filter((tool) => !SHOWN_ELSEWHERE.has(tool.name)) }), [reply]);
@@ -293,6 +295,7 @@ export const DtReplyView = memo(function DtReplyView({ reply, baseUrl, stateKey,
           ) : null}
           {reply.answer.trim() ? <ReadAloudButton id={readId} markdown={reply.answer} rate={prefs.deepTutorRate} /> : null}
           {last && onRegenerate ? <IconButton icon="arrow-path" label="Regenerate" size={18} color={palette.textMuted} onPress={onRegenerate} /> : null}
+          {onReport && reply.answer.trim() ? <IconButton icon="flag" label="Report" size={18} color={palette.textMuted} onPress={() => onReport(reply)} /> : null}
         </View>
       ) : null}
     </View>
