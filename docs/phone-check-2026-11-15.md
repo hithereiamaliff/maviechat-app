@@ -57,3 +57,19 @@ It's asked once per server on this phone, so each space shows it only on its fir
 - [ ] DeepTutor: send a message. The notice names learn.techmavie.digital. **Not Now** keeps your text, with no error; **Continue** sends it.
 - [ ] OpenCode: send a prompt in a session. The notice names your machine and the AI providers set up there. **Not Now** keeps your text; **Continue** sends it.
 - [ ] On Android, tapping outside the notice counts as **Not Now**.
+
+## Added 21 November: Report on AI replies
+
+The update is `f7ccb55e` (Android: `aee68907`). Close MavieChat completely and open it again, twice if needed, or tap **Restart** on "A MavieChat update is ready". Settings → **About** then shows it on the **Update** line as `01a1fc6a`.
+
+Each report you send really emails hello@techmavie.digital, so write "test" in the note.
+
+- [ ] Open WebUI: under any reply, find the flag right after 👎 (swipe the row sideways if it's off the edge) and tap it. **Report Reply** opens and names chat.techmavie.digital, saying its admins will see the report too.
+- [ ] **Send Report** stays grey until you pick what's wrong. Pick one, type "test" in the note and tap **Send Report**: the sheet closes and "Report sent. Thank you." shows. The email arrives from formresponses@netlify.com within a minute or two, and that reply's 👎 is now filled in.
+- [ ] Report another reply with **Include the reply's text** off: the email's reply line says "(not included)".
+- [ ] Open the sheet again and tap **Cancel**: nothing is sent.
+- [ ] At the bottom of the sheet, hello@techmavie.digital opens your email app and @hiiialanhere opens Threads.
+- [ ] In Airplane mode, **Send Report** shows a red "Couldn't send the report…" and the sheet stays open. Turn Airplane mode off and send it.
+- [ ] DeepTutor: in a chat, a partner chat and a group discussion, the flag is the last button under a finished reply. The sheet names learn.techmavie.digital, with no line about admins.
+- [ ] OpenCode: under a finished reply, the flag sits at the right of the model and tokens line. The sheet says the reply "came from an AI model set up in OpenCode on your computer", and the email names the model.
+- [ ] A temporary chat in Open WebUI: Report works, but the sheet doesn't mention the server's admins.
